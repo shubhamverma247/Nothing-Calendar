@@ -209,6 +209,11 @@ Implemented:
   - Month dark theme pass: black calendar background, white top icons, current-day red circle readable.
   - Add Event overlay pass: full-screen editor opens from `+`, X/check top bar visible, all-day switch size looks smaller.
   - Add Event all-day checked pass: red track with white thumb remains correct after switch sizing change.
+- Add/Edit Event recurrence/reminder/delete:
+  - Editor now shows `Repeat` choices: None, Daily, Weekly, Monthly.
+  - Repeat saves to existing `calendar_events.rrule`; no schema/table/column changes.
+  - Edit Event now preselects the saved reminder from existing `event_reminders`.
+  - Edit Event now shows a `Delete event` action that deletes the event and its reminders.
 - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Installed latest debug APK on connected phone `4ab0d020`; package is `com.dotfield.dotcal`, launcher label is sourced from `@string/app_name` = `DotCal`.
 - Verified debug build succeeds after Add/Edit expansion with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
@@ -217,16 +222,18 @@ Implemented:
 - Verified debug build succeeds after Add/Edit full-screen overlay with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Verified debug build succeeds after Add/Edit all-day switch sizing with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Verified visual QA screenshots on connected phone `4ab0d020` after Add/Edit all-day switch sizing.
+- Verified debug build succeeds after Add/Edit recurrence/reminder/delete with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 
 Known gap:
 - `calendar_events` CHECK (`endTimeMs >= startTimeMs`) is not enforced by Room annotation yet. Repository validates new local events by construction. Later add custom open helper/migration if strict SQLite CHECK required from v1.
-- Edit Event does not prefill existing reminders yet; reminder selection is saved when user chooses an option.
 - No visual QA screenshot pass yet; validate on connected phone.
+- Recurrence currently stores `FREQ=DAILY/WEEKLY/MONTHLY` in `rrule`, but calendar views do not expand recurring instances yet.
+- Add/Edit recurrence/reminder/delete is ready for manual QA; user will test manually.
 
 ## Next Step
 
 Next should continue calendar polish:
-- Polish Add/Edit Event UX: date controls, recurring rule UI backed by existing `rrule`, reminder prefill, delete action, and visual QA.
+- Polish Add/Edit Event UX: date controls, recurring instance expansion, and manual QA fixes.
 - Use stored week start preference later instead of hardcoded Sunday, if user wants configurable week start.
 
 ## What To Test Now

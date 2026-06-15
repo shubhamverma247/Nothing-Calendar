@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
+import com.dotfield.dotcal.data.EventReminder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +27,9 @@ class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val tasks: StateFlow<List<CalendarEvent>> = repository.observeTasks()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val reminders: StateFlow<List<EventReminder>> = repository.observeReminders()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
@@ -51,5 +55,9 @@ class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
 
     fun saveEvent(existing: CalendarEvent?, data: EventEditorData) {
         viewModelScope.launch { repository.saveLocalEvent(existing = existing, data = data) }
+    }
+
+    fun deleteEvent(event: CalendarEvent) {
+        viewModelScope.launch { repository.deleteLocalEvent(event) }
     }
 }

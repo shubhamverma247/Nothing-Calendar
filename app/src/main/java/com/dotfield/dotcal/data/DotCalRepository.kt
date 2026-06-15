@@ -16,6 +16,7 @@ data class EventEditorData(
     val endTime: LocalTime,
     val isAllDay: Boolean,
     val reminderMinutes: Int?,
+    val rrule: String?,
 )
 
 class DotCalRepository(private val dao: CalendarDao) {
@@ -26,6 +27,8 @@ class DotCalRepository(private val dao: CalendarDao) {
     }
 
     fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks()
+
+    fun observeReminders(): Flow<List<EventReminder>> = dao.observeReminders()
 
     suspend fun ensureLocalAccount() {
         dao.upsertAccount(
@@ -66,6 +69,7 @@ class DotCalRepository(private val dao: CalendarDao) {
             endTimeMs = end,
             timeZone = zoneId.id,
             isAllDay = if (data.isAllDay) 1 else 0,
+            rrule = data.rrule,
             updatedAtMs = now,
         ) ?: CalendarEvent(
                 id = eventId,
@@ -78,7 +82,7 @@ class DotCalRepository(private val dao: CalendarDao) {
                 timeZone = zoneId.id,
                 isAllDay = if (data.isAllDay) 1 else 0,
                 colorHex = null,
-                rrule = null,
+                rrule = data.rrule,
                 source = "LOCAL",
                 googleEventId = null,
                 googleCalendarId = null,
@@ -103,6 +107,11 @@ class DotCalRepository(private val dao: CalendarDao) {
         }
     }
 
+    suspend fun deleteLocalEvent(event: CalendarEvent) {
+        dao.deleteRemindersForEvent(event.id)
+        dao.deleteEvent(event.id)
+    }
+
     suspend fun addLocalEvent(title: String, date: LocalDate, startTime: LocalTime = LocalTime.of(9, 0)) {
         saveLocalEvent(
             existing = null,
@@ -115,6 +124,7 @@ class DotCalRepository(private val dao: CalendarDao) {
                 endTime = startTime.plusHours(1),
                 isAllDay = false,
                 reminderMinutes = null,
+                rrule = null,
             ),
         )
     }

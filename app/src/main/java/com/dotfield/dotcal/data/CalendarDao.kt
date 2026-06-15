@@ -29,6 +29,9 @@ interface CalendarDao {
     )
     fun observeTasks(): Flow<List<CalendarEvent>>
 
+    @Query("SELECT * FROM event_reminders ORDER BY triggerAtMs ASC")
+    fun observeReminders(): Flow<List<EventReminder>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAccount(account: CalendarAccount)
 
@@ -37,6 +40,9 @@ interface CalendarDao {
 
     @Query("DELETE FROM event_reminders WHERE eventId = :eventId")
     suspend fun deleteRemindersForEvent(eventId: String)
+
+    @Query("DELETE FROM calendar_events WHERE id = :eventId")
+    suspend fun deleteEvent(eventId: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReminders(reminders: List<EventReminder>)

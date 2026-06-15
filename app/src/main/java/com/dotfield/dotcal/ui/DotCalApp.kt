@@ -113,6 +113,13 @@ private val sheetDateFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMM", Loc
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
 private const val WEEK_HOUR_HEIGHT_DP = 64f
 private val reminderOptions = listOf(null, 5, 10, 30)
+private data class RecurrenceOption(val label: String, val rrule: String?)
+private val recurrenceOptions = listOf(
+    RecurrenceOption("None", null),
+    RecurrenceOption("Daily", "FREQ=DAILY"),
+    RecurrenceOption("Weekly", "FREQ=WEEKLY"),
+    RecurrenceOption("Monthly", "FREQ=MONTHLY"),
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,6 +128,7 @@ fun DotCalApp(viewModel: DotCalViewModel) {
     val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
     val events by viewModel.events.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
+    val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     var screenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var previousScreenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var showSheet by remember { mutableStateOf(false) }
@@ -301,6 +309,7 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                 event = editingEvent,
                 selectedDate = selectedDate,
                 selectedTime = addStartTime,
+                initialReminderMinutes = editingEvent?.let { event -> reminders.firstOrNull { it.eventId == event.id }?.minutesBefore },
                 palette = palette,
                 onDismiss = {
                     editingEvent = null
@@ -310,6 +319,13 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                     viewModel.saveEvent(editingEvent, it)
                     editingEvent = null
                     addSheet = false
+                },
+                onDelete = editingEvent?.let { eventToDelete ->
+                    {
+                        viewModel.deleteEvent(eventToDelete)
+                        editingEvent = null
+                        addSheet = false
+                    }
                 },
             )
         }
@@ -1087,19 +1103,23 @@ private fun EventEditorScreen(
     event: CalendarEvent?,
     selectedDate: LocalDate,
     selectedTime: LocalTime,
+    initialReminderMinutes: Int?,
     palette: DotCalPalette,
     onDismiss: () -> Unit,
     onSave: (EventEditorData) -> Unit,
+    onDelete: (() -> Unit)?,
 ) {
+    val editorDate = event?.localDate() ?: selectedDate
     val initialStart = event?.startLocalTime() ?: selectedTime
     val initialEnd = event?.endLocalTime() ?: selectedTime.plusHours(1)
-    var title by remember(event?.id, selectedDate, selectedTime) { mutableStateOf(event?.title.orEmpty()) }
-    var description by remember(event?.id, selectedDate, selectedTime) { mutableStateOf(event?.description.orEmpty()) }
-    var location by remember(event?.id, selectedDate, selectedTime) { mutableStateOf(event?.location.orEmpty()) }
-    var startText by remember(event?.id, selectedDate, selectedTime) { mutableStateOf(initialStart.format(timeFormatter)) }
-    var endText by remember(event?.id, selectedDate, selectedTime) { mutableStateOf(initialEnd.format(timeFormatter)) }
-    var allDay by remember(event?.id, selectedDate, selectedTime) { mutableStateOf(event?.isAllDay == 1) }
-    var reminderMinutes by remember(event?.id, selectedDate, selectedTime) { mutableStateOf<Int?>(null) }
+    var title by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.title.orEmpty()) }
+    var description by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.description.orEmpty()) }
+    var location by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.location.orEmpty()) }
+    var startText by remember(event?.id, editorDate, selectedTime) { mutableStateOf(initialStart.format(timeFormatter)) }
+    var endText by remember(event?.id, editorDate, selectedTime) { mutableStateOf(initialEnd.format(timeFormatter)) }
+    var allDay by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.isAllDay == 1) }
+    var reminderMinutes by remember(event?.id, editorDate, selectedTime, initialReminderMinutes) { mutableStateOf(initialReminderMinutes) }
+    var recurrenceRule by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.rrule) }
     var submitted by remember { mutableStateOf(false) }
     fun trySave() {
         submitted = true
@@ -1111,11 +1131,12 @@ private fun EventEditorScreen(
                     title = title,
                     description = description,
                     location = location,
-                    date = selectedDate,
+                    date = editorDate,
                     startTime = validStart ?: LocalTime.MIDNIGHT,
                     endTime = validEnd ?: LocalTime.MIDNIGHT,
                     isAllDay = allDay,
                     reminderMinutes = reminderMinutes,
+                    rrule = recurrenceRule,
                 ),
             )
         }
@@ -1215,7 +1236,7 @@ private fun EventEditorScreen(
                     )
                 }
             }
-            Text(selectedDate.format(sheetDateFormatter), modifier = Modifier.padding(top = 12.dp), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            Text(editorDate.format(sheetDateFormatter), modifier = Modifier.padding(top = 12.dp), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(12.dp))
             Text("Reminder", color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
             Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1231,10 +1252,35 @@ private fun EventEditorScreen(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(18.dp))
+            Text("Repeat", color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                recurrenceOptions.forEach { option ->
+                    val selected = recurrenceRule == option.rrule
+                    Box(
+                        modifier = Modifier
+                            .background(if (selected) palette.accent.copy(alpha = 0.12f) else palette.cell)
+                            .clickable { recurrenceRule = option.rrule }
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                    ) {
+                        Text(option.label, color = if (selected) palette.accent else palette.primaryText, fontFamily = mono, fontSize = 12.sp)
+                    }
+                }
+            }
             val start = parseEditorTime(startText)
             val end = parseEditorTime(endText)
             if (submitted && !allDay && (start == null || end == null || !end.isAfter(start))) {
                 Text("Use HH:mm and end after start", color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+            }
+            if (event != null && onDelete != null) {
+                Button(
+                    onClick = onDelete,
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+                    shape = RoundedCornerShape(0.dp),
+                ) {
+                    Text("Delete event", fontFamily = mono)
+                }
             }
             Spacer(modifier = Modifier.height(28.dp))
         }
