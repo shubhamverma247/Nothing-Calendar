@@ -1,0 +1,24 @@
+package com.dotfield.dotcal.prefs
+
+import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+
+val Context.calendarPreferencesDataStore by preferencesDataStore(name = "calendar_preferences")
+
+object CalendarPreferences {
+    val KEY_DEFAULT_VIEW = stringPreferencesKey("default_view")
+    val KEY_WEEK_START = stringPreferencesKey("week_start")
+    val KEY_DEFAULT_REMINDER = intPreferencesKey("default_reminder")
+    val KEY_SYNC_ENABLED = booleanPreferencesKey("sync_enabled")
+    val KEY_SYNC_INTERVAL_MINS = intPreferencesKey("sync_interval_mins")
+    val KEY_BIRTHDAY_ENABLED = booleanPreferencesKey("birthday_enabled")
+    val KEY_ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
+    val KEY_LAST_SYNC_MS = longPreferencesKey("last_sync_ms")
+    val KEY_SHOW_DECLINED = booleanPreferencesKey("show_declined")
+    val KEY_24_HOUR_FORMAT = booleanPreferencesKey("twenty_four_hour_format")
+    val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
+}
