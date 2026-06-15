@@ -204,6 +204,11 @@ Implemented:
   - All-day switch checked state now uses red track with white thumb instead of fully red.
 - Latest Add/Edit polish:
   - Add/Edit Event all-day switch is visually smaller while preserving the red track and white thumb checked state.
+- Visual QA:
+  - Installed debug APK on connected phone `4ab0d020`.
+  - Month dark theme pass: black calendar background, white top icons, current-day red circle readable.
+  - Add Event overlay pass: full-screen editor opens from `+`, X/check top bar visible, all-day switch size looks smaller.
+  - Add Event all-day checked pass: red track with white thumb remains correct after switch sizing change.
 - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Installed latest debug APK on connected phone `4ab0d020`; package is `com.dotfield.dotcal`, launcher label is sourced from `@string/app_name` = `DotCal`.
 - Verified debug build succeeds after Add/Edit expansion with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
@@ -211,6 +216,7 @@ Implemented:
 - Verified debug build succeeds after settings arrow alignment fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Verified debug build succeeds after Add/Edit full-screen overlay with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Verified debug build succeeds after Add/Edit all-day switch sizing with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Verified visual QA screenshots on connected phone `4ab0d020` after Add/Edit all-day switch sizing.
 
 Known gap:
 - `calendar_events` CHECK (`endTimeMs >= startTimeMs`) is not enforced by Room annotation yet. Repository validates new local events by construction. Later add custom open helper/migration if strict SQLite CHECK required from v1.
@@ -220,7 +226,6 @@ Known gap:
 ## Next Step
 
 Next should continue calendar polish:
-- Visual QA dark dropdowns and sticky Settings header on device.
 - Polish Add/Edit Event UX: date controls, recurring rule UI backed by existing `rrule`, reminder prefill, delete action, and visual QA.
 - Use stored week start preference later instead of hardcoded Sunday, if user wants configurable week start.
 
