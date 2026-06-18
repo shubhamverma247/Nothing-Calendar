@@ -378,6 +378,75 @@ Implemented:
   - `Whole series` keeps existing master-series edit/delete behavior.
   - No schema/table/column changes; still exactly 5 Room tables.
 - Verified debug build succeeds after recurring per-instance edit/delete with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Finalized Add Event / Date-Time picker design-system alignment:
+  - Added explicit palette tokens for top bar, bottom nav, cancel border, and drag handle while preserving existing package, DB filename, schema columns, and exactly 5 Room tables.
+  - Add/Edit Event now uses finalized screen/top-bar colors: Dark `#000000`; Light screen `#F7F7F7` with top bar `#FFFFFF`.
+  - Bottom navigation now uses finalized nav colors: Dark `#000000`; Light `#FFFFFF`.
+  - Date/time picker and other bottom sheets use 24dp top corner radius, theme drag-handle colors, finalized dialog backgrounds, and consistent 16dp-24dp spacing.
+  - Date/time picker Cancel and OK buttons now have equal widths, 16dp gap, margin alignment, cancel border (`#2A2A2A` Dark / `#E0E0E0` Light), and OK stays DotCal red `#FF3B30`.
+  - Date/time wheel selected row now uses primary text, bold weight, stronger size, and separator emphasis; unselected rows use disabled text.
+  - No schema/table/column changes; still exactly 5 Room tables.
+- Verified debug build succeeds after finalized Add Event / Date-Time picker design alignment with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after finalized Add Event / Date-Time picker design alignment with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Calendar top spacing polish:
+  - Added 12dp vertical space between the top action bar and the Calendar segmented control/calendar section.
+  - Tasks and Settings top spacing were left unchanged.
+  - No schema/table/column changes; still exactly 5 Room tables.
+- Verified debug build succeeds after calendar top spacing polish with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Light top/bottom surface confirmation:
+  - Confirmed existing light theme tokens already set top bar and bottom navigation to pure white `#FFFFFF`.
+  - Calendar content area remains `#F7F7F7`; accent remains `#FF3B30`.
+  - No typography or spacing changes.
+- Verified debug build succeeds after light top/bottom surface confirmation with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after light top/bottom surface confirmation with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Light top/status/bottom white correction and view spacing parity:
+  - Light theme XML status bar and navigation bar colors changed from `#F7F7F7` to pure white `#FFFFFF`.
+  - Runtime system bar colors now sync from the active DotCal palette with AndroidX `enableEdgeToEdge`, so theme switching keeps the top/status and bottom navigation areas white in Light and black in Dark.
+  - Added the Year-view-equivalent 8dp gap above non-Year calendar content while leaving Year unchanged.
+  - Calendar content area remains `#F7F7F7`; accent remains `#FF3B30`; typography was not changed.
+  - No schema/table/column changes; still exactly 5 Room tables.
+- Verified debug build succeeds after light top/status/bottom white correction and view spacing parity with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after light top/status/bottom white correction and view spacing parity with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Top bar status-inset paint fix:
+  - Confirmed Settings spacing was not changed; the visible back arrow came from color/system-bar changes, not a Settings layout change.
+  - Calendar top bar is now wrapped in a `#FFFFFF` Light / `#000000` Dark surface that also paints behind the status-bar inset, so edge-to-edge transparency no longer shows the page background above the top bar.
+  - No typography changes; Calendar content area remains `#F7F7F7`; accent remains `#FF3B30`.
+  - No schema/table/column changes; still exactly 5 Room tables.
+- Verified debug build succeeds after top bar status-inset paint fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after top bar status-inset paint fix with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Settings back-arrow visibility correction:
+  - Reverted the edge-to-edge behavior for the app shell with `WindowCompat.setDecorFitsSystemWindows(window, true)` because it made Settings draw under the status bar and could hide the back arrow.
+  - Removed the extra status-bar padding from the main top-bar wrapper so Calendar label/top spacing is not artificially increased.
+  - System bar icon appearance still follows theme; Light status/nav bars remain `#FFFFFF` through XML and pre-Android-15 runtime color sync.
+  - No Settings layout spacing, typography, schema, table, or column changes.
+- Verified debug build succeeds after Settings back-arrow visibility correction with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after Settings back-arrow visibility correction with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Android 15 top-bar background correction:
+  - Root cause: Android 15 target SDK 35 uses transparent system bars, and the Scaffold/content background was painting `#F7F7F7` behind the transparent status area.
+  - Switched app shell back to edge-to-edge and made Scaffold/system-inset backing use the top-bar surface (`#FFFFFF` Light / `#000000` Dark).
+  - Reordered main content modifiers so Calendar content still paints `#F7F7F7` only inside safe content, not behind the status area.
+  - Settings and Add/Edit overlays now apply top safe-area padding so back/close controls remain visible.
+  - No typography, schema, table, or column changes.
+- Verified debug build succeeds after Android 15 top-bar background correction with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after Android 15 top-bar background correction with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Reinstalled and self-checked the Android 15 top-bar correction on connected phone `4ab0d020`:
+  - Launched `com.dotfield.dotcal` after reinstall.
+  - Captured `dotcal-check.png` from device.
+  - Pixel samples in the status/top-bar area were `#FFFFFF`, including `(20,20)`, `(200,40)`, `(500,80)`, `(200,140)`, and `(200,220)`.
+- Calendar segmented-control surface correction:
+  - Clarified user meant the Year/Month/Week/Day/Agenda segmented-control section, not the Android status/title top bar.
+  - Segmented-control outer surface and internal surface now use `palette.topBarSurface`, so Light theme is pure white `#FFFFFF`.
+  - The 12dp spacer between the top title bar and segmented control now also uses `palette.topBarSurface`, removing the gray strip.
+  - Calendar content area remains `#F7F7F7`; accent remains `#FF3B30`.
+  - No typography, schema, table, or column changes.
+- Verified debug build succeeds after segmented-control surface correction with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after segmented-control surface correction with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Bottom navigation icon refresh:
+  - Replaced the Tasks bottom-nav icon from a circled checkmark to a cleaner checklist icon.
+  - Replaced the Settings bottom-nav icon from a gear to a cleaner sliders icon.
+  - Kept bottom-nav sizing, spacing, text, colors, package name, deep link scheme, DB filename, schema columns, and exactly 5 Room tables unchanged.
+- Verified debug build succeeds after bottom navigation icon refresh with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after bottom navigation icon refresh with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
 
 Known gap:
 - `calendar_events` CHECK (`endTimeMs >= startTimeMs`) is not enforced by Room annotation yet. Repository validates new local events by construction. Later add custom open helper/migration if strict SQLite CHECK required from v1.

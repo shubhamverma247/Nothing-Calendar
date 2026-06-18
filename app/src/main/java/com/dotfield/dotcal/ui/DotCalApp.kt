@@ -1,11 +1,14 @@
 package com.dotfield.dotcal.ui
 
+import android.app.Activity
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -14,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -24,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items as lazyItems
@@ -56,6 +61,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -76,6 +82,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -87,6 +94,7 @@ import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.datastore.preferences.core.edit
+import androidx.core.view.WindowCompat
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.baseEventId
@@ -166,6 +174,7 @@ fun DotCalApp(viewModel: DotCalViewModel) {
     val systemDark = isSystemInDarkTheme()
     val resolvedThemeMode = themeMode
     val palette = remember(resolvedThemeMode, systemDark) { resolvedThemeMode?.let { dotCalPalette(it, systemDark) } ?: dotCalBootPalette() }
+    SystemBarColorSync(palette)
     LaunchedEffect(resolvedThemeMode) {
         resolvedThemeMode?.let { mode ->
             bootPreferences.edit().putString(BOOT_THEME_KEY, mode.name).apply()
@@ -202,7 +211,7 @@ fun DotCalApp(viewModel: DotCalViewModel) {
         closeTopSurface()
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(palette.topBarSurface)) {
         val visibleMainTab = if (screenTab == ScreenTab.Settings) previousScreenTab else screenTab
         val calendarHeaderLabel = when (activeCalendarTab) {
             CalendarTab.Month -> "${month.year}/${month.monthValue}"
@@ -213,7 +222,7 @@ fun DotCalApp(viewModel: DotCalViewModel) {
             CalendarTab.Year -> selectedDate.year.toString()
         }
         Scaffold(
-            containerColor = palette.background,
+            containerColor = palette.topBarSurface,
             bottomBar = {
                 DotCalBottomNav(
                     selected = screenTab,
@@ -239,22 +248,34 @@ fun DotCalApp(viewModel: DotCalViewModel) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(palette.background)
-                    .padding(padding),
+                    .padding(padding)
+                    .background(palette.background),
             ) {
-                CalendarActionBar(
-                    title = if (visibleMainTab == ScreenTab.Calendar) calendarHeaderLabel else visibleMainTab.name,
-                    palette = palette,
-                    onTitleClick = {
-                        if (visibleMainTab == ScreenTab.Calendar) viewModel.selectDate(LocalDate.now())
-                    },
-                    onAdd = {
-                        addStartTime = LocalTime.of(9, 0)
-                        editingEvent = null
-                        addSheet = true
-                    },
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(palette.topBarSurface),
+                ) {
+                    CalendarActionBar(
+                        title = if (visibleMainTab == ScreenTab.Calendar) calendarHeaderLabel else visibleMainTab.name,
+                        palette = palette,
+                        onTitleClick = {
+                            if (visibleMainTab == ScreenTab.Calendar) viewModel.selectDate(LocalDate.now())
+                        },
+                        onAdd = {
+                            addStartTime = LocalTime.of(9, 0)
+                            editingEvent = null
+                            addSheet = true
+                        },
+                    )
+                }
                 if (visibleMainTab == ScreenTab.Calendar) {
+                    Spacer(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(12.dp)
+                            .background(palette.topBarSurface),
+                    )
                     CalendarViewSegmentedControl(
                         selected = activeCalendarTab,
                         palette = palette,
@@ -264,6 +285,9 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                             selectCalendarTab(it)
                         },
                     )
+                    if (activeCalendarTab != CalendarTab.Year) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
                 when (visibleMainTab) {
                 ScreenTab.Calendar -> {
@@ -354,7 +378,7 @@ fun DotCalApp(viewModel: DotCalViewModel) {
             visible = screenTab == ScreenTab.Settings,
             enter = slideInHorizontally(initialOffsetX = { it }),
             exit = slideOutHorizontally(targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface).statusBarsPadding(),
         ) {
             SettingsPreview(
                 themeMode = resolvedThemeMode ?: DotCalThemeMode.System,
@@ -376,7 +400,7 @@ fun DotCalApp(viewModel: DotCalViewModel) {
             visible = addSheet,
             enter = slideInHorizontally(initialOffsetX = { it }),
             exit = slideOutHorizontally(targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
         ) {
             EventEditorScreen(
                 event = editingEvent,
@@ -431,6 +455,24 @@ fun DotCalApp(viewModel: DotCalViewModel) {
 }
 
 @Composable
+private fun SystemBarColorSync(palette: DotCalPalette) {
+    val view = LocalView.current
+    SideEffect {
+        val window = (view.context as? Activity)?.window ?: return@SideEffect
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT < 35) {
+            @Suppress("DEPRECATION")
+            window.statusBarColor = palette.topBarSurface.toArgb()
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = palette.bottomNavSurface.toArgb()
+        }
+        val controller = WindowCompat.getInsetsController(window, view)
+        controller.isAppearanceLightStatusBars = !palette.isDark
+        controller.isAppearanceLightNavigationBars = !palette.isDark
+    }
+}
+
+@Composable
 private fun CalendarActionBar(
     title: String,
     palette: DotCalPalette,
@@ -442,7 +484,7 @@ private fun CalendarActionBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .background(palette.background)
+            .background(palette.topBarSurface)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -475,7 +517,7 @@ private fun DotCalBottomNav(
     onTasks: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    val surface = palette.background
+    val surface = palette.bottomNavSurface
     val border = palette.disabledText.copy(alpha = if (palette.isDark) 0.35f else 0.45f)
     val active = palette.accent
     val inactive = palette.secondaryText
@@ -562,14 +604,14 @@ private fun CalendarViewSegmentedControl(
 ) {
     val segmentShape = RoundedCornerShape(28.dp)
     val compactTabs = CalendarTab.pickerEntries
-    val segmentSurface = palette.background
+    val segmentSurface = palette.topBarSurface
     val segmentBorder = palette.disabledText.copy(alpha = if (palette.isDark) 0.35f else 0.45f)
     val segmentSelected = palette.segmentSelected
     val inactiveText = palette.secondaryText
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(palette.background)
+            .background(palette.topBarSurface)
             .padding(horizontal = 22.dp, vertical = 0.dp)
             .height(42.dp)
             .clip(segmentShape)
@@ -643,32 +685,37 @@ private fun BottomCalendarIcon(tint: Color) {
 @Composable
 private fun BottomTaskIcon(tint: Color) {
     Canvas(modifier = Modifier.size(30.dp)) {
-        val stroke = Stroke(width = 2.2.dp.toPx())
-        drawCircle(tint, radius = 12.dp.toPx(), center = Offset(size.width / 2f, size.height / 2f), style = stroke)
-        drawLine(tint, Offset(10.dp.toPx(), 15.dp.toPx()), Offset(14.dp.toPx(), 19.dp.toPx()), strokeWidth = 2.2.dp.toPx())
-        drawLine(tint, Offset(14.dp.toPx(), 19.dp.toPx()), Offset(21.dp.toPx(), 11.dp.toPx()), strokeWidth = 2.2.dp.toPx())
+        val stroke = Stroke(width = 2.1.dp.toPx())
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(5.dp.toPx(), 5.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size(20.dp.toPx(), 20.dp.toPx()),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx(), 4.dp.toPx()),
+            style = stroke,
+        )
+        drawLine(tint, Offset(10.dp.toPx(), 12.dp.toPx()), Offset(12.5.dp.toPx(), 14.5.dp.toPx()), strokeWidth = 2.1.dp.toPx())
+        drawLine(tint, Offset(12.5.dp.toPx(), 14.5.dp.toPx()), Offset(16.dp.toPx(), 10.dp.toPx()), strokeWidth = 2.1.dp.toPx())
+        drawLine(tint, Offset(18.dp.toPx(), 12.dp.toPx()), Offset(22.dp.toPx(), 12.dp.toPx()), strokeWidth = 2.1.dp.toPx())
+        drawLine(tint, Offset(10.dp.toPx(), 20.dp.toPx()), Offset(22.dp.toPx(), 20.dp.toPx()), strokeWidth = 2.1.dp.toPx())
     }
 }
 
 @Composable
 private fun BottomSettingsIcon(tint: Color) {
     Canvas(modifier = Modifier.size(30.dp)) {
-        val stroke = Stroke(width = 2.1.dp.toPx())
-        val center = Offset(size.width / 2f, size.height / 2f)
-        repeat(8) { index ->
-            val angle = Math.toRadians((index * 45).toDouble())
-            val start = Offset(
-                center.x + kotlin.math.cos(angle).toFloat() * 9.dp.toPx(),
-                center.y + kotlin.math.sin(angle).toFloat() * 9.dp.toPx(),
-            )
-            val end = Offset(
-                center.x + kotlin.math.cos(angle).toFloat() * 13.dp.toPx(),
-                center.y + kotlin.math.sin(angle).toFloat() * 13.dp.toPx(),
-            )
-            drawLine(tint, start, end, strokeWidth = 2.1.dp.toPx())
-        }
-        drawCircle(tint, radius = 9.dp.toPx(), center = center, style = stroke)
-        drawCircle(tint, radius = 3.dp.toPx(), center = center, style = stroke)
+        val strokeWidth = 2.2.dp.toPx()
+        val knobStroke = Stroke(width = strokeWidth)
+        val startX = 5.dp.toPx()
+        val endX = 25.dp.toPx()
+        val firstY = 9.dp.toPx()
+        val secondY = 15.dp.toPx()
+        val thirdY = 21.dp.toPx()
+        drawLine(tint, Offset(startX, firstY), Offset(endX, firstY), strokeWidth = strokeWidth)
+        drawLine(tint, Offset(startX, secondY), Offset(endX, secondY), strokeWidth = strokeWidth)
+        drawLine(tint, Offset(startX, thirdY), Offset(endX, thirdY), strokeWidth = strokeWidth)
+        drawCircle(tint, radius = 3.dp.toPx(), center = Offset(12.dp.toPx(), firstY), style = knobStroke)
+        drawCircle(tint, radius = 3.dp.toPx(), center = Offset(20.dp.toPx(), secondY), style = knobStroke)
+        drawCircle(tint, radius = 3.dp.toPx(), center = Offset(15.dp.toPx(), thirdY), style = knobStroke)
     }
 }
 
@@ -1158,10 +1205,15 @@ private fun EventListSheet(
     onAdd: () -> Unit,
     onEdit: (CalendarEvent) -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.dialogSurface, contentColor = palette.primaryText) {
-        Column(modifier = Modifier.fillMaxWidth().background(palette.dialogSurface).padding(horizontal = 20.dp, vertical = 12.dp)) {
-            Box(modifier = Modifier.align(Alignment.CenterHorizontally).size(width = 32.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(palette.dimText))
-            Spacer(modifier = Modifier.height(20.dp))
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().background(palette.dialogSurface).padding(horizontal = 20.dp).padding(bottom = 12.dp)) {
+            Spacer(modifier = Modifier.height(12.dp))
             Text(selectedDate.format(sheetDateFormatter), fontFamily = mono, fontSize = 16.sp, color = palette.primaryText)
             Spacer(modifier = Modifier.height(16.dp))
             if (events.isEmpty()) {
@@ -1245,12 +1297,13 @@ private fun EventEditorScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(palette.calendarSurface),
+            .background(palette.background),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
+                .background(palette.topBarSurface)
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1505,12 +1558,19 @@ private fun DateTimeChoiceSheet(
     var pickedMinute by remember { mutableStateOf(selectedTime.minute) }
     val dialogBackground = palette.dialogSurface
 
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = dialogBackground, contentColor = palette.primaryText) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = dialogBackground,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(dialogBackground)
-                .padding(horizontal = 20.dp, vertical = 18.dp),
+                .padding(horizontal = 20.dp)
+                .padding(top = 4.dp, bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(title, color = palette.primaryText, fontFamily = mono, fontSize = 20.sp)
@@ -1523,7 +1583,7 @@ private fun DateTimeChoiceSheet(
             )
             Row(
                 modifier = Modifier.fillMaxWidth().height(188.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 WheelColumn(
@@ -1556,8 +1616,8 @@ private fun DateTimeChoiceSheet(
                 }
             }
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Button(
                     onClick = onDismiss,
@@ -1567,8 +1627,16 @@ private fun DateTimeChoiceSheet(
                         contentColor = palette.primaryText,
                     ),
                     shape = RoundedCornerShape(18.dp),
+                    contentPadding = PaddingValues(0.dp),
                 ) {
-                    Text("Cancel", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .border(1.dp, palette.cancelBorder, RoundedCornerShape(18.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("Cancel", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
                 Button(
                     onClick = { onSelected(pickedDate, LocalTime.of(pickedHour, pickedMinute)) },
@@ -1637,6 +1705,11 @@ private fun <T> WheelColumn(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(rowHeight)
+                    .drawBehind {
+                        val lineColor = palette.line.copy(alpha = if (isCentered) 0.78f else 0.34f)
+                        drawLine(lineColor, Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1.dp.toPx())
+                        drawLine(lineColor, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
+                    }
                     .clickable {
                         scope.launch {
                             val targetIndex = if (circular && items.isNotEmpty()) {
@@ -1653,14 +1726,10 @@ private fun <T> WheelColumn(
             ) {
                 Text(
                     label(item),
-                    color = if (isCentered) {
-                        if (palette.isDark) Color.White else palette.primaryText
-                    } else {
-                        palette.secondaryText.copy(alpha = 0.55f)
-                    },
+                    color = if (isCentered) palette.primaryText else palette.disabledText,
                     fontFamily = mono,
-                    fontWeight = if (isCentered) FontWeight.SemiBold else FontWeight.Normal,
-                    fontSize = if (isCentered) 23.sp else 17.sp,
+                    fontWeight = if (isCentered) FontWeight.Bold else FontWeight.Normal,
+                    fontSize = if (isCentered) 24.sp else 17.sp,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1691,7 +1760,13 @@ private fun TimeChoiceSheet(
             }
         }
     }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.dialogSurface, contentColor = palette.primaryText) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
         ChoiceSheetContent(
             title = title,
             items = times,
@@ -1706,7 +1781,13 @@ private fun TimeChoiceSheet(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReminderChoiceSheet(selected: Int?, palette: DotCalPalette, onDismiss: () -> Unit, onSelected: (Int?) -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.dialogSurface, contentColor = palette.primaryText) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
         ChoiceSheetContent(
             title = "Reminder",
             items = reminderOptions,
@@ -1721,7 +1802,13 @@ private fun ReminderChoiceSheet(selected: Int?, palette: DotCalPalette, onDismis
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RepeatChoiceSheet(selected: String?, palette: DotCalPalette, onDismiss: () -> Unit, onSelected: (String?) -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.dialogSurface, contentColor = palette.primaryText) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
         ChoiceSheetContent(
             title = "Repeat",
             items = recurrenceOptions,
@@ -1741,7 +1828,13 @@ private fun ApplyScopeChoiceSheet(
     onDismiss: () -> Unit,
     onSelected: (RecurringEditScope) -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.dialogSurface, contentColor = palette.primaryText) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
         ChoiceSheetContent(
             title = "Apply to",
             items = listOf(RecurringEditScope.ThisEvent, RecurringEditScope.WholeSeries),
@@ -1762,9 +1855,8 @@ private fun <T> ChoiceSheetContent(
     palette: DotCalPalette,
     onSelected: (T) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().background(palette.dialogSurface).padding(horizontal = 20.dp, vertical = 12.dp)) {
-        Box(modifier = Modifier.align(Alignment.CenterHorizontally).size(width = 32.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(palette.dimText))
-        Spacer(modifier = Modifier.height(20.dp))
+    Column(modifier = Modifier.fillMaxWidth().background(palette.dialogSurface).padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
+        Spacer(modifier = Modifier.height(12.dp))
         Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
         Spacer(modifier = Modifier.height(12.dp))
         LazyColumn(modifier = Modifier.fillMaxWidth().height(320.dp)) {
@@ -1785,6 +1877,17 @@ private fun <T> ChoiceSheetContent(
         }
         Spacer(modifier = Modifier.height(20.dp))
     }
+}
+
+@Composable
+private fun BottomSheetDragHandle(palette: DotCalPalette) {
+    Box(
+        modifier = Modifier
+            .padding(top = 12.dp, bottom = 8.dp)
+            .size(width = 36.dp, height = 4.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(palette.dragHandle),
+    )
 }
 
 @Composable
@@ -2648,8 +2751,12 @@ private data class DotCalPalette(
     val line: Color,
     val cell: Color,
     val calendarSurface: Color,
+    val topBarSurface: Color,
+    val bottomNavSurface: Color,
     val dialogSurface: Color,
     val cancelSurface: Color,
+    val cancelBorder: Color,
+    val dragHandle: Color,
     val segmentSelected: Color,
     val disabledText: Color,
     val dot: Color,
@@ -2687,8 +2794,12 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
             line = Color(0xFF2A2A2A),
             cell = NBlack,
             calendarSurface = NBlack,
+            topBarSurface = Color(0xFF000000),
+            bottomNavSurface = Color(0xFF000000),
             dialogSurface = Color(0xFF1E1E1E),
             cancelSurface = Color(0xFF121212),
+            cancelBorder = Color(0xFF2A2A2A),
+            dragHandle = Color(0xFF707070),
             segmentSelected = Color(0xFF1E1E1E),
             disabledText = Color(0xFF6E6E6E),
             dot = Color(0xFFFFFFFF),
@@ -2706,8 +2817,12 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
             line = Color(0xFFBDBDBD),
             cell = Color(0xFFF7F7F7),
             calendarSurface = Color(0xFFF7F7F7),
+            topBarSurface = Color(0xFFFFFFFF),
+            bottomNavSurface = Color(0xFFFFFFFF),
             dialogSurface = Color(0xFFFFFFFF),
             cancelSurface = Color(0xFFEFEFEF),
+            cancelBorder = Color(0xFFE0E0E0),
+            dragHandle = Color(0xFFC8C8C8),
             segmentSelected = Color(0xFFEFEFEF),
             disabledText = Color(0xFFBDBDBD),
             dot = Color(0xFF101010),
@@ -2730,8 +2845,12 @@ private fun dotCalBootPalette(): DotCalPalette {
         line = Color(0xFF2A2A2A),
         cell = NBlack,
         calendarSurface = NBlack,
+        topBarSurface = Color(0xFF000000),
+        bottomNavSurface = Color(0xFF000000),
         dialogSurface = Color(0xFF1E1E1E),
         cancelSurface = Color(0xFF121212),
+        cancelBorder = Color(0xFF2A2A2A),
+        dragHandle = Color(0xFF707070),
         segmentSelected = Color(0xFF1E1E1E),
         disabledText = Color(0xFF6E6E6E),
         dot = Color(0xFFFFFFFF),
