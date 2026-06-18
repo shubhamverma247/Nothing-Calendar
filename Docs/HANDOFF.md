@@ -9,6 +9,7 @@ Build DotCal (`com.dotfield.dotcal`) as a premium Android calendar. Quality bar:
 ## Source Prompt
 
 Prompt came from `C:\Users\Admin\.codex\attachments\61ea4d34-0342-4103-9c6a-4302906da194\pasted-text.txt`.
+Latest continuation prompt came from `C:\Users\Admin\.codex\attachments\7cb21fbc-f8f6-4294-a05e-8d242938d821\pasted-text.txt`.
 
 Key requirements:
 - Every future session working on this repo must use `$android-development`.
@@ -354,21 +355,604 @@ Implemented:
 - Verified debug build succeeds after segmented-control label clipping fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Light nav color/header placement polish:
   - Light top segmented control, top add bar, and bottom nav now use the same off-white nav surface (`#FAFAFA`) with light gray borders and selected chip color closer to the provided reference.
-  - Calendar segmented control now renders before the add action bar, so the Year/Month/Week/Day/Agenda header sits at the top of the calendar nav area.
+  - Note: this initially moved the segmented Year/Month/Week/Day/Agenda control too high; corrected later so only the date/year label moves to the top bar.
   - No schema/table/column changes.
 - Verified debug build succeeds after light nav color/header placement polish with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Exact theme code and bottom-nav reference alignment:
+  - Theme palette now follows the provided image codes: Dark Screen `#000000`, Dialog `#1E1E1E`, Cancel `#121212`, OK `#FF3B30`, Primary `#FFFFFF`, Secondary `#B3B3B3`, Disabled `#6E6E6E`; Light Screen `#F7F7F7`, Dialog `#FFFFFF`, Cancel `#EFEFEF`, OK `#FF3B30`, Primary `#101010`, Secondary `#6B6B6B`, Disabled `#BDBDBD`.
+  - Light calendar/nav surfaces now use Screen `#F7F7F7` instead of the prior custom off-white nav color.
+  - Segmented selected chip now uses Dialog `#1E1E1E` in Dark and Cancel `#EFEFEF` in Light.
+  - Bottom nav now matches the image more closely: flat full-width bar, no rounded top/shadow, screen-color background, top divider, smaller icons/labels, red active item, secondary inactive items.
+  - No schema/table/column changes.
+- Verified debug build succeeds after exact theme/bottom-nav alignment with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Date/year header placement correction:
+  - Moved the date/year label (`2026/6` or year-only in Year view) into the top action bar beside the add button.
+  - Restored the segmented Year/Month/Week/Day/Agenda control below the top action bar.
+  - Removed duplicate per-view date/year header rows from Month, Week, Day, Agenda, Three-day, and Year views.
+  - No schema/table/column changes.
+- Verified debug build succeeds after date/year header placement correction with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Recurring event per-instance edit/delete:
+  - Recurring occurrence editor now has an `Apply to` picker with `This event` and `Whole series`.
+  - `This event` edit excludes the original occurrence via existing `calendar_events.exceptionDates` and creates a detached single local event with no `rrule`.
+  - `This event` delete excludes only that occurrence via existing `calendar_events.exceptionDates`.
+  - `Whole series` keeps existing master-series edit/delete behavior.
+  - No schema/table/column changes; still exactly 5 Room tables.
+- Verified debug build succeeds after recurring per-instance edit/delete with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 
 Known gap:
 - `calendar_events` CHECK (`endTimeMs >= startTimeMs`) is not enforced by Room annotation yet. Repository validates new local events by construction. Later add custom open helper/migration if strict SQLite CHECK required from v1.
 - Phone manual QA is user-owned unless explicitly requested.
 - Add/Edit recurrence/reminder/delete and recurring event expansion are ready for manual QA; user will test manually.
-- Recurring event editing currently edits/deletes the whole original series, not one detached occurrence.
+- Recurring detached occurrences are local-only and are not synced as Google exception instances yet.
+- Current manual test list still contains stale references to older overflow/three-dot navigation. Current UI rule is bottom navigation for `Calendar`, `Tasks`, and `Settings`; no top three-dot overflow should be visible.
+
+## Continuation Roadmap
+
+Source: latest continuation prompt at `C:\Users\Admin\.codex\attachments\7cb21fbc-f8f6-4294-a05e-8d242938d821\pasted-text.txt`.
+
+Strict rules:
+- Do not touch already-working code unless a new feature requires it.
+- Do not change Room schema: keep exactly 5 tables only: `calendar_accounts`, `calendar_events`, `event_reminders`, `sync_metadata`, `deleted_event_log`.
+- Do not add columns to any table.
+- Do not change package name `com.dotfield.dotcal`, deep link scheme `dotcal://`, or DB filename `dotcal.db`.
+- Do not run phone/manual UI testing unless explicitly requested; update `What To Test Now` instead.
+- After every completed implementation step, update this file.
+- Build after every implementation step with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`; fix failures before moving on.
+
+Build order:
+1. Event Detail Screen
+   - Full-screen `EventDetailScreen`, not a sheet.
+   - Event taps from Month sheet, Week, Day, and Agenda navigate to details.
+   - Top bar: back arrow, centered `EVENT DETAILS`, edit pencil.
+   - Show accent strip, title, date/time or all-day chip, recurrence, reminders, location, calendar account, selectable description, images, and voice note.
+   - Add deep link route `dotcal://event/{eventId}`.
+   - Birthday/read-only events must hide edit in later birthday flow.
+2. Image Attachments
+   - Use existing `calendar_events.imageUris` JSON array column only.
+   - Use Android Photo Picker via `ActivityResultContracts.PickMultipleVisualMedia`; no `READ_MEDIA_IMAGES`.
+   - Max 5 images; persist URI read permission; show thumbnails and remove overlay.
+3. Voice Notes
+   - Use existing `calendar_events.voiceNotePath` column only.
+   - Request `RECORD_AUDIO` at runtime on first mic tap; if denied, hide mic button with no blocking error.
+   - Record AAC/MPEG_4 to `context.filesDir/voice_notes/{eventId}.m4a`, max 5 minutes.
+   - Support playback, pause/resume, duration, and delete.
+4. AlarmManager Reminders
+   - Use existing `event_reminders` table only.
+   - On event save, replace reminder rows and schedule future alarms.
+   - Use exact alarms when allowed; fallback to `setWindow()` with 5-minute window on Android 12+ when exact alarms denied.
+   - Notification channel `dotcal_reminders`; actions: `VIEW` deep link and `SNOOZE 10 MIN`.
+   - Boot receiver reschedules future undelivered reminders.
+5. Google Calendar Sync
+   - Use CalendarProvider API only; no REST, OAuth, or network.
+   - Use existing `sync_metadata` and `deleted_event_log`.
+   - Local-only mode when `READ_CALENDAR` denied.
+   - WorkManager periodic sync controlled by DataStore sync settings.
+   - Settings rows: Sync Now, Last synced, Sync enabled, Sync interval.
+6. Tasks Tab Complete
+   - Store tasks in `calendar_events` where `isTask = 1`.
+   - Filters: All, Today, Upcoming, Completed.
+   - Group tasks by date; swipe left delete, swipe right complete.
+   - Add Task bottom sheet saves task-only rows with optional date/time/reminder, no repeat/images/voice.
+7. Birthday Calendar
+   - Import birthdays from ContactsProvider into existing `calendar_events` as `source = BIRTHDAY`.
+   - Create/use Birthdays account in existing `calendar_accounts`.
+   - Settings toggle controlled by `KEY_BIRTHDAY_ENABLED`.
+   - Birthday events are read-only and default to 1-day reminder.
+8. Home Screen Widgets
+   - Use Jetpack Glance only, not legacy `AppWidgetProvider`/`RemoteViews`.
+   - Build small 2x2, medium 4x2, and large 4x4 widgets.
+   - Add `WidgetDataRepository`, `WidgetUpdateWorker`, and `DotCalGlanceTheme`.
+   - Update widgets after event save/delete and sync completion.
+9. Onboarding Flow
+   - Show once based on `KEY_ONBOARDING_DONE`.
+   - 5-page pager: Welcome, Calendar permission, Notifications, Contacts, Ready.
+   - App must degrade gracefully when permissions are skipped or denied.
+10. Settings Missing Items
+   - Calendars: Sync Now, Last synced.
+   - Reminders: Default reminder picker saved to `KEY_DEFAULT_REMINDER`.
+   - Additional: Birthday calendar, Sync enabled, Sync interval.
+   - About: Privacy Policy WebView, Rate DotCal Play Store link, Version from `BuildConfig.VERSION_NAME`.
+11. Release Rules After Steps
+   - Add R8/ProGuard rules for Room, Hilt, Kotlin Serialization, Glance, and Coroutines after all roadmap steps are complete.
+
+## Detailed Continuation Feature Spec
+
+Source: latest continuation prompt. This section preserves the detailed future-feature requirements so future sessions stay in sync. Existing app behavior/UI remains source of truth when any item conflicts.
+
+### Step 1: Event Detail Screen
+
+Create a full-screen `EventDetailScreen`, not a sheet.
+
+Requested navigation:
+- Add deep link route `dotcal://event/{eventId}`.
+- Back arrow returns to previous screen.
+- Spec requests event row taps across Month sheet, Week, Day, and Agenda navigate to `EventDetailScreen`; if this conflicts with existing working edit behavior, preserve current app behavior unless user explicitly approves the navigation change.
+
+Layout, top to bottom:
+- Top bar:
+  - Back arrow on left.
+  - `EVENT DETAILS` centered title.
+  - Pencil edit icon on right opens Add/Edit Event for this event.
+- Color accent strip:
+  - Full width.
+  - 4dp height.
+  - Color = `event.colorHex`; fallback account color; fallback `#FF0000`.
+- Title:
+  - `event.title`.
+  - 24sp.
+  - Primary text color.
+- Date/time row:
+  - Format `MON, 14 JAN 2026 - 09:00 - 10:00`.
+  - If all-day, show `ALL DAY EVENT` chip instead of times.
+- Recurrence row, only if `rrule` is not null:
+  - `DAILY` -> `REPEATS DAILY`.
+  - `WEEKLY` -> `REPEATS WEEKLY`.
+  - `MONTHLY` -> `REPEATS MONTHLY`.
+- Reminders section, only if reminders exist:
+  - Query `event_reminders` for this `eventId`.
+  - Each reminder text: `10 MINUTES BEFORE`.
+- Location row, only if location is not empty:
+  - Map pin icon.
+  - Location text.
+- Calendar account row:
+  - Colored dot.
+  - Account `displayName` from `calendar_accounts`.
+- Description, only if not empty:
+  - Full text.
+  - Selectable.
+- Images section, only if `imageUris` is not empty:
+  - Horizontal thumbnail row.
+  - Tap thumbnail -> full-screen zoomable image viewer.
+  - Use Coil `AsyncImage`.
+- Voice note section, only if `voiceNotePath` is not null:
+  - Play/pause button.
+  - Duration text.
+  - Use `MediaPlayer`.
+
+### Step 2: Image Attachments On Events
+
+Add image attachment support to Add/Edit Event using existing `calendar_events.imageUris` JSON array column. No schema changes.
+
+Implementation:
+- Use `ActivityResultContracts.PickMultipleVisualMedia` Android Photo Picker.
+- Do not request `READ_MEDIA_IMAGES`.
+- Max 5 images per event.
+- Store selected URIs as JSON array in `imageUris`.
+- Take persistable URI permission:
+
+```kotlin
+context.contentResolver.takePersistableUriPermission(
+    uri,
+    Intent.FLAG_GRANT_READ_URI_PERMISSION
+)
+```
+
+Add/Edit Event UI:
+- Add `IMAGES` section below Description field.
+- Show horizontal thumbnail row with Coil `AsyncImage`.
+- Show `+ ADD IMAGE` chip when image count is below 5.
+- Show `3/5` count badge when images exist.
+- Tap thumbnail -> show remove `X` overlay.
+- Tap `X` -> remove URI from list.
+
+Save behavior:
+- Serialize `imageUris` list to JSON string before saving to Room.
+- Deserialize on load.
+
+### Step 3: Voice Notes On Events
+
+Add voice note support to Add/Edit Event using existing `calendar_events.voiceNotePath`. No schema changes.
+
+Permission:
+- `RECORD_AUDIO` already exists in manifest.
+- Request at runtime on first mic tap.
+- If denied, hide mic button and show no blocking error.
+
+Recording:
+- Use `MediaRecorder`.
+- Output format: `MPEG_4`.
+- Audio encoder: `AAC`.
+- Save to `context.filesDir/voice_notes/{eventId}.m4a`.
+- Max duration: 5 minutes, 300 seconds.
+- Auto-stop at 5 minutes.
+
+Add/Edit Event `VOICE NOTE` row below Images:
+- State A, no recording:
+  - Mic icon.
+  - `TAP TO RECORD`.
+  - Tap -> request `RECORD_AUDIO` if needed -> start recording.
+- State B, recording:
+  - Red pulsing dot.
+  - Timer like `0:23`.
+  - `STOP` button stops recording and saves file.
+- State C, recording exists:
+  - Play/pause button.
+  - Duration text like `0:45`.
+  - Delete `X` deletes file and clears `voiceNotePath`.
+
+Playback:
+- Use `MediaPlayer`.
+- Show current position while playing.
+- Pause/resume on button tap.
+
+### Step 4: AlarmManager Reminders
+
+Implement proper reminder scheduling with `AlarmManager` using existing `event_reminders`. No schema changes.
+
+When event is saved:
+1. Delete existing reminders for the event from `event_reminders`.
+2. Insert new `EventReminder` rows.
+3. Compute `triggerAtMs = startTimeMs - minutesBefore * 60_000`.
+4. Skip triggers in the past.
+5. Schedule `AlarmManager` for each future reminder.
+6. Use unique `alarmRequestCode = (eventId.hashCode() * 31 + minutesBefore)`.
+
+Android 12+ exact alarm behavior:
+- If `Build.VERSION.SDK_INT >= 31`, check `AlarmManager.canScheduleExactAlarms()`.
+- If exact alarms are denied, fallback to `setWindow()` with 5-minute window.
+- Save exact-alarm-denied state to DataStore key `KEY_EXACT_ALARM_DENIED` if that key exists or is added without schema impact.
+- Otherwise use `setExactAndAllowWhileIdle`.
+
+Notification:
+- Channel ID: `dotcal_reminders`.
+- Channel name: `Event Reminders`.
+- Importance: `IMPORTANCE_HIGH`.
+- Create channel on app startup in `DotCalApplication`.
+- Title: event title.
+- Body:
+  - `In X minutes` if no location.
+  - `In X minutes - {location}` if location exists.
+- Actions:
+  - `VIEW` -> `PendingIntent` -> `dotcal://event/{eventId}`.
+  - `SNOOZE 10 MIN` -> reschedule alarm 10 minutes later.
+- After delivery, update `event_reminders.isDelivered = 1` for that reminder id.
+
+Boot behavior:
+- `BOOT_COMPLETED` receiver is already declared.
+- On boot, query all `EventReminder` where `triggerAtMs > now` and `isDelivered = 0`.
+- Reschedule all via `AlarmManager`.
+- Run in `goAsync` coroutine.
+
+### Step 5: Google Calendar Sync
+
+Implement Google Calendar sync via CalendarProvider API only. No REST API, OAuth, network calls, schema changes, or new Room tables. Use existing `sync_metadata` and `deleted_event_log`.
+
+`CalendarProviderDataSource` in `data/provider/`:
+- `getDeviceCalendars(): List<CalendarAccountEntity>`
+  - Query `CalendarContract.Calendars`.
+  - Map to `CalendarAccountEntity` with `accountType = GOOGLE` or `DEVICE`.
+  - Check `READ_CALENDAR` before querying.
+  - Return empty list if permission denied or cursor null.
+- `getEventsInRange(calendarId: Long, startMs: Long, endMs: Long): List<CalendarEventEntity>`
+  - Query `CalendarContract.Events`.
+  - Range: next 60 days from now.
+  - Map all available columns to `CalendarEventEntity` with `source = GOOGLE`.
+  - Handle null cursor gracefully.
+
+`CalendarSyncRepository.sync()` logic:
+1. Check `READ_CALENDAR`; return early if denied.
+2. Query device calendars and upsert into `calendar_accounts`.
+3. For each Google calendar:
+   - Query provider events for next 60 days.
+   - Query Room for existing `GOOGLE` source events in same range.
+   - Build maps keyed by `googleEventId`.
+   - Compute inserts, updates where `syncVersion` differs, and deletes.
+   - Check inserts against `deleted_event_log`; skip tombstoned events.
+   - Execute insert/update/delete in one transaction.
+4. Clean `deleted_event_log` rows older than 30 days.
+5. Update `sync_metadata` with `lastSyncMs`, `lastSyncStatus`, and counts.
+
+`CalendarSyncWorker`:
+- `CoroutineWorker` with Hilt injection if Hilt is already used; otherwise follow existing DI pattern.
+- `doWork()` calls sync repository.
+- On `SecurityException`, return `Result.failure()`.
+- On other exception, retry up to 3 times then fail.
+- Periodic work interval comes from `KEY_SYNC_INTERVAL_MINS`, default 15 minutes.
+- Use `ExistingPeriodicWorkPolicy.KEEP`.
+- Schedule on app startup when `KEY_SYNC_ENABLED = true`.
+
+Permission handling:
+- If `READ_CALENDAR` denied, show non-blocking Calendar banner: `Running in local mode - grant calendar access in Settings`.
+- App remains fully usable in local-only mode.
+
+Settings integration:
+- `SYNC NOW` row enqueues one-time sync.
+- Last synced text reads from `sync_metadata`, like `LAST SYNCED 5 MIN AGO`.
+- Sync enabled toggle cancels/schedules WorkManager.
+- Sync interval picker reschedules WorkManager.
+
+### Step 6: Tasks Tab Complete
+
+Replace placeholder Tasks screen with full implementation. Store tasks in existing `calendar_events` where `isTask = 1`. No schema changes.
+
+Layout:
+- Horizontal, no-wrap filter chip row:
+  - `ALL`, `TODAY`, `UPCOMING`, `COMPLETED`.
+  - Active chip: `#FF3B30` background and white text.
+  - Inactive chip: transparent, 1dp border, secondary text.
+  - Row scrolls horizontally if needed.
+- `LazyColumn` grouped by date:
+  - Date header: uppercase format like `MON, 14 JAN`.
+  - Task row:
+    - Square checkbox with 1dp border.
+    - Title.
+    - Completed title uses strikethrough and secondary color.
+    - Optional time uses secondary color, 12sp.
+    - Swipe left -> red background + trash icon -> delete.
+    - Swipe right -> green background + check icon -> mark complete.
+    - Use `SwipeToDismiss` or `AnchoredDraggable`.
+- Empty states:
+  - All: `NO TASKS YET` + `TAP + TO ADD ONE`.
+  - Today: `NOTHING DUE TODAY`.
+  - Upcoming: `ALL CLEAR`.
+  - Completed: `NO COMPLETED TASKS`.
+- FAB `+` opens Add Task `ModalBottomSheet`:
+  - Required title field.
+  - Date row opens date picker.
+  - Optional time row opens time picker.
+  - One optional reminder: None, 5m, 10m, 30m, 1 day.
+  - `SAVE TASK` button.
+  - Save with `isTask = true`, `isCompleted = false`.
+  - No repeat field.
+  - No calendar selector; use primary local account.
+  - No voice note.
+  - No images.
+
+DAO queries needed:
+- All: `WHERE isTask = 1`.
+- Today: `WHERE isTask = 1 AND startTimeMs BETWEEN dayStart AND dayEnd`.
+- Upcoming: `WHERE isTask = 1 AND isCompleted = 0 AND startTimeMs > now`.
+- Completed: `WHERE isTask = 1 AND isCompleted = 1`.
+
+### Step 7: Birthday Calendar
+
+Import birthdays from device contacts as yearly recurring events using existing `calendar_events` with `source = BIRTHDAY`. No schema changes.
+
+`ContactsProviderDataSource` in `data/provider/`:
+- `getBirthdays(): List<CalendarEventEntity>`.
+- Query `ContactsContract.Data` where:
+  - `mimetype = CommonDataKinds.Event.CONTENT_ITEM_TYPE`.
+  - `type = CommonDataKinds.Event.TYPE_BIRTHDAY`.
+- For each birthday, create event:
+  - Title: `{ContactName}'s Birthday`.
+  - `isAllDay = 1`.
+  - `rrule = FREQ=YEARLY`.
+  - `source = BIRTHDAY`.
+  - `isTask = 0`.
+  - `colorHex = #FF3B30`.
+  - `accountId = birthday calendar account id`.
+- Check `READ_CONTACTS` before querying.
+- Return empty list if denied.
+
+Birthday calendar account:
+- Create/use one `CalendarAccountEntity`:
+  - `displayName = Birthdays`.
+  - `accountType = DEVICE`.
+  - `color = #FF3B30`.
+  - `isVisible = 1`.
+
+Settings integration:
+- Birthday calendar toggle uses `KEY_BIRTHDAY_ENABLED`.
+- When turned on:
+  - Request `READ_CONTACTS` if not granted.
+  - If granted, import birthdays and show count like `47 BIRTHDAYS IMPORTED`.
+  - If denied, show rationale and keep toggle off.
+- When turned off:
+  - Delete all `BIRTHDAY` source events from `calendar_events`.
+  - Show `BIRTHDAY CALENDAR DISABLED`.
+- Re-import on launch if birthday calendar is enabled and contacts permission is granted.
+
+Birthday behavior:
+- Read-only: no edit, no delete from UI.
+- Birthday tap can show Event Detail, but no edit icon in top bar.
+- Default reminder: 1 day before, 1440 minutes.
+
+### Step 8: Home Screen Widgets With Glance
+
+Build 3 home screen widgets using Jetpack Glance 1.1+. Do not use legacy `AppWidgetProvider` or `RemoteViews`.
+
+Dependencies, if not already present:
+- `androidx.glance:glance-appwidget:1.1.0`.
+- `androidx.glance:glance-material3:1.1.0`.
+
+Small widget, 2x2, `widget/SmallCalendarWidget.kt`:
+- Background: Glance theme surface, dark `#000000`.
+- Day name: `MON`, 12sp, secondary.
+- Date number: `14`, 40sp, primary; red `#FF3B30` if today.
+- Event count: `3 EVENTS` or `NO EVENTS`, 11sp, secondary.
+- Tap anywhere launches Day view: `dotcal://day/{todayMs}`.
+
+Medium widget, 4x2, `widget/MediumCalendarWidget.kt`:
+- Left column fixed 80dp:
+  - Same content as small widget.
+- Vertical divider: 1dp.
+- Right column fills remaining:
+  - Next 3 upcoming events.
+  - Each row: time `09:00` 11sp secondary, 6dp colored dot, title 12sp primary one line ellipsis.
+  - If no events: centered `NOTHING SCHEDULED` secondary.
+- Tap event row -> `dotcal://event/{eventId}`.
+- Tap left column -> `dotcal://day/{todayMs}`.
+
+Large widget, 4x4, `widget/LargeCalendarWidget.kt`:
+- Top half: mini month grid for current month:
+  - 7 columns.
+  - Day numbers only.
+  - Today has red circle background.
+  - Days with events show small red dot below number.
+  - Tap launches Month view.
+- Horizontal divider: 1dp.
+- Bottom half: today's events list up to 5, same row style as medium.
+- Tap event -> `dotcal://event/{eventId}`.
+
+Widget data:
+- Create `WidgetDataRepository`.
+- `getTodayEvents()`:
+  - Query non-task events for today.
+  - Sort by `startTimeMs` ascending.
+  - Limit 5.
+- `getUpcomingEvents(limit: Int)`:
+  - Query next events after now.
+  - Limit by argument.
+
+Widget updates:
+- Create `WidgetUpdateWorker` with WorkManager.
+- Periodic work every 15 minutes.
+- Calls `GlanceAppWidgetManager.updateAll(context)`.
+- Trigger immediate widget update after event create/edit/delete and after calendar sync completes.
+
+Glance theme:
+- Create `DotCalGlanceTheme`.
+- Dark colors:
+  - Background `#000000`.
+  - Surface `#0A0A0A`.
+  - Primary text `#FFFFFF`.
+  - Secondary `#666666`.
+  - Accent `#FF3B30`.
+- Apply to all widgets.
+
+### Step 9: Onboarding Flow
+
+Show onboarding only once on first launch using `KEY_ONBOARDING_DONE`.
+
+Flow:
+- If false, show `OnboardingScreen` before main app.
+- If true, go directly to main Calendar screen.
+- Use 5-screen horizontal pager.
+
+Screen 1, Welcome:
+- `DotCal` large, bold, primary.
+- `YOUR TIME. YOUR TERMS.` secondary below.
+- `GET STARTED ->` red `#FF3B30` button at bottom.
+- No skip.
+
+Screen 2, Calendar Permission:
+- Calendar icon, 64dp.
+- Title: `Sync your calendars`.
+- Body: `Connect your Google Calendar and device calendars. Your data never leaves your phone.`
+- `ALLOW CALENDAR ACCESS` requests `READ_CALENDAR` and `WRITE_CALENDAR`.
+- `SKIP FOR NOW` text button below.
+
+Screen 3, Notifications:
+- Bell icon, 64dp.
+- Title: `Never miss an event`.
+- Body: `Get reminders exactly when you need them.`
+- `ALLOW NOTIFICATIONS` requests `POST_NOTIFICATIONS` on Android 13+.
+- `SKIP FOR NOW` text button below.
+
+Screen 4, Contacts:
+- Person icon, 64dp.
+- Title: `Birthday calendar`.
+- Body: `Import birthdays from your contacts. Read-only access - we never modify your contacts.`
+- `ALLOW CONTACTS` requests `READ_CONTACTS`.
+- `SKIP FOR NOW` text button below.
+
+Screen 5, Ready:
+- Checkmark icon, 64dp, red `#FF3B30`.
+- Title: `You're all set`.
+- Body:
+  - If `READ_CALENDAR` granted: `Your calendars are syncing`.
+  - If denied: `Running in local mode`.
+- `OPEN DOTCAL` red button:
+  - Set `KEY_ONBOARDING_DONE = true`.
+  - Navigate to main Calendar screen.
+
+Progress dots:
+- 5 dots at bottom of each screen.
+- Active dot filled `#FF3B30`, 8dp.
+- Inactive dot filled secondary, 6dp.
+
+Permission handling:
+- Prompt requested `rememberPermissionState` from Accompanist; use only if dependency already exists or adding it matches project direction.
+- If permanently denied, show rationale text and no button.
+- Skipping permission is valid; app degrades gracefully.
+
+### Settings Missing Items
+
+Add these rows to existing Settings. Do not rebuild Settings from scratch.
+
+Calendars section:
+- `SYNC NOW` row enqueues `CalendarSyncWorker`.
+- `Last synced` subtitle reads from `sync_metadata`.
+
+Reminders section:
+- `Default reminder` row opens picker:
+  - None.
+  - 5 min.
+  - 10 min.
+  - 30 min.
+  - 1 hour.
+  - 1 day.
+- Save to `KEY_DEFAULT_REMINDER`.
+- Use value as preselected reminder in Add Event.
+
+Additional section:
+- `Birthday calendar` toggle -> `KEY_BIRTHDAY_ENABLED`; when turned on, request `READ_CONTACTS`.
+- `Sync enabled` toggle -> `KEY_SYNC_ENABLED`; off cancels WorkManager sync, on schedules sync.
+- `Sync interval` row opens picker:
+  - Manual.
+  - 15 min.
+  - 30 min.
+  - 1 hour.
+- Save to `KEY_SYNC_INTERVAL_MINS`.
+
+About section:
+- `Privacy Policy` opens WebView: `https://dotfieldstudio.com/dotcal/privacy`.
+- `Rate DotCal` opens Play Store: `https://play.google.com/store/apps/details?id=com.dotfield.dotcal`.
+- `Version` reads from `BuildConfig.VERSION_NAME`.
+
+### Architecture Rules For New Code
+
+- All DB/IO operations run on `Dispatchers.IO`.
+- CPU-bound recurrence expansion runs on `Dispatchers.Default`.
+- ViewModels expose `StateFlow<UiState<T>>` where practical.
+- `UiState` shape:
+  - `Loading`.
+  - `Success<T>(data)`.
+  - `Error(message)`.
+- Repository functions should return `Result<T>` for new feature boundaries where practical.
+- Wrap exceptions and never expose raw exceptions to UI.
+- Domain models should be `@Immutable` data classes.
+- Prefer immutable UI collections. If project does not already use `ImmutableList<T>`, do not introduce broad dependency churn without need.
+- Never hold `Context` in ViewModel.
+- Never query DB on main thread.
+
+### After All Roadmap Steps
+
+Add R8/ProGuard rules to `proguard-rules.pro`:
+
+```proguard
+# Room
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-keepclassmembers @androidx.room.Entity class * { *; }
+
+# Hilt
+-keepnames @dagger.hilt.android.lifecycle.HiltViewModel class *
+
+# Kotlin Serialization
+-keepattributes *Annotation*, InnerClasses
+-keep @kotlinx.serialization.Serializable class * { *; }
+
+# Glance
+-keep class androidx.glance.** { *; }
+
+# Coroutines
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+```
+
+Conflict check:
+- New prompt changes event-row behavior: existing event taps currently open Add/Edit directly in some surfaces; new rule routes taps to Event Detail first, with edit available from the detail pencil. Existing working app behavior wins unless user explicitly approves changing it.
+- Handoff product target still mentions mono typography, but current implemented UI explicitly moved to system sans-serif. Preserve current UI rule unless user asks to revert typography.
+- Older handoff source says Calendar sub-tabs Month/Week/Day/Agenda; current implemented UI and latest prompt use segmented `Year`, `Month`, `Week`, `Day`, `Agenda`. Preserve current segmented control and hidden Three-day behavior.
+- Latest prompt says build after each implementation step; current user asked to update planning in one file and not change app code, so no build is required for this docs-only sync.
 
 ## Next Step
 
-Next should continue calendar polish:
-- Polish Add/Edit Event UX: date controls and manual QA fixes.
-- Do not run phone/manual UI testing by default; tell the user what to test manually and keep this checklist updated.
+Next implementation step:
+- Step 1 from Continuation Roadmap: build full-screen Event Detail Screen.
+- Preserve schema columns/current UI rules and exactly 5 Room tables.
+- Do not run phone/manual UI testing by default; update `What To Test Now` instead.
 - Use stored week start preference later instead of hardcoded Sunday, if user wants configurable week start.
 
 ## What To Test Now
@@ -415,9 +999,11 @@ Manual:
 - Segmented view control should show `Year`, `Month`, `Week`, `Day`, `Agenda`.
 - Segmented view control should be compact vertically, not tall.
 - `Year` left text gap and `Agenda` right text gap should be equal.
-- In Light theme, segmented control should use white/off-white surface, light gray border, and light gray selected chip like the reference.
-- In Light theme, the top segmented control, top add bar, and bottom nav should share the same off-white nav color from the reference.
-- The segmented Year/Month/Week/Day/Agenda header should sit at the top of the calendar nav area, above the add action bar.
+- In Light theme, segmented control should use Screen `#F7F7F7`, Disabled-border tint, and Cancel `#EFEFEF` selected chip like the reference.
+- In Dark theme, segmented control should use Screen `#000000`, Disabled-border tint, and Dialog `#1E1E1E` selected chip.
+- In Light theme, the top segmented control, top add bar, calendar surface, and bottom nav should use Screen `#F7F7F7`.
+- The date/year label (`YYYY/M` or year-only in Year view) should sit in the top action bar beside the `+`.
+- The segmented Year/Month/Week/Day/Agenda control should sit below the top action bar, not above it.
 - `Agenda` should render fully, not as `Agen...`.
 - Tapping each segment should switch active view immediately and persist selected view.
 - UI should no longer show heavy borders around most elements.
@@ -453,8 +1039,8 @@ Manual:
 - Settings large header back arrow should align horizontally with option labels below.
 - Dropdown labels should be normal weight.
 - Text should no longer look monospace.
-- Bottom nav should be visible and match the rounded dark reference.
-- In Light theme, bottom nav should use the same white/light-gray combination as the reference, with red active Calendar and gray inactive items.
+- Bottom nav should be visible and match the reference: flat full-width bar, no rounded top/shadow, top divider only.
+- Bottom nav should use Screen color for the background, red active item, and Secondary color for inactive items in both themes.
 - Month view should not show other-month day numbers.
 - Week/Day hour grids should show visible block cells even when background is white.
 - Week/Day grid background must remain white; only thin grid lines should be visible.
@@ -480,7 +1066,11 @@ Manual:
 - Add a Weekly repeating event; it should show on the same weekday in later weeks.
 - Add a Monthly repeating event; it should show on the same day number in later months, skipping months where that day does not exist.
 - Tap a recurring instance; Edit should prefill title/time/repeat/reminder.
-- Delete a recurring instance; the whole series should disappear.
+- In a recurring instance editor, `Apply to` should default to `This event`.
+- For a recurring instance, choose `This event`, edit title/time, and save; only that occurrence should change and future occurrences should remain.
+- For a recurring instance, choose `Whole series`, edit title/time, and save; the whole series should change.
+- For a recurring instance, choose `This event`, tap `Delete event`; only that occurrence should disappear.
+- For a recurring instance, choose `Whole series`, tap `Delete series`; the whole series should disappear.
 - Tap `+`; Start and End should be filled by default and should open picker sheets, not keyboard/manual typing.
 - Start and End should show full date + time in one row, like `Wed, 17 Jun, 2026 9:00 pm`.
 - There should be no separate `Start time` or `End time` labels.
@@ -512,6 +1102,12 @@ Manual:
 
 Use caveman-ultra and `$android-development`. Work in `D:\Caveman\caveman\Nothing-Calendar`. Read `Docs/HANDOFF.md` first.
 
-Continue DotCal (`com.dotfield.dotcal`). Preserve schema columns/current UI rules and exactly 5 Room tables. Do not run phone/manual UI QA unless explicitly asked. Keep `Docs/HANDOFF.md` updated after each completed step.
+Continue DotCal (`com.dotfield.dotcal`). Preserve existing app behavior/UI when it conflicts with newer roadmap text. Preserve schema columns/current UI rules and exactly 5 Room tables: `calendar_accounts`, `calendar_events`, `event_reminders`, `sync_metadata`, `deleted_event_log`.
 
-let me know when you are ready i have some issue points
+Do not change package name, deep link scheme, or DB filename. Do not run phone/manual UI QA unless explicitly asked. Keep `Docs/HANDOFF.md` updated after each completed step. Build after implementation steps with:
+
+```powershell
+.\gradlew.bat --no-daemon --console=plain :app:assembleDebug
+```
+
+Current next implementation step: Continuation Roadmap Step 1, Event Detail Screen, but keep existing app behavior as source of truth where conflicts exist.
