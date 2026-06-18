@@ -5,7 +5,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-val NRed = Color(0xFFFF0000)
+val NRed = Color(0xFFFF3B30)
 val NBlack = Color(0xFF000000)
 val NWhite = Color(0xFFFFFFFF)
 val NGray = Color(0xFF666666)

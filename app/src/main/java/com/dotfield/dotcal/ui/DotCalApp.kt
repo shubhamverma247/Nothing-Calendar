@@ -1,5 +1,7 @@
 package com.dotfield.dotcal.ui
 
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -31,7 +33,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -52,12 +53,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -71,9 +71,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -82,19 +83,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.datastore.preferences.core.edit
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventEditorData
+import com.dotfield.dotcal.data.baseEventId
+import com.dotfield.dotcal.data.isRecurrenceOccurrence
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.ui.theme.NBlack
-import com.dotfield.dotcal.ui.theme.NDim
-import com.dotfield.dotcal.ui.theme.NGray
-import com.dotfield.dotcal.ui.theme.NLine
 import com.dotfield.dotcal.ui.theme.NRed
 import com.dotfield.dotcal.ui.theme.NWhite
 import java.time.DayOfWeek
@@ -110,8 +110,16 @@ import kotlinx.coroutines.flow.map
 
 private val mono = FontFamily.SansSerif
 private val sheetDateFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMM", Locale.US)
+private val compactDateFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
+private val editorDateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM, yyyy", Locale.US)
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
+private val editorTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
 private const val WEEK_HOUR_HEIGHT_DP = 64f
+private const val BOOT_PREFS = "dotcal_boot"
+private const val BOOT_THEME_KEY = "theme_mode"
+private val lightNavSurface = Color(0xFFFAFAFA)
+private val lightNavBorder = Color(0xFFE1E1E1)
+private val lightNavSelected = Color(0xFFE9E9E9)
 private val reminderOptions = listOf(null, 5, 10, 30)
 private data class RecurrenceOption(val label: String, val rrule: String?)
 private val recurrenceOptions = listOf(
@@ -120,6 +128,7 @@ private val recurrenceOptions = listOf(
     RecurrenceOption("Weekly", "FREQ=WEEKLY"),
     RecurrenceOption("Monthly", "FREQ=MONTHLY"),
 )
+private enum class DateTimeField { Start, End }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -138,11 +147,15 @@ fun DotCalApp(viewModel: DotCalViewModel) {
     var settingsScreen by remember { mutableStateOf(SettingsScreen.Root) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val bootPreferences = remember(context) { context.getSharedPreferences(BOOT_PREFS, android.content.Context.MODE_PRIVATE) }
+    val bootThemeMode = remember(bootPreferences) {
+        DotCalThemeMode.fromStorage(bootPreferences.getString(BOOT_THEME_KEY, null))
+    }
     val themeMode by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             DotCalThemeMode.fromStorage(preferences[CalendarPreferences.KEY_THEME_MODE])
         }
-    }.collectAsState(initial = DotCalThemeMode.System)
+    }.collectAsState(initial = bootThemeMode)
     val storedCalendarTab by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             CalendarTab.fromStorage(preferences[CalendarPreferences.KEY_DEFAULT_VIEW])
@@ -154,7 +167,13 @@ fun DotCalApp(viewModel: DotCalViewModel) {
     }
     val activeCalendarTab = calendarTab ?: storedCalendarTab
     val systemDark = isSystemInDarkTheme()
-    val palette = remember(themeMode, systemDark) { dotCalPalette(themeMode, systemDark) }
+    val resolvedThemeMode = themeMode
+    val palette = remember(resolvedThemeMode, systemDark) { resolvedThemeMode?.let { dotCalPalette(it, systemDark) } ?: dotCalBootPalette() }
+    LaunchedEffect(resolvedThemeMode) {
+        resolvedThemeMode?.let { mode ->
+            bootPreferences.edit().putString(BOOT_THEME_KEY, mode.name).apply()
+        }
+    }
     fun selectCalendarTab(tab: CalendarTab) {
         calendarTab = tab
         scope.launch {
@@ -163,35 +182,79 @@ fun DotCalApp(viewModel: DotCalViewModel) {
             }
         }
     }
+    fun closeTopSurface() {
+        when {
+            addSheet -> {
+                editingEvent = null
+                addSheet = false
+            }
+            screenTab == ScreenTab.Settings && settingsScreen != SettingsScreen.Root -> {
+                settingsScreen = SettingsScreen.Root
+            }
+            screenTab == ScreenTab.Settings -> {
+                settingsScreen = SettingsScreen.Root
+                screenTab = previousScreenTab
+            }
+            screenTab == ScreenTab.Tasks -> {
+                screenTab = ScreenTab.Calendar
+                previousScreenTab = ScreenTab.Calendar
+            }
+        }
+    }
+    BackHandler(enabled = addSheet || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks) {
+        closeTopSurface()
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         val visibleMainTab = if (screenTab == ScreenTab.Settings) previousScreenTab else screenTab
-        Scaffold(containerColor = palette.background) { padding ->
+        Scaffold(
+            containerColor = palette.background,
+            bottomBar = {
+                DotCalBottomNav(
+                    selected = screenTab,
+                    palette = palette,
+                    onCalendar = {
+                        settingsScreen = SettingsScreen.Root
+                        screenTab = ScreenTab.Calendar
+                        previousScreenTab = ScreenTab.Calendar
+                    },
+                    onTasks = {
+                        settingsScreen = SettingsScreen.Root
+                        previousScreenTab = ScreenTab.Calendar
+                        screenTab = ScreenTab.Tasks
+                    },
+                    onSettings = {
+                        previousScreenTab = if (screenTab == ScreenTab.Settings) previousScreenTab else screenTab
+                        settingsScreen = SettingsScreen.Root
+                        screenTab = ScreenTab.Settings
+                    },
+                )
+            },
+        ) { padding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(palette.background)
                     .padding(padding),
             ) {
+                if (visibleMainTab == ScreenTab.Calendar) {
+                    CalendarViewSegmentedControl(
+                        selected = activeCalendarTab,
+                        palette = palette,
+                        onSelected = {
+                            screenTab = ScreenTab.Calendar
+                            previousScreenTab = ScreenTab.Calendar
+                            selectCalendarTab(it)
+                        },
+                    )
+                }
                 CalendarActionBar(
-                    selected = activeCalendarTab,
                     palette = palette,
                     onAdd = {
                         addStartTime = LocalTime.of(9, 0)
                         editingEvent = null
                         addSheet = true
                     },
-                    onSelected = {
-                        screenTab = ScreenTab.Calendar
-                        previousScreenTab = ScreenTab.Calendar
-                        selectCalendarTab(it)
-                    },
-                    onOpenSettings = {
-                        previousScreenTab = if (screenTab == ScreenTab.Settings) previousScreenTab else screenTab
-                        settingsScreen = SettingsScreen.Root
-                        screenTab = ScreenTab.Settings
-                    },
-                    onOpenTasks = { screenTab = ScreenTab.Tasks },
                 )
                 when (visibleMainTab) {
                 ScreenTab.Calendar -> {
@@ -285,12 +348,13 @@ fun DotCalApp(viewModel: DotCalViewModel) {
             modifier = Modifier.fillMaxSize(),
         ) {
             SettingsPreview(
-                themeMode = themeMode,
+                themeMode = resolvedThemeMode ?: DotCalThemeMode.System,
                 palette = palette,
                 screen = settingsScreen,
-                onBack = { screenTab = previousScreenTab },
+                onBack = { closeTopSurface() },
                 onScreenChange = { settingsScreen = it },
                 onThemeSelected = { selectedTheme ->
+                    bootPreferences.edit().putString(BOOT_THEME_KEY, selectedTheme.name).apply()
                     scope.launch {
                         context.calendarPreferencesDataStore.edit { preferences ->
                             preferences[CalendarPreferences.KEY_THEME_MODE] = selectedTheme.name
@@ -309,7 +373,7 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                 event = editingEvent,
                 selectedDate = selectedDate,
                 selectedTime = addStartTime,
-                initialReminderMinutes = editingEvent?.let { event -> reminders.firstOrNull { it.eventId == event.id }?.minutesBefore },
+                initialReminderMinutes = editingEvent?.let { event -> reminders.firstOrNull { it.eventId == event.baseEventId() }?.minutesBefore },
                 palette = palette,
                 onDismiss = {
                     editingEvent = null
@@ -328,6 +392,10 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                     }
                 },
             )
+        }
+        BackHandler(enabled = addSheet) {
+            editingEvent = null
+            addSheet = false
         }
     }
 
@@ -355,23 +423,16 @@ fun DotCalApp(viewModel: DotCalViewModel) {
 
 @Composable
 private fun CalendarActionBar(
-    selected: CalendarTab,
     palette: DotCalPalette,
     onAdd: () -> Unit,
-    onSelected: (CalendarTab) -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenTasks: () -> Unit,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
-    var moreOpen by remember { mutableStateOf(false) }
-    val menuSurface = if (palette.isDark) Color(0xFF191919) else palette.calendarSurface
-    val menuText = palette.primaryText
     val topIconTint = if (palette.isDark) NWhite else palette.accent
+    val surface = if (palette.isDark) palette.calendarSurface else lightNavSurface
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .background(palette.calendarSurface)
+            .background(surface)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.End,
@@ -383,162 +444,215 @@ private fun CalendarActionBar(
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add event", tint = topIconTint)
             }
-            Box {
-                IconButton(
-                    onClick = { menuOpen = true },
-                    modifier = Modifier.size(44.dp),
-                ) {
-                    CalendarTabIcon(tab = selected, tint = topIconTint)
-                }
-                DropdownMenu(
-                    expanded = menuOpen,
-                    onDismissRequest = { menuOpen = false },
-                    modifier = Modifier.background(menuSurface),
-                ) {
-                    CalendarTab.pickerEntries.forEach { tab ->
-                        val selectedTab = selected == tab
-                        DropdownMenuItem(
-                            modifier = Modifier.background(menuSurface),
-                            text = {
-                                Text(
-                                    tab.label,
-                                    color = menuText,
-                                    fontFamily = mono,
-                                    fontWeight = FontWeight.Normal,
-                                    fontSize = 18.sp,
-                                )
-                            },
-                            trailingIcon = {
-                                if (selectedTab) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = menuText)
-                                }
-                            },
-                            onClick = {
-                                onSelected(tab)
-                                menuOpen = false
-                            },
-                        )
-                    }
-                }
-            }
-            Box {
-                IconButton(
-                    onClick = { moreOpen = true },
-                    modifier = Modifier.size(44.dp),
-                ) {
-                    VerticalDotsIcon(tint = if (palette.isDark) NWhite else palette.primaryText)
-                }
-                DropdownMenu(
-                    expanded = moreOpen,
-                    onDismissRequest = { moreOpen = false },
-                    modifier = Modifier.background(menuSurface),
-                ) {
-                    DropdownMenuItem(
-                        modifier = Modifier.background(menuSurface),
-                        text = {
-                            Text("Settings", color = menuText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 18.sp)
-                        },
-                        onClick = {
-                            onOpenSettings()
-                            moreOpen = false
-                        },
-                    )
-                    DropdownMenuItem(
-                        modifier = Modifier.background(menuSurface),
-                        text = {
-                            Text("Tasks", color = menuText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 18.sp)
-                        },
-                        onClick = {
-                            onOpenTasks()
-                            moreOpen = false
-                        },
-                    )
-                }
-            }
         }
     }
 }
 
 @Composable
-private fun VerticalDotsIcon(tint: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(24.dp)) {
-        drawCircle(tint, radius = 1.8.dp.toPx(), center = Offset(size.width / 2f, 6.dp.toPx()))
-        drawCircle(tint, radius = 1.8.dp.toPx(), center = Offset(size.width / 2f, size.height / 2f))
-        drawCircle(tint, radius = 1.8.dp.toPx(), center = Offset(size.width / 2f, size.height - 6.dp.toPx()))
-    }
-}
-
-@Composable
-private fun CalendarTabs(selected: CalendarTab, palette: DotCalPalette, onSelected: (CalendarTab) -> Unit) {
-    TabRow(
-        selectedTabIndex = selected.ordinal,
-        containerColor = palette.background,
-        contentColor = palette.primaryText,
+private fun DotCalBottomNav(
+    selected: ScreenTab,
+    palette: DotCalPalette,
+    onCalendar: () -> Unit,
+    onTasks: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    val surface = if (palette.isDark) Color(0xFF101010) else lightNavSurface
+    val border = if (palette.isDark) palette.line.copy(alpha = 0.6f) else lightNavBorder
+    val active = palette.accent
+    val inactive = if (palette.isDark) palette.secondaryText else Color(0xFF5F6368)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(104.dp)
+            .shadow(20.dp, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), clip = false)
+            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            .background(surface)
+            .drawBehind {
+                drawLine(
+                    border,
+                    Offset(0f, 0f),
+                    Offset(size.width, 0f),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
+            .padding(horizontal = 28.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        CalendarTab.entries.forEach { tab ->
-            Tab(
-                selected = selected == tab,
-                onClick = { onSelected(tab) },
-                text = {
+        BottomNavItem(
+            label = "Calendar",
+            selected = selected == ScreenTab.Calendar,
+            activeColor = active,
+            inactiveColor = inactive,
+            icon = { tint -> BottomCalendarIcon(tint) },
+            onClick = onCalendar,
+        )
+        BottomNavItem(
+            label = "Tasks",
+            selected = selected == ScreenTab.Tasks,
+            activeColor = active,
+            inactiveColor = inactive,
+            icon = { tint -> BottomTaskIcon(tint) },
+            onClick = onTasks,
+        )
+        BottomNavItem(
+            label = "Settings",
+            selected = selected == ScreenTab.Settings,
+            activeColor = active,
+            inactiveColor = inactive,
+            icon = { tint -> BottomSettingsIcon(tint) },
+            onClick = onSettings,
+        )
+    }
+}
+
+@Composable
+private fun BottomNavItem(
+    label: String,
+    selected: Boolean,
+    activeColor: Color,
+    inactiveColor: Color,
+    icon: @Composable (Color) -> Unit,
+    onClick: () -> Unit,
+) {
+    val tint = if (selected) activeColor else inactiveColor
+    Column(
+        modifier = Modifier
+            .width(82.dp)
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        icon(tint)
+        Spacer(modifier = Modifier.height(7.dp))
+        Text(
+            label,
+            color = tint,
+            fontFamily = mono,
+            fontSize = 14.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun CalendarViewSegmentedControl(
+    selected: CalendarTab,
+    palette: DotCalPalette,
+    onSelected: (CalendarTab) -> Unit,
+) {
+    val segmentShape = RoundedCornerShape(28.dp)
+    val compactTabs = CalendarTab.pickerEntries
+    val segmentSurface = if (palette.isDark) palette.calendarSurface else lightNavSurface
+    val segmentBorder = if (palette.isDark) palette.line.copy(alpha = 0.85f) else lightNavBorder
+    val segmentSelected = if (palette.isDark) palette.segmentSelected else lightNavSelected
+    val inactiveText = if (palette.isDark) palette.secondaryText else Color(0xFF303236)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (palette.isDark) palette.calendarSurface else lightNavSurface)
+            .padding(horizontal = 0.dp, vertical = 0.dp)
+            .height(44.dp)
+            .clip(segmentShape)
+            .background(segmentSurface)
+            .drawBehind {
+                drawRoundRect(
+                    color = segmentBorder,
+                    size = size,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(28.dp.toPx(), 28.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            }
+            .padding(horizontal = 20.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        compactTabs.forEach { tab ->
+            val isSelected = selected == tab
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) segmentSelected else Color.Transparent)
+                    .clickable { onSelected(tab) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier.padding(horizontal = if (isSelected) 14.dp else 0.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Text(
-                        tab.label,
+                        tab.shortLabel,
                         fontFamily = mono,
-                        fontSize = 12.sp,
-                        color = if (selected == tab) palette.primaryText else palette.secondaryText,
+                        color = if (selected == tab) palette.primaryText else inactiveText,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                        fontSize = 17.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
                     )
-                },
-            )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun CalendarTabIcon(tab: CalendarTab, tint: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(26.dp)) {
+private fun BottomCalendarIcon(tint: Color) {
+    Canvas(modifier = Modifier.size(28.dp)) {
         val stroke = Stroke(width = 2.2.dp.toPx())
-        val radius = 4.dp.toPx()
+        val left = 4.dp.toPx()
+        val top = 5.dp.toPx()
+        val right = size.width - 4.dp.toPx()
+        val bottom = size.height - 3.dp.toPx()
         drawRoundRect(
             color = tint,
-            topLeft = Offset(3.dp.toPx(), 4.dp.toPx()),
-            size = Size(size.width - 6.dp.toPx(), size.height - 7.dp.toPx()),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius),
+            topLeft = Offset(left, top),
+            size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx(), 3.dp.toPx()),
             style = stroke,
         )
-        drawLine(tint, Offset(7.dp.toPx(), 2.dp.toPx()), Offset(7.dp.toPx(), 7.dp.toPx()), strokeWidth = 2.2.dp.toPx())
-        drawLine(tint, Offset(size.width - 7.dp.toPx(), 2.dp.toPx()), Offset(size.width - 7.dp.toPx(), 7.dp.toPx()), strokeWidth = 2.2.dp.toPx())
-        drawLine(tint, Offset(5.dp.toPx(), 10.dp.toPx()), Offset(size.width - 5.dp.toPx(), 10.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+        drawLine(tint, Offset(left, 11.dp.toPx()), Offset(right, 11.dp.toPx()), strokeWidth = 2.dp.toPx())
+        drawLine(tint, Offset(9.dp.toPx(), 2.dp.toPx()), Offset(9.dp.toPx(), 7.dp.toPx()), strokeWidth = 2.2.dp.toPx())
+        drawLine(tint, Offset(19.dp.toPx(), 2.dp.toPx()), Offset(19.dp.toPx(), 7.dp.toPx()), strokeWidth = 2.2.dp.toPx())
+        drawCircle(tint, radius = 1.5.dp.toPx(), center = Offset(10.dp.toPx(), 16.dp.toPx()))
+        drawCircle(tint, radius = 1.5.dp.toPx(), center = Offset(15.dp.toPx(), 16.dp.toPx()))
+        drawCircle(tint, radius = 1.5.dp.toPx(), center = Offset(20.dp.toPx(), 16.dp.toPx()))
+    }
+}
 
-        when (tab) {
-            CalendarTab.Year -> {
-                drawLine(tint, Offset(8.dp.toPx(), 15.dp.toPx()), Offset(size.width - 8.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-            }
-            CalendarTab.Month -> {
-                for (row in 0..1) {
-                    for (col in 0..2) {
-                        drawCircle(tint, radius = 1.4.dp.toPx(), center = Offset((9 + col * 4).dp.toPx(), (15 + row * 4).dp.toPx()))
-                    }
-                }
-            }
-            CalendarTab.Week -> {
-                drawLine(tint, Offset(7.dp.toPx(), 15.dp.toPx()), Offset(size.width - 7.dp.toPx(), 15.dp.toPx()), strokeWidth = 2.2.dp.toPx())
-                drawLine(tint, Offset(7.dp.toPx(), 19.dp.toPx()), Offset(size.width - 11.dp.toPx(), 19.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-            }
-            CalendarTab.Day -> {
-                drawCircle(tint, radius = 2.dp.toPx(), center = Offset(10.dp.toPx(), 17.dp.toPx()))
-                drawLine(tint, Offset(14.dp.toPx(), 17.dp.toPx()), Offset(size.width - 7.dp.toPx(), 17.dp.toPx()), strokeWidth = 2.dp.toPx())
-            }
-            CalendarTab.ThreeDay -> {
-                drawLine(tint, Offset(8.dp.toPx(), 14.dp.toPx()), Offset(8.dp.toPx(), 21.dp.toPx()), strokeWidth = 2.dp.toPx())
-                drawLine(tint, Offset(13.dp.toPx(), 14.dp.toPx()), Offset(13.dp.toPx(), 21.dp.toPx()), strokeWidth = 2.dp.toPx())
-                drawLine(tint, Offset(18.dp.toPx(), 14.dp.toPx()), Offset(18.dp.toPx(), 21.dp.toPx()), strokeWidth = 2.dp.toPx())
-            }
-            CalendarTab.Agenda -> {
-                drawLine(tint, Offset(8.dp.toPx(), 15.dp.toPx()), Offset(16.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-                drawLine(tint, Offset(8.dp.toPx(), 19.dp.toPx()), Offset(14.dp.toPx(), 19.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-                drawLine(tint, Offset(17.dp.toPx(), 19.dp.toPx()), Offset(20.dp.toPx(), 22.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-                drawLine(tint, Offset(20.dp.toPx(), 22.dp.toPx()), Offset(24.dp.toPx(), 16.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-            }
+@Composable
+private fun BottomTaskIcon(tint: Color) {
+    Canvas(modifier = Modifier.size(30.dp)) {
+        val stroke = Stroke(width = 2.2.dp.toPx())
+        drawCircle(tint, radius = 12.dp.toPx(), center = Offset(size.width / 2f, size.height / 2f), style = stroke)
+        drawLine(tint, Offset(10.dp.toPx(), 15.dp.toPx()), Offset(14.dp.toPx(), 19.dp.toPx()), strokeWidth = 2.2.dp.toPx())
+        drawLine(tint, Offset(14.dp.toPx(), 19.dp.toPx()), Offset(21.dp.toPx(), 11.dp.toPx()), strokeWidth = 2.2.dp.toPx())
+    }
+}
+
+@Composable
+private fun BottomSettingsIcon(tint: Color) {
+    Canvas(modifier = Modifier.size(30.dp)) {
+        val stroke = Stroke(width = 2.1.dp.toPx())
+        val center = Offset(size.width / 2f, size.height / 2f)
+        repeat(8) { index ->
+            val angle = Math.toRadians((index * 45).toDouble())
+            val start = Offset(
+                center.x + kotlin.math.cos(angle).toFloat() * 9.dp.toPx(),
+                center.y + kotlin.math.sin(angle).toFloat() * 9.dp.toPx(),
+            )
+            val end = Offset(
+                center.x + kotlin.math.cos(angle).toFloat() * 13.dp.toPx(),
+                center.y + kotlin.math.sin(angle).toFloat() * 13.dp.toPx(),
+            )
+            drawLine(tint, start, end, strokeWidth = 2.1.dp.toPx())
         }
+        drawCircle(tint, radius = 9.dp.toPx(), center = center, style = stroke)
+        drawCircle(tint, radius = 3.dp.toPx(), center = center, style = stroke)
     }
 }
 
@@ -574,13 +688,12 @@ private fun MonthView(
             },
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(56.dp).background(palette.calendarSurface),
+            modifier = Modifier.fillMaxWidth().height(58.dp).background(palette.calendarSurface),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start,
         ) {
             Column(modifier = Modifier.padding(start = 16.dp).clickable(onClick = onJumpToday), horizontalAlignment = Alignment.Start) {
-                Text("${month.year}/${month.monthValue}", fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = palette.primaryText)
-                Text("Local / Device calendar", fontFamily = mono, fontSize = 9.sp, color = palette.secondaryText)
+                Text("${month.year}/${month.monthValue}", fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 28.sp, color = palette.primaryText)
             }
         }
 
@@ -709,7 +822,7 @@ private fun WeekView(
             },
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(56.dp).background(palette.calendarSurface),
+            modifier = Modifier.fillMaxWidth().height(58.dp).background(palette.calendarSurface),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start,
         ) {
@@ -719,9 +832,8 @@ private fun WeekView(
                     color = palette.primaryText,
                     fontFamily = mono,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
+                    fontSize = 28.sp,
                 )
-                Text("Week", color = palette.secondaryText, fontFamily = mono, fontSize = 9.sp)
             }
         }
 
@@ -930,7 +1042,7 @@ private fun DayView(
 
     Column(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(56.dp).background(palette.calendarSurface),
+            modifier = Modifier.fillMaxWidth().height(58.dp).background(palette.calendarSurface),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start,
         ) {
@@ -940,9 +1052,8 @@ private fun DayView(
                     color = palette.primaryText,
                     fontFamily = mono,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
+                    fontSize = 28.sp,
                 )
-                Text("Day", color = palette.secondaryText, fontFamily = mono, fontSize = 9.sp)
             }
         }
 
@@ -1073,8 +1184,8 @@ private fun EventListSheet(
     onAdd: () -> Unit,
     onEdit: (CalendarEvent) -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.calendarSurface, contentColor = palette.primaryText) {
-        Column(modifier = Modifier.fillMaxWidth().background(palette.calendarSurface).padding(horizontal = 20.dp, vertical = 12.dp)) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.dialogSurface, contentColor = palette.primaryText) {
+        Column(modifier = Modifier.fillMaxWidth().background(palette.dialogSurface).padding(horizontal = 20.dp, vertical = 12.dp)) {
             Box(modifier = Modifier.align(Alignment.CenterHorizontally).size(width = 32.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(palette.dimText))
             Spacer(modifier = Modifier.height(20.dp))
             Text(selectedDate.format(sheetDateFormatter), fontFamily = mono, fontSize = 16.sp, color = palette.primaryText)
@@ -1112,28 +1223,36 @@ private fun EventEditorScreen(
     val editorDate = event?.localDate() ?: selectedDate
     val initialStart = event?.startLocalTime() ?: selectedTime
     val initialEnd = event?.endLocalTime() ?: selectedTime.plusHours(1)
+    val initialEndDate = event?.endLocalDateForEditor() ?: editorDate
     var title by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.title.orEmpty()) }
     var description by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.description.orEmpty()) }
     var location by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.location.orEmpty()) }
-    var startText by remember(event?.id, editorDate, selectedTime) { mutableStateOf(initialStart.format(timeFormatter)) }
-    var endText by remember(event?.id, editorDate, selectedTime) { mutableStateOf(initialEnd.format(timeFormatter)) }
+    var startDate by remember(event?.id, editorDate, selectedTime) { mutableStateOf(editorDate) }
+    var endDate by remember(event?.id, editorDate, selectedTime) { mutableStateOf(maxOf(editorDate, initialEndDate)) }
+    var startTime by remember(event?.id, editorDate, selectedTime) { mutableStateOf(initialStart) }
+    var endTime by remember(event?.id, editorDate, selectedTime) { mutableStateOf(coerceEndAfterStart(initialStart, initialEnd)) }
     var allDay by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.isAllDay == 1) }
     var reminderMinutes by remember(event?.id, editorDate, selectedTime, initialReminderMinutes) { mutableStateOf(initialReminderMinutes) }
     var recurrenceRule by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.rrule) }
+    var dateTimePicker by remember { mutableStateOf<DateTimeField?>(null) }
+    var showReminderPicker by remember { mutableStateOf(false) }
+    var showRepeatPicker by remember { mutableStateOf(false) }
     var submitted by remember { mutableStateOf(false) }
+    val editsWholeSeries = event?.rrule != null || event?.isRecurrenceOccurrence() == true
     fun trySave() {
         submitted = true
-        val validStart = parseEditorTime(startText)
-        val validEnd = parseEditorTime(endText)
-        if (title.isNotBlank() && (allDay || (validStart != null && validEnd != null && validEnd.isAfter(validStart)))) {
+        val startDateTime = startDate.atTime(startTime)
+        val endDateTime = endDate.atTime(endTime)
+        if (title.isNotBlank() && (if (allDay) endDate >= startDate else endDateTime.isAfter(startDateTime))) {
             onSave(
                 EventEditorData(
                     title = title,
                     description = description,
                     location = location,
-                    date = editorDate,
-                    startTime = validStart ?: LocalTime.MIDNIGHT,
-                    endTime = validEnd ?: LocalTime.MIDNIGHT,
+                    date = startDate,
+                    endDate = endDate,
+                    startTime = startTime,
+                    endTime = endTime,
                     isAllDay = allDay,
                     reminderMinutes = reminderMinutes,
                     rrule = recurrenceRule,
@@ -1216,74 +1335,424 @@ private fun EventEditorScreen(
                     ),
                 )
             }
-            if (!allDay) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = startText,
-                        onValueChange = { startText = it.take(5) },
-                        modifier = Modifier.weight(1f),
-                        label = { Text("Start", fontFamily = mono) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                    )
-                    OutlinedTextField(
-                        value = endText,
-                        onValueChange = { endText = it.take(5) },
-                        modifier = Modifier.weight(1f),
-                        label = { Text("End", fontFamily = mono) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                    )
-                }
-            }
-            Text(editorDate.format(sheetDateFormatter), modifier = Modifier.padding(top = 12.dp), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            EditorValueRow(
+                title = "Starts",
+                value = if (allDay) startDate.format(editorDateFormatter) else dateTimeLabel(startDate, startTime),
+                palette = palette,
+                onClick = { dateTimePicker = DateTimeField.Start },
+            )
+            EditorValueRow(
+                title = "Ends",
+                value = if (allDay) endDate.format(editorDateFormatter) else dateTimeLabel(endDate, endTime),
+                palette = palette,
+                onClick = { dateTimePicker = DateTimeField.End },
+            )
             Spacer(modifier = Modifier.height(12.dp))
-            Text("Reminder", color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                reminderOptions.forEach { minutes ->
-                    val selected = reminderMinutes == minutes
-                    Box(
-                        modifier = Modifier
-                            .background(if (selected) palette.accent.copy(alpha = 0.12f) else palette.cell)
-                            .clickable { reminderMinutes = minutes }
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                    ) {
-                        Text(minutes?.let { "${it}m" } ?: "None", color = if (selected) palette.accent else palette.primaryText, fontFamily = mono, fontSize = 12.sp)
-                    }
-                }
+            EditorValueRow(
+                title = "Reminder",
+                value = reminderLabel(reminderMinutes),
+                palette = palette,
+                onClick = { showReminderPicker = true },
+            )
+            EditorValueRow(
+                title = "Repeat",
+                value = recurrenceOptions.firstOrNull { it.rrule == recurrenceRule }?.label ?: "None",
+                palette = palette,
+                onClick = { showRepeatPicker = true },
+            )
+            if (editsWholeSeries) {
+                Text(
+                    "Changes apply to the whole series",
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
-            Spacer(modifier = Modifier.height(18.dp))
-            Text("Repeat", color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                recurrenceOptions.forEach { option ->
-                    val selected = recurrenceRule == option.rrule
-                    Box(
-                        modifier = Modifier
-                            .background(if (selected) palette.accent.copy(alpha = 0.12f) else palette.cell)
-                            .clickable { recurrenceRule = option.rrule }
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                    ) {
-                        Text(option.label, color = if (selected) palette.accent else palette.primaryText, fontFamily = mono, fontSize = 12.sp)
-                    }
-                }
+            if (submitted && allDay && endDate < startDate) {
+                Text("End date must be on or after start date", color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
             }
-            val start = parseEditorTime(startText)
-            val end = parseEditorTime(endText)
-            if (submitted && !allDay && (start == null || end == null || !end.isAfter(start))) {
-                Text("Use HH:mm and end after start", color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+            if (submitted && !allDay && !endDate.atTime(endTime).isAfter(startDate.atTime(startTime))) {
+                Text("End must be after start", color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
             }
             if (event != null && onDelete != null) {
                 Button(
                     onClick = onDelete,
                     modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.cell, contentColor = palette.accent),
                     shape = RoundedCornerShape(0.dp),
                 ) {
-                    Text("Delete event", fontFamily = mono)
+                    Text(if (editsWholeSeries) "Delete series" else "Delete event", fontFamily = mono)
                 }
             }
             Spacer(modifier = Modifier.height(28.dp))
         }
+    }
+    dateTimePicker?.let { field ->
+        DateTimeChoiceSheet(
+            title = if (field == DateTimeField.Start) "From" else "To",
+            selectedDate = if (field == DateTimeField.Start) startDate else endDate,
+            selectedTime = if (field == DateTimeField.Start) startTime else endTime,
+            minDate = if (field == DateTimeField.End) startDate else null,
+            includeTime = !allDay,
+            palette = palette,
+            onDismiss = { dateTimePicker = null },
+            onSelected = { pickedDate, pickedTime ->
+                if (field == DateTimeField.Start) {
+                    val deltaDays = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate).coerceAtLeast(0)
+                    startDate = pickedDate
+                    startTime = pickedTime
+                    endDate = pickedDate.plusDays(deltaDays)
+                    if (!allDay && !endDate.atTime(endTime).isAfter(startDate.atTime(startTime))) {
+                        endTime = coerceEndAfterStart(pickedTime, endTime)
+                    }
+                } else {
+                    endDate = pickedDate
+                    endTime = pickedTime
+                    if (!allDay && !endDate.atTime(endTime).isAfter(startDate.atTime(startTime))) {
+                        endDate = startDate
+                        endTime = coerceEndAfterStart(startTime, endTime)
+                    }
+                }
+                dateTimePicker = null
+            },
+        )
+    }
+    if (showReminderPicker) {
+        ReminderChoiceSheet(
+            selected = reminderMinutes,
+            palette = palette,
+            onDismiss = { showReminderPicker = false },
+            onSelected = {
+                reminderMinutes = it
+                showReminderPicker = false
+            },
+        )
+    }
+    if (showRepeatPicker) {
+        RepeatChoiceSheet(
+            selected = recurrenceRule,
+            palette = palette,
+            onDismiss = { showRepeatPicker = false },
+            onSelected = {
+                recurrenceRule = it
+                showRepeatPicker = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun EditorValueRow(title: String, value: String, palette: DotCalPalette, onClick: () -> Unit, visible: Boolean = true) {
+    if (!visible) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .drawBehind {
+                drawLine(palette.line.copy(alpha = 0.55f), Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
+            }
+            .padding(vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, color = palette.primaryText, fontFamily = mono, fontSize = 15.sp, modifier = Modifier.weight(1f))
+        Text(
+            value,
+            color = palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1.35f),
+        )
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateTimeChoiceSheet(
+    title: String,
+    selectedDate: LocalDate,
+    selectedTime: LocalTime,
+    minDate: LocalDate?,
+    includeTime: Boolean,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (LocalDate, LocalTime) -> Unit,
+) {
+    val initialDate = maxOf(selectedDate, minDate ?: selectedDate)
+    val dates = remember(initialDate, minDate) {
+        val start = maxOf(minDate ?: initialDate.minusYears(1), initialDate.minusYears(1))
+        List(731) { start.plusDays(it.toLong()) }
+    }
+    val hours = remember { (0..23).toList() }
+    val minutes = remember { (0..59).toList() }
+    var pickedDate by remember { mutableStateOf(initialDate) }
+    var pickedHour by remember { mutableStateOf(selectedTime.hour) }
+    var pickedMinute by remember { mutableStateOf(selectedTime.minute) }
+    val dialogBackground = palette.dialogSurface
+
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = dialogBackground, contentColor = palette.primaryText) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(dialogBackground)
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(title, color = palette.primaryText, fontFamily = mono, fontSize = 20.sp)
+            Text(
+                if (includeTime) dateTimeLabel(pickedDate, LocalTime.of(pickedHour, pickedMinute)) else pickedDate.format(editorDateFormatter),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 15.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().height(188.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WheelColumn(
+                    items = dates,
+                    selected = pickedDate,
+                    label = { it.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)) },
+                    palette = palette,
+                    modifier = Modifier.weight(1.8f),
+                    onSelected = { pickedDate = it },
+                )
+                if (includeTime) {
+                    WheelColumn(
+                        items = hours,
+                        selected = pickedHour,
+                        label = { it.toString().padStart(2, '0') },
+                        palette = palette,
+                        modifier = Modifier.weight(0.7f),
+                        circular = true,
+                        onSelected = { pickedHour = it },
+                    )
+                    WheelColumn(
+                        items = minutes,
+                        selected = pickedMinute,
+                        label = { it.toString().padStart(2, '0') },
+                        palette = palette,
+                        modifier = Modifier.weight(0.7f),
+                        circular = true,
+                        onSelected = { pickedMinute = it },
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = palette.cancelSurface,
+                        contentColor = palette.primaryText,
+                    ),
+                    shape = RoundedCornerShape(18.dp),
+                ) {
+                    Text("Cancel", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Button(
+                    onClick = { onSelected(pickedDate, LocalTime.of(pickedHour, pickedMinute)) },
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+                    shape = RoundedCornerShape(18.dp),
+                ) {
+                    Text("OK", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun <T> WheelColumn(
+    items: List<T>,
+    selected: T,
+    label: (T) -> String,
+    palette: DotCalPalette,
+    modifier: Modifier = Modifier,
+    circular: Boolean = false,
+    onSelected: (T) -> Unit,
+) {
+    val selectedIndex = items.indexOf(selected).coerceAtLeast(0)
+    val rowHeight = 56.dp
+    val virtualCount = if (circular && items.isNotEmpty()) items.size * 1000 else items.size
+    val initialIndex = if (circular && items.isNotEmpty()) {
+        (virtualCount / 2 / items.size) * items.size + selectedIndex
+    } else {
+        selectedIndex
+    }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (initialIndex - 1).coerceAtLeast(0))
+    val scope = rememberCoroutineScope()
+    val centeredIndex by remember {
+        derivedStateOf {
+            val layout = listState.layoutInfo
+            val viewportCenter = (layout.viewportStartOffset + layout.viewportEndOffset) / 2
+            layout.visibleItemsInfo.minByOrNull { item ->
+                kotlin.math.abs((item.offset + item.size / 2) - viewportCenter)
+            }?.index ?: initialIndex
+        }
+    }
+    LaunchedEffect(selectedIndex, circular) {
+        if (circular) return@LaunchedEffect
+        listState.scrollToItem((selectedIndex - 1).coerceAtLeast(0))
+    }
+    LaunchedEffect(listState.isScrollInProgress, centeredIndex) {
+        if (!listState.isScrollInProgress && items.isNotEmpty()) {
+            val targetIndex = centeredIndex.coerceIn(0, (virtualCount - 1).coerceAtLeast(0))
+            val targetItemIndex = if (circular) targetIndex % items.size else targetIndex
+            listState.animateScrollToItem((targetIndex - 1).coerceAtLeast(0))
+            if (items[targetItemIndex] != selected) onSelected(items[targetItemIndex])
+        }
+    }
+    LazyColumn(
+        state = listState,
+        modifier = modifier.height(rowHeight * 3),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        items(virtualCount) { index ->
+            val itemIndex = if (circular) index % items.size else index
+            val item = items[itemIndex]
+            val isCentered = index == centeredIndex
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(rowHeight)
+                    .clickable {
+                        scope.launch {
+                            val targetIndex = if (circular && items.isNotEmpty()) {
+                                nearestCircularIndex(centeredIndex, itemIndex, items.size)
+                            } else {
+                                index
+                            }
+                            listState.animateScrollToItem((targetIndex - 1).coerceAtLeast(0))
+                            onSelected(item)
+                        }
+                    }
+                    .padding(horizontal = 2.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label(item),
+                    color = if (isCentered) {
+                        if (palette.isDark) Color.White else palette.primaryText
+                    } else {
+                        palette.secondaryText.copy(alpha = 0.55f)
+                    },
+                    fontFamily = mono,
+                    fontWeight = if (isCentered) FontWeight.SemiBold else FontWeight.Normal,
+                    fontSize = if (isCentered) 23.sp else 17.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeChoiceSheet(
+    title: String,
+    selected: LocalTime,
+    minExclusive: LocalTime?,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (LocalTime) -> Unit,
+) {
+    val times = remember(minExclusive) {
+        buildList {
+            repeat(24 * 4) { index ->
+                val time = LocalTime.MIDNIGHT.plusMinutes(index * 15L)
+                if (minExclusive == null || time.isAfter(minExclusive)) add(time)
+            }
+            if (minExclusive != null && all { it != LocalTime.of(23, 59) } && LocalTime.of(23, 59).isAfter(minExclusive)) {
+                add(LocalTime.of(23, 59))
+            }
+        }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.dialogSurface, contentColor = palette.primaryText) {
+        ChoiceSheetContent(
+            title = title,
+            items = times,
+            selected = selected,
+            label = { it.format(timeFormatter) },
+            palette = palette,
+            onSelected = onSelected,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderChoiceSheet(selected: Int?, palette: DotCalPalette, onDismiss: () -> Unit, onSelected: (Int?) -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.dialogSurface, contentColor = palette.primaryText) {
+        ChoiceSheetContent(
+            title = "Reminder",
+            items = reminderOptions,
+            selected = selected,
+            label = { reminderLabel(it) },
+            palette = palette,
+            onSelected = onSelected,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RepeatChoiceSheet(selected: String?, palette: DotCalPalette, onDismiss: () -> Unit, onSelected: (String?) -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.dialogSurface, contentColor = palette.primaryText) {
+        ChoiceSheetContent(
+            title = "Repeat",
+            items = recurrenceOptions,
+            selected = recurrenceOptions.firstOrNull { it.rrule == selected } ?: recurrenceOptions.first(),
+            label = { it.label },
+            palette = palette,
+            onSelected = { onSelected(it.rrule) },
+        )
+    }
+}
+
+@Composable
+private fun <T> ChoiceSheetContent(
+    title: String,
+    items: List<T>,
+    selected: T,
+    label: (T) -> String,
+    palette: DotCalPalette,
+    onSelected: (T) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().background(palette.dialogSurface).padding(horizontal = 20.dp, vertical = 12.dp)) {
+        Box(modifier = Modifier.align(Alignment.CenterHorizontally).size(width = 32.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(palette.dimText))
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+        LazyColumn(modifier = Modifier.fillMaxWidth().height(320.dp)) {
+            lazyItems(items, key = { label(it) }) { item ->
+                val isSelected = item == selected
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelected(item) }
+                        .padding(vertical = 15.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(label(item), color = palette.primaryText, fontFamily = mono, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    if (isSelected) Icon(Icons.Default.Check, contentDescription = null, tint = palette.primaryText, modifier = Modifier.size(18.dp))
+                }
+                HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
+            }
+        }
+        Spacer(modifier = Modifier.height(20.dp))
     }
 }
 
@@ -1323,8 +1792,7 @@ private fun AgendaPreview(
     LazyColumn(modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(16.dp)) {
         item {
             Column(modifier = Modifier.clickable(onClick = onJumpToday)) {
-                Text("${selectedDate.year}/${selectedDate.monthValue}", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-            Text("Agenda", color = palette.secondaryText, fontFamily = mono, fontSize = 9.sp, modifier = Modifier.padding(top = 2.dp, bottom = 16.dp))
+                Text("${selectedDate.year}/${selectedDate.monthValue}", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 28.sp, modifier = Modifier.padding(bottom = 16.dp))
             }
         }
         if (grouped.isEmpty()) {
@@ -1409,9 +1877,8 @@ private fun ThreeDayView(
                 )
             },
     ) {
-        Column(modifier = Modifier.fillMaxWidth().height(56.dp).background(palette.calendarSurface).padding(start = 16.dp).clickable(onClick = onJumpToday), verticalArrangement = Arrangement.Center) {
-            Text("${selectedDate.year}/${selectedDate.monthValue}", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-            Text("3 Days", color = palette.secondaryText, fontFamily = mono, fontSize = 9.sp)
+        Column(modifier = Modifier.fillMaxWidth().height(58.dp).background(palette.calendarSurface).padding(start = 16.dp).clickable(onClick = onJumpToday), verticalArrangement = Arrangement.Center) {
+            Text("${selectedDate.year}/${selectedDate.monthValue}", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 28.sp)
         }
         Row(modifier = Modifier.fillMaxWidth().height(64.dp).background(palette.calendarSurface)) {
             days.forEach { day ->
@@ -1519,9 +1986,8 @@ private fun YearView(
                 )
             },
     ) {
-        Column(modifier = Modifier.fillMaxWidth().height(56.dp).background(palette.calendarSurface).padding(start = 16.dp).clickable(onClick = onJumpToday), verticalArrangement = Arrangement.Center) {
-            Text(selectedDate.year.toString(), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-            Text("Year", color = palette.secondaryText, fontFamily = mono, fontSize = 9.sp)
+        Column(modifier = Modifier.fillMaxWidth().height(58.dp).background(palette.calendarSurface).padding(start = 16.dp).clickable(onClick = onJumpToday), verticalArrangement = Arrangement.Center) {
+            Text(selectedDate.year.toString(), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 30.sp)
         }
         LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(8.dp)) {
             items(months) { month ->
@@ -1562,45 +2028,75 @@ private fun YearMonthCell(
             Text(month.monthValue.toString().padStart(2, '0'), color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp)
         }
         Spacer(modifier = Modifier.height(5.dp))
-        listOf("S", "M", "T", "W", "T", "F", "S").chunked(7).forEach { labels ->
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                labels.forEach { label ->
-                    Text(label, color = palette.yearWeekday, fontFamily = mono, fontWeight = FontWeight.ExtraBold, fontSize = 7.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-                }
-            }
+        MiniMonthGridCanvas(
+            month = month,
+            days = days,
+            today = today,
+            eventDates = eventDates,
+            palette = palette,
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun MiniMonthGridCanvas(
+    month: LocalDate,
+    days: List<LocalDate>,
+    today: LocalDate,
+    eventDates: Set<LocalDate>,
+    palette: DotCalPalette,
+    modifier: Modifier = Modifier,
+) {
+    val weekdayColor = palette.yearWeekday.toArgb()
+    val secondaryColor = palette.secondaryText.toArgb()
+    val dimColor = palette.dimText.copy(alpha = 0.35f).toArgb()
+    val accentColor = palette.accent.toArgb()
+    val onAccentColor = palette.onAccent.toArgb()
+    Canvas(modifier = modifier) {
+        val nativeCanvas = drawContext.canvas.nativeCanvas
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = weekdayColor
+            textAlign = Paint.Align.CENTER
+            textSize = 7.sp.toPx()
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
-        days.chunked(7).forEach { week ->
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                week.forEach { day ->
-                    val inMonth = day.monthValue == month.monthValue
-                    val hasEvent = day in eventDates
-                    val isToday = day == today
-                    val isWeekdayDate = inMonth && day.dayOfWeek != DayOfWeek.SATURDAY && day.dayOfWeek != DayOfWeek.SUNDAY
-                    Box(modifier = Modifier.weight(1f).height(17.dp), contentAlignment = Alignment.Center) {
-                        Box(
-                            modifier = Modifier
-                                .size(15.dp)
-                                .clip(CircleShape)
-                                .background(if (isToday) palette.accent else Color.Transparent),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                day.dayOfMonth.toString(),
-                                color = when {
-                                    isToday -> palette.onAccent
-                                    !inMonth -> palette.dimText.copy(alpha = 0.35f)
-                                    hasEvent -> palette.accent
-                                    else -> palette.secondaryText
-                                },
-                                fontFamily = mono,
-                                fontWeight = if (isWeekdayDate) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 7.sp,
-                                lineHeight = 7.sp,
-                            )
-                        }
-                    }
-                }
+        val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER
+            textSize = 7.sp.toPx()
+        }
+        val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accentColor
+            style = Paint.Style.FILL
+        }
+        val columnWidth = size.width / 7f
+        val rowHeight = size.height / 7f
+        val labels = listOf("S", "M", "T", "W", "T", "F", "S")
+        labels.forEachIndexed { index, label ->
+            val x = columnWidth * index + columnWidth / 2f
+            val y = rowHeight * 0.58f
+            nativeCanvas.drawText(label, x, y, labelPaint)
+        }
+        days.forEachIndexed { index, day ->
+            val row = index / 7 + 1
+            val column = index % 7
+            val x = columnWidth * column + columnWidth / 2f
+            val y = rowHeight * row + rowHeight * 0.62f
+            val inMonth = day.monthValue == month.monthValue
+            val isToday = day == today
+            val hasEvent = day in eventDates
+            val isWeekdayDate = inMonth && day.dayOfWeek != DayOfWeek.SATURDAY && day.dayOfWeek != DayOfWeek.SUNDAY
+            if (isToday) {
+                nativeCanvas.drawCircle(x, rowHeight * row + rowHeight / 2f, 7.5.dp.toPx(), circlePaint)
             }
+            datePaint.color = when {
+                isToday -> onAccentColor
+                !inMonth -> dimColor
+                hasEvent -> accentColor
+                else -> secondaryColor
+            }
+            datePaint.typeface = Typeface.create(Typeface.DEFAULT, if (isWeekdayDate) Typeface.BOLD else Typeface.NORMAL)
+            nativeCanvas.drawText(day.dayOfMonth.toString(), x, y, datePaint)
         }
     }
 }
@@ -1614,6 +2110,13 @@ private fun SettingsPreview(
     onScreenChange: (SettingsScreen) -> Unit,
     onThemeSelected: (DotCalThemeMode) -> Unit,
 ) {
+    BackHandler {
+        if (screen == SettingsScreen.Theme) {
+            onScreenChange(SettingsScreen.Root)
+        } else {
+            onBack()
+        }
+    }
     when (screen) {
         SettingsScreen.Root -> SettingsRoot(
             themeMode = themeMode,
@@ -1752,7 +2255,7 @@ private fun ThemeSettings(
 private fun SettingsSectionTitle(title: String, palette: DotCalPalette) {
     Text(
         title,
-        color = Color(0xFF9BA3B2),
+        color = palette.secondaryText,
         fontFamily = mono,
         fontSize = 12.sp,
         modifier = Modifier.padding(top = 14.dp, bottom = 8.dp),
@@ -1779,13 +2282,13 @@ private fun SettingsMenuRow(
         Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (value.isNotBlank()) {
-                Text(value, color = Color(0xFFAAAAAA), fontFamily = mono, fontSize = 12.sp)
+                Text(value, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
                 Spacer(modifier = Modifier.width(8.dp))
             }
             if (showStepper) {
-                UpDownChevron(tint = Color(0xFFAAAAAA))
+                UpDownChevron(tint = palette.secondaryText)
             } else {
-                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFFB8B8B8), modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
             }
         }
     }
@@ -1808,7 +2311,7 @@ private fun SettingsToggleRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             if (subtitle != null) {
-                Text(subtitle, color = Color(0xFF777777), fontFamily = mono, fontSize = 11.sp, lineHeight = 12.sp)
+                Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp, lineHeight = 12.sp)
             }
         }
         Switch(
@@ -1818,7 +2321,7 @@ private fun SettingsToggleRow(
                 checkedThumbColor = NWhite,
                 checkedTrackColor = palette.accent,
                 uncheckedThumbColor = NWhite,
-                uncheckedTrackColor = Color(0xFFE5E5E5),
+                uncheckedTrackColor = palette.disabledText,
                 uncheckedBorderColor = Color.Transparent,
             ),
         )
@@ -1832,7 +2335,7 @@ private fun SettingsThemeDropdownRow(
     onThemeSelected: (DotCalThemeMode) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val menuSurface = if (palette.isDark) Color(0xFF191919) else palette.calendarSurface
+    val menuSurface = palette.dialogSurface
     val menuText = palette.primaryText
     Box {
         Row(
@@ -1845,9 +2348,9 @@ private fun SettingsThemeDropdownRow(
         ) {
             Text("Theme", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(themeMode.label, color = Color(0xFFAAAAAA), fontFamily = mono, fontSize = 12.sp)
+                Text(themeMode.label, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
                 Spacer(modifier = Modifier.width(8.dp))
-                UpDownChevron(tint = Color(0xFFAAAAAA))
+                UpDownChevron(tint = palette.secondaryText)
             }
         }
         DropdownMenu(
@@ -2025,12 +2528,43 @@ private fun CalendarEvent.startLocalTime(): LocalTime {
     return Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
 }
 
+private fun CalendarEvent.endLocalDateForEditor(): LocalDate {
+    val endInstant = if (isAllDay == 1) endTimeMs - 1 else endTimeMs
+    return Instant.ofEpochMilli(endInstant).atZone(ZoneId.systemDefault()).toLocalDate()
+}
+
 private fun CalendarEvent.endLocalTime(): LocalTime {
     return Instant.ofEpochMilli(endTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
 }
 
 private fun parseEditorTime(value: String): LocalTime? {
     return runCatching { LocalTime.parse(value, timeFormatter) }.getOrNull()
+}
+
+private fun coerceEndAfterStart(start: LocalTime, end: LocalTime): LocalTime {
+    if (end.isAfter(start)) return end
+    return when {
+        start < LocalTime.of(22, 45) -> start.plusHours(1)
+        start < LocalTime.of(23, 45) -> LocalTime.of(23, 45)
+        else -> LocalTime.of(23, 59)
+    }
+}
+
+private fun reminderLabel(minutes: Int?): String {
+    return minutes?.let { "$it minutes before" } ?: "None"
+}
+
+private fun dateTimeLabel(date: LocalDate, time: LocalTime): String {
+    return "${date.format(editorDateFormatter)} ${time.format(editorTimeFormatter).lowercase(Locale.US)}"
+}
+
+private fun nearestCircularIndex(currentIndex: Int, targetItemIndex: Int, itemCount: Int): Int {
+    if (itemCount <= 0) return currentIndex
+    val currentItemIndex = currentIndex % itemCount
+    val forward = (targetItemIndex - currentItemIndex + itemCount) % itemCount
+    val backward = forward - itemCount
+    val delta = if (kotlin.math.abs(backward) < forward) backward else forward
+    return currentIndex + delta
 }
 
 private fun CalendarEvent.durationMinutes(): Int {
@@ -2056,13 +2590,13 @@ private fun parseColor(hex: String): Int {
     }
 }
 
-private enum class CalendarTab(val label: String) {
-    Year("Year view"),
-    Month("Month view"),
-    Week("Week view"),
-    Day("Day view"),
-    ThreeDay("Three-day view"),
-    Agenda("Agenda view");
+private enum class CalendarTab(val label: String, val shortLabel: String) {
+    Year("Year view", "Year"),
+    Month("Month view", "Month"),
+    Week("Week view", "Week"),
+    Day("Day view", "Day"),
+    ThreeDay("Three-day view", "3 Days"),
+    Agenda("Agenda view", "Agenda");
 
     companion object {
         val pickerEntries = listOf(Year, Month, Week, Day, Agenda)
@@ -2087,6 +2621,10 @@ private data class DotCalPalette(
     val line: Color,
     val cell: Color,
     val calendarSurface: Color,
+    val dialogSurface: Color,
+    val cancelSurface: Color,
+    val segmentSelected: Color,
+    val disabledText: Color,
     val dot: Color,
     val yearWeekday: Color,
     val yearMonthLabel: Color,
@@ -2115,37 +2653,67 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
     }
     return when (resolved) {
         DotCalThemeMode.Dark -> DotCalPalette(
-            background = NBlack,
-            primaryText = Color(0xFFF4F4F4),
-            secondaryText = Color(0xFF9A9A9A),
-            dimText = Color(0xFF555555),
+            background = Color(0xFF000000),
+            primaryText = Color(0xFFFFFFFF),
+            secondaryText = Color(0xFFB3B3B3),
+            dimText = Color(0xFF6E6E6E),
             line = Color(0xFF2A2A2A),
             cell = NBlack,
             calendarSurface = NBlack,
-            dot = Color(0xFFF4F4F4),
+            dialogSurface = Color(0xFF1E1E1E),
+            cancelSurface = Color(0xFF121212),
+            segmentSelected = Color(0xFF2E2E2E),
+            disabledText = Color(0xFF6E6E6E),
+            dot = Color(0xFFFFFFFF),
             yearWeekday = Color(0xFFFFFFFF),
             yearMonthLabel = Color(0xFFFFFFFF),
             accent = NRed,
-            onAccent = NBlack,
+            onAccent = Color(0xFFFFFFFF),
             isDark = true,
         )
         DotCalThemeMode.Light -> DotCalPalette(
-            background = Color(0xFFF7F7F2),
-            primaryText = Color(0xFF111111),
-            secondaryText = Color(0xFF666666),
-            dimText = Color(0xFFAAAAAA),
+            background = Color(0xFFF7F7F7),
+            primaryText = Color(0xFF101010),
+            secondaryText = Color(0xFF6B6B6B),
+            dimText = Color(0xFFBDBDBD),
             line = Color(0xFFD8D8D0),
             cell = Color(0xFFF2F2EC),
-            calendarSurface = NWhite,
-            dot = Color(0xFF111111),
-            yearWeekday = Color(0xFF111111),
-            yearMonthLabel = Color(0xFF111111),
+            calendarSurface = Color(0xFFFFFFFF),
+            dialogSurface = Color(0xFFFFFFFF),
+            cancelSurface = Color(0xFFEFEFEF),
+            segmentSelected = Color(0xFFE7E7E7),
+            disabledText = Color(0xFFBDBDBD),
+            dot = Color(0xFF101010),
+            yearWeekday = Color(0xFF101010),
+            yearMonthLabel = Color(0xFF101010),
             accent = NRed,
             onAccent = NWhite,
             isDark = false,
         )
         DotCalThemeMode.System -> error("System must be resolved before palette creation")
     }
+}
+
+private fun dotCalBootPalette(): DotCalPalette {
+    return DotCalPalette(
+        background = Color(0xFF000000),
+        primaryText = Color(0xFFFFFFFF),
+        secondaryText = Color(0xFFB3B3B3),
+        dimText = Color(0xFF6E6E6E),
+        line = Color(0xFF2A2A2A),
+        cell = NBlack,
+        calendarSurface = NBlack,
+        dialogSurface = Color(0xFF1E1E1E),
+        cancelSurface = Color(0xFF121212),
+        segmentSelected = Color(0xFF2E2E2E),
+        disabledText = Color(0xFF6E6E6E),
+        dot = Color(0xFFFFFFFF),
+        yearWeekday = Color(0xFFFFFFFF),
+        yearMonthLabel = Color(0xFFFFFFFF),
+        accent = NRed,
+        onAccent = Color(0xFFFFFFFF),
+        isDark = true,
+    )
 }
 
 private enum class ScreenTab {

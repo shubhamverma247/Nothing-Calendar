@@ -14,11 +14,18 @@ interface CalendarDao {
     @Query(
         """
         SELECT * FROM calendar_events
-        WHERE isTask = 0 AND startTimeMs < :rangeEndMs AND endTimeMs >= :rangeStartMs
+        WHERE isTask = 0
+        AND (
+            (startTimeMs < :rangeEndMs AND endTimeMs >= :rangeStartMs)
+            OR (rrule IS NOT NULL AND rrule != '' AND startTimeMs < :rangeEndMs)
+        )
         ORDER BY startTimeMs ASC
         """,
     )
     fun observeEvents(rangeStartMs: Long, rangeEndMs: Long): Flow<List<CalendarEvent>>
+
+    @Query("SELECT * FROM calendar_events WHERE id = :eventId LIMIT 1")
+    suspend fun getEvent(eventId: String): CalendarEvent?
 
     @Query(
         """

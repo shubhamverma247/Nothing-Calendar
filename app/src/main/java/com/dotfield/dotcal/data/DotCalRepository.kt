@@ -1,9 +1,12 @@
 package com.dotfield.dotcal.data
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.YearMonth
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 import kotlin.math.absoluteValue
 
@@ -12,6 +15,7 @@ data class EventEditorData(
     val description: String,
     val location: String,
     val date: LocalDate,
+    val endDate: LocalDate,
     val startTime: LocalTime,
     val endTime: LocalTime,
     val isAllDay: Boolean,
@@ -24,6 +28,7 @@ class DotCalRepository(private val dao: CalendarDao) {
         val start = month.withDayOfMonth(1)
         val end = start.plusMonths(1)
         return dao.observeEvents(start.atStartMs(), end.atStartMs())
+            .map { events -> expandRecurringEvents(events, start, end) }
     }
 
     fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks()
@@ -48,20 +53,37 @@ class DotCalRepository(private val dao: CalendarDao) {
     suspend fun saveLocalEvent(existing: CalendarEvent?, data: EventEditorData) {
         require(data.title.isNotBlank()) { "TITLE REQUIRED" }
         val zoneId = ZoneId.systemDefault()
-        val start = if (data.isAllDay) {
-            data.date.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val eventId = existing?.baseEventId() ?: UUID.randomUUID().toString()
+        val existingMaster = if (existing?.isRecurrenceOccurrence() == true) {
+            dao.getEvent(eventId) ?: existing.copy(id = eventId)
         } else {
-            data.date.atTime(data.startTime).atZone(zoneId).toInstant().toEpochMilli()
+            existing
+        }
+        val startDate = if (existing?.isRecurrenceOccurrence() == true && existingMaster?.rrule != null) {
+            existingMaster.startDate()
+        } else {
+            data.date
+        }
+        val endDate = if (existing?.isRecurrenceOccurrence() == true && existingMaster?.rrule != null) {
+            val selectedSpanDays = ChronoUnit.DAYS.between(data.date, data.endDate).coerceAtLeast(0)
+            startDate.plusDays(selectedSpanDays)
+        } else {
+            data.endDate
+        }
+        val start = if (data.isAllDay) {
+            startDate.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        } else {
+            startDate.atTime(data.startTime).atZone(zoneId).toInstant().toEpochMilli()
         }
         val end = if (data.isAllDay) {
-            data.date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+            endDate.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
         } else {
-            data.date.atTime(data.endTime).atZone(zoneId).toInstant().toEpochMilli()
+            endDate.atTime(data.endTime).atZone(zoneId).toInstant().toEpochMilli()
         }
         require(end > start) { "END MUST BE AFTER START" }
         val now = System.currentTimeMillis()
-        val eventId = existing?.id ?: UUID.randomUUID().toString()
-        val event = existing?.copy(
+        val event = existingMaster?.copy(
+            id = eventId,
             title = data.title.trim(),
             description = data.description.trim(),
             location = data.location.trim(),
@@ -108,8 +130,9 @@ class DotCalRepository(private val dao: CalendarDao) {
     }
 
     suspend fun deleteLocalEvent(event: CalendarEvent) {
-        dao.deleteRemindersForEvent(event.id)
-        dao.deleteEvent(event.id)
+        val eventId = event.baseEventId()
+        dao.deleteRemindersForEvent(eventId)
+        dao.deleteEvent(eventId)
     }
 
     suspend fun addLocalEvent(title: String, date: LocalDate, startTime: LocalTime = LocalTime.of(9, 0)) {
@@ -120,6 +143,7 @@ class DotCalRepository(private val dao: CalendarDao) {
                 description = "",
                 location = "",
                 date = date,
+                endDate = date,
                 startTime = startTime,
                 endTime = startTime.plusHours(1),
                 isAllDay = false,
@@ -133,7 +157,100 @@ class DotCalRepository(private val dao: CalendarDao) {
         return atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
 
+    private fun expandRecurringEvents(events: List<CalendarEvent>, rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
+        val expanded = events.flatMap { event ->
+            when (event.rrule?.trim()) {
+                "FREQ=DAILY" -> event.expandDaily(rangeStart, rangeEndExclusive)
+                "FREQ=WEEKLY" -> event.expandWeekly(rangeStart, rangeEndExclusive)
+                "FREQ=MONTHLY" -> event.expandMonthly(rangeStart, rangeEndExclusive)
+                else -> listOf(event)
+            }
+        }
+        return expanded.sortedWith(compareBy<CalendarEvent> { it.startTimeMs }.thenBy { it.title })
+    }
+
+    private fun CalendarEvent.expandDaily(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
+        val firstDate = startDate()
+        val firstVisibleDate = maxOf(firstDate, rangeStart)
+        return generateOccurrences(firstVisibleDate, rangeEndExclusive) { it.plusDays(1) }
+    }
+
+    private fun CalendarEvent.expandWeekly(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
+        val firstDate = startDate()
+        val daysToRange = ChronoUnit.DAYS.between(firstDate, rangeStart).coerceAtLeast(0)
+        val weeksToRange = daysToRange / 7
+        val firstVisibleDate = firstDate.plusWeeks(weeksToRange).let { candidate ->
+            if (candidate < rangeStart) candidate.plusWeeks(1) else candidate
+        }
+        return generateOccurrences(firstVisibleDate, rangeEndExclusive) { it.plusWeeks(1) }
+    }
+
+    private fun CalendarEvent.expandMonthly(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
+        val firstDate = startDate()
+        val monthsToRange = ChronoUnit.MONTHS.between(firstDate.withDayOfMonth(1), rangeStart.withDayOfMonth(1)).coerceAtLeast(0)
+        var cursorMonth = firstDate.withDayOfMonth(1).plusMonths(monthsToRange)
+        val occurrences = mutableListOf<CalendarEvent>()
+        while (cursorMonth < rangeEndExclusive.withDayOfMonth(1).plusMonths(1)) {
+            val date = cursorMonth.dayOrNull(firstDate.dayOfMonth)
+            if (date != null && date >= firstDate && date >= rangeStart && date < rangeEndExclusive) {
+                occurrences += occurrenceOn(date)
+            }
+            cursorMonth = cursorMonth.plusMonths(1)
+        }
+        return occurrences
+    }
+
+    private fun CalendarEvent.generateOccurrences(
+        firstVisibleDate: LocalDate,
+        rangeEndExclusive: LocalDate,
+        nextDate: (LocalDate) -> LocalDate,
+    ): List<CalendarEvent> {
+        val firstDate = startDate()
+        var cursor = firstVisibleDate
+        val occurrences = mutableListOf<CalendarEvent>()
+        while (cursor < rangeEndExclusive) {
+            if (cursor >= firstDate) occurrences += occurrenceOn(cursor)
+            cursor = nextDate(cursor)
+        }
+        return occurrences
+    }
+
+    private fun CalendarEvent.occurrenceOn(date: LocalDate): CalendarEvent {
+        val zoneId = ZoneId.of(timeZone)
+        val startDateTime = java.time.Instant.ofEpochMilli(startTimeMs).atZone(zoneId).toLocalDateTime()
+        val durationMs = endTimeMs - startTimeMs
+        val occurrenceStart = date.atTime(startDateTime.toLocalTime()).atZone(zoneId).toInstant().toEpochMilli()
+        return copy(
+            id = recurrenceOccurrenceId(id, occurrenceStart),
+            startTimeMs = occurrenceStart,
+            endTimeMs = occurrenceStart + durationMs,
+        )
+    }
+
+    private fun CalendarEvent.startDate(): LocalDate {
+        return java.time.Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.of(timeZone)).toLocalDate()
+    }
+
+    private fun LocalDate.dayOrNull(day: Int): LocalDate? {
+        val yearMonth = YearMonth.from(this)
+        return if (day <= yearMonth.lengthOfMonth()) withDayOfMonth(day) else null
+    }
+
     companion object {
         const val LOCAL_ACCOUNT_ID = "local-primary"
     }
+}
+
+private const val RECURRENCE_OCCURRENCE_SEPARATOR = "::occurrence::"
+
+fun recurrenceOccurrenceId(eventId: String, occurrenceStartMs: Long): String {
+    return "$eventId$RECURRENCE_OCCURRENCE_SEPARATOR$occurrenceStartMs"
+}
+
+fun CalendarEvent.baseEventId(): String {
+    return id.substringBefore(RECURRENCE_OCCURRENCE_SEPARATOR)
+}
+
+fun CalendarEvent.isRecurrenceOccurrence(): Boolean {
+    return id.contains(RECURRENCE_OCCURRENCE_SEPARATOR)
 }

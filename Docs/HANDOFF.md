@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-06-15
+Updated: 2026-06-18
 
 ## Product Target
 
@@ -12,6 +12,7 @@ Prompt came from `C:\Users\Admin\.codex\attachments\61ea4d34-0342-4103-9c6a-4302
 
 Key requirements:
 - Every future session working on this repo must use `$android-development`.
+- Manual QA rule: do not run phone/manual UI testing unless the user explicitly asks. Build/install only when needed; otherwise update `What To Test Now` so the user can test manually.
 - Room DB with exactly 5 tables: `calendar_accounts`, `calendar_events`, `event_reminders`, `sync_metadata`, `deleted_event_log`.
 - Preferences DataStore keys: default view, week start, default reminder, sync, birthday, onboarding, last sync, declined events, 24-hour format, theme mode.
 - Features: Month, Week, Day, Agenda, Add/Edit Event, Event Detail, Reminders/Notifications, Glance widgets, Tasks, Settings, Onboarding.
@@ -214,6 +215,23 @@ Implemented:
   - Repeat saves to existing `calendar_events.rrule`; no schema/table/column changes.
   - Edit Event now preselects the saved reminder from existing `event_reminders`.
   - Edit Event now shows a `Delete event` action that deletes the event and its reminders.
+- Recurring event expansion:
+  - Month-scoped event loading now includes recurring master events that started before the visible month ends.
+  - Daily, Weekly, and Monthly `rrule` values expand into visible display instances for Month, Week, Day, Agenda, and Year event markers.
+  - Display instances use generated occurrence ids for Compose keys/layout while save/delete/reminder lookup routes back to the original event id.
+  - No schema/table/column changes.
+- Add/Edit Event picker polish:
+  - Start and end time are no longer manually typed text fields.
+  - Start and end time now show default-filled rows that open tap-to-pick bottom sheets.
+  - Start and end now include dates; users can pick both date and time without typing.
+  - Start and end now use one row each (`Starts`, `Ends`) instead of separate date/time labels.
+  - Timed start/end rows display like `Wed, 17 Jun, 2026 9:00 pm`.
+  - Start/end picker is a bottom sheet with scrollable date/hour/minute columns plus Cancel/OK actions.
+  - All-day mode shows date-only start/end rows.
+  - Timed events can end on a later date for overnight/multi-day events.
+  - Reminder and Repeat changed from red-accent chip rows to Settings-style value rows that open neutral bottom-sheet pickers.
+  - Selected picker rows use neutral text/check styling with no red background.
+  - Delete event action no longer uses a red background.
 - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Installed latest debug APK on connected phone `4ab0d020`; package is `com.dotfield.dotcal`, launcher label is sourced from `@string/app_name` = `DotCal`.
 - Verified debug build succeeds after Add/Edit expansion with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
@@ -223,17 +241,134 @@ Implemented:
 - Verified debug build succeeds after Add/Edit all-day switch sizing with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Verified visual QA screenshots on connected phone `4ab0d020` after Add/Edit all-day switch sizing.
 - Verified debug build succeeds after Add/Edit recurrence/reminder/delete with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Verified debug build succeeds after recurring event expansion with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Verified debug build succeeds after Add/Edit picker polish with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after Add/Edit picker polish with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Verified debug build succeeds after Add/Edit date+time picker polish with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after Add/Edit date+time picker polish with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Verified debug build succeeds after single-row start/end wheel picker with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after single-row start/end wheel picker with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Verified debug build succeeds after Add/Edit picker center-wheel polish with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after Add/Edit picker center-wheel polish with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Verified debug build succeeds after Add/Edit picker font/cancel-button QA fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after Add/Edit picker font/cancel-button QA fix with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Verified debug build succeeds after Add/Edit picker cancel color/all-day correction with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after Add/Edit picker cancel color/all-day correction with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Verified debug build succeeds after Add/Edit picker dark dialog background fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after Add/Edit picker dark dialog background fix with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Verified debug build succeeds after Add/Edit picker cancel/circular time wheel fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after Add/Edit picker cancel/circular time wheel fix with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Add/Edit start/end date-time picker wheel polish:
+  - Picker now renders exactly three visible rows per column: previous, centered selected, next.
+  - Scrolling a date/hour/minute column snaps the nearest item into the center row.
+  - Centered item becomes the selected value and uses larger semi-bold text.
+  - Selected wheel text no longer uses blue; Dark theme uses white selected text, Light theme uses primary text for readability.
+- Add/Edit picker manual QA fix:
+  - Center selected wheel font reduced slightly from previous oversized size.
+  - All-day picker behavior confirmed: All-day mode shows date-only picker, timed mode shows date/hour/minute.
+  - Date/time picker dialog background follows the latest theme color codes.
+  - Cancel and OK buttons follow the latest theme color codes.
+  - Hour and minute picker columns are circular: after `23` comes `00`, and after `59` comes `00`; date column remains bounded.
+- Theme color code alignment:
+  - Dark theme uses Screen `#000000`, Dialog `#1E1E1E`, Cancel `#121212`, OK/accent `#FF3B30`, PrimaryText `#FFFFFF`, Secondary `#B3B3B3`, Disabled `#6E6E6E`.
+  - Light theme uses Screen `#F7F7F7`, Dialog `#FFFFFF`, Cancel `#EFEFEF`, OK/accent `#FF3B30`, PrimaryText `#101010`, Secondary `#6B6B6B`, Disabled `#BDBDBD`.
+  - Date/time, reminder, repeat, event-list sheets now use the dialog surface.
+  - Date/time picker Cancel uses the cancel surface; OK uses `#FF3B30`.
+- Verified debug build succeeds after theme color code alignment with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Installed debug APK after theme color code alignment with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Back gesture handling:
+  - System back/gesture now closes Add/Edit overlay instead of exiting the app.
+  - System back/gesture now returns Settings Theme detail to Settings root.
+  - System back/gesture now closes Settings root back to the previous Calendar/Tasks screen.
+  - System back/gesture now returns Tasks to Calendar instead of exiting the app.
+  - Settings header back button uses the same behavior as system back.
+- Verified debug build succeeds after back gesture handling with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Back gesture slide-out hardening:
+  - Add/Edit screen now owns its own `BackHandler`, so a second back gesture during the slide-out animation is consumed and cannot exit the app.
+  - Settings overlay now owns its own `BackHandler`, so Theme/root back behavior stays stable while the overlay is visible or animating.
+- Verified debug build succeeds after back gesture slide-out hardening with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Add/Edit back gesture priority fix:
+  - Add/Edit overlay now registers a dedicated highest-priority `BackHandler` after the animated overlay in composition.
+  - Removed the editor-local `BackHandler` so one owner closes `addSheet` state.
+  - This targets the manual repro where Android back gesture visually slides Add Event but leaves Add Event open, then the next back exits the app.
+- Verified debug build succeeds after Add/Edit back gesture priority fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Theme startup flash fix:
+  - Theme preference collection now starts as `null` instead of `System`, so the app no longer renders Light/System before stored Dark is loaded.
+  - Added a black/dark boot palette used only until DataStore emits the saved theme.
+  - This targets the manual repro where reopening in saved Dark briefly shows Light, then switches back to Dark.
+- Verified debug build succeeds after theme startup flash fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Native launch flash hardening:
+  - `Theme.DotCal` now sets native window background to black before Compose starts.
+  - Native status/nav bars remain black and force-dark is disabled.
+  - Added API 31 splash background/icon background as black to avoid a white splash frame before the Compose boot palette.
+- Calendar header cleanup:
+  - Removed secondary header labels below the main date label (`Local / Device calendar`, `Week`, `Day`, `Agenda`, `3 Days`, `Year`).
+  - Increased main header label size across Month, Week, Day, Agenda, Three-day, and Year views.
+- Verified debug build succeeds after native launch flash/header cleanup with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Theme startup flash final fix:
+  - Added Light/Dark native theme variants: `Theme.DotCal.Light` and `Theme.DotCal.Dark`.
+  - `MainActivity` reads saved `KEY_THEME_MODE` synchronously once before `super.onCreate`, mirrors it into `SharedPreferences`, and applies the matching native theme before Compose starts.
+  - Compose theme collection starts from the mirrored boot theme, so saved Light no longer shows a black/dark content flash and saved Dark no longer shows a Light flash.
+  - Theme changes immediately update the boot mirror before the DataStore write finishes.
+- Verified debug build succeeds after final theme startup flash fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Theme startup flash race fix:
+  - Removed blocking DataStore read before `setTheme`; it was delaying theme application and letting the manifest dark window show first.
+  - `MainActivity` now applies the mirrored boot theme immediately, then syncs the mirror from DataStore after `super.onCreate`.
+  - This targets the manual repro where saved Light still showed a black flash for about a second before switching to Light.
+- Verified debug build succeeds after theme startup flash race fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Add/Edit recurring-series UX polish:
+  - Editing a recurring event or generated recurring occurrence now shows `Changes apply to the whole series`.
+  - Delete action changes from `Delete event` to `Delete series` for recurring events/occurrences.
+  - Start/End/Reminder/Repeat row values now ellipsize instead of overflowing on narrow screens.
+- Verified debug build succeeds after recurring-series Add/Edit polish with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Calendar view segmented control:
+  - Removed the top calendar icon/dropdown view picker.
+  - Added a pill segmented control between the top action bar and the calendar date/year header.
+  - Segments are `Year`, `Month`, `Week`, `Day`, and `Agenda`; `Three-day` remains hidden and old stored values still map back to Month.
+  - Selected segment uses a filled rounded chip; inactive segments use normal secondary text.
+- Verified debug build succeeds after calendar segmented-control change with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Calendar segmented-control sizing polish:
+  - Reduced segmented-control vertical height and padding so it no longer feels oversized.
+  - Balanced first/last segment weights so `Year` left spacing and `Agenda` right spacing read more evenly.
+- Verified debug build succeeds after segmented-control sizing polish with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Bottom navigation restore:
+  - Removed the top three-dot overflow menu.
+  - Added bottom navigation with `Calendar`, `Tasks`, and `Settings` tabs matching the dark rounded reference style.
+  - Bottom nav uses custom calendar/check/settings icons; active tab uses red icon/text, inactive tabs use secondary gray.
+  - `Settings` now opens from bottom nav as the same full-screen overlay; `Tasks` opens from bottom nav.
+  - Calendar segmented control now uses `SpaceBetween` label layout so `Year` left text gap and `Agenda` right text gap are equal.
+- Verified debug build succeeds after bottom navigation restore and segment gap fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Year view switch performance:
+  - Replaced per-day mini-calendar Compose nodes in Year view with one Canvas-rendered mini grid per month.
+  - This reduces the Year view from hundreds of tiny Text/Box composables to 12 month cells with lightweight canvas drawing.
+  - Segmented control uses fixed-width labels so `Year` and `Agenda` edge gaps remain equal.
+- Verified debug build succeeds after Year view Canvas optimization with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Light theme top/bottom nav color polish:
+  - Light segmented control now uses white/off-white surface, `#E5E5E5` border, and `#EEEEEE` selected chip like the reference.
+  - Light segmented inactive labels use dark neutral text instead of the prior softer gray.
+  - Light bottom nav now uses white/off-white surface, `#E8E8E8` top border, red active icon/text, and `#5F6368` inactive icon/text.
+- Verified debug build succeeds after light top/bottom nav color polish with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Segmented-control label clipping fix:
+  - Removed the fixed-width label box that caused `Agenda` to render as `Agen...`.
+  - Segment labels now wrap their content while `SpaceBetween` keeps the first and last text-edge gaps balanced.
+- Verified debug build succeeds after segmented-control label clipping fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Light nav color/header placement polish:
+  - Light top segmented control, top add bar, and bottom nav now use the same off-white nav surface (`#FAFAFA`) with light gray borders and selected chip color closer to the provided reference.
+  - Calendar segmented control now renders before the add action bar, so the Year/Month/Week/Day/Agenda header sits at the top of the calendar nav area.
+  - No schema/table/column changes.
+- Verified debug build succeeds after light nav color/header placement polish with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 
 Known gap:
 - `calendar_events` CHECK (`endTimeMs >= startTimeMs`) is not enforced by Room annotation yet. Repository validates new local events by construction. Later add custom open helper/migration if strict SQLite CHECK required from v1.
-- No visual QA screenshot pass yet; validate on connected phone.
-- Recurrence currently stores `FREQ=DAILY/WEEKLY/MONTHLY` in `rrule`, but calendar views do not expand recurring instances yet.
-- Add/Edit recurrence/reminder/delete is ready for manual QA; user will test manually.
+- Phone manual QA is user-owned unless explicitly requested.
+- Add/Edit recurrence/reminder/delete and recurring event expansion are ready for manual QA; user will test manually.
+- Recurring event editing currently edits/deletes the whole original series, not one detached occurrence.
 
 ## Next Step
 
 Next should continue calendar polish:
-- Polish Add/Edit Event UX: date controls, recurring instance expansion, and manual QA fixes.
+- Polish Add/Edit Event UX: date controls and manual QA fixes.
+- Do not run phone/manual UI testing by default; tell the user what to test manually and keep this checklist updated.
 - Use stored week start preference later instead of hardcoded Sunday, if user wants configurable week start.
 
 ## What To Test Now
@@ -264,18 +399,33 @@ Manual:
 - Enter invalid time or end before start: validation shows `Use HH:mm and end after start`.
 - Toggle all-day and save: event appears in all-day area for Week/Day.
 - All-day switch checked state should be red track with white thumb, not fully red.
-- Top three-dot menu opens Settings and Tasks.
-- From Settings or Tasks, tapping the calendar icon and choosing any view returns to Calendar.
+- Top three-dot menu should not be visible.
+- Bottom navigation should show `Calendar`, `Tasks`, and `Settings`.
+- Bottom nav active item should be red; inactive items should be gray.
+- Tapping `Tasks` in bottom nav should open Tasks.
+- Tapping `Settings` in bottom nav should open Settings full-screen overlay.
+- From Tasks, Android back gesture should return to Calendar; Settings back should return to the previous screen.
 - Settings > Theme opens nested picker.
 - Theme picker can switch Light/Dark/System.
 - Settings root should feel cleaner: sectioned rows, no inline theme buttons.
 - Week tab shows date range, day strip, 24-hour grid, and current-time marker.
 - Calendar top-right `+` opens Add Event.
-- Calendar top-right calendar icon opens view picker.
-- Selecting Year/Month/Week/Day/Agenda switches active view.
+- Calendar top-right should not show a calendar/view-picker icon.
+- A segmented view control should appear between the top action bar and the date/year header.
+- Segmented view control should show `Year`, `Month`, `Week`, `Day`, `Agenda`.
+- Segmented view control should be compact vertically, not tall.
+- `Year` left text gap and `Agenda` right text gap should be equal.
+- In Light theme, segmented control should use white/off-white surface, light gray border, and light gray selected chip like the reference.
+- In Light theme, the top segmented control, top add bar, and bottom nav should share the same off-white nav color from the reference.
+- The segmented Year/Month/Week/Day/Agenda header should sit at the top of the calendar nav area, above the add action bar.
+- `Agenda` should render fully, not as `Agen...`.
+- Tapping each segment should switch active view immediately and persist selected view.
 - UI should no longer show heavy borders around most elements.
 - No dot pattern should be visible in background.
 - Month view label should be left aligned as `YYYY/M`.
+- Month view should show only one top label, no `Local / Device calendar` sublabel.
+- Week/Day/Agenda/Three-day/Year should show only the primary date/year label and no secondary view-name sublabel.
+- Top date/year labels should look larger than before.
 - Month view should not show prev/next arrow buttons.
 - Top bar should show icon-only `+`, not a filled button.
 - Day view should show timeline + tasks section.
@@ -283,23 +433,17 @@ Manual:
 - Month/Week/Day headers should be left aligned and should not show arrow buttons.
 - Agenda should group events by date and show `NO EVENTS` when empty.
 - Week swipe left/right should change week.
-- View picker should not show Three-day option.
-- View picker order should be Year, Month, Week, Day, Agenda.
-- View picker rows should show labels only, no option icons.
-- Dropdown selected row should use red icon/text/check, not blue.
-- Top action bar should show only selected view icon, not view text.
-- Top selected-view icon should be red.
-- In Dark theme, top-right `+`, selected calendar view icon, and overflow icon should be white.
-- In Dark theme, calendar view dropdown, overflow dropdown, and theme dropdown should use the same near-black background as the reference.
-- Dropdown selected rows should not use red text or red background.
+- Segmented view control should not show Three-day option.
+- Segment order should be Year, Month, Week, Day, Agenda.
+- Selected segment should be a rounded filled chip like the reference.
+- In Dark theme, top-right `+` should be white.
+- In Dark theme, theme dropdown should use the same near-black background as the reference.
 - Calendar screen should follow selected theme, not forced white.
 - In Light theme Month view, top bar/header/week row/day grid should be white, with remaining background warm light gray.
 - In Light theme Week/Day/Three-day/Year/Agenda, visible calendar/list surfaces should be white.
 - In Dark theme Month view, top/calendar/day-grid background should be black.
-- View dropdown should be white in Light theme and dark/black in Dark theme.
-- View dropdown should have square corners, not rounded corners.
-- View dropdown should not show Three-day option.
-- Switching dropdown views should feel immediate.
+- Segment control should sit above the primary date/year label, not inside a dropdown.
+- Switching segmented views should feel immediate.
 - Settings screen should be white in Light theme.
 - Three-dot > Settings should slide a full-screen Settings page in from right to left.
 - Settings top-left back arrow should slide Settings out from left to right and restore the previous screen.
@@ -309,7 +453,8 @@ Manual:
 - Settings large header back arrow should align horizontally with option labels below.
 - Dropdown labels should be normal weight.
 - Text should no longer look monospace.
-- Bottom nav should not be visible.
+- Bottom nav should be visible and match the rounded dark reference.
+- In Light theme, bottom nav should use the same white/light-gray combination as the reference, with red active Calendar and gray inactive items.
 - Month view should not show other-month day numbers.
 - Week/Day hour grids should show visible block cells even when background is white.
 - Week/Day grid background must remain white; only thin grid lines should be visible.
@@ -317,6 +462,7 @@ Manual:
 - Settings > Additional > Theme should open a dropdown with only Light/Dark/System and no icons.
 - Theme dropdown row should show stacked up/down chevrons like reference, not a `v`.
 - Year option should show 12 mini month calendars, 3 per row; header should show only year and swipe should change year.
+- Switching from Month/Week/Day/Agenda to Year should feel immediate, without the earlier pause.
 - In Year view, current month/day should be red only for the real current year/month/day.
 - Year mini-calendar day numbers should not be cut off at bottom.
 - Current-day red circle should be centered.
@@ -330,8 +476,42 @@ Manual:
 - Save from tapped Week hour; event should appear in that hour, not `09:00`.
 - Add/seed overlapping Week events; overlapping blocks should appear side-by-side, not stacked on top of each other.
 - Add/seed a 30-minute and multi-hour event; Week block height should reflect duration.
+- Add a Daily repeating event; it should show on every date from the event start date in Month, Week, Day, and Agenda.
+- Add a Weekly repeating event; it should show on the same weekday in later weeks.
+- Add a Monthly repeating event; it should show on the same day number in later months, skipping months where that day does not exist.
+- Tap a recurring instance; Edit should prefill title/time/repeat/reminder.
+- Delete a recurring instance; the whole series should disappear.
+- Tap `+`; Start and End should be filled by default and should open picker sheets, not keyboard/manual typing.
+- Start and End should show full date + time in one row, like `Wed, 17 Jun, 2026 9:00 pm`.
+- There should be no separate `Start time` or `End time` labels.
+- Tap Starts/Ends; a bottom sheet should open with scrollable date/hour/minute columns and Cancel/OK.
+- In Dark theme, date/time picker dialog should be `#1E1E1E`, Cancel `#121212`, OK `#FF3B30`, selected wheel text white.
+- In Light theme, date/time picker dialog should be `#FFFFFF`, Cancel `#EFEFEF`, OK `#FF3B30`, selected wheel text `#101010`.
+- From Add/Edit Event, Android back gesture should close editor and stay in app.
+- From Add/Edit Event, swipe back twice quickly during the slide-out; app should not exit and should land on Calendar.
+- From Add/Edit Event, swipe back once and wait for slide to finish; Add/Edit must not remain open.
+- Repeat `+` -> back gesture five times; app must never exit and Add/Edit must close every time.
+- Set theme to Dark, close app fully, reopen app; it should not flash Light before Dark appears.
+- Set theme to Dark, force close from recents, reopen from launcher; native launch frame should stay black, no white/light flash.
+- Set theme to Light, close app fully, reopen app; it should not flash black/dark content before Light appears.
+- From Settings root, Android back gesture should close Settings and return to previous screen.
+- From Settings > Theme, Android back gesture should return to Settings root, not exit app.
+- From Tasks, Android back gesture should return to Calendar, not exit app.
+- Toggle All-day; Start/End should show date-only rows.
+- Create an overnight timed event by setting End date to tomorrow; it should save.
+- Change Start; End should stay after Start automatically.
+- Reminder row should open neutral picker sheet, with no red selected background.
+- Repeat row should open neutral picker sheet, with no red selected background.
+- Delete event button should not have a red background.
+- Recurring event Edit should show `Changes apply to the whole series`.
+- Recurring event Delete button should say `Delete series`.
+- Long Start/End/Reminder/Repeat values should stay on one line and not overlap the chevron or title.
 - Month cells stay readable; current day red fill still clear.
 
 ## Resume Prompt For New Chat
 
-Use caveman-ultra and `$android-development`. Work in `D:\Caveman\caveman\Nothing-Calendar`. Read `Docs/HANDOFF.md` first. Continue DotCal (`com.dotfield.dotcal`). Preserve schema columns/current UI rules. Keep HANDOFF updated after each completed step. Recent: dark dropdowns near-black/no red selected state; dark top icons white; Settings large/sticky headers done; Add/Edit Event is full-screen overlay with X/check top bar and red/white all-day switch. Next: visual QA, then Add/Edit recurrence/reminder-prefill/delete.
+Use caveman-ultra and `$android-development`. Work in `D:\Caveman\caveman\Nothing-Calendar`. Read `Docs/HANDOFF.md` first.
+
+Continue DotCal (`com.dotfield.dotcal`). Preserve schema columns/current UI rules and exactly 5 Room tables. Do not run phone/manual UI QA unless explicitly asked. Keep `Docs/HANDOFF.md` updated after each completed step.
+
+let me know when you are ready i have some issue points
