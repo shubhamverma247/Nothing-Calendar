@@ -69,6 +69,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,6 +83,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -124,6 +126,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.zIndex
@@ -163,6 +166,7 @@ import kotlinx.coroutines.withContext
 private val mono = FontFamily.SansSerif
 private val sheetDateFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMM", Locale.US)
 private val detailDateFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy", Locale.US)
+private val agendaDateHeaderFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM", Locale.US)
 private val compactDateFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 private val editorDateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM, yyyy", Locale.US)
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
@@ -179,6 +183,12 @@ private val recurrenceOptions = listOf(
     RecurrenceOption("Monthly", "FREQ=MONTHLY"),
 )
 private enum class DateTimeField { Start, End }
+private enum class DeleteSource { Editor, Detail }
+private data class PendingDelete(
+    val event: CalendarEvent,
+    val scope: RecurringEditScope,
+    val source: DeleteSource,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -198,6 +208,7 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
     var editingEvent by remember { mutableStateOf<CalendarEvent?>(null) }
     var editorSessionKey by remember { mutableStateOf(UUID.randomUUID().toString()) }
     var settingsScreen by remember { mutableStateOf(SettingsScreen.Root) }
+    var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val bootPreferences = remember(context) { context.getSharedPreferences(BOOT_PREFS, android.content.Context.MODE_PRIVATE) }
@@ -433,7 +444,7 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
                             selectedDate = selectedDate,
                             events = events,
                             palette = palette,
-                            onJumpToday = { viewModel.selectDate(LocalDate.now()) },
+                            onAdd = { openAddEditor() },
                             onEventClick = viewModel::openEventDetail,
                         )
                         CalendarTab.Year -> YearView(
@@ -503,9 +514,7 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
                 },
                 onDelete = editingEvent?.let { eventToDelete ->
                     { scope ->
-                        viewModel.deleteEvent(eventToDelete, scope)
-                        editingEvent = null
-                        addSheet = false
+                        pendingDelete = PendingDelete(eventToDelete, scope, DeleteSource.Editor)
                     }
                 },
             )
@@ -528,11 +537,28 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
                         openEditEditor(event)
                     },
                     onDelete = {
-                        viewModel.deleteEvent(event)
-                        viewModel.closeEventDetail()
+                        pendingDelete = PendingDelete(event, RecurringEditScope.WholeSeries, DeleteSource.Detail)
                     },
                 )
             }
+        }
+        pendingDelete?.let { request ->
+            ConfirmDeleteDialog(
+                deleteSeries = request.scope == RecurringEditScope.WholeSeries && !request.event.rrule.isNullOrBlank(),
+                palette = palette,
+                onDismiss = { pendingDelete = null },
+                onConfirm = {
+                    viewModel.deleteEvent(request.event, request.scope)
+                    when (request.source) {
+                        DeleteSource.Editor -> {
+                            editingEvent = null
+                            addSheet = false
+                        }
+                        DeleteSource.Detail -> viewModel.closeEventDetail()
+                    }
+                    pendingDelete = null
+                },
+            )
         }
         BackHandler(enabled = addSheet) {
             editingEvent = null
@@ -552,11 +578,38 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
             },
             onEdit = {
                 showSheet = false
-                openEditEditor(it)
+                viewModel.openEventDetail(it)
             },
         )
     }
 
+}
+
+@Composable
+private fun ConfirmDeleteDialog(
+    deleteSeries: Boolean,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        titleContentColor = palette.primaryText,
+        textContentColor = palette.secondaryText,
+        title = { Text(if (deleteSeries) "Delete series?" else "Delete event?") },
+        text = { Text("This cannot be undone.") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(if (deleteSeries) "Delete series" else "Delete", color = palette.accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = palette.primaryText)
+            }
+        },
+    )
 }
 
 @Composable
@@ -2933,44 +2986,158 @@ private fun AgendaPreview(
     selectedDate: LocalDate,
     events: List<CalendarEvent>,
     palette: DotCalPalette,
-    onJumpToday: () -> Unit,
+    onAdd: () -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
 ) {
-    val grouped = remember(events) {
+    val dayEvents = remember(events, selectedDate) {
         events
-            .filter { it.isTask == 0 }
+            .filter { it.isTask == 0 && it.localDate() == selectedDate }
             .sortedBy { it.startTimeMs }
-            .groupBy { it.localDate() }
-            .toSortedMap()
     }
-    LazyColumn(modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(16.dp)) {
-        if (grouped.isEmpty()) {
-            item {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(palette.calendarSurface),
+        contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 22.dp, bottom = 36.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item {
+            Text(
+                selectedDate.format(agendaDateHeaderFormatter),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Medium,
+                fontSize = 13.sp,
+                letterSpacing = 0.4.sp,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+        lazyItems(dayEvents, key = { it.id }) { event ->
+            AgendaEventCard(event = event, palette = palette, onClick = { onEventClick(event) })
+        }
+        item {
+            AgendaEndOfDayState(
+                palette = palette,
+                topPadding = if (dayEvents.isEmpty()) 96.dp else 128.dp,
+                onAdd = onAdd,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AgendaEventCard(
+    event: CalendarEvent,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (palette.isDark) palette.dialogSurface else palette.eventCardSurface)
+            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Text(
+            event.agendaTimeRange(),
+            color = palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 14.sp,
+            maxLines = 1,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            event.title,
+            color = palette.primaryText,
+            fontFamily = mono,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 20.sp,
+            lineHeight = 24.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (event.location.isNotBlank()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(palette.secondaryText),
+                )
+                Spacer(modifier = Modifier.width(9.dp))
                 Text(
-                    "No events",
-                    color = palette.dimText,
+                    event.location,
+                    color = palette.secondaryText,
                     fontFamily = mono,
-                    fontSize = 14.sp,
-                    modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
-                    textAlign = TextAlign.Center,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-        } else {
-            grouped.forEach { (date, dayEvents) ->
-                item {
-                    Text(
-                        "${date.dayOfWeek.name.take(3)} ${date.dayOfMonth.toString().padStart(2, '0')}",
-                        color = palette.secondaryText,
-                        fontFamily = mono,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
-                    )
-                }
-                items(dayEvents.size) { index ->
-                    val event = dayEvents[index]
-                    EventRow(event, palette, onClick = { onEventClick(event) })
-                }
-            }
+        }
+    }
+}
+
+@Composable
+private fun AgendaEndOfDayState(
+    palette: DotCalPalette,
+    topPadding: Dp,
+    onAdd: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = topPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        AgendaCalendarOutlineIcon(tint = palette.dimText)
+        Spacer(modifier = Modifier.height(18.dp))
+        Text(
+            "No more events for this day",
+            color = palette.dimText,
+            fontFamily = mono,
+            fontSize = 15.sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            "+ Add Event",
+            color = palette.accent,
+            fontFamily = mono,
+            fontSize = 16.sp,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onAdd)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun AgendaCalendarOutlineIcon(tint: Color) {
+    Canvas(modifier = Modifier.size(38.dp)) {
+        val stroke = 1.6.dp.toPx()
+        val radius = 5.dp.toPx()
+        val left = 3.dp.toPx()
+        val top = 6.dp.toPx()
+        val right = size.width - 3.dp.toPx()
+        val bottom = size.height - 3.dp.toPx()
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(left, top),
+            size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius),
+            style = Stroke(width = stroke),
+        )
+        drawLine(tint, Offset(left, 15.dp.toPx()), Offset(right, 15.dp.toPx()), strokeWidth = stroke)
+        drawLine(tint, Offset(12.dp.toPx(), 3.dp.toPx()), Offset(12.dp.toPx(), 9.dp.toPx()), strokeWidth = stroke)
+        drawLine(tint, Offset(26.dp.toPx(), 3.dp.toPx()), Offset(26.dp.toPx(), 9.dp.toPx()), strokeWidth = stroke)
+        val dotRadius = 1.4.dp.toPx()
+        listOf(12.dp, 19.dp, 26.dp).forEach { x ->
+            drawCircle(tint, radius = dotRadius, center = Offset(x.toPx(), 23.dp.toPx()))
         }
     }
 }
@@ -3747,6 +3914,13 @@ private fun CalendarEvent.timeRange(): String {
     val start = Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
     val end = Instant.ofEpochMilli(endTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
     return "${start.format(timeFormatter)} - ${end.format(timeFormatter)}"
+}
+
+private fun CalendarEvent.agendaTimeRange(): String {
+    if (isAllDay == 1) return "All-day"
+    val start = Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
+    val end = Instant.ofEpochMilli(endTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
+    return "${start.format(timeFormatter)} – ${end.format(timeFormatter)}"
 }
 
 private fun CalendarEvent.detailTimeRange(): String {

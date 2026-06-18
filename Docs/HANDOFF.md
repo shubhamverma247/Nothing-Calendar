@@ -25,6 +25,28 @@ Key requirements:
 Requested GitHub repo was empty, so scaffold created.
 
 Implemented:
+- Latest Agenda card height polish:
+  - Reduced Agenda event card height by tightening card padding, time/title spacing, title size/line height, and location spacing.
+  - Agenda card tap behavior remains Event Detail first; no schema/table/package/deep-link changes.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed; user did not request phone/manual UI QA.
+- Latest Agenda redesign:
+  - Rebuilt Agenda as a selected-day view matching the attached visual reference: date header like `Thu, 18 Jun`, subtle 20dp event cards, no chevrons, and centered end-of-day empty state.
+  - Agenda cards use time range, large semibold title, and optional subtle location indicator; tapping a card opens Event Detail, not Edit Event.
+  - End-of-day state shows a custom outline calendar icon, `No more events for this day`, and accent-red `+ Add Event` action.
+  - Agenda remains event-only (`isTask = 0`); Tasks stay separate (`isTask = 1`).
+  - Light/Dark/System theme behavior uses existing DotCal palette surfaces and keeps layout identical across themes.
+  - No package name, deep link scheme, DB filename, schema columns, or table count changed.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed; user did not request phone/manual UI QA.
+- Latest event navigation/delete guard:
+  - Month date bottom-sheet event rows now open full-screen Event Detail instead of opening Add/Edit directly.
+  - Users can still enter Edit Event from Event Detail via the existing `Edit` action.
+  - Delete from Event Detail and Edit Event now shows a confirmation dialog before deleting.
+  - Confirmed deletes still use the existing repository delete path and preserve recurring edit scope from the editor.
+  - No package name, deep link scheme, DB filename, schema columns, or table count changed.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed; user did not request phone/manual UI QA.
 - Latest Event Details redesign:
   - Rebuilt Event Detail screen to match the attached reference: top bar with back arrow, centered `Event Details`, right text `Edit`, large 32sp semibold title, single-column sections, subtle dividers, and centered text-only `Delete Event`.
   - Section order is `TIME`, `LOCATION`, `REMINDER`, `CALENDAR`, `DESCRIPTION`, `IMAGES`, `VOICE NOTE`.
@@ -470,14 +492,14 @@ Implemented:
   - Detail screen shows title, timed/all-day status, recurrence label, reminders from existing `event_reminders`, location, calendar account from existing `calendar_accounts`, selectable description, image placeholders from existing `imageUris`, and basic voice-note playback for existing `voiceNotePath`.
   - Added deep link handling for `dotcal://event/{eventId}` without changing the `dotcal` scheme.
   - Week, Day, hidden Three-day, and Agenda event taps open Event Detail.
-  - Month day bottom-sheet event rows still open Add/Edit directly because existing working app behavior remains source of truth where it conflicts with the newer roadmap.
+  - Month day bottom-sheet event rows originally preserved direct Add/Edit behavior; later user-approved change now routes them to Event Detail first.
   - Birthday/read-only source events hide the edit pencil for later birthday flow compatibility.
   - No package name, deep link scheme, DB filename, schema columns, table count, or existing UI chrome rules changed; still exactly 5 Room tables.
 - Verified debug build succeeds after Event Detail Screen with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Event Detail tap-target fix:
   - Fixed Week, Day, and hidden Three-day timeline event blocks so tapping the visible event block opens Event Detail instead of falling through to the parent empty-hour Add Event action.
   - Empty hour taps still open Add Event at the tapped hour.
-  - Month day bottom-sheet event rows still preserve current direct Add/Edit behavior.
+  - Month day bottom-sheet event rows now route to Event Detail first after later user-approved change.
 - Verified debug build succeeds after Event Detail tap-target fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Event details bottom-sheet and editor polish:
   - Preserved the final DotCal palette and updated Light grid/line to the specified `#E8E8E8`.
@@ -1137,10 +1159,10 @@ Add R8/ProGuard rules to `proguard-rules.pro`:
 ```
 
 Conflict check:
-- New prompt changes event-row behavior: existing event taps currently open Add/Edit directly in some surfaces; new rule routes taps to Event Detail first, with edit available from the detail pencil. Existing working app behavior wins unless user explicitly approves changing it.
+- User explicitly approved changing month date bottom-sheet event rows to open Event Detail first, with Edit available from Event Detail.
 - Handoff product target still mentions mono typography, but current implemented UI explicitly moved to system sans-serif. Preserve current UI rule unless user asks to revert typography.
 - Older handoff source says Calendar sub-tabs Month/Week/Day/Agenda; current implemented UI and latest prompt use segmented `Year`, `Month`, `Week`, `Day`, `Agenda`. Preserve current segmented control and hidden Three-day behavior.
-- Latest prompt says build after each implementation step; current user asked to update planning in one file and not change app code, so no build is required for this docs-only sync.
+- Latest prompt says build after each implementation step; build is required after app code changes.
 
 ## Next Step
 
@@ -1173,7 +1195,7 @@ Manual:
 - Tap `+`: Add Event should slide in full-screen from right like Settings, not open as a bottom sheet.
 - Add/Edit top bar should show close `X` on left and save check on right.
 - Add title, location, description, start/end time, reminder, save: dot appears on that date and row appears in bottom sheet.
-- Tap an existing event row from date sheet: Edit Event opens with title/location/description/time/all-day values.
+- Tap an existing event row from date sheet: Event Detail opens, then `Edit` opens Add/Edit Event with title/location/description/time/all-day values.
 - Edit title/time and save: existing row updates without creating a duplicate.
 - Enter invalid time or end before start: validation shows `Use HH:mm and end after start`.
 - Toggle all-day and save: event appears in all-day area for Week/Day.
@@ -1212,7 +1234,12 @@ Manual:
 - Day view should show timeline + tasks section.
 - Month/Week/Day/Agenda headers should all use `YYYY/M` format.
 - Month/Week/Day headers should be left aligned and should not show arrow buttons.
-- Agenda should group events by date and show `NO EVENTS` when empty.
+- Agenda should show the selected day's date header like `Thu, 18 Jun`.
+- Agenda should show selected-day events in 20dp subtle cards with no chevrons.
+- Agenda event card should show `09:00 – 10:00`, large semibold title, and optional subtle location line.
+- Tap an Agenda event card: Event Detail should open, not Edit Event.
+- After the selected day's final event, Agenda should show outline calendar icon, `No more events for this day`, and red `+ Add Event`.
+- Tap Agenda `+ Add Event`: Add Event should open for the selected date.
 - Week swipe left/right should change week.
 - Segmented view control should not show Three-day option.
 - Segment order should be Year, Month, Week, Day, Agenda.
@@ -1301,7 +1328,7 @@ Manual:
 - Event Detail should show accent strip, title, date/time or `ALL DAY EVENT`, recurrence if set, reminders if set, location if set, calendar account, and selectable description if set.
 - Tap Event Detail edit pencil: Add/Edit Event should open for that event.
 - Event Detail back arrow and Android back should return to the previous Calendar/Agenda view.
-- Month date bottom-sheet event row should still open Add/Edit directly, preserving current app behavior.
+- Month date bottom-sheet event row should open Event Detail first.
 - Launch a deep link like `dotcal://event/{eventId}`: app should open Event Detail for that event id.
 - Month view: tap a date with three or more events; sheet should show every event as its own card, 12dp apart.
 - Event cards should use `#121212`/`#2A2A2A` in Dark and `#FFFFFF`/`#E8E8E8` in Light, with exactly one right chevron.
@@ -1319,7 +1346,10 @@ Manual:
 - No `READ_MEDIA_IMAGES` permission prompt should appear.
 - Bottom nav Settings icon should look like a circular settings icon, not sliders.
 - Bottom nav Settings icon should look like a Nothing OS-inspired dotted circular settings glyph.
-- Tap an event card in the date sheet: Add/Edit Event should open for that event.
+- Tap an event card in the date sheet: Event Detail should open for that event.
+- From Event Detail, tap `Edit`: Add/Edit Event should open for that event.
+- Tap `Delete Event` from Event Detail: confirmation dialog should appear; Cancel should keep the event; Delete should remove it.
+- Tap `Delete event` or `Delete series` from Edit Event: confirmation dialog should appear; Cancel should keep the event; Delete should remove the selected event/scope.
 - Tap the sheet `+ Add Event` button: Add/Edit Event should open; button should be 56dp tall, rounded, red, and full width.
 - Add/Edit Event should show monochrome icons for title, location, and description.
 - Focus each Add/Edit text field: border and cursor should turn `#FF3B30`; unfocused border should return to theme default.
