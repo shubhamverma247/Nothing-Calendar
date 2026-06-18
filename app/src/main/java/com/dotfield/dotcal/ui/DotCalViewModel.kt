@@ -6,6 +6,7 @@ import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
+import com.dotfield.dotcal.data.RecurringEditScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -53,11 +54,29 @@ class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
         viewModelScope.launch { repository.addLocalEvent(title = title, date = date, startTime = startTime) }
     }
 
-    fun saveEvent(existing: CalendarEvent?, data: EventEditorData) {
-        viewModelScope.launch { repository.saveLocalEvent(existing = existing, data = data) }
+    fun saveEvent(
+        existing: CalendarEvent?,
+        data: EventEditorData,
+        recurringEditScope: RecurringEditScope = RecurringEditScope.WholeSeries,
+    ) {
+        viewModelScope.launch {
+            repository.saveLocalEvent(
+                existing = existing,
+                data = data,
+                recurringEditScope = recurringEditScope,
+            )
+        }
     }
 
-    fun deleteEvent(event: CalendarEvent) {
-        viewModelScope.launch { repository.deleteLocalEvent(event) }
+    fun deleteEvent(
+        event: CalendarEvent,
+        recurringEditScope: RecurringEditScope = RecurringEditScope.WholeSeries,
+    ) {
+        viewModelScope.launch {
+            repository.deleteLocalEvent(
+                event = event,
+                recurringEditScope = recurringEditScope,
+            )
+        }
     }
 }

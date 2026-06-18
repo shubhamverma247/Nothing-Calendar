@@ -69,7 +69,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -92,6 +91,7 @@ import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.isRecurrenceOccurrence
+import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.ui.theme.NBlack
@@ -117,9 +117,6 @@ private val editorTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.U
 private const val WEEK_HOUR_HEIGHT_DP = 64f
 private const val BOOT_PREFS = "dotcal_boot"
 private const val BOOT_THEME_KEY = "theme_mode"
-private val lightNavSurface = Color(0xFFFAFAFA)
-private val lightNavBorder = Color(0xFFE1E1E1)
-private val lightNavSelected = Color(0xFFE9E9E9)
 private val reminderOptions = listOf(null, 5, 10, 30)
 private data class RecurrenceOption(val label: String, val rrule: String?)
 private val recurrenceOptions = listOf(
@@ -207,6 +204,14 @@ fun DotCalApp(viewModel: DotCalViewModel) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         val visibleMainTab = if (screenTab == ScreenTab.Settings) previousScreenTab else screenTab
+        val calendarHeaderLabel = when (activeCalendarTab) {
+            CalendarTab.Month -> "${month.year}/${month.monthValue}"
+            CalendarTab.Week,
+            CalendarTab.Day,
+            CalendarTab.ThreeDay,
+            CalendarTab.Agenda -> "${selectedDate.year}/${selectedDate.monthValue}"
+            CalendarTab.Year -> selectedDate.year.toString()
+        }
         Scaffold(
             containerColor = palette.background,
             bottomBar = {
@@ -237,6 +242,18 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                     .background(palette.background)
                     .padding(padding),
             ) {
+                CalendarActionBar(
+                    title = if (visibleMainTab == ScreenTab.Calendar) calendarHeaderLabel else visibleMainTab.name,
+                    palette = palette,
+                    onTitleClick = {
+                        if (visibleMainTab == ScreenTab.Calendar) viewModel.selectDate(LocalDate.now())
+                    },
+                    onAdd = {
+                        addStartTime = LocalTime.of(9, 0)
+                        editingEvent = null
+                        addSheet = true
+                    },
+                )
                 if (visibleMainTab == ScreenTab.Calendar) {
                     CalendarViewSegmentedControl(
                         selected = activeCalendarTab,
@@ -248,14 +265,6 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                         },
                     )
                 }
-                CalendarActionBar(
-                    palette = palette,
-                    onAdd = {
-                        addStartTime = LocalTime.of(9, 0)
-                        editingEvent = null
-                        addSheet = true
-                    },
-                )
                 when (visibleMainTab) {
                 ScreenTab.Calendar -> {
                     when (activeCalendarTab) {
@@ -379,14 +388,14 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                     editingEvent = null
                     addSheet = false
                 },
-                onSave = {
-                    viewModel.saveEvent(editingEvent, it)
+                onSave = { data, scope ->
+                    viewModel.saveEvent(editingEvent, data, scope)
                     editingEvent = null
                     addSheet = false
                 },
                 onDelete = editingEvent?.let { eventToDelete ->
-                    {
-                        viewModel.deleteEvent(eventToDelete)
+                    { scope ->
+                        viewModel.deleteEvent(eventToDelete, scope)
                         editingEvent = null
                         addSheet = false
                     }
@@ -423,20 +432,30 @@ fun DotCalApp(viewModel: DotCalViewModel) {
 
 @Composable
 private fun CalendarActionBar(
+    title: String,
     palette: DotCalPalette,
+    onTitleClick: () -> Unit,
     onAdd: () -> Unit,
 ) {
     val topIconTint = if (palette.isDark) NWhite else palette.accent
-    val surface = if (palette.isDark) palette.calendarSurface else lightNavSurface
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .background(surface)
+            .background(palette.background)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.End,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
+        Text(
+            title,
+            color = palette.primaryText,
+            fontFamily = mono,
+            fontWeight = FontWeight.Bold,
+            fontSize = if (title.length <= 4) 30.sp else 28.sp,
+            modifier = Modifier.padding(start = 8.dp).clickable(onClick = onTitleClick),
+            maxLines = 1,
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(
                 onClick = onAdd,
@@ -456,16 +475,14 @@ private fun DotCalBottomNav(
     onTasks: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    val surface = if (palette.isDark) Color(0xFF101010) else lightNavSurface
-    val border = if (palette.isDark) palette.line.copy(alpha = 0.6f) else lightNavBorder
+    val surface = palette.background
+    val border = palette.disabledText.copy(alpha = if (palette.isDark) 0.35f else 0.45f)
     val active = palette.accent
-    val inactive = if (palette.isDark) palette.secondaryText else Color(0xFF5F6368)
+    val inactive = palette.secondaryText
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(104.dp)
-            .shadow(20.dp, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), clip = false)
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            .height(78.dp)
             .background(surface)
             .drawBehind {
                 drawLine(
@@ -475,7 +492,7 @@ private fun DotCalBottomNav(
                     strokeWidth = 1.dp.toPx(),
                 )
             }
-            .padding(horizontal = 28.dp, vertical = 14.dp),
+            .padding(horizontal = 36.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -518,20 +535,19 @@ private fun BottomNavItem(
     val tint = if (selected) activeColor else inactiveColor
     Column(
         modifier = Modifier
-            .width(82.dp)
+            .width(72.dp)
             .fillMaxHeight()
-            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         icon(tint)
-        Spacer(modifier = Modifier.height(7.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             label,
             color = tint,
             fontFamily = mono,
-            fontSize = 14.sp,
+            fontSize = 12.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
         )
@@ -546,16 +562,16 @@ private fun CalendarViewSegmentedControl(
 ) {
     val segmentShape = RoundedCornerShape(28.dp)
     val compactTabs = CalendarTab.pickerEntries
-    val segmentSurface = if (palette.isDark) palette.calendarSurface else lightNavSurface
-    val segmentBorder = if (palette.isDark) palette.line.copy(alpha = 0.85f) else lightNavBorder
-    val segmentSelected = if (palette.isDark) palette.segmentSelected else lightNavSelected
-    val inactiveText = if (palette.isDark) palette.secondaryText else Color(0xFF303236)
+    val segmentSurface = palette.background
+    val segmentBorder = palette.disabledText.copy(alpha = if (palette.isDark) 0.35f else 0.45f)
+    val segmentSelected = palette.segmentSelected
+    val inactiveText = palette.secondaryText
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (palette.isDark) palette.calendarSurface else lightNavSurface)
-            .padding(horizontal = 0.dp, vertical = 0.dp)
-            .height(44.dp)
+            .background(palette.background)
+            .padding(horizontal = 22.dp, vertical = 0.dp)
+            .height(42.dp)
             .clip(segmentShape)
             .background(segmentSurface)
             .drawBehind {
@@ -566,7 +582,7 @@ private fun CalendarViewSegmentedControl(
                     style = Stroke(width = 1.dp.toPx()),
                 )
             }
-            .padding(horizontal = 20.dp, vertical = 4.dp),
+            .padding(horizontal = 18.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -589,7 +605,7 @@ private fun CalendarViewSegmentedControl(
                         fontFamily = mono,
                         color = if (selected == tab) palette.primaryText else inactiveText,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        fontSize = 17.sp,
+                        fontSize = 15.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
@@ -687,16 +703,6 @@ private fun MonthView(
                 )
             },
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(58.dp).background(palette.calendarSurface),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start,
-        ) {
-            Column(modifier = Modifier.padding(start = 16.dp).clickable(onClick = onJumpToday), horizontalAlignment = Alignment.Start) {
-                Text("${month.year}/${month.monthValue}", fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 28.sp, color = palette.primaryText)
-            }
-        }
-
         Row(modifier = Modifier.fillMaxWidth().height(32.dp).background(palette.calendarSurface)) {
             listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT").forEach {
                 Text(
@@ -821,22 +827,6 @@ private fun WeekView(
                 )
             },
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(58.dp).background(palette.calendarSurface),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start,
-        ) {
-            Column(modifier = Modifier.padding(start = 16.dp).clickable(onClick = onJumpToday), horizontalAlignment = Alignment.Start) {
-                Text(
-                    "${weekStart.year}/${weekStart.monthValue}",
-                    color = palette.primaryText,
-                    fontFamily = mono,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 28.sp,
-                )
-            }
-        }
-
         Row(modifier = Modifier.fillMaxWidth().height(64.dp).background(palette.calendarSurface)) {
             Spacer(modifier = Modifier.width(48.dp))
             days.forEach { day ->
@@ -1041,22 +1031,6 @@ private fun DayView(
     val tasks = events.filter { it.isTask == 1 && it.localDate() == selectedDate }
 
     Column(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(58.dp).background(palette.calendarSurface),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start,
-        ) {
-            Column(modifier = Modifier.padding(start = 16.dp).clickable(onClick = onJumpToday), horizontalAlignment = Alignment.Start) {
-                Text(
-                    "${selectedDate.year}/${selectedDate.monthValue}",
-                    color = palette.primaryText,
-                    fontFamily = mono,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 28.sp,
-                )
-            }
-        }
-
         if (allDayEvents.isNotEmpty()) {
             LazyColumn(modifier = Modifier.fillMaxWidth().height(44.dp).background(palette.calendarSurface)) {
                 items(allDayEvents.size) { index ->
@@ -1217,8 +1191,8 @@ private fun EventEditorScreen(
     initialReminderMinutes: Int?,
     palette: DotCalPalette,
     onDismiss: () -> Unit,
-    onSave: (EventEditorData) -> Unit,
-    onDelete: (() -> Unit)?,
+    onSave: (EventEditorData, RecurringEditScope) -> Unit,
+    onDelete: ((RecurringEditScope) -> Unit)?,
 ) {
     val editorDate = event?.localDate() ?: selectedDate
     val initialStart = event?.startLocalTime() ?: selectedTime
@@ -1237,8 +1211,15 @@ private fun EventEditorScreen(
     var dateTimePicker by remember { mutableStateOf<DateTimeField?>(null) }
     var showReminderPicker by remember { mutableStateOf(false) }
     var showRepeatPicker by remember { mutableStateOf(false) }
+    var showApplyScopePicker by remember { mutableStateOf(false) }
     var submitted by remember { mutableStateOf(false) }
-    val editsWholeSeries = event?.rrule != null || event?.isRecurrenceOccurrence() == true
+    val isRecurringInstance = event?.isRecurrenceOccurrence() == true
+    val canChooseRecurrenceScope = isRecurringInstance
+    var recurringEditScope by remember(event?.id) {
+        mutableStateOf(if (isRecurringInstance) RecurringEditScope.ThisEvent else RecurringEditScope.WholeSeries)
+    }
+    val editsWholeSeries = (event?.rrule != null || event?.isRecurrenceOccurrence() == true) &&
+        recurringEditScope == RecurringEditScope.WholeSeries
     fun trySave() {
         submitted = true
         val startDateTime = startDate.atTime(startTime)
@@ -1257,6 +1238,7 @@ private fun EventEditorScreen(
                     reminderMinutes = reminderMinutes,
                     rrule = recurrenceRule,
                 ),
+                recurringEditScope,
             )
         }
     }
@@ -1356,13 +1338,22 @@ private fun EventEditorScreen(
             )
             EditorValueRow(
                 title = "Repeat",
-                value = recurrenceOptions.firstOrNull { it.rrule == recurrenceRule }?.label ?: "None",
+                value = if (recurringEditScope == RecurringEditScope.ThisEvent) "None" else recurrenceOptions.firstOrNull { it.rrule == recurrenceRule }?.label ?: "None",
                 palette = palette,
                 onClick = { showRepeatPicker = true },
+                enabled = recurringEditScope == RecurringEditScope.WholeSeries,
             )
-            if (editsWholeSeries) {
+            if (canChooseRecurrenceScope) {
+                EditorValueRow(
+                    title = "Apply to",
+                    value = recurringEditScope.label(),
+                    palette = palette,
+                    onClick = { showApplyScopePicker = true },
+                )
+            }
+            if (canChooseRecurrenceScope) {
                 Text(
-                    "Changes apply to the whole series",
+                    if (editsWholeSeries) "Changes apply to the whole series" else "Changes apply only to this event",
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 12.sp,
@@ -1377,7 +1368,7 @@ private fun EventEditorScreen(
             }
             if (event != null && onDelete != null) {
                 Button(
-                    onClick = onDelete,
+                    onClick = { onDelete(recurringEditScope) },
                     modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = palette.cell, contentColor = palette.accent),
                     shape = RoundedCornerShape(0.dp),
@@ -1440,25 +1431,45 @@ private fun EventEditorScreen(
             },
         )
     }
+    if (showApplyScopePicker) {
+        ApplyScopeChoiceSheet(
+            selected = recurringEditScope,
+            palette = palette,
+            onDismiss = { showApplyScopePicker = false },
+            onSelected = {
+                recurringEditScope = it
+                showApplyScopePicker = false
+            },
+        )
+    }
 }
 
 @Composable
-private fun EditorValueRow(title: String, value: String, palette: DotCalPalette, onClick: () -> Unit, visible: Boolean = true) {
+private fun EditorValueRow(
+    title: String,
+    value: String,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+    visible: Boolean = true,
+    enabled: Boolean = true,
+) {
     if (!visible) return
+    val rowTextColor = if (enabled) palette.primaryText else palette.disabledText
+    val valueTextColor = if (enabled) palette.secondaryText else palette.disabledText
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
             .drawBehind {
                 drawLine(palette.line.copy(alpha = 0.55f), Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
             }
             .padding(vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, color = palette.primaryText, fontFamily = mono, fontSize = 15.sp, modifier = Modifier.weight(1f))
+        Text(title, color = rowTextColor, fontFamily = mono, fontSize = 15.sp, modifier = Modifier.weight(1f))
         Text(
             value,
-            color = palette.secondaryText,
+            color = valueTextColor,
             fontFamily = mono,
             fontSize = 14.sp,
             maxLines = 1,
@@ -1466,7 +1477,7 @@ private fun EditorValueRow(title: String, value: String, palette: DotCalPalette,
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1.35f),
         )
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = valueTextColor, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -1722,6 +1733,26 @@ private fun RepeatChoiceSheet(selected: String?, palette: DotCalPalette, onDismi
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ApplyScopeChoiceSheet(
+    selected: RecurringEditScope,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (RecurringEditScope) -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.dialogSurface, contentColor = palette.primaryText) {
+        ChoiceSheetContent(
+            title = "Apply to",
+            items = listOf(RecurringEditScope.ThisEvent, RecurringEditScope.WholeSeries),
+            selected = selected,
+            label = { it.label() },
+            palette = palette,
+            onSelected = onSelected,
+        )
+    }
+}
+
 @Composable
 private fun <T> ChoiceSheetContent(
     title: String,
@@ -1790,11 +1821,6 @@ private fun AgendaPreview(
             .toSortedMap()
     }
     LazyColumn(modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(16.dp)) {
-        item {
-            Column(modifier = Modifier.clickable(onClick = onJumpToday)) {
-                Text("${selectedDate.year}/${selectedDate.monthValue}", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 28.sp, modifier = Modifier.padding(bottom = 16.dp))
-            }
-        }
         if (grouped.isEmpty()) {
             item {
                 Text(
@@ -1877,9 +1903,6 @@ private fun ThreeDayView(
                 )
             },
     ) {
-        Column(modifier = Modifier.fillMaxWidth().height(58.dp).background(palette.calendarSurface).padding(start = 16.dp).clickable(onClick = onJumpToday), verticalArrangement = Arrangement.Center) {
-            Text("${selectedDate.year}/${selectedDate.monthValue}", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 28.sp)
-        }
         Row(modifier = Modifier.fillMaxWidth().height(64.dp).background(palette.calendarSurface)) {
             days.forEach { day ->
                 WeekDayHeader(
@@ -1986,9 +2009,6 @@ private fun YearView(
                 )
             },
     ) {
-        Column(modifier = Modifier.fillMaxWidth().height(58.dp).background(palette.calendarSurface).padding(start = 16.dp).clickable(onClick = onJumpToday), verticalArrangement = Arrangement.Center) {
-            Text(selectedDate.year.toString(), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 30.sp)
-        }
         LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(8.dp)) {
             items(months) { month ->
                 YearMonthCell(
@@ -2554,6 +2574,13 @@ private fun reminderLabel(minutes: Int?): String {
     return minutes?.let { "$it minutes before" } ?: "None"
 }
 
+private fun RecurringEditScope.label(): String {
+    return when (this) {
+        RecurringEditScope.ThisEvent -> "This event"
+        RecurringEditScope.WholeSeries -> "Whole series"
+    }
+}
+
 private fun dateTimeLabel(date: LocalDate, time: LocalTime): String {
     return "${date.format(editorDateFormatter)} ${time.format(editorTimeFormatter).lowercase(Locale.US)}"
 }
@@ -2662,7 +2689,7 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
             calendarSurface = NBlack,
             dialogSurface = Color(0xFF1E1E1E),
             cancelSurface = Color(0xFF121212),
-            segmentSelected = Color(0xFF2E2E2E),
+            segmentSelected = Color(0xFF1E1E1E),
             disabledText = Color(0xFF6E6E6E),
             dot = Color(0xFFFFFFFF),
             yearWeekday = Color(0xFFFFFFFF),
@@ -2676,12 +2703,12 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
             primaryText = Color(0xFF101010),
             secondaryText = Color(0xFF6B6B6B),
             dimText = Color(0xFFBDBDBD),
-            line = Color(0xFFD8D8D0),
-            cell = Color(0xFFF2F2EC),
-            calendarSurface = Color(0xFFFFFFFF),
+            line = Color(0xFFBDBDBD),
+            cell = Color(0xFFF7F7F7),
+            calendarSurface = Color(0xFFF7F7F7),
             dialogSurface = Color(0xFFFFFFFF),
             cancelSurface = Color(0xFFEFEFEF),
-            segmentSelected = Color(0xFFE7E7E7),
+            segmentSelected = Color(0xFFEFEFEF),
             disabledText = Color(0xFFBDBDBD),
             dot = Color(0xFF101010),
             yearWeekday = Color(0xFF101010),
@@ -2705,7 +2732,7 @@ private fun dotCalBootPalette(): DotCalPalette {
         calendarSurface = NBlack,
         dialogSurface = Color(0xFF1E1E1E),
         cancelSurface = Color(0xFF121212),
-        segmentSelected = Color(0xFF2E2E2E),
+        segmentSelected = Color(0xFF1E1E1E),
         disabledText = Color(0xFF6E6E6E),
         dot = Color(0xFFFFFFFF),
         yearWeekday = Color(0xFFFFFFFF),

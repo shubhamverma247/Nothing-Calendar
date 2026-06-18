@@ -23,6 +23,11 @@ data class EventEditorData(
     val rrule: String?,
 )
 
+enum class RecurringEditScope {
+    ThisEvent,
+    WholeSeries,
+}
+
 class DotCalRepository(private val dao: CalendarDao) {
     fun observeEventsForMonth(month: LocalDate): Flow<List<CalendarEvent>> {
         val start = month.withDayOfMonth(1)
@@ -50,9 +55,17 @@ class DotCalRepository(private val dao: CalendarDao) {
         )
     }
 
-    suspend fun saveLocalEvent(existing: CalendarEvent?, data: EventEditorData) {
+    suspend fun saveLocalEvent(
+        existing: CalendarEvent?,
+        data: EventEditorData,
+        recurringEditScope: RecurringEditScope = RecurringEditScope.WholeSeries,
+    ) {
         require(data.title.isNotBlank()) { "TITLE REQUIRED" }
         val zoneId = ZoneId.systemDefault()
+        if (existing?.isRecurrenceOccurrence() == true && recurringEditScope == RecurringEditScope.ThisEvent) {
+            saveDetachedOccurrence(existing, data, zoneId)
+            return
+        }
         val eventId = existing?.baseEventId() ?: UUID.randomUUID().toString()
         val existingMaster = if (existing?.isRecurrenceOccurrence() == true) {
             dao.getEvent(eventId) ?: existing.copy(id = eventId)
@@ -129,7 +142,14 @@ class DotCalRepository(private val dao: CalendarDao) {
         }
     }
 
-    suspend fun deleteLocalEvent(event: CalendarEvent) {
+    suspend fun deleteLocalEvent(
+        event: CalendarEvent,
+        recurringEditScope: RecurringEditScope = RecurringEditScope.WholeSeries,
+    ) {
+        if (event.isRecurrenceOccurrence() && recurringEditScope == RecurringEditScope.ThisEvent) {
+            excludeOccurrence(event)
+            return
+        }
         val eventId = event.baseEventId()
         dao.deleteRemindersForEvent(eventId)
         dao.deleteEvent(eventId)
@@ -155,6 +175,66 @@ class DotCalRepository(private val dao: CalendarDao) {
 
     private fun LocalDate.atStartMs(): Long {
         return atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }
+
+    private suspend fun saveDetachedOccurrence(existing: CalendarEvent, data: EventEditorData, zoneId: ZoneId) {
+        val master = excludeOccurrence(existing) ?: return
+        val start = if (data.isAllDay) {
+            data.date.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        } else {
+            data.date.atTime(data.startTime).atZone(zoneId).toInstant().toEpochMilli()
+        }
+        val end = if (data.isAllDay) {
+            data.endDate.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+        } else {
+            data.endDate.atTime(data.endTime).atZone(zoneId).toInstant().toEpochMilli()
+        }
+        require(end > start) { "END MUST BE AFTER START" }
+        val now = System.currentTimeMillis()
+        val detachedId = UUID.randomUUID().toString()
+        val detachedEvent = master.copy(
+            id = detachedId,
+            title = data.title.trim(),
+            description = data.description.trim(),
+            location = data.location.trim(),
+            startTimeMs = start,
+            endTimeMs = end,
+            timeZone = zoneId.id,
+            isAllDay = if (data.isAllDay) 1 else 0,
+            rrule = null,
+            exceptionDates = "[]",
+            googleEventId = null,
+            googleCalendarId = null,
+            syncVersion = 0,
+            createdAtMs = now,
+            updatedAtMs = now,
+        )
+        dao.upsertEvent(detachedEvent)
+        data.reminderMinutes?.let { minutes ->
+            dao.insertReminders(
+                listOf(
+                    EventReminder(
+                        eventId = detachedId,
+                        minutesBefore = minutes,
+                        triggerAtMs = start - minutes * 60_000L,
+                        alarmRequestCode = "$detachedId-$minutes".hashCode().absoluteValue,
+                    ),
+                ),
+            )
+        }
+    }
+
+    private suspend fun excludeOccurrence(event: CalendarEvent): CalendarEvent? {
+        val occurrenceStartMs = event.occurrenceStartMs() ?: return null
+        val masterId = event.baseEventId()
+        val master = dao.getEvent(masterId) ?: return null
+        val exceptions = master.exceptionStartTimes() + occurrenceStartMs
+        val updatedMaster = master.copy(
+            exceptionDates = exceptions.sorted().joinToString(prefix = "[", postfix = "]"),
+            updatedAtMs = System.currentTimeMillis(),
+        )
+        dao.upsertEvent(updatedMaster)
+        return updatedMaster
     }
 
     private fun expandRecurringEvents(events: List<CalendarEvent>, rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
@@ -193,7 +273,7 @@ class DotCalRepository(private val dao: CalendarDao) {
         while (cursorMonth < rangeEndExclusive.withDayOfMonth(1).plusMonths(1)) {
             val date = cursorMonth.dayOrNull(firstDate.dayOfMonth)
             if (date != null && date >= firstDate && date >= rangeStart && date < rangeEndExclusive) {
-                occurrences += occurrenceOn(date)
+                occurrenceOn(date)?.let { occurrences += it }
             }
             cursorMonth = cursorMonth.plusMonths(1)
         }
@@ -209,17 +289,18 @@ class DotCalRepository(private val dao: CalendarDao) {
         var cursor = firstVisibleDate
         val occurrences = mutableListOf<CalendarEvent>()
         while (cursor < rangeEndExclusive) {
-            if (cursor >= firstDate) occurrences += occurrenceOn(cursor)
+            if (cursor >= firstDate) occurrenceOn(cursor)?.let { occurrences += it }
             cursor = nextDate(cursor)
         }
         return occurrences
     }
 
-    private fun CalendarEvent.occurrenceOn(date: LocalDate): CalendarEvent {
+    private fun CalendarEvent.occurrenceOn(date: LocalDate): CalendarEvent? {
         val zoneId = ZoneId.of(timeZone)
         val startDateTime = java.time.Instant.ofEpochMilli(startTimeMs).atZone(zoneId).toLocalDateTime()
         val durationMs = endTimeMs - startTimeMs
         val occurrenceStart = date.atTime(startDateTime.toLocalTime()).atZone(zoneId).toInstant().toEpochMilli()
+        if (occurrenceStart in exceptionStartTimes()) return null
         return copy(
             id = recurrenceOccurrenceId(id, occurrenceStart),
             startTimeMs = occurrenceStart,
@@ -253,4 +334,17 @@ fun CalendarEvent.baseEventId(): String {
 
 fun CalendarEvent.isRecurrenceOccurrence(): Boolean {
     return id.contains(RECURRENCE_OCCURRENCE_SEPARATOR)
+}
+
+fun CalendarEvent.occurrenceStartMs(): Long? {
+    return id.substringAfter(RECURRENCE_OCCURRENCE_SEPARATOR, "").toLongOrNull()
+}
+
+private fun CalendarEvent.exceptionStartTimes(): Set<Long> {
+    return exceptionDates
+        .removePrefix("[")
+        .removeSuffix("]")
+        .split(',')
+        .mapNotNull { it.trim().toLongOrNull() }
+        .toSet()
 }
