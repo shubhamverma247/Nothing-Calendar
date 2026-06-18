@@ -27,6 +27,21 @@ interface CalendarDao {
     @Query("SELECT * FROM calendar_events WHERE id = :eventId LIMIT 1")
     suspend fun getEvent(eventId: String): CalendarEvent?
 
+    @Query("SELECT * FROM event_reminders WHERE eventId = :eventId ORDER BY triggerAtMs ASC")
+    suspend fun getRemindersForEvent(eventId: String): List<EventReminder>
+
+    @Query("SELECT * FROM event_reminders WHERE alarmRequestCode = :alarmRequestCode LIMIT 1")
+    suspend fun getReminderByRequestCode(alarmRequestCode: Int): EventReminder?
+
+    @Query(
+        """
+        SELECT * FROM event_reminders
+        WHERE isDelivered = 0 AND triggerAtMs > :nowMs
+        ORDER BY triggerAtMs ASC
+        """,
+    )
+    suspend fun getFutureUndeliveredReminders(nowMs: Long): List<EventReminder>
+
     @Query(
         """
         SELECT * FROM calendar_events
@@ -39,8 +54,8 @@ interface CalendarDao {
     @Query("SELECT * FROM event_reminders ORDER BY triggerAtMs ASC")
     fun observeReminders(): Flow<List<EventReminder>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertAccount(account: CalendarAccount)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAccountIfAbsent(account: CalendarAccount)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertEvent(event: CalendarEvent)
@@ -53,4 +68,7 @@ interface CalendarDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReminders(reminders: List<EventReminder>)
+
+    @Query("UPDATE event_reminders SET isDelivered = 1 WHERE alarmRequestCode = :alarmRequestCode")
+    suspend fun markReminderDelivered(alarmRequestCode: Int)
 }

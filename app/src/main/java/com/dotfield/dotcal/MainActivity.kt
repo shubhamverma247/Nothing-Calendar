@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             DotCalTheme {
-                DotCalApp(viewModel = viewModel)
+                DotCalApp(viewModel = viewModel, initialEventId = intent.eventDetailId())
             }
         }
     }
@@ -47,5 +47,14 @@ class MainActivity : ComponentActivity() {
     private companion object {
         const val BOOT_PREFS = "dotcal_boot"
         const val BOOT_THEME_KEY = "theme_mode"
+    }
+}
+
+private fun android.content.Intent.eventDetailId(): String? {
+    val uri = data ?: return null
+    return when {
+        uri.scheme == "dotcal" && uri.host == "event" -> uri.lastPathSegment
+        uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" -> uri.pathSegments.getOrNull(1)
+        else -> null
     }
 }

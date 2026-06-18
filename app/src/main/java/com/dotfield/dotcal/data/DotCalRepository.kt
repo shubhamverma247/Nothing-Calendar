@@ -1,5 +1,7 @@
 package com.dotfield.dotcal.data
 
+import android.content.Context
+import com.dotfield.dotcal.reminders.ReminderScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -11,6 +13,7 @@ import java.util.UUID
 import kotlin.math.absoluteValue
 
 data class EventEditorData(
+    val eventId: String? = null,
     val title: String,
     val description: String,
     val location: String,
@@ -21,6 +24,8 @@ data class EventEditorData(
     val isAllDay: Boolean,
     val reminderMinutes: Int?,
     val rrule: String?,
+    val imageUris: String = "[]",
+    val voiceNotePath: String? = null,
 )
 
 enum class RecurringEditScope {
@@ -28,7 +33,14 @@ enum class RecurringEditScope {
     WholeSeries,
 }
 
-class DotCalRepository(private val dao: CalendarDao) {
+class DotCalRepository(
+    private val dao: CalendarDao,
+    context: Context,
+) {
+    private val reminderScheduler = ReminderScheduler(context)
+
+    fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts()
+
     fun observeEventsForMonth(month: LocalDate): Flow<List<CalendarEvent>> {
         val start = month.withDayOfMonth(1)
         val end = start.plusMonths(1)
@@ -40,8 +52,24 @@ class DotCalRepository(private val dao: CalendarDao) {
 
     fun observeReminders(): Flow<List<EventReminder>> = dao.observeReminders()
 
+    suspend fun getEvent(eventId: String): CalendarEvent? = dao.getEvent(eventId)
+
+    suspend fun getReminderByRequestCode(alarmRequestCode: Int): EventReminder? = dao.getReminderByRequestCode(alarmRequestCode)
+
+    suspend fun markReminderDelivered(alarmRequestCode: Int) {
+        dao.markReminderDelivered(alarmRequestCode)
+    }
+
+    suspend fun rescheduleFutureReminders() {
+        dao.getFutureUndeliveredReminders(System.currentTimeMillis()).forEach { reminder ->
+            dao.getEvent(reminder.eventId)?.let { event ->
+                reminderScheduler.scheduleReminder(reminder, event)
+            }
+        }
+    }
+
     suspend fun ensureLocalAccount() {
-        dao.upsertAccount(
+        dao.insertAccountIfAbsent(
             CalendarAccount(
                 id = LOCAL_ACCOUNT_ID,
                 accountName = "LOCAL",
@@ -61,12 +89,13 @@ class DotCalRepository(private val dao: CalendarDao) {
         recurringEditScope: RecurringEditScope = RecurringEditScope.WholeSeries,
     ) {
         require(data.title.isNotBlank()) { "TITLE REQUIRED" }
+        ensureLocalAccount()
         val zoneId = ZoneId.systemDefault()
         if (existing?.isRecurrenceOccurrence() == true && recurringEditScope == RecurringEditScope.ThisEvent) {
             saveDetachedOccurrence(existing, data, zoneId)
             return
         }
-        val eventId = existing?.baseEventId() ?: UUID.randomUUID().toString()
+        val eventId = existing?.baseEventId() ?: data.eventId ?: UUID.randomUUID().toString()
         val existingMaster = if (existing?.isRecurrenceOccurrence() == true) {
             dao.getEvent(eventId) ?: existing.copy(id = eventId)
         } else {
@@ -105,6 +134,8 @@ class DotCalRepository(private val dao: CalendarDao) {
             timeZone = zoneId.id,
             isAllDay = if (data.isAllDay) 1 else 0,
             rrule = data.rrule,
+            imageUris = data.imageUris,
+            voiceNotePath = data.voiceNotePath,
             updatedAtMs = now,
         ) ?: CalendarEvent(
                 id = eventId,
@@ -118,27 +149,27 @@ class DotCalRepository(private val dao: CalendarDao) {
                 isAllDay = if (data.isAllDay) 1 else 0,
                 colorHex = null,
                 rrule = data.rrule,
+                imageUris = data.imageUris,
                 source = "LOCAL",
                 googleEventId = null,
                 googleCalendarId = null,
                 completedAtMs = null,
-                voiceNotePath = null,
+                voiceNotePath = data.voiceNotePath,
                 createdAtMs = now,
                 updatedAtMs = now,
             )
+        dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
         dao.upsertEvent(event)
         dao.deleteRemindersForEvent(eventId)
         data.reminderMinutes?.let { minutes ->
-            dao.insertReminders(
-                listOf(
-                    EventReminder(
-                        eventId = eventId,
-                        minutesBefore = minutes,
-                        triggerAtMs = start - minutes * 60_000L,
-                        alarmRequestCode = "$eventId-$minutes".hashCode().absoluteValue,
-                    ),
-                ),
+            val reminder = EventReminder(
+                eventId = eventId,
+                minutesBefore = minutes,
+                triggerAtMs = start - minutes * 60_000L,
+                alarmRequestCode = "$eventId-$minutes".hashCode().absoluteValue,
             )
+            dao.insertReminders(listOf(reminder))
+            reminderScheduler.scheduleReminder(reminder, event)
         }
     }
 
@@ -151,6 +182,7 @@ class DotCalRepository(private val dao: CalendarDao) {
             return
         }
         val eventId = event.baseEventId()
+        dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
         dao.deleteRemindersForEvent(eventId)
         dao.deleteEvent(eventId)
     }
@@ -169,6 +201,8 @@ class DotCalRepository(private val dao: CalendarDao) {
                 isAllDay = false,
                 reminderMinutes = null,
                 rrule = null,
+                imageUris = "[]",
+                voiceNotePath = null,
             ),
         )
     }
@@ -191,7 +225,7 @@ class DotCalRepository(private val dao: CalendarDao) {
         }
         require(end > start) { "END MUST BE AFTER START" }
         val now = System.currentTimeMillis()
-        val detachedId = UUID.randomUUID().toString()
+        val detachedId = data.eventId ?: UUID.randomUUID().toString()
         val detachedEvent = master.copy(
             id = detachedId,
             title = data.title.trim(),
@@ -203,6 +237,8 @@ class DotCalRepository(private val dao: CalendarDao) {
             isAllDay = if (data.isAllDay) 1 else 0,
             rrule = null,
             exceptionDates = "[]",
+            imageUris = data.imageUris,
+            voiceNotePath = data.voiceNotePath,
             googleEventId = null,
             googleCalendarId = null,
             syncVersion = 0,
@@ -211,16 +247,14 @@ class DotCalRepository(private val dao: CalendarDao) {
         )
         dao.upsertEvent(detachedEvent)
         data.reminderMinutes?.let { minutes ->
-            dao.insertReminders(
-                listOf(
-                    EventReminder(
-                        eventId = detachedId,
-                        minutesBefore = minutes,
-                        triggerAtMs = start - minutes * 60_000L,
-                        alarmRequestCode = "$detachedId-$minutes".hashCode().absoluteValue,
-                    ),
-                ),
+            val reminder = EventReminder(
+                eventId = detachedId,
+                minutesBefore = minutes,
+                triggerAtMs = start - minutes * 60_000L,
+                alarmRequestCode = "$detachedId-$minutes".hashCode().absoluteValue,
             )
+            dao.insertReminders(listOf(reminder))
+            reminderScheduler.scheduleReminder(reminder, detachedEvent)
         }
     }
 

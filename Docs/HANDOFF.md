@@ -15,7 +15,7 @@ Key requirements:
 - Every future session working on this repo must use `$android-development`.
 - Manual QA rule: do not run phone/manual UI testing unless the user explicitly asks. Build/install only when needed; otherwise update `What To Test Now` so the user can test manually.
 - Room DB with exactly 5 tables: `calendar_accounts`, `calendar_events`, `event_reminders`, `sync_metadata`, `deleted_event_log`.
-- Preferences DataStore keys: default view, week start, default reminder, sync, birthday, onboarding, last sync, declined events, 24-hour format, theme mode.
+- Preferences DataStore keys: default view, week start, default reminder, sync, birthday, onboarding, last sync, declined events, 24-hour format, theme mode, last selected date.
 - Features: Month, Week, Day, Agenda, Add/Edit Event, Event Detail, Reminders/Notifications, Glance widgets, Tasks, Settings, Onboarding.
 - Bottom nav: Calendar / Tasks / Settings. Calendar sub-tabs: Month / Week / Day / Agenda.
 - Manifest permissions declared for calendar, contacts, notifications, audio, boot, vibrate, exact alarms, foreground service, wake lock.
@@ -25,6 +25,24 @@ Key requirements:
 Requested GitHub repo was empty, so scaffold created.
 
 Implemented:
+- Latest Event Details redesign:
+  - Rebuilt Event Detail screen to match the attached reference: top bar with back arrow, centered `Event Details`, right text `Edit`, large 32sp semibold title, single-column sections, subtle dividers, and centered text-only `Delete Event`.
+  - Section order is `TIME`, `LOCATION`, `REMINDER`, `CALENDAR`, `DESCRIPTION`, `IMAGES`, `VOICE NOTE`.
+  - Removed the large edit icon, red toolbar divider/accent strip, chip styling, two-column section layout, cards, shadows, and decorative section icons from Event Detail.
+  - Light/Dark detail colors now use the requested DotCal palette values: background/top bar/text/dividers/red accent/image border/voice progress switch by theme while layout remains identical.
+  - Image attachments are read-only 80dp x 80dp thumbnails with 12dp radius and theme border; no add/upload controls on detail.
+  - Voice note detail is a minimal horizontal player with play/pause glyph, progress line, and duration text; no waveform.
+  - Delete uses the existing event delete path from detail and then closes detail.
+  - No package name, deep link scheme, DB filename, schema columns, or table count changed.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed; user did not request phone/manual UI QA.
+- Latest bug fix:
+  - Fixed event loss after app restart and same-day multi-event overwrite.
+  - Root cause: `ensureLocalAccount()` used Room `REPLACE` for `calendar_accounts`; SQLite deletes the parent row before replacing it, so the `calendar_events.accountId` FK cascaded and deleted existing local events.
+  - `CalendarDao` now inserts the local account with `OnConflictStrategy.IGNORE` via `insertAccountIfAbsent`, preserving the existing `local-primary` parent row and all child events.
+  - No package name, deep link scheme, DB filename, schema columns, or table count changed.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed; user did not request phone/manual UI QA.
 - Android Gradle project with wrapper copied from local Android project.
 - App module: Kotlin, Compose, Room, DataStore, WorkManager, Glance dependencies.
 - Package/application id: `com.dotfield.dotcal`.
@@ -447,6 +465,114 @@ Implemented:
   - Kept bottom-nav sizing, spacing, text, colors, package name, deep link scheme, DB filename, schema columns, and exactly 5 Room tables unchanged.
 - Verified debug build succeeds after bottom navigation icon refresh with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
 - Installed debug APK after bottom navigation icon refresh with `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Continuation Roadmap Step 1, Event Detail Screen:
+  - Added full-screen `EventDetailScreen` with right-to-left overlay, back arrow, centered `EVENT DETAILS`, edit pencil, and event-color accent strip.
+  - Detail screen shows title, timed/all-day status, recurrence label, reminders from existing `event_reminders`, location, calendar account from existing `calendar_accounts`, selectable description, image placeholders from existing `imageUris`, and basic voice-note playback for existing `voiceNotePath`.
+  - Added deep link handling for `dotcal://event/{eventId}` without changing the `dotcal` scheme.
+  - Week, Day, hidden Three-day, and Agenda event taps open Event Detail.
+  - Month day bottom-sheet event rows still open Add/Edit directly because existing working app behavior remains source of truth where it conflicts with the newer roadmap.
+  - Birthday/read-only source events hide the edit pencil for later birthday flow compatibility.
+  - No package name, deep link scheme, DB filename, schema columns, table count, or existing UI chrome rules changed; still exactly 5 Room tables.
+- Verified debug build succeeds after Event Detail Screen with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Event Detail tap-target fix:
+  - Fixed Week, Day, and hidden Three-day timeline event blocks so tapping the visible event block opens Event Detail instead of falling through to the parent empty-hour Add Event action.
+  - Empty hour taps still open Add Event at the tapped hour.
+  - Month day bottom-sheet event rows still preserve current direct Add/Edit behavior.
+- Verified debug build succeeds after Event Detail tap-target fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Event details bottom-sheet and editor polish:
+  - Preserved the final DotCal palette and updated Light grid/line to the specified `#E8E8E8`.
+  - Month date tap now uses subtle haptic feedback before opening the existing slide-up event sheet.
+  - Day event sheet now displays all selected-day events as separate clickable cards with 12dp spacing, theme card surface/border, time/title layout, and exactly one right-side chevron.
+  - Event sheet Add Event button is full width, 56dp tall, 16dp radius, red `#FF3B30`, and white text.
+  - Add/Edit Event text fields now have monochrome leading icons, transparent backgrounds, final default/focused borders, and red cursor/focus color.
+  - Delete event action is centered red medium-weight text with no filled background.
+  - No package name, deep link scheme, DB filename, schema columns, or table count changed; still exactly 5 Room tables.
+- Verified debug build succeeds after event sheet/editor polish with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Add/Edit focus fix:
+  - Tapping Starts, Ends, Reminder, Repeat, Apply to, or the All-day switch now hides the keyboard and moves focus to a hidden focus sink, so Location/Description no longer remain visually focused after opening pickers.
+  - Add/Edit scroll content now clears current field focus on every touch-down before child controls handle the tap; tapping another text field still focuses that new field.
+  - Add/Edit text fields now force `textStyle` to the active DotCal palette primary text so Light theme edit text stays `#101010` instead of inheriting Material dark text.
+  - Event card edit affordance is now a custom-drawn single right-side chevron per card, not one chevron per text line.
+  - Week, Day, and hidden Three-day timeline event blocks now win taps over the empty-hour Add Event target. If an hour contains event blocks, tapping the event opens detail; empty hours still open Add Event.
+- Verified debug build succeeds after Add/Edit touch-down focus clearing, forced text-field text color, focus sink, custom single chevron, and timeline tap-target fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Event card layout update:
+  - Date-sheet event cards now use 16dp radius and the same typography-driven layout in Light and Dark.
+  - Card line 1 is time range, line 2 is title, and optional line 3 is location with a monochrome location icon only.
+  - Removed the previous colored event strip from date-sheet cards; no time/title/description icons are used.
+  - Chevron uses dedicated card-chevron colors: Dark `#6E6E6E`, Light `#BDBDBD`.
+  - Card colors remain Dark `#121212`/`#2A2A2A` and Light `#FFFFFF`/`#E8E8E8`.
+- Verified debug build succeeds after event card layout update with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Event card compact height polish:
+  - Reduced date-sheet event-card vertical padding from 14dp to 10dp.
+  - Tightened time/title gap from 4dp to 2dp and location gap from 6dp to 4dp.
+  - Kept 16dp radius, same colors, same one-chevron affordance, and same optional location row.
+- Verified debug build succeeds after compact event-card height polish with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Continuation Roadmap Step 2, Image Attachments:
+  - Add/Edit Event now supports image attachments using the existing `calendar_events.imageUris` JSON array column only.
+  - Uses Android Photo Picker via `ActivityResultContracts.PickMultipleVisualMedia`; no media read permission was added.
+  - Max 5 images per event; selected image URIs are persisted with read grants when available.
+  - Add/Edit Event shows thumbnail row, `+` add tile while below 5 images, and remove overlay on each selected thumbnail.
+  - Save/edit paths preserve and update `imageUris` for normal events and detached recurring occurrences.
+  - Event Detail now shows real image thumbnails from `imageUris` instead of numbered placeholders.
+  - Thumbnail rendering uses local Android thumbnail decoding; no new dependency or schema/table/column change.
+  - No package name, deep link scheme, DB filename, schema columns, or table count changed; still exactly 5 Room tables.
+- Bottom navigation icon update:
+  - Settings bottom-nav icon changed from sliders to a circular settings glyph.
+  - Bottom nav sizing, text, colors, package name, schema, and table count unchanged.
+- Verified debug build succeeds after Image Attachments and Settings icon update with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- Continuation Roadmap Step 3, Voice Notes:
+  - Add/Edit Event now supports voice notes using the existing `calendar_events.voiceNotePath` column only.
+  - Editor uses runtime `RECORD_AUDIO` permission on first mic tap; denied permission hides the mic affordance without blocking the editor.
+  - Recordings use `MediaRecorder` MPEG_4/AAC at `context.filesDir/voice_notes/{eventId}.m4a` with a 5-minute cap.
+  - Voice note UI supports tap-to-record, recording timer with `STOP`, play/pause with duration/progress, and delete `X`.
+  - New local events receive a stable draft event id before save so the voice-note filename matches the saved event id.
+  - Event save/edit paths now preserve and update `voiceNotePath` for normal events and detached recurring occurrences.
+  - Settings bottom-nav icon was refined to a Nothing OS-inspired dotted circular gear glyph while preserving nav sizing and colors.
+  - No package name, deep link scheme, DB filename, schema columns, or table count changed; still exactly 5 Room tables.
+- Verified debug build succeeds after Voice Notes and Settings icon refinement with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- APK was not installed after Voice Notes because phone/manual UI QA was not requested.
+- Voice note playback/persistence fix:
+  - Fixed recorder lifecycle so Compose disposal no longer stops/releases the newly-started `MediaRecorder`, which caused near-1-second/corrupt files and `UNAVAILABLE` playback in Event Detail.
+  - Event Detail now uses the same progress-capable play/pause row as Add/Edit for existing `voiceNotePath` files.
+  - Save completion now closes the Add/Edit overlay only after the ViewModel repository save finishes, reducing risk of quick app-close before Room write completes.
+  - Event Detail image thumbnails are now tappable and open a full-screen image preview overlay with close action.
+  - No package name, deep link scheme, DB filename, schema columns, or table count changed; still exactly 5 Room tables.
+- Verified debug build succeeds after voice note lifecycle/save and image preview fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- APK was not installed after voice note lifecycle/save and image preview fix because phone/manual UI QA was not requested.
+- Cold-start event visibility fix:
+  - Added `KEY_LAST_SELECTED_DATE` to Preferences DataStore and persist/restore the last selected calendar date.
+  - Add/Edit save now selects the saved event start date after the Room save completes, so reopening the app returns to the month/date where the new event exists instead of resetting to today.
+  - DataStore restore waits for the real stored value before writing, avoiding an initial cold-start overwrite with today's date.
+  - No package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+- Verified debug build succeeds after cold-start event visibility fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- APK was not installed after cold-start event visibility fix because phone/manual UI QA was not requested.
+- Today-event save hardening:
+  - `saveLocalEvent()` now calls `ensureLocalAccount()` synchronously before inserting/updating `calendar_events`, so local event saves cannot race the startup account creation coroutine and fail FK/account persistence.
+  - This targets the case where an event appears during the current app session but is missing after clearing the app and reopening.
+  - No package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+- Verified debug build succeeds after today-event save hardening with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- APK was not installed after today-event save hardening because phone/manual UI QA was not requested.
+- Continuation Roadmap Step 4, AlarmManager Reminders:
+  - Added `ReminderScheduler`, `ReminderReceiver`, and `BootReceiver`.
+  - Event save now cancels previous reminder alarms, replaces existing `event_reminders` rows, and schedules future reminder alarms from the same table.
+  - Event delete now cancels scheduled reminder alarms before deleting reminders/events.
+  - Uses exact alarms with `setExactAndAllowWhileIdle()` when allowed; on Android 12+ when exact alarms are unavailable, falls back to `setWindow()` with a 5-minute window.
+  - Notification channel id is `dotcal_reminders`.
+  - Reminder notifications include `VIEW` deep link action to `dotcal://event/{eventId}` and `SNOOZE 10 MIN`.
+  - Snooze schedules a one-off 10-minute alarm without adding new schema/table/columns.
+  - Boot receiver handles `BOOT_COMPLETED` and reschedules future undelivered reminders from existing `event_reminders`.
+  - Notification display respects `POST_NOTIFICATIONS` permission on Android 13+.
+  - No package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+- Verified debug build succeeds after AlarmManager Reminders with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- APK was not installed after AlarmManager Reminders because phone/manual UI QA was not requested.
+- Add/Edit create-overwrite fix:
+  - Fixed root cause of multiple new events replacing each other: the full-screen Add/Edit editor kept the same remembered draft event id across repeated Add Event opens when date/time did not change.
+  - DotCal now creates a fresh `editorSessionKey` every time Add/Edit opens, and new-event draft ids are keyed from that session instead of only date/time.
+  - Add/Edit form state, reminder, recurrence, images, and voice note state also reset from the fresh editor session for new creates.
+  - This targets the reported flow: create Event 1, then create Event 2 on the same date/time, where Event 2 replaced Event 1 and only Event 2 remained after restart.
+  - No package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+- Verified debug build succeeds after Add/Edit create-overwrite fix with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- APK was not installed after Add/Edit create-overwrite fix because phone/manual UI QA was not requested.
 
 Known gap:
 - `calendar_events` CHECK (`endTimeMs >= startTimeMs`) is not enforced by Room annotation yet. Repository validates new local events by construction. Later add custom open helper/migration if strict SQLite CHECK required from v1.
@@ -1019,7 +1145,7 @@ Conflict check:
 ## Next Step
 
 Next implementation step:
-- Step 1 from Continuation Roadmap: build full-screen Event Detail Screen.
+- Step 5 from Continuation Roadmap: Google Calendar Sync via CalendarProvider.
 - Preserve schema columns/current UI rules and exactly 5 Room tables.
 - Do not run phone/manual UI testing by default; update `What To Test Now` instead.
 - Use stored week start preference later instead of hardcoded Sunday, if user wants configurable week start.
@@ -1166,6 +1292,70 @@ Manual:
 - Recurring event Delete button should say `Delete series`.
 - Long Start/End/Reminder/Repeat values should stay on one line and not overlap the chevron or title.
 - Month cells stay readable; current day red fill still clear.
+- Tap a Week event block: full-screen Event Detail should slide in.
+- Tap a Day event block or all-day row: full-screen Event Detail should slide in.
+- Tap an Agenda event row: full-screen Event Detail should slide in.
+- Tap empty Week/Day/Three-day hour cell away from an event block: Add Event should still open with that date/hour.
+- Tap directly on the visible Week/Day/Three-day event block text or colored area: Add Event should not open; Event Detail should open.
+- Event Detail top bar should show back arrow, centered `EVENT DETAILS`, and edit pencil for normal events.
+- Event Detail should show accent strip, title, date/time or `ALL DAY EVENT`, recurrence if set, reminders if set, location if set, calendar account, and selectable description if set.
+- Tap Event Detail edit pencil: Add/Edit Event should open for that event.
+- Event Detail back arrow and Android back should return to the previous Calendar/Agenda view.
+- Month date bottom-sheet event row should still open Add/Edit directly, preserving current app behavior.
+- Launch a deep link like `dotcal://event/{eventId}`: app should open Event Detail for that event id.
+- Month view: tap a date with three or more events; sheet should show every event as its own card, 12dp apart.
+- Event cards should use `#121212`/`#2A2A2A` in Dark and `#FFFFFF`/`#E8E8E8` in Light, with exactly one right chevron.
+- Event cards should use 16dp radius.
+- Event cards should look more compact than the earlier tall version; time/title gap should be tight.
+- Event card line 1 should be time range, line 2 should be title, optional line 3 should be location.
+- Event cards should not show time/title/description icons or the old colored event strip.
+- Event card chevron should be `#6E6E6E` in Dark and `#BDBDBD` in Light.
+- Event card location icon, when location exists, should match secondary text: `#B3B3B3` Dark and `#6B6B6B` Light.
+- Add/Edit Event > Images: tap `+`, choose 1-5 images from Photo Picker, and thumbnails should appear.
+- Add/Edit Event > Images: remove overlay should remove only that thumbnail.
+- Save an event with images, reopen it, and thumbnails should still be present.
+- Event Detail should show real thumbnails for events with images.
+- Selecting more than 5 images should keep only 5.
+- No `READ_MEDIA_IMAGES` permission prompt should appear.
+- Bottom nav Settings icon should look like a circular settings icon, not sliders.
+- Bottom nav Settings icon should look like a Nothing OS-inspired dotted circular settings glyph.
+- Tap an event card in the date sheet: Add/Edit Event should open for that event.
+- Tap the sheet `+ Add Event` button: Add/Edit Event should open; button should be 56dp tall, rounded, red, and full width.
+- Add/Edit Event should show monochrome icons for title, location, and description.
+- Focus each Add/Edit text field: border and cursor should turn `#FF3B30`; unfocused border should return to theme default.
+- Focus Location, then tap Starts or Ends: picker should open and Location should no longer stay focused.
+- Focus Location, then tap Reminder, Repeat, Apply to, or All-day: Location should lose focus before the picker/toggle action.
+- Focus Location, then tap blank space in the Add/Edit screen: red focus border and keyboard should clear.
+- Focus Location, then tap Title or Description: Location should lose focus and the tapped field should gain focus.
+- In Light theme, edit existing event fields should show typed text in `#101010`, not white.
+- Tap Week/Day event blocks: Event Detail should open, not Add Event.
+- Delete event action should be centered red medium-weight text, not a filled red or gray button.
+- Add/Edit Event > Voice note: first tap should request microphone permission if not already granted.
+- Add/Edit Event > Voice note: denying microphone permission should hide the mic affordance and not block editing/saving.
+- Add/Edit Event > Voice note: tap to record, timer should run, `STOP` should save a `.m4a` voice note.
+- Add/Edit Event > Voice note: saved voice note should show play/pause, duration/progress, and delete `X`.
+- Save an event with a voice note, reopen it, and the voice note should still be available.
+- Event Detail should show playback for events with `voiceNotePath`.
+- Voice note files should save under app internal files `voice_notes/{eventId}.m4a`.
+- Voice note recording should stop automatically by 5 minutes.
+- Record a voice note longer than 5 seconds, tap `STOP`, and duration should match the actual recording instead of `0:01`.
+- Tap play in Add/Edit after stopping a recording; audio should play/pause.
+- Save event, open Event Detail, and voice note should play instead of showing `UNAVAILABLE`.
+- Save event, close app, reopen app, and the event should still be present.
+- Save event on a non-today date, clear app from recents, reopen app, and the calendar should return to that event's month/date.
+- Save event, immediately close app after editor closes, reopen app, and the event should still be visible.
+- Save an event for today's date right after launching the app, clear app from recents, reopen app, and the event should still be visible.
+- Tap an image thumbnail in Event Detail; full-screen image preview should open and close cleanly.
+- Create an event with a reminder set in the future; notification should fire around the expected time.
+- On Android 12+, deny exact-alarm access if prompted/available; reminder should still fire within roughly a 5-minute fallback window.
+- Reminder notification `VIEW` should open `dotcal://event/{eventId}` into Event Detail.
+- Reminder notification `SNOOZE 10 MIN` should fire another reminder roughly 10 minutes later.
+- Edit an event reminder time; old alarm should not fire and new alarm should.
+- Delete an event with a reminder; no reminder notification should fire later.
+- Reboot phone after creating a future reminder; reminder should still fire after boot reschedule.
+- Create Event 1 for today, save, then create Event 2 for today with the same default time, save; both events should remain visible.
+- Clear app from recents and reopen; Event 1 and Event 2 should both still be visible.
+- Open Add Event after saving another event; title/location/description/images/voice note should start clean unless editing an existing event.
 
 ## Resume Prompt For New Chat
 
@@ -1179,4 +1369,4 @@ Do not change package name, deep link scheme, or DB filename. Do not run phone/m
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
 ```
 
-Current next implementation step: Continuation Roadmap Step 1, Event Detail Screen, but keep existing app behavior as source of truth where conflicts exist.
+Current next implementation step: Continuation Roadmap Step 5, Google Calendar Sync via CalendarProvider, but keep existing app behavior as source of truth where conflicts exist.

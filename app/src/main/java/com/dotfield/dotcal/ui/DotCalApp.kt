@@ -1,16 +1,33 @@
 package com.dotfield.dotcal.ui
 
+import android.Manifest
 import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.media.MediaPlayer
+import android.media.MediaRecorder
+import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
+import android.util.Size
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -31,6 +48,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -40,11 +58,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -55,11 +77,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -67,6 +91,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -77,26 +102,40 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.zIndex
 import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.datastore.preferences.core.edit
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventEditorData
+import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.isRecurrenceOccurrence
 import com.dotfield.dotcal.data.RecurringEditScope
@@ -112,12 +151,18 @@ import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.io.File
 import java.util.Locale
+import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 private val mono = FontFamily.SansSerif
 private val sheetDateFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMM", Locale.US)
+private val detailDateFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy", Locale.US)
 private val compactDateFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 private val editorDateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM, yyyy", Locale.US)
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
@@ -137,18 +182,21 @@ private enum class DateTimeField { Start, End }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DotCalApp(viewModel: DotCalViewModel) {
+fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
     val month by viewModel.month.collectAsStateWithLifecycle()
     val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
     val events by viewModel.events.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
+    val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
+    val detailEvent by viewModel.detailEvent.collectAsStateWithLifecycle()
     var screenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var previousScreenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var showSheet by remember { mutableStateOf(false) }
     var addSheet by remember { mutableStateOf(false) }
     var addStartTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
     var editingEvent by remember { mutableStateOf<CalendarEvent?>(null) }
+    var editorSessionKey by remember { mutableStateOf(UUID.randomUUID().toString()) }
     var settingsScreen by remember { mutableStateOf(SettingsScreen.Root) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -166,6 +214,12 @@ fun DotCalApp(viewModel: DotCalViewModel) {
             CalendarTab.fromStorage(preferences[CalendarPreferences.KEY_DEFAULT_VIEW])
         }
     }.collectAsState(initial = CalendarTab.Month)
+    val storedSelectedDateValue by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_LAST_SELECTED_DATE].orEmpty()
+        }
+    }.collectAsState(initial = null)
+    var selectedDateRestored by remember { mutableStateOf(false) }
     var calendarTab by remember { mutableStateOf<CalendarTab?>(null) }
     LaunchedEffect(storedCalendarTab) {
         if (calendarTab == null) calendarTab = storedCalendarTab
@@ -180,6 +234,25 @@ fun DotCalApp(viewModel: DotCalViewModel) {
             bootPreferences.edit().putString(BOOT_THEME_KEY, mode.name).apply()
         }
     }
+    LaunchedEffect(storedSelectedDateValue, initialEventId) {
+        val storedValue = storedSelectedDateValue ?: return@LaunchedEffect
+        if (!selectedDateRestored) {
+            if (initialEventId == null && storedValue.isNotBlank()) {
+                runCatching { LocalDate.parse(storedValue) }.getOrNull()?.let(viewModel::selectDate)
+            }
+            selectedDateRestored = true
+        }
+    }
+    LaunchedEffect(selectedDate, selectedDateRestored) {
+        if (selectedDateRestored) {
+            context.calendarPreferencesDataStore.edit { preferences ->
+                preferences[CalendarPreferences.KEY_LAST_SELECTED_DATE] = selectedDate.toString()
+            }
+        }
+    }
+    LaunchedEffect(initialEventId) {
+        initialEventId?.let(viewModel::openEventDetailById)
+    }
     fun selectCalendarTab(tab: CalendarTab) {
         calendarTab = tab
         scope.launch {
@@ -188,8 +261,20 @@ fun DotCalApp(viewModel: DotCalViewModel) {
             }
         }
     }
+    fun openAddEditor(startTime: LocalTime = LocalTime.of(9, 0)) {
+        editorSessionKey = UUID.randomUUID().toString()
+        addStartTime = startTime
+        editingEvent = null
+        addSheet = true
+    }
+    fun openEditEditor(event: CalendarEvent) {
+        editorSessionKey = UUID.randomUUID().toString()
+        editingEvent = event
+        addSheet = true
+    }
     fun closeTopSurface() {
         when {
+            detailEvent != null -> viewModel.closeEventDetail()
             addSheet -> {
                 editingEvent = null
                 addSheet = false
@@ -207,7 +292,7 @@ fun DotCalApp(viewModel: DotCalViewModel) {
             }
         }
     }
-    BackHandler(enabled = addSheet || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks) {
+    BackHandler(enabled = detailEvent != null || addSheet || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks) {
         closeTopSurface()
     }
 
@@ -263,9 +348,7 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                             if (visibleMainTab == ScreenTab.Calendar) viewModel.selectDate(LocalDate.now())
                         },
                         onAdd = {
-                            addStartTime = LocalTime.of(9, 0)
-                            editingEvent = null
-                            addSheet = true
+                            openAddEditor()
                         },
                     )
                 }
@@ -315,10 +398,9 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                             onDateSelected = viewModel::selectDate,
                             onAddAtDate = { date, time ->
                                 viewModel.selectDate(date)
-                                addStartTime = time
-                                editingEvent = null
-                                addSheet = true
+                                openAddEditor(time)
                             },
+                            onEventClick = viewModel::openEventDetail,
                         )
                         CalendarTab.Day -> DayView(
                             selectedDate = selectedDate,
@@ -329,10 +411,9 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                             onJumpToday = { viewModel.selectDate(LocalDate.now()) },
                             onAddAtDate = { date, time ->
                                 viewModel.selectDate(date)
-                                addStartTime = time
-                                editingEvent = null
-                                addSheet = true
+                                openAddEditor(time)
                             },
+                            onEventClick = viewModel::openEventDetail,
                         )
                         CalendarTab.ThreeDay -> ThreeDayView(
                             selectedDate = selectedDate,
@@ -344,16 +425,16 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                             onDateSelected = viewModel::selectDate,
                             onAddAtDate = { date, time ->
                                 viewModel.selectDate(date)
-                                addStartTime = time
-                                editingEvent = null
-                                addSheet = true
+                                openAddEditor(time)
                             },
+                            onEventClick = viewModel::openEventDetail,
                         )
                         CalendarTab.Agenda -> AgendaPreview(
                             selectedDate = selectedDate,
                             events = events,
                             palette = palette,
                             onJumpToday = { viewModel.selectDate(LocalDate.now()) },
+                            onEventClick = viewModel::openEventDetail,
                         )
                         CalendarTab.Year -> YearView(
                             selectedDate = selectedDate,
@@ -404,6 +485,7 @@ fun DotCalApp(viewModel: DotCalViewModel) {
         ) {
             EventEditorScreen(
                 event = editingEvent,
+                editorSessionKey = editorSessionKey,
                 selectedDate = selectedDate,
                 selectedTime = addStartTime,
                 initialReminderMinutes = editingEvent?.let { event -> reminders.firstOrNull { it.eventId == event.baseEventId() }?.minutesBefore },
@@ -413,9 +495,11 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                     addSheet = false
                 },
                 onSave = { data, scope ->
-                    viewModel.saveEvent(editingEvent, data, scope)
-                    editingEvent = null
-                    addSheet = false
+                    viewModel.saveEvent(editingEvent, data, scope) {
+                        viewModel.selectDate(data.date)
+                        editingEvent = null
+                        addSheet = false
+                    }
                 },
                 onDelete = editingEvent?.let { eventToDelete ->
                     { scope ->
@@ -425,6 +509,30 @@ fun DotCalApp(viewModel: DotCalViewModel) {
                     }
                 },
             )
+        }
+        AnimatedVisibility(
+            visible = detailEvent != null,
+            enter = slideInHorizontally(initialOffsetX = { it }),
+            exit = slideOutHorizontally(targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            detailEvent?.let { event ->
+                EventDetailScreen(
+                    event = event,
+                    reminders = reminders.filter { it.eventId == event.baseEventId() },
+                    account = accounts.firstOrNull { it.id == event.accountId },
+                    palette = palette,
+                    onBack = viewModel::closeEventDetail,
+                    onEdit = {
+                        viewModel.closeEventDetail()
+                        openEditEditor(event)
+                    },
+                    onDelete = {
+                        viewModel.deleteEvent(event)
+                        viewModel.closeEventDetail()
+                    },
+                )
+            }
         }
         BackHandler(enabled = addSheet) {
             editingEvent = null
@@ -440,14 +548,11 @@ fun DotCalApp(viewModel: DotCalViewModel) {
             onDismiss = { showSheet = false },
             onAdd = {
                 showSheet = false
-                addStartTime = LocalTime.of(9, 0)
-                editingEvent = null
-                addSheet = true
+                openAddEditor()
             },
             onEdit = {
                 showSheet = false
-                editingEvent = it
-                addSheet = true
+                openEditEditor(it)
             },
         )
     }
@@ -703,19 +808,20 @@ private fun BottomTaskIcon(tint: Color) {
 @Composable
 private fun BottomSettingsIcon(tint: Color) {
     Canvas(modifier = Modifier.size(30.dp)) {
-        val strokeWidth = 2.2.dp.toPx()
-        val knobStroke = Stroke(width = strokeWidth)
-        val startX = 5.dp.toPx()
-        val endX = 25.dp.toPx()
-        val firstY = 9.dp.toPx()
-        val secondY = 15.dp.toPx()
-        val thirdY = 21.dp.toPx()
-        drawLine(tint, Offset(startX, firstY), Offset(endX, firstY), strokeWidth = strokeWidth)
-        drawLine(tint, Offset(startX, secondY), Offset(endX, secondY), strokeWidth = strokeWidth)
-        drawLine(tint, Offset(startX, thirdY), Offset(endX, thirdY), strokeWidth = strokeWidth)
-        drawCircle(tint, radius = 3.dp.toPx(), center = Offset(12.dp.toPx(), firstY), style = knobStroke)
-        drawCircle(tint, radius = 3.dp.toPx(), center = Offset(20.dp.toPx(), secondY), style = knobStroke)
-        drawCircle(tint, radius = 3.dp.toPx(), center = Offset(15.dp.toPx(), thirdY), style = knobStroke)
+        val strokeWidth = 1.9.dp.toPx()
+        val stroke = Stroke(width = strokeWidth)
+        val center = Offset(size.width / 2f, size.height / 2f)
+        drawCircle(tint, radius = 11.5.dp.toPx(), center = center, style = stroke)
+        drawCircle(tint, radius = 3.dp.toPx(), center = center, style = stroke)
+        val dotRadius = 1.35.dp.toPx()
+        repeat(12) { index ->
+            val angle = Math.toRadians((index * 30).toDouble())
+            val dotCenter = Offset(
+                center.x + kotlin.math.cos(angle).toFloat() * 8.dp.toPx(),
+                center.y + kotlin.math.sin(angle).toFloat() * 8.dp.toPx(),
+            )
+            drawCircle(tint, radius = dotRadius, center = dotCenter)
+        }
     }
 }
 
@@ -789,11 +895,15 @@ private fun DayCell(
 ) {
     val isToday = date == LocalDate.now()
     val inMonth = YearMonth.from(date) == activeMonth
+    val haptic = LocalHapticFeedback.current
     Box(
         modifier = Modifier
             .aspectRatio(1f)
             .background(palette.calendarSurface)
-            .clickable(onClick = onClick),
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            },
         contentAlignment = Alignment.TopCenter,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 8.dp)) {
@@ -849,6 +959,7 @@ private fun WeekView(
     onJumpToday: () -> Unit,
     onDateSelected: (LocalDate) -> Unit,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
+    onEventClick: (CalendarEvent) -> Unit,
 ) {
     val days = remember(selectedDate) { weekDays(selectedDate) }
     val weekStart = days.first()
@@ -914,6 +1025,7 @@ private fun WeekView(
                     eventLayouts = eventLayouts,
                     palette = palette,
                     onAddAtDate = onAddAtDate,
+                    onEventClick = onEventClick,
                 )
             }
         }
@@ -970,6 +1082,7 @@ private fun WeekHourRow(
     eventLayouts: Map<String, WeekEventLayout>,
     palette: DotCalPalette,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
+    onEventClick: (CalendarEvent) -> Unit,
 ) {
     val now = LocalTime.now()
     val showNow = selectedDate in days && selectedDate == LocalDate.now() && hour == now.hour
@@ -1006,9 +1119,15 @@ private fun WeekHourRow(
                     .drawBehind {
                         drawLine(palette.line, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
                         drawLine(palette.line, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-                    }
-                    .clickable { onAddAtDate(day, LocalTime.of(hour, 0)) },
+                    },
             ) {
+                if (dayEvents.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { onAddAtDate(day, LocalTime.of(hour, 0)) },
+                    )
+                }
                 if (showNow && day == selectedDate) {
                     Box(
                         modifier = Modifier
@@ -1027,6 +1146,7 @@ private fun WeekHourRow(
                             .fillMaxWidth()
                             .height(height)
                             .offset(y = top)
+                            .zIndex(1f)
                             .padding(horizontal = 2.dp),
                     ) {
                         repeat(layout.columnCount) { column ->
@@ -1034,6 +1154,7 @@ private fun WeekHourRow(
                                 WeekEventBlock(
                                     event = event,
                                     palette = palette,
+                                    onClick = { onEventClick(event) },
                                     modifier = Modifier
                                         .weight(1f)
                                         .fillMaxHeight(),
@@ -1050,11 +1171,17 @@ private fun WeekHourRow(
 }
 
 @Composable
-private fun WeekEventBlock(event: CalendarEvent, palette: DotCalPalette, modifier: Modifier = Modifier) {
+private fun WeekEventBlock(
+    event: CalendarEvent,
+    palette: DotCalPalette,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .background(Color(parseColor(event.colorHex ?: "#FF0000")).copy(alpha = 0.80f))
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1071,6 +1198,7 @@ private fun DayView(
     onNextDay: () -> Unit,
     onJumpToday: () -> Unit,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
+    onEventClick: (CalendarEvent) -> Unit,
 ) {
     val dayEvents = events.filter { it.isTask == 0 && it.localDate() == selectedDate }
     val allDayEvents = dayEvents.filter { it.isAllDay == 1 }
@@ -1090,6 +1218,7 @@ private fun DayView(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp)
                             .background(Color(parseColor(allDayEvents[index].colorHex ?: "#FF0000")).copy(alpha = 0.75f))
+                            .clickable { onEventClick(allDayEvents[index]) }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     )
                 }
@@ -1104,6 +1233,7 @@ private fun DayView(
                     events = timedEvents,
                     palette = palette,
                     onAddAtDate = onAddAtDate,
+                    onEventClick = onEventClick,
                 )
             }
             item {
@@ -1139,6 +1269,7 @@ private fun DayHourRow(
     events: List<CalendarEvent>,
     palette: DotCalPalette,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
+    onEventClick: (CalendarEvent) -> Unit,
 ) {
     val now = LocalTime.now()
     val showNow = selectedDate == LocalDate.now() && hour == now.hour
@@ -1172,9 +1303,15 @@ private fun DayHourRow(
                 .background(palette.calendarSurface)
                 .drawBehind {
                     drawLine(palette.line, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-                }
-                .clickable { onAddAtDate(selectedDate, LocalTime.of(hour, 0)) },
+                },
         ) {
+            if (hourEvents.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clickable { onAddAtDate(selectedDate, LocalTime.of(hour, 0)) },
+                )
+            }
             if (showNow) {
                 Box(
                     modifier = Modifier
@@ -1188,7 +1325,8 @@ private fun DayHourRow(
                 WeekEventBlock(
                     event = event,
                     palette = palette,
-                    modifier = Modifier.padding(start = 6.dp, end = 8.dp, top = (6 + index * 30).dp).height(24.dp),
+                    onClick = { onEventClick(event) },
+                    modifier = Modifier.zIndex(1f).padding(start = 6.dp, end = 8.dp, top = (6 + index * 30).dp).height(24.dp),
                 )
             }
         }
@@ -1219,7 +1357,10 @@ private fun EventListSheet(
             if (events.isEmpty()) {
                 Text("No events", modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp), fontFamily = mono, fontSize = 14.sp, color = palette.dimText, textAlign = TextAlign.Center)
             } else {
-                LazyColumn(modifier = Modifier.fillMaxWidth().height(220.dp)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().height(260.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     lazyItems(events, key = { it.id }) { event ->
                         EventRow(event = event, palette = palette, onClick = { onEdit(event) })
                     }
@@ -1227,17 +1368,763 @@ private fun EventListSheet(
             }
             Button(
                 onClick = onAdd,
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
-                shape = RoundedCornerShape(0.dp),
-            ) { Text("+ Add event", fontFamily = mono) }
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp).height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
+                shape = RoundedCornerShape(16.dp),
+            ) { Text("+ Add Event", fontFamily = mono) }
         }
+    }
+}
+
+@Composable
+private fun EventDetailScreen(
+    event: CalendarEvent,
+    reminders: List<EventReminder>,
+    account: CalendarAccount?,
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val isReadOnly = event.source == "BIRTHDAY"
+    val imageUris = remember(event.imageUris) { parseJsonStringArray(event.imageUris) }
+    var previewImageUri by remember { mutableStateOf<String?>(null) }
+    Box(modifier = Modifier.fillMaxSize().background(palette.background)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .background(palette.topBarSurface)
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+                }
+                Text(
+                    "Event Details",
+                    modifier = Modifier.weight(1f),
+                    color = palette.primaryText,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
+                Box(modifier = Modifier.width(64.dp).height(48.dp), contentAlignment = Alignment.Center) {
+                    if (!isReadOnly) {
+                        Text(
+                            "Edit",
+                            color = palette.primaryText,
+                            fontSize = 15.sp,
+                            modifier = Modifier.clickable(onClick = onEdit).padding(horizontal = 12.dp, vertical = 10.dp),
+                        )
+                    }
+                }
+            }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(palette.background),
+                contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 26.dp, bottom = 28.dp),
+            ) {
+                item {
+                    Text(
+                        event.title,
+                        color = palette.primaryText,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 32.sp,
+                        lineHeight = 38.sp,
+                    )
+                    Spacer(modifier = Modifier.height(26.dp))
+                }
+                item {
+                    DetailSection(label = "TIME", palette = palette) {
+                        if (event.isAllDay == 1) {
+                            Text("All-day", color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                        } else {
+                            Text(event.detailDateLine(), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(event.detailTimeLine(), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                        }
+                        event.recurrenceDetailLabel()?.let { label ->
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(label.toSentenceCase(), color = palette.secondaryText, fontSize = 14.sp, lineHeight = 20.sp)
+                        }
+                    }
+                }
+                if (event.location.isNotBlank()) {
+                    item {
+                        DetailDivider(palette)
+                        DetailSection(label = "LOCATION", palette = palette) {
+                            Text(event.location, color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                        }
+                    }
+                }
+                if (reminders.isNotEmpty()) {
+                    item {
+                        DetailDivider(palette)
+                        DetailSection(label = "REMINDER", palette = palette) {
+                            Text(
+                                reminders.sortedBy { it.minutesBefore }.joinToString { it.detailLabel().toSentenceCase() },
+                                color = palette.primaryText,
+                                fontSize = 16.sp,
+                                lineHeight = 23.sp,
+                            )
+                        }
+                    }
+                }
+                item {
+                    DetailDivider(palette)
+                    DetailSection(label = "CALENDAR", palette = palette) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(palette.accent),
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(account?.displayName ?: event.accountId, color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                        }
+                    }
+                }
+                if (event.description.isNotBlank()) {
+                    item {
+                        DetailDivider(palette)
+                        DetailSection(label = "DESCRIPTION", palette = palette) {
+                            SelectionContainer {
+                                Text(
+                                    event.description,
+                                    color = palette.primaryText,
+                                    fontSize = 16.sp,
+                                    lineHeight = 23.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+                if (imageUris.isNotEmpty()) {
+                    item {
+                        DetailDivider(palette)
+                        DetailSection(label = "IMAGES", palette = palette) {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                lazyItems(imageUris.take(5), key = { it }) { uri ->
+                                    DetailImageThumb(uri = uri, palette = palette, onClick = { previewImageUri = uri })
+                                }
+                            }
+                        }
+                    }
+                }
+                event.voiceNotePath?.takeIf { it.isNotBlank() }?.let { path ->
+                    item {
+                        DetailDivider(palette)
+                        DetailSection(label = "VOICE NOTE", palette = palette) {
+                            DetailVoiceNotePlayer(path = path, palette = palette)
+                        }
+                    }
+                }
+                item {
+                    DetailDivider(palette)
+                    Spacer(modifier = Modifier.height(24.dp))
+                    if (!isReadOnly) {
+                        Text(
+                            "Delete Event",
+                            color = palette.accent,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 15.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(onClick = onDelete)
+                                .padding(vertical = 12.dp),
+                        )
+                    }
+                }
+            }
+        }
+        previewImageUri?.let { uri ->
+            FullscreenImagePreview(uri = uri, palette = palette, onDismiss = { previewImageUri = null })
+        }
+    }
+}
+
+@Composable
+private fun DetailSection(label: String, palette: DotCalPalette, content: @Composable () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp)) {
+        Text(
+            label,
+            color = palette.secondaryText,
+            fontSize = 12.sp,
+            letterSpacing = 0.35.sp,
+            maxLines = 1,
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        content()
+    }
+}
+
+@Composable
+private fun DetailDivider(palette: DotCalPalette) {
+    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(palette.line))
+}
+
+@Composable
+private fun DetailImageThumb(uri: String, palette: DotCalPalette, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val bitmap by produceState<Bitmap?>(initialValue = null, uri) {
+        value = withContext(Dispatchers.IO) {
+            loadImageThumbnail(context, uri)
+        }
+    }
+    Box(
+        modifier = Modifier
+            .size(80.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.background)
+            .border(1.dp, palette.line, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        bitmap?.let { image ->
+            Image(
+                bitmap = image.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } ?: Text("IMG", color = palette.secondaryText, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun DetailVoiceNotePlayer(path: String, palette: DotCalPalette) {
+    var playing by remember(path) { mutableStateOf(false) }
+    var positionMs by remember(path) { mutableStateOf(0) }
+    val mediaPlayer = remember(path) {
+        runCatching {
+            MediaPlayer().apply {
+                setDataSource(path)
+                prepare()
+                setOnCompletionListener {
+                    playing = false
+                    positionMs = 0
+                    seekTo(0)
+                }
+            }
+        }.getOrNull()
+    }
+    LaunchedEffect(playing, mediaPlayer) {
+        while (playing && mediaPlayer != null) {
+            positionMs = runCatching { mediaPlayer.currentPosition }.getOrDefault(positionMs)
+            delay(500)
+        }
+    }
+    DisposableEffect(mediaPlayer) {
+        onDispose {
+            runCatching {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+            }
+        }
+    }
+    val durationMs = (mediaPlayer?.duration ?: 0).coerceAtLeast(1)
+    val progress = (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+    Row(
+        modifier = Modifier.fillMaxWidth().height(32.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DetailVoicePlayGlyph(
+            playing = playing,
+            tint = palette.primaryText,
+            modifier = Modifier
+                .size(28.dp)
+                .clickable(enabled = mediaPlayer != null) {
+                    mediaPlayer?.let { player ->
+                        if (player.isPlaying) {
+                            player.pause()
+                            playing = false
+                        } else {
+                            player.start()
+                            playing = true
+                        }
+                    }
+                },
+        )
+        Spacer(modifier = Modifier.width(14.dp))
+        Box(modifier = Modifier.weight(1f).height(16.dp), contentAlignment = Alignment.CenterStart) {
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (palette.isDark) Color(0xFF6E6E6E) else Color(0xFFBDBDBD)))
+            Box(modifier = Modifier.fillMaxWidth(progress).height(2.dp).background(palette.accent))
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Text(
+            formatVoiceDuration((durationMs / 1000).coerceAtLeast(1)),
+            color = palette.primaryText,
+            fontSize = 16.sp,
+        )
+    }
+}
+
+@Composable
+private fun DetailVoicePlayGlyph(playing: Boolean, tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        if (playing) {
+            val barWidth = 4.dp.toPx()
+            val barHeight = 16.dp.toPx()
+            val top = (size.height - barHeight) / 2f
+            drawRoundRect(tint, Offset(size.width / 2f - 6.dp.toPx(), top), androidx.compose.ui.geometry.Size(barWidth, barHeight))
+            drawRoundRect(tint, Offset(size.width / 2f + 2.dp.toPx(), top), androidx.compose.ui.geometry.Size(barWidth, barHeight))
+        } else {
+            val left = size.width / 2f - 4.dp.toPx()
+            val top = size.height / 2f - 8.dp.toPx()
+            val path = androidx.compose.ui.graphics.Path().apply {
+                moveTo(left, top)
+                lineTo(left, top + 16.dp.toPx())
+                lineTo(left + 13.dp.toPx(), top + 8.dp.toPx())
+                close()
+            }
+            drawPath(path, tint)
+        }
+    }
+}
+
+@Composable
+private fun VoiceNoteRow(path: String, palette: DotCalPalette) {
+    var playing by remember(path) { mutableStateOf(false) }
+    val mediaPlayer = remember(path) {
+        runCatching {
+            MediaPlayer().apply {
+                setDataSource(path)
+                prepare()
+            }
+        }.getOrNull()
+    }
+    DisposableEffect(mediaPlayer) {
+        onDispose {
+            runCatching {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+            }
+        }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(palette.cell)
+            .clickable(enabled = mediaPlayer != null) {
+                mediaPlayer?.let { player ->
+                    if (player.isPlaying) {
+                        player.pause()
+                        playing = false
+                    } else {
+                        player.start()
+                        playing = true
+                    }
+                }
+            }
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(if (playing) "PAUSE" else "PLAY", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Text(
+            mediaPlayer?.duration?.let { "${(it / 1000).coerceAtLeast(1)} SEC" } ?: "UNAVAILABLE",
+            color = palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(start = 18.dp),
+        )
+    }
+}
+
+@Composable
+private fun dotCalTextFieldColors(palette: DotCalPalette) = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = palette.primaryText,
+    unfocusedTextColor = palette.primaryText,
+    focusedBorderColor = palette.accent,
+    unfocusedBorderColor = palette.textFieldBorder,
+    focusedLabelColor = palette.accent,
+    cursorColor = palette.accent,
+    focusedLeadingIconColor = palette.primaryText,
+    unfocusedLeadingIconColor = palette.secondaryText,
+    focusedContainerColor = Color.Transparent,
+    unfocusedContainerColor = Color.Transparent,
+    errorContainerColor = Color.Transparent,
+)
+
+@Composable
+private fun ImageAttachmentSection(
+    imageUris: List<String>,
+    palette: DotCalPalette,
+    onAddImage: () -> Unit,
+    onRemoveImage: (String) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Images", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            if (imageUris.isNotEmpty()) {
+                Text("${imageUris.size}/5", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            lazyItems(imageUris, key = { it }) { uri ->
+                ImageAttachmentThumb(uri = uri, palette = palette, onRemove = { onRemoveImage(uri) })
+            }
+            if (imageUris.size < 5) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, palette.line, RoundedCornerShape(12.dp))
+                            .clickable(onClick = onAddImage),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("+", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 24.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageAttachmentThumb(uri: String, palette: DotCalPalette, onRemove: () -> Unit) {
+    val context = LocalContext.current
+    val bitmap by produceState<Bitmap?>(initialValue = null, uri) {
+        value = withContext(Dispatchers.IO) {
+            loadImageThumbnail(context, uri)
+        }
+    }
+    Box(
+        modifier = Modifier
+            .size(76.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.cell),
+    ) {
+        bitmap?.let { image ->
+            Image(
+                bitmap = image.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } ?: Box(modifier = Modifier.fillMaxSize().background(palette.cell), contentAlignment = Alignment.Center) {
+            Text("IMG", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.72f))
+                .clickable(onClick = onRemove),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.Close, contentDescription = "Remove image", tint = Color.White, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+@Composable
+private fun ImageDisplayThumb(uri: String, palette: DotCalPalette, onClick: (() -> Unit)? = null) {
+    val context = LocalContext.current
+    val bitmap by produceState<Bitmap?>(initialValue = null, uri) {
+        value = withContext(Dispatchers.IO) {
+            loadImageThumbnail(context, uri)
+        }
+    }
+    Box(
+        modifier = Modifier
+            .size(76.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.cell)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        bitmap?.let { image ->
+            Image(
+                bitmap = image.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } ?: Text("IMG", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun FullscreenImagePreview(uri: String, palette: DotCalPalette, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val bitmap by produceState<Bitmap?>(initialValue = null, uri) {
+        value = withContext(Dispatchers.IO) {
+            loadImagePreview(context, uri)
+        }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.94f))
+            .clickable(onClick = onDismiss)
+            .zIndex(10f),
+        contentAlignment = Alignment.Center,
+    ) {
+        bitmap?.let { image ->
+            Image(
+                bitmap = image.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp)
+                    .aspectRatio(image.width.toFloat() / image.height.toFloat()),
+                contentScale = ContentScale.Fit,
+            )
+        } ?: Text("Image unavailable", color = Color.White, fontFamily = mono, fontSize = 14.sp)
+        IconButton(
+            onClick = onDismiss,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+                .size(44.dp),
+        ) {
+            Icon(Icons.Default.Close, contentDescription = "Close image", tint = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun VoiceNoteEditorSection(
+    eventId: String,
+    voiceNotePath: String?,
+    palette: DotCalPalette,
+    onVoiceNoteChanged: (String?) -> Unit,
+) {
+    val context = LocalContext.current
+    var permissionDenied by remember { mutableStateOf(false) }
+    var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    var recordingStartedAt by remember { mutableStateOf(0L) }
+    var recordingSeconds by remember { mutableStateOf(0) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            startVoiceRecording(context, eventId)?.let { started ->
+                recorder = started
+                recordingStartedAt = SystemClock.elapsedRealtime()
+                recordingSeconds = 0
+            }
+        } else {
+            permissionDenied = true
+        }
+    }
+
+    fun stopRecording() {
+        val activeRecorder = recorder ?: return
+        runCatching { activeRecorder.stop() }
+        runCatching { activeRecorder.release() }
+        recorder = null
+        recordingStartedAt = 0L
+        recordingSeconds = 0
+        onVoiceNoteChanged(voiceNoteFile(context, eventId).absolutePath)
+    }
+
+    LaunchedEffect(recorder, recordingStartedAt) {
+        while (recorder != null && recordingStartedAt > 0L) {
+            val elapsed = ((SystemClock.elapsedRealtime() - recordingStartedAt) / 1000L).toInt()
+            recordingSeconds = elapsed.coerceAtMost(MAX_VOICE_NOTE_SECONDS)
+            if (elapsed >= MAX_VOICE_NOTE_SECONDS) {
+                stopRecording()
+                break
+            }
+            delay(500)
+        }
+    }
+    DisposableEffect(recorder) {
+        val recorderForThisEffect = recorder
+        onDispose {
+            recorderForThisEffect?.let { activeRecorder ->
+                runCatching { activeRecorder.stop() }
+                runCatching { activeRecorder.release() }
+            }
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("Voice note", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        Spacer(modifier = Modifier.height(10.dp))
+        when {
+            recorder != null -> RecordingVoiceNoteRow(
+                seconds = recordingSeconds,
+                palette = palette,
+                onStop = { stopRecording() },
+            )
+            !voiceNotePath.isNullOrBlank() -> ExistingVoiceNoteRow(
+                path = voiceNotePath,
+                palette = palette,
+                onDelete = {
+                    runCatching { File(voiceNotePath).delete() }
+                    onVoiceNoteChanged(null)
+                },
+            )
+            !permissionDenied -> EmptyVoiceNoteRow(
+                palette = palette,
+                onRecord = {
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                        startVoiceRecording(context, eventId)?.let { started ->
+                            recorder = started
+                            recordingStartedAt = SystemClock.elapsedRealtime()
+                            recordingSeconds = 0
+                        }
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyVoiceNoteRow(palette: DotCalPalette, onRecord: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, palette.line, RoundedCornerShape(12.dp))
+            .clickable(onClick = onRecord)
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MicGlyph(tint = palette.primaryText)
+        Text("TAP TO RECORD", color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp, modifier = Modifier.padding(start = 12.dp))
+    }
+}
+
+@Composable
+private fun RecordingVoiceNoteRow(seconds: Int, palette: DotCalPalette, onStop: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.cell)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(palette.accent))
+        Text(formatVoiceDuration(seconds), color = palette.primaryText, fontFamily = mono, fontSize = 14.sp, modifier = Modifier.padding(start = 12.dp).weight(1f))
+        Text(
+            "STOP",
+            color = palette.accent,
+            fontFamily = mono,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            modifier = Modifier.clickable(onClick = onStop).padding(horizontal = 8.dp, vertical = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun ExistingVoiceNoteRow(path: String, palette: DotCalPalette, onDelete: (() -> Unit)?) {
+    var playing by remember(path) { mutableStateOf(false) }
+    var positionMs by remember(path) { mutableStateOf(0) }
+    val mediaPlayer = remember(path) {
+        runCatching {
+            MediaPlayer().apply {
+                setDataSource(path)
+                prepare()
+                setOnCompletionListener {
+                    playing = false
+                    positionMs = 0
+                    seekTo(0)
+                }
+            }
+        }.getOrNull()
+    }
+    LaunchedEffect(playing, mediaPlayer) {
+        while (playing && mediaPlayer != null) {
+            positionMs = runCatching { mediaPlayer.currentPosition }.getOrDefault(positionMs)
+            delay(500)
+        }
+    }
+    DisposableEffect(mediaPlayer) {
+        onDispose {
+            runCatching {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+            }
+        }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.cell)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            if (playing) "PAUSE" else "PLAY",
+            color = palette.primaryText,
+            fontFamily = mono,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            modifier = Modifier.clickable(enabled = mediaPlayer != null) {
+                mediaPlayer?.let { player ->
+                    if (player.isPlaying) {
+                        player.pause()
+                        playing = false
+                    } else {
+                        player.start()
+                        playing = true
+                    }
+                }
+            },
+        )
+        val durationSeconds = ((mediaPlayer?.duration ?: 0) / 1000).coerceAtLeast(1)
+        val positionSeconds = (positionMs / 1000).coerceAtLeast(0)
+        Text(
+            "${formatVoiceDuration(positionSeconds)} / ${formatVoiceDuration(durationSeconds)}",
+            color = palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(start = 18.dp).weight(1f),
+        )
+        if (onDelete != null) {
+            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Delete voice note", tint = palette.secondaryText, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun MicGlyph(tint: Color) {
+    Canvas(modifier = Modifier.size(24.dp)) {
+        val stroke = Stroke(width = 2.dp.toPx())
+        val centerX = size.width / 2f
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(centerX - 4.dp.toPx(), 3.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size(8.dp.toPx(), 12.dp.toPx()),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx(), 4.dp.toPx()),
+            style = stroke,
+        )
+        drawLine(tint, Offset(7.dp.toPx(), 12.dp.toPx()), Offset(7.dp.toPx(), 14.dp.toPx()), strokeWidth = 2.dp.toPx())
+        drawLine(tint, Offset(17.dp.toPx(), 12.dp.toPx()), Offset(17.dp.toPx(), 14.dp.toPx()), strokeWidth = 2.dp.toPx())
+        drawArc(tint, 0f, 180f, false, topLeft = Offset(7.dp.toPx(), 9.dp.toPx()), size = androidx.compose.ui.geometry.Size(10.dp.toPx(), 10.dp.toPx()), style = stroke)
+        drawLine(tint, Offset(centerX, 19.dp.toPx()), Offset(centerX, 22.dp.toPx()), strokeWidth = 2.dp.toPx())
+        drawLine(tint, Offset(9.dp.toPx(), 22.dp.toPx()), Offset(15.dp.toPx(), 22.dp.toPx()), strokeWidth = 2.dp.toPx())
     }
 }
 
 @Composable
 private fun EventEditorScreen(
     event: CalendarEvent?,
+    editorSessionKey: String,
     selectedDate: LocalDate,
     selectedTime: LocalTime,
     initialReminderMinutes: Int?,
@@ -1250,28 +2137,55 @@ private fun EventEditorScreen(
     val initialStart = event?.startLocalTime() ?: selectedTime
     val initialEnd = event?.endLocalTime() ?: selectedTime.plusHours(1)
     val initialEndDate = event?.endLocalDateForEditor() ?: editorDate
-    var title by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.title.orEmpty()) }
-    var description by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.description.orEmpty()) }
-    var location by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.location.orEmpty()) }
-    var startDate by remember(event?.id, editorDate, selectedTime) { mutableStateOf(editorDate) }
-    var endDate by remember(event?.id, editorDate, selectedTime) { mutableStateOf(maxOf(editorDate, initialEndDate)) }
-    var startTime by remember(event?.id, editorDate, selectedTime) { mutableStateOf(initialStart) }
-    var endTime by remember(event?.id, editorDate, selectedTime) { mutableStateOf(coerceEndAfterStart(initialStart, initialEnd)) }
-    var allDay by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.isAllDay == 1) }
-    var reminderMinutes by remember(event?.id, editorDate, selectedTime, initialReminderMinutes) { mutableStateOf(initialReminderMinutes) }
-    var recurrenceRule by remember(event?.id, editorDate, selectedTime) { mutableStateOf(event?.rrule) }
+    val editorStateKey = event?.id ?: editorSessionKey
+    val draftEventId = remember(editorStateKey) {
+        if (event == null || event.isRecurrenceOccurrence()) UUID.randomUUID().toString() else event.baseEventId()
+    }
+    var title by remember(editorStateKey) { mutableStateOf(event?.title.orEmpty()) }
+    var description by remember(editorStateKey) { mutableStateOf(event?.description.orEmpty()) }
+    var location by remember(editorStateKey) { mutableStateOf(event?.location.orEmpty()) }
+    var startDate by remember(editorStateKey) { mutableStateOf(editorDate) }
+    var endDate by remember(editorStateKey) { mutableStateOf(maxOf(editorDate, initialEndDate)) }
+    var startTime by remember(editorStateKey) { mutableStateOf(initialStart) }
+    var endTime by remember(editorStateKey) { mutableStateOf(coerceEndAfterStart(initialStart, initialEnd)) }
+    var allDay by remember(editorStateKey) { mutableStateOf(event?.isAllDay == 1) }
+    var reminderMinutes by remember(editorStateKey, initialReminderMinutes) { mutableStateOf(initialReminderMinutes) }
+    var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule) }
+    var imageUris by remember(editorStateKey) { mutableStateOf(parseJsonStringArray(event?.imageUris ?: "[]")) }
+    var voiceNotePath by remember(editorStateKey) { mutableStateOf(event?.voiceNotePath) }
     var dateTimePicker by remember { mutableStateOf<DateTimeField?>(null) }
     var showReminderPicker by remember { mutableStateOf(false) }
     var showRepeatPicker by remember { mutableStateOf(false) }
     var showApplyScopePicker by remember { mutableStateOf(false) }
     var submitted by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusSinkRequester = remember { FocusRequester() }
+    val context = LocalContext.current
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5),
+    ) { uris ->
+        val availableSlots = (5 - imageUris.size).coerceAtLeast(0)
+        val selected = uris.take(availableSlots).map { it.toString() }
+        uris.take(availableSlots).forEach { uri ->
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+        imageUris = (imageUris + selected).distinct().take(5)
+    }
     val isRecurringInstance = event?.isRecurrenceOccurrence() == true
     val canChooseRecurrenceScope = isRecurringInstance
-    var recurringEditScope by remember(event?.id) {
+    var recurringEditScope by remember(editorStateKey) {
         mutableStateOf(if (isRecurringInstance) RecurringEditScope.ThisEvent else RecurringEditScope.WholeSeries)
     }
     val editsWholeSeries = (event?.rrule != null || event?.isRecurrenceOccurrence() == true) &&
         recurringEditScope == RecurringEditScope.WholeSeries
+    fun clearEditorFocus() {
+        keyboardController?.hide()
+        focusManager.clearFocus(force = true)
+        runCatching { focusSinkRequester.requestFocus() }
+    }
     fun trySave() {
         submitted = true
         val startDateTime = startDate.atTime(startTime)
@@ -1279,6 +2193,7 @@ private fun EventEditorScreen(
         if (title.isNotBlank() && (if (allDay) endDate >= startDate else endDateTime.isAfter(startDateTime))) {
             onSave(
                 EventEditorData(
+                    eventId = draftEventId,
                     title = title,
                     description = description,
                     location = location,
@@ -1289,6 +2204,8 @@ private fun EventEditorScreen(
                     isAllDay = allDay,
                     reminderMinutes = reminderMinutes,
                     rrule = recurrenceRule,
+                    imageUris = imageUris.toJsonStringArray(),
+                    voiceNotePath = voiceNotePath,
                 ),
                 recurringEditScope,
             )
@@ -1326,15 +2243,29 @@ private fun EventEditorScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .pointerInput(event?.id) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val pointerEvent = awaitPointerEvent(PointerEventPass.Initial)
+                            if (pointerEvent.changes.any { it.pressed && !it.previousPressed }) {
+                                clearEditorFocus()
+                            }
+                        }
+                    }
+                }
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
         ) {
+            Box(modifier = Modifier.size(1.dp).focusRequester(focusSinkRequester).focusable())
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Event title", fontFamily = mono, color = palette.secondaryText) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null, tint = palette.secondaryText) },
+                colors = dotCalTextFieldColors(palette),
+                textStyle = TextStyle(color = palette.primaryText, fontFamily = mono),
                 singleLine = true,
             )
             if (submitted && title.isBlank()) Text("Title required", color = palette.accent, fontFamily = mono, fontSize = 12.sp)
@@ -1344,6 +2275,9 @@ private fun EventEditorScreen(
                 onValueChange = { location = it },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Location", fontFamily = mono, color = palette.secondaryText) },
+                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = palette.secondaryText) },
+                colors = dotCalTextFieldColors(palette),
+                textStyle = TextStyle(color = palette.primaryText, fontFamily = mono),
                 singleLine = true,
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -1352,14 +2286,42 @@ private fun EventEditorScreen(
                 onValueChange = { description = it },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Description", fontFamily = mono, color = palette.secondaryText) },
+                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, tint = palette.secondaryText) },
+                colors = dotCalTextFieldColors(palette),
+                textStyle = TextStyle(color = palette.primaryText, fontFamily = mono),
                 minLines = 2,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            ImageAttachmentSection(
+                imageUris = imageUris,
+                palette = palette,
+                onAddImage = {
+                    clearEditorFocus()
+                    val availableSlots = (5 - imageUris.size).coerceAtLeast(0)
+                    if (availableSlots > 0) {
+                        imagePicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    }
+                },
+                onRemoveImage = { uri -> imageUris = imageUris.filterNot { it == uri } },
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            VoiceNoteEditorSection(
+                eventId = draftEventId,
+                voiceNotePath = voiceNotePath,
+                palette = palette,
+                onVoiceNoteChanged = { voiceNotePath = it },
             )
             Spacer(modifier = Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("All-day", color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
                 Switch(
-                    checked = allDay,
-                    onCheckedChange = { allDay = it },
+                checked = allDay,
+                onCheckedChange = {
+                        clearEditorFocus()
+                        allDay = it
+                    },
                     modifier = Modifier.scale(0.86f),
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = NWhite,
@@ -1374,26 +2336,38 @@ private fun EventEditorScreen(
                 title = "Starts",
                 value = if (allDay) startDate.format(editorDateFormatter) else dateTimeLabel(startDate, startTime),
                 palette = palette,
-                onClick = { dateTimePicker = DateTimeField.Start },
+                onClick = {
+                    clearEditorFocus()
+                    dateTimePicker = DateTimeField.Start
+                },
             )
             EditorValueRow(
                 title = "Ends",
                 value = if (allDay) endDate.format(editorDateFormatter) else dateTimeLabel(endDate, endTime),
                 palette = palette,
-                onClick = { dateTimePicker = DateTimeField.End },
+                onClick = {
+                    clearEditorFocus()
+                    dateTimePicker = DateTimeField.End
+                },
             )
             Spacer(modifier = Modifier.height(12.dp))
             EditorValueRow(
                 title = "Reminder",
                 value = reminderLabel(reminderMinutes),
                 palette = palette,
-                onClick = { showReminderPicker = true },
+                onClick = {
+                    clearEditorFocus()
+                    showReminderPicker = true
+                },
             )
             EditorValueRow(
                 title = "Repeat",
                 value = if (recurringEditScope == RecurringEditScope.ThisEvent) "None" else recurrenceOptions.firstOrNull { it.rrule == recurrenceRule }?.label ?: "None",
                 palette = palette,
-                onClick = { showRepeatPicker = true },
+                onClick = {
+                    clearEditorFocus()
+                    showRepeatPicker = true
+                },
                 enabled = recurringEditScope == RecurringEditScope.WholeSeries,
             )
             if (canChooseRecurrenceScope) {
@@ -1401,7 +2375,10 @@ private fun EventEditorScreen(
                     title = "Apply to",
                     value = recurringEditScope.label(),
                     palette = palette,
-                    onClick = { showApplyScopePicker = true },
+                    onClick = {
+                        clearEditorFocus()
+                        showApplyScopePicker = true
+                    },
                 )
             }
             if (canChooseRecurrenceScope) {
@@ -1420,14 +2397,17 @@ private fun EventEditorScreen(
                 Text("End must be after start", color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
             }
             if (event != null && onDelete != null) {
-                Button(
-                    onClick = { onDelete(recurringEditScope) },
-                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = palette.cell, contentColor = palette.accent),
-                    shape = RoundedCornerShape(0.dp),
-                ) {
-                    Text(if (editsWholeSeries) "Delete series" else "Delete event", fontFamily = mono)
-                }
+                Text(
+                    if (editsWholeSeries) "Delete series" else "Delete event",
+                    color = palette.accent,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 15.sp,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 28.dp)
+                        .clickable { onDelete(recurringEditScope) },
+                )
             }
             Spacer(modifier = Modifier.height(28.dp))
         }
@@ -1895,17 +2875,56 @@ private fun EventRow(event: CalendarEvent, palette: DotCalPalette, onClick: (() 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .background(palette.cell)
+            .clip(RoundedCornerShape(16.dp))
+            .background(palette.eventCardSurface)
+            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(16.dp))
             .clickable(enabled = onClick != null) { onClick?.invoke() }
-            .padding(10.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.width(4.dp).height(42.dp).background(Color(parseColor(event.colorHex ?: "#FF0000"))))
-        Column(modifier = Modifier.padding(start = 10.dp)) {
-            Text(event.timeRange(), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
-            Text(event.title, color = palette.primaryText, fontFamily = mono, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(event.timeRange(), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 1)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(event.title, color = palette.primaryText, fontFamily = mono, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (event.location.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = palette.secondaryText,
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        event.location,
+                        color = palette.secondaryText,
+                        fontFamily = mono,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
+        if (onClick != null) {
+            Spacer(modifier = Modifier.width(12.dp))
+            EventCardChevron(tint = palette.eventCardChevron)
+        }
+    }
+}
+
+@Composable
+private fun EventCardChevron(tint: Color) {
+    Canvas(modifier = Modifier.size(24.dp)) {
+        val strokeWidth = 2.dp.toPx()
+        val startX = 9.dp.toPx()
+        val midX = 15.dp.toPx()
+        val topY = 7.dp.toPx()
+        val midY = 12.dp.toPx()
+        val bottomY = 17.dp.toPx()
+        drawLine(tint, Offset(startX, topY), Offset(midX, midY), strokeWidth = strokeWidth)
+        drawLine(tint, Offset(midX, midY), Offset(startX, bottomY), strokeWidth = strokeWidth)
     }
 }
 
@@ -1915,6 +2934,7 @@ private fun AgendaPreview(
     events: List<CalendarEvent>,
     palette: DotCalPalette,
     onJumpToday: () -> Unit,
+    onEventClick: (CalendarEvent) -> Unit,
 ) {
     val grouped = remember(events) {
         events
@@ -1946,7 +2966,10 @@ private fun AgendaPreview(
                         modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
                     )
                 }
-                items(dayEvents.size) { index -> EventRow(dayEvents[index], palette) }
+                items(dayEvents.size) { index ->
+                    val event = dayEvents[index]
+                    EventRow(event, palette, onClick = { onEventClick(event) })
+                }
             }
         }
     }
@@ -1985,6 +3008,7 @@ private fun ThreeDayView(
     onJumpToday: () -> Unit,
     onDateSelected: (LocalDate) -> Unit,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
+    onEventClick: (CalendarEvent) -> Unit,
 ) {
     val days = remember(selectedDate) { List(3) { selectedDate.plusDays(it.toLong()) } }
     val rangeEvents = events.filter { it.isAllDay == 0 && it.localDate() in days.first()..days.last() }
@@ -2026,6 +3050,7 @@ private fun ThreeDayView(
                     events = rangeEvents,
                     palette = palette,
                     onAddAtDate = onAddAtDate,
+                    onEventClick = onEventClick,
                 )
             }
         }
@@ -2040,6 +3065,7 @@ private fun ThreeDayHourRow(
     events: List<CalendarEvent>,
     palette: DotCalPalette,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
+    onEventClick: (CalendarEvent) -> Unit,
 ) {
     val now = LocalTime.now()
     val showNow = selectedDate == LocalDate.now() && hour == now.hour
@@ -2057,9 +3083,15 @@ private fun ThreeDayHourRow(
                     .drawBehind {
                         drawLine(palette.line, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
                         drawLine(palette.line, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-                    }
-                    .clickable { onAddAtDate(day, LocalTime.of(hour, 0)) },
+                    },
             ) {
+                if (dayEvents.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { onAddAtDate(day, LocalTime.of(hour, 0)) },
+                    )
+                }
                 if (showNow && day == selectedDate) {
                     Box(
                         modifier = Modifier
@@ -2070,7 +3102,12 @@ private fun ThreeDayHourRow(
                     )
                 }
                 dayEvents.take(2).forEachIndexed { index, event ->
-                    WeekEventBlock(event = event, palette = palette, modifier = Modifier.padding(start = 5.dp, end = 5.dp, top = (5 + index * 29).dp).height(24.dp))
+                    WeekEventBlock(
+                        event = event,
+                        palette = palette,
+                        onClick = { onEventClick(event) },
+                        modifier = Modifier.zIndex(1f).padding(start = 5.dp, end = 5.dp, top = (5 + index * 29).dp).height(24.dp),
+                    )
                 }
             }
         }
@@ -2712,6 +3749,130 @@ private fun CalendarEvent.timeRange(): String {
     return "${start.format(timeFormatter)} - ${end.format(timeFormatter)}"
 }
 
+private fun CalendarEvent.detailTimeRange(): String {
+    val start = Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault())
+    val end = Instant.ofEpochMilli(endTimeMs).atZone(ZoneId.systemDefault())
+    return "${start.format(detailDateFormatter).uppercase(Locale.US)} - ${start.toLocalTime().format(timeFormatter)} - ${end.toLocalTime().format(timeFormatter)}"
+}
+
+private fun CalendarEvent.detailDateLine(): String {
+    val start = Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault())
+    return start.format(DateTimeFormatter.ofPattern("EEEE, d MMM yyyy", Locale.US))
+}
+
+private fun CalendarEvent.detailTimeLine(): String {
+    val start = Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault())
+    val end = Instant.ofEpochMilli(endTimeMs).atZone(ZoneId.systemDefault())
+    return "${start.toLocalTime().format(timeFormatter)} - ${end.toLocalTime().format(timeFormatter)}"
+}
+
+private fun CalendarEvent.recurrenceDetailLabel(): String? {
+    return when (rrule?.trim()) {
+        "FREQ=DAILY" -> "REPEATS DAILY"
+        "FREQ=WEEKLY" -> "REPEATS WEEKLY"
+        "FREQ=MONTHLY" -> "REPEATS MONTHLY"
+        else -> null
+    }
+}
+
+private fun EventReminder.detailLabel(): String {
+    return when (minutesBefore) {
+        1 -> "1 MINUTE BEFORE"
+        60 -> "1 HOUR BEFORE"
+        1440 -> "1 DAY BEFORE"
+        else -> "$minutesBefore MINUTES BEFORE"
+    }
+}
+
+private fun String.toSentenceCase(): String {
+    val lower = lowercase(Locale.US)
+    return lower.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(Locale.US) else char.toString() }
+}
+
+private fun parseJsonStringArray(value: String): List<String> {
+    val trimmed = value.trim()
+    if (trimmed.length < 2 || trimmed.first() != '[' || trimmed.last() != ']') return emptyList()
+    return trimmed
+        .removePrefix("[")
+        .removeSuffix("]")
+        .split(',')
+        .mapNotNull { raw ->
+            raw.trim()
+                .removeSurrounding("\"")
+                .replace("\\\"", "\"")
+                .takeIf { it.isNotBlank() }
+        }
+}
+
+private fun List<String>.toJsonStringArray(): String {
+    return joinToString(prefix = "[", postfix = "]") { value ->
+        "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+    }
+}
+
+private fun loadImageThumbnail(context: Context, uriValue: String): Bitmap? {
+    val uri = runCatching { Uri.parse(uriValue) }.getOrNull() ?: return null
+    return runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            context.contentResolver.loadThumbnail(uri, Size(180, 180), null)
+        } else {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                BitmapFactory.decodeStream(input)
+            }
+        }
+    }.getOrNull()
+}
+
+private fun loadImagePreview(context: Context, uriValue: String): Bitmap? {
+    val uri = runCatching { Uri.parse(uriValue) }.getOrNull() ?: return null
+    return runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            context.contentResolver.loadThumbnail(uri, Size(1280, 1280), null)
+        } else {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                BitmapFactory.decodeStream(input)
+            }
+        }
+    }.getOrNull()
+}
+
+private const val MAX_VOICE_NOTE_SECONDS = 300
+
+private fun voiceNoteFile(context: Context, eventId: String): File {
+    val directory = File(context.filesDir, "voice_notes").apply { mkdirs() }
+    return File(directory, "$eventId.m4a")
+}
+
+private fun startVoiceRecording(context: Context, eventId: String): MediaRecorder? {
+    val outputFile = voiceNoteFile(context, eventId)
+    runCatching { if (outputFile.exists()) outputFile.delete() }
+    return runCatching {
+        mediaRecorder(context).apply {
+            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            setMaxDuration(MAX_VOICE_NOTE_SECONDS * 1000)
+            setOutputFile(outputFile.absolutePath)
+            prepare()
+            start()
+        }
+    }.getOrNull()
+}
+
+private fun mediaRecorder(context: Context): MediaRecorder {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        MediaRecorder(context)
+    } else {
+        @Suppress("DEPRECATION")
+        MediaRecorder()
+    }
+}
+
+private fun formatVoiceDuration(seconds: Int): String {
+    val safeSeconds = seconds.coerceAtLeast(0)
+    return "${safeSeconds / 60}:${(safeSeconds % 60).toString().padStart(2, '0')}"
+}
+
 private fun parseColor(hex: String): Int {
     return try {
         android.graphics.Color.parseColor(hex)
@@ -2757,6 +3918,10 @@ private data class DotCalPalette(
     val cancelSurface: Color,
     val cancelBorder: Color,
     val dragHandle: Color,
+    val eventCardSurface: Color,
+    val eventCardBorder: Color,
+    val eventCardChevron: Color,
+    val textFieldBorder: Color,
     val segmentSelected: Color,
     val disabledText: Color,
     val dot: Color,
@@ -2800,6 +3965,10 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
             cancelSurface = Color(0xFF121212),
             cancelBorder = Color(0xFF2A2A2A),
             dragHandle = Color(0xFF707070),
+            eventCardSurface = Color(0xFF121212),
+            eventCardBorder = Color(0xFF2A2A2A),
+            eventCardChevron = Color(0xFF6E6E6E),
+            textFieldBorder = Color(0xFF4A4A4A),
             segmentSelected = Color(0xFF1E1E1E),
             disabledText = Color(0xFF6E6E6E),
             dot = Color(0xFFFFFFFF),
@@ -2814,7 +3983,7 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
             primaryText = Color(0xFF101010),
             secondaryText = Color(0xFF6B6B6B),
             dimText = Color(0xFFBDBDBD),
-            line = Color(0xFFBDBDBD),
+            line = Color(0xFFE8E8E8),
             cell = Color(0xFFF7F7F7),
             calendarSurface = Color(0xFFF7F7F7),
             topBarSurface = Color(0xFFFFFFFF),
@@ -2823,6 +3992,10 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
             cancelSurface = Color(0xFFEFEFEF),
             cancelBorder = Color(0xFFE0E0E0),
             dragHandle = Color(0xFFC8C8C8),
+            eventCardSurface = Color(0xFFFFFFFF),
+            eventCardBorder = Color(0xFFE8E8E8),
+            eventCardChevron = Color(0xFFBDBDBD),
+            textFieldBorder = Color(0xFFDADADA),
             segmentSelected = Color(0xFFEFEFEF),
             disabledText = Color(0xFFBDBDBD),
             dot = Color(0xFF101010),
@@ -2851,6 +4024,10 @@ private fun dotCalBootPalette(): DotCalPalette {
         cancelSurface = Color(0xFF121212),
         cancelBorder = Color(0xFF2A2A2A),
         dragHandle = Color(0xFF707070),
+        eventCardSurface = Color(0xFF121212),
+        eventCardBorder = Color(0xFF2A2A2A),
+        eventCardChevron = Color(0xFF6E6E6E),
+        textFieldBorder = Color(0xFF4A4A4A),
         segmentSelected = Color(0xFF1E1E1E),
         disabledText = Color(0xFF6E6E6E),
         dot = Color(0xFFFFFFFF),
