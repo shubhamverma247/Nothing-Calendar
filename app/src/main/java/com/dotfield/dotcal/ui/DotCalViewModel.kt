@@ -8,6 +8,7 @@ import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.RecurringEditScope
+import com.dotfield.dotcal.data.SyncMetadata
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +33,9 @@ class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val accounts: StateFlow<List<CalendarAccount>> = repository.observeAccounts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val syncMetadata: StateFlow<List<SyncMetadata>> = repository.observeSyncMetadata()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val reminders: StateFlow<List<EventReminder>> = repository.observeReminders()
@@ -103,6 +107,18 @@ class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
                 event = event,
                 recurringEditScope = recurringEditScope,
             )
+        }
+    }
+
+    fun setAccountVisible(accountId: String, visible: Boolean) {
+        viewModelScope.launch {
+            repository.setAccountVisible(accountId, visible)
+        }
+    }
+
+    fun syncNow() {
+        viewModelScope.launch {
+            repository.syncNow()
         }
     }
 

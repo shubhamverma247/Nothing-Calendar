@@ -1,9 +1,17 @@
 package com.dotfield.dotcal.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.edit
+import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.reminders.ReminderScheduler
+import com.dotfield.dotcal.sync.CalendarSyncRepository
+import com.dotfield.dotcal.sync.CalendarSyncResult
+import com.dotfield.dotcal.prefs.CalendarPreferences
+import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
@@ -35,11 +43,17 @@ enum class RecurringEditScope {
 
 class DotCalRepository(
     private val dao: CalendarDao,
-    context: Context,
+    private val context: Context,
 ) {
     private val reminderScheduler = ReminderScheduler(context)
+    private val syncRepository = CalendarSyncRepository(
+        dao = dao,
+        providerDataSource = CalendarProviderDataSource(context.applicationContext),
+    )
 
     fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts()
+
+    fun observeSyncMetadata(): Flow<List<SyncMetadata>> = dao.observeSyncMetadata()
 
     fun observeEventsForMonth(month: LocalDate): Flow<List<CalendarEvent>> {
         val start = month.withDayOfMonth(1)
@@ -81,6 +95,21 @@ class DotCalRepository(
                 sortOrder = 0,
             ),
         )
+    }
+
+    suspend fun setAccountVisible(accountId: String, visible: Boolean) {
+        if (accountId == LOCAL_ACCOUNT_ID) return
+        dao.updateAccountVisibility(accountId, if (visible) 1 else 0)
+    }
+
+    suspend fun syncNow(): CalendarSyncResult = withContext(Dispatchers.IO) {
+        val result = syncRepository.sync()
+        if (!result.permissionDenied) {
+            context.calendarPreferencesDataStore.edit { preferences ->
+                preferences[CalendarPreferences.KEY_LAST_SYNC_MS] = System.currentTimeMillis()
+            }
+        }
+        result
     }
 
     suspend fun saveLocalEvent(
@@ -183,6 +212,14 @@ class DotCalRepository(
         }
         val eventId = event.baseEventId()
         dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        event.googleEventId?.let { googleEventId ->
+            dao.insertDeletedEventLog(
+                DeletedEventLog(
+                    googleEventId = googleEventId,
+                    deletedAtMs = System.currentTimeMillis(),
+                ),
+            )
+        }
         dao.deleteRemindersForEvent(eventId)
         dao.deleteEvent(eventId)
     }

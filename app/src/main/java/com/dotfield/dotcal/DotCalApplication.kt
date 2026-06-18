@@ -4,6 +4,7 @@ import android.app.Application
 import com.dotfield.dotcal.data.DotCalDatabase
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.reminders.ReminderScheduler
+import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -17,6 +18,7 @@ class DotCalApplication : Application() {
         ReminderScheduler(this).ensureChannel()
         CoroutineScope(Dispatchers.IO).launch {
             repository.rescheduleFutureReminders()
+            CalendarSyncWorkScheduler.syncFromPreferences(this@DotCalApplication)
         }
     }
 }

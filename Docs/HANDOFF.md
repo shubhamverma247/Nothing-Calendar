@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-06-18
+Updated: 2026-06-19
 
 ## Product Target
 
@@ -25,6 +25,45 @@ Key requirements:
 Requested GitHub repo was empty, so scaffold created.
 
 Implemented:
+- Latest Calendar accounts UX/direct sync fix:
+  - Settings > Calendar accounts now uses the same full-screen right-to-left slide overlay pattern as other top surfaces, not an inline-feeling content swap.
+  - Calendar accounts screen now reuses the same large Settings back-arrow header and sticky compact header behavior.
+  - `Sync now` from Settings and Calendar accounts now runs direct in-process CalendarProvider sync through `DotCalViewModel`/`DotCalRepository` instead of only enqueueing WorkManager; periodic background sync still uses WorkManager.
+  - Direct sync updates `KEY_LAST_SYNC_MS` after a non-permission-denied provider sync and refreshes Room-backed account/event flows immediately.
+  - Account color dots are Android CalendarProvider calendar colors (`CalendarContract.Calendars.CALENDAR_COLOR`), used only to visually identify calendars/accounts.
+  - No package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - Latest debug APK was installed on connected phone `4ab0d020` after this fix.
+- Latest Calendar account selection sync fix:
+  - Settings > Calendar accounts now opens a nested account list after calendar permission is granted, with a `Sync now` row at the top for refreshing provider accounts/events.
+  - The account list shows existing `calendar_accounts` rows with switches; `local-primary` stays on, provider/device calendars can be selected or deselected.
+  - Account selection uses existing `calendar_accounts.isVisible`; no schema columns, DB filename, package name, deep link scheme, or Room table count changed.
+  - Calendar event queries now join `calendar_accounts` and only show events whose account `isVisible = 1`.
+  - Provider sync preserves user-selected `isVisible` for existing accounts and skips event import/update for deselected provider calendars, so future sync does not pull all accounts.
+  - `Sync enabled` remains background periodic sync: on schedules WorkManager at the selected interval; off cancels periodic sync. `Sync now` remains manual one-time CalendarProvider import.
+  - Important caveat: `Sync now` reads Android's local `CalendarProvider`; it does not force a cloud Google REST sync. The Google/phone calendar must already have synced the event onto the device.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this account-selection fix because phone/manual UI QA was not requested.
+- Latest Settings calendar permission UX fix:
+  - Fixed Settings > Calendar accounts silent no-op after the user denies calendar permission once in the same app session.
+  - First tap without calendar permission still requests `READ_CALENDAR`/`WRITE_CALENDAR`.
+  - If permission was already requested and is still denied, the next tap opens DotCal's Android App Info screen so the user can grant Calendar access manually instead of seeing no response.
+  - Settings sync controls keep their existing labels and placement: `Sync now`, `Last synced`, `Sync enabled`, and `Sync interval`.
+  - Calendar tab no longer shows the local-mode banner; Calendar can be used as local-only, while Settings > Calendar accounts shows `Local only` or `Connected`.
+  - No package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this UX fix because phone/manual UI QA was not requested.
+- Latest Google Calendar sync slice:
+  - Added CalendarProvider-only sync path; no REST, OAuth, network, schema changes, package changes, deep-link changes, DB filename changes, or new Room tables.
+  - Added `CalendarProviderDataSource` to read visible device calendars/events when `READ_CALENDAR` is granted and return empty/local-only results when denied.
+  - Provider calendars upsert into existing `calendar_accounts`; provider events import into existing `calendar_events` as `source = GOOGLE` with `googleEventId`, `googleCalendarId`, and computed `syncVersion`.
+  - Added `CalendarSyncRepository` using existing `sync_metadata` and `deleted_event_log`; provider deletes remove stale imported Google events, and user-deleted synced events are tombstoned so they do not immediately reimport.
+  - Added `CalendarSyncWorker` and startup scheduling controlled by `KEY_SYNC_ENABLED` and `KEY_SYNC_INTERVAL_MINS`; one-time Sync Now uses WorkManager.
+  - Settings now includes `Sync now`, `Last synced`, `Sync enabled`, and `Sync interval` rows without changing current Settings navigation/layout rules.
+  - Settings > Calendar accounts now requests `READ_CALENDAR`/`WRITE_CALENDAR`; granting access immediately enqueues a one-time sync.
+  - Calendar screen shows non-blocking local-mode banner when calendar read permission is missing: `Running in local mode - grant calendar access in Settings`.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this sync slice because phone/manual UI QA was not requested.
 - Latest snooze/edit navigation fix:
   - Reminder notification action labels now use title case: `View` and `Snooze 10 min`.
   - Snooze now dismisses the current reminder notification immediately when `Snooze 10 min` is tapped.
@@ -649,6 +688,13 @@ Known gap:
 - Add/Edit recurrence/reminder/delete and recurring event expansion are ready for manual QA; user will test manually.
 - Recurring detached occurrences are local-only and are not synced as Google exception instances yet.
 - Current manual test list still contains stale references to older overflow/three-dot navigation. Current UI rule is bottom navigation for `Calendar`, `Tasks`, and `Settings`; no top three-dot overflow should be visible.
+- Connected-phone reminder debug note:
+  - Device inspected: Xiaomi/Redmi `2201117TI` on Android 13.
+  - DotCal had `POST_NOTIFICATIONS` granted, exact-alarm permissions granted, and the `dotcal_reminders` channel was high importance after launching the app.
+  - AlarmManager showed DotCal `SHOW_REMINDER` wakeup alarms firing, but logs showed MIUI `ProcessSceneCleaner: SwipeUpClean` killed DotCal after it was swiped away, and the later alarm did not start DotCal/produce `ReminderReceiver` logs or a notification.
+  - Current likely cause on this connected phone is MIUI battery/autostart restriction after recents cleanup, not the normal notification permission/channel path; Nothing Phone 3 works because it does not block the receiver in the same way.
+  - Manual device mitigation: enable DotCal AutoStart, set Battery saver to No restrictions/Unrestricted, lock DotCal in recents, and avoid swiping it away before reminder tests.
+  - Code hardening option if needed: use `AlarmManager.setAlarmClock()` for reminder alarms on Xiaomi/MIUI even when exact alarm permission is granted, accepting the system next-alarm side effect.
 
 ## Continuation Roadmap
 
@@ -1214,7 +1260,7 @@ Conflict check:
 ## Next Step
 
 Next implementation step:
-- Step 5 from Continuation Roadmap: Google Calendar Sync via CalendarProvider.
+- Step 6 from Continuation Roadmap: Tasks Tab Complete.
 - Preserve schema columns/current UI rules and exactly 5 Room tables.
 - Do not run phone/manual UI testing by default; update `What To Test Now` instead.
 - Use stored week start preference later instead of hardcoded Sunday, if user wants configurable week start.
@@ -1233,6 +1279,18 @@ app\build\outputs\apk\debug\app-debug.apk
 
 Manual:
 - Install the new debug APK manually if testing this fix; APK was not installed by Codex.
+- With Calendar permission denied, Calendar screen should stay usable as local-only and should not show the old local-mode banner.
+- Open Settings > Calendar accounts. Expected: Android calendar permission prompt appears for DotCal.
+- Deny calendar access, then tap Settings > Calendar accounts again. Expected: DotCal Android App Info opens so Calendar permission can be granted manually.
+- Allow calendar access. Expected: Settings > Calendar accounts opens/refreshes provider account sync; after provider sync, the row should show selected count like `2/3 selected`.
+- Open Settings > Calendar accounts after permission is granted. Expected: nested account list shows `Personal` plus device/provider calendars, each with a switch; `Personal` stays locked on.
+- Calendar accounts screen should slide in from the right and use the same large back-arrow header and sticky compact header behavior as Settings.
+- Turn one provider calendar off. Expected: its imported events disappear from Calendar views and later Sync now does not reimport that account while it remains off.
+- Turn that provider calendar back on, then tap Sync now. Expected: that account's visible device-calendar events can appear again after sync.
+- Settings should show `Sync now`, `Last synced`, `Sync enabled`, and `Sync interval`.
+- Tap `Sync now` from Settings and from Calendar accounts. Expected: direct sync runs, `Last synced` updates, and existing Android CalendarProvider events within next 60 days import into DotCal if permission is allowed and selected accounts are on.
+- Toggle `Sync enabled` on, then choose a sync interval. Expected: periodic WorkManager sync is scheduled; toggling off cancels it.
+- Delete an imported Google/provider event from DotCal. Expected: event disappears locally and should not immediately reappear after `Sync now`.
 - Open DotCal, allow notification permission if prompted, and make sure Android system notification settings for DotCal and `DotCal reminders` channel are enabled.
 - Create a timed event 6-7 minutes in the future with `5m` reminder. Expected: notification appears about 5 minutes before start.
 - Repeat once with another event 6-7 minutes in the future. Expected: second notification also appears; no reliance on app foreground state.
@@ -1452,4 +1510,4 @@ Do not change package name, deep link scheme, or DB filename. Do not run phone/m
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
 ```
 
-Current next implementation step: Continuation Roadmap Step 5, Google Calendar Sync via CalendarProvider, but keep existing app behavior as source of truth where conflicts exist.
+Current next implementation step: Continuation Roadmap Step 6, Tasks Tab Complete, but keep existing app behavior as source of truth where conflicts exist.
