@@ -25,6 +25,53 @@ Key requirements:
 Requested GitHub repo was empty, so scaffold created.
 
 Implemented:
+- Latest snooze/edit navigation fix:
+  - Reminder notification action labels now use title case: `View` and `Snooze 10 min`.
+  - Snooze now dismisses the current reminder notification immediately when `Snooze 10 min` is tapped.
+  - Snooze scheduling now carries event title/minutes in the alarm payload and uses the same reliable exact-alarm/AlarmClock path as first reminders, so the 10-minute reminder can show without depending on async Room lookup at fire time.
+  - Event Detail `Edit` now opens Add/Edit as the top overlay with the existing right-to-left slide transition instead of closing/replacing it in a different-feeling way.
+  - Back priority now closes Add/Edit before Event Detail when both are transitioning.
+  - No UI redesign, package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` after the title-case notification label change.
+  - APK was not installed after this fix because phone/manual UI QA was not requested.
+- Latest platform floor change:
+  - Raised the app minimum Android version from API 26 to API 30 (Android 11).
+  - Removed obsolete pre-Android-11 code paths: notification-channel no-op guard for pre-Oreo and image thumbnail stream fallback for pre-Android-10.
+  - Kept Android 12/13/15 guards because DotCal still supports Android 11+ and those branches are active OS feature gates.
+  - No UI, package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+  - Reminder behavior was not changed in this step.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this cleanup because phone/manual UI QA was not requested.
+- Latest reminder reliability hardening:
+  - Alarm scheduling now carries event title/minutes in the alarm `PendingIntent`, so `ReminderReceiver` can still show a notification if the Room event/reminder lookup is unavailable at delivery time.
+  - Exact-alarm-denied path now uses `AlarmManager.setAlarmClock()` with a DotCal event deep link show intent instead of an inexact idle fallback, so valid 5-minute reminders are scheduled through Android's most reliable user-visible alarm path when exact alarm access is blocked.
+  - `ReminderReceiver` now logs malformed/dropped reminder broadcasts instead of silently swallowing them, and logs when it uses the alarm payload fallback.
+  - App startup now reschedules future undelivered reminders from `event_reminders` after creating the notification channel.
+  - No package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this reminder reliability hardening because phone/manual UI QA was not requested.
+- Latest exact reminder capability fix:
+  - Added `android.permission.USE_EXACT_ALARM` because DotCal is a calendar/reminder app and minute-accurate reminders should not depend on delayed inexact alarm fallback.
+  - This targets the repeated valid miss: event at `23:37`, saved at `23:30`, with `5m` reminder and notification permission allowed, but no reminder appeared at `23:32`.
+  - Kept existing `SCHEDULE_EXACT_ALARM` and the fallback path for devices/OS states that still deny exact scheduling.
+  - No package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after the exact reminder capability fix because phone/manual UI QA was not requested.
+- Latest reminder delivery hardening:
+  - Fixed a reported valid reminder test where an event at `23:22` with `5m` reminder saved at `23:15` did not show a notification.
+  - Exact-alarm-denied fallback now uses `AlarmManager.setAndAllowWhileIdle()` instead of `setWindow()`, so reminders can still fire while the phone is idle/dozing.
+  - Reminder notification actions now use a real small icon resource instead of `0`, avoiding notification build failures on stricter Android builds.
+  - No package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after the reminder delivery hardening because phone/manual UI QA was not requested.
+- Latest reminder visibility fix:
+  - Created the `dotcal_reminders` notification channel on app startup in `DotCalApplication`, instead of waiting until alarm delivery.
+  - Add/Edit Event now requests `POST_NOTIFICATIONS` on Android 13+ when a non-`None` reminder is selected or saved.
+  - This fixes the common case where `AlarmManager` fires but no visible notification appears because notification permission was never requested.
+  - Reminder triggers still follow the existing rule: if `startTimeMs - reminderMinutes` is already in the past when saving, that reminder is skipped.
+  - No package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after the reminder visibility fix because phone/manual UI QA was not requested.
 - Latest Agenda card height polish:
   - Reduced Agenda event card height by tightening card padding, time/title spacing, title size/line height, and location spacing.
   - Agenda card tap behavior remains Event Detail first; no schema/table/package/deep-link changes.
@@ -1185,6 +1232,11 @@ app\build\outputs\apk\debug\app-debug.apk
 ```
 
 Manual:
+- Install the new debug APK manually if testing this fix; APK was not installed by Codex.
+- Open DotCal, allow notification permission if prompted, and make sure Android system notification settings for DotCal and `DotCal reminders` channel are enabled.
+- Create a timed event 6-7 minutes in the future with `5m` reminder. Expected: notification appears about 5 minutes before start.
+- Repeat once with another event 6-7 minutes in the future. Expected: second notification also appears; no reliance on app foreground state.
+- If notification still does not appear, capture `adb logcat` around the trigger time filtering `ReminderReceiver` and `ReminderScheduler`, or approve Codex to run phone/logcat/alarm inspection.
 - Launch app.
 - Confirm installed package is `com.dotfield.dotcal` and app label is `DotCal`.
 - Confirm no old `com.dotfield.ncalendar` app remains on the phone.
@@ -1376,8 +1428,9 @@ Manual:
 - Save event, immediately close app after editor closes, reopen app, and the event should still be visible.
 - Save an event for today's date right after launching the app, clear app from recents, reopen app, and the event should still be visible.
 - Tap an image thumbnail in Event Detail; full-screen image preview should open and close cleanly.
-- Create an event with a reminder set in the future; notification should fire around the expected time.
-- On Android 12+, deny exact-alarm access if prompted/available; reminder should still fire within roughly a 5-minute fallback window.
+- Create an event with a reminder whose trigger time is still future. Example: if choosing `5m`, set the event at least 6-7 minutes ahead; notification should fire around 5 minutes before start.
+- On Android 13+, selecting/saving a non-`None` reminder should request notification permission if DotCal does not already have it. Allow it before waiting for the reminder.
+- On Android 12+, deny exact-alarm access if prompted/available; reminder should still fire via idle-tolerant inexact fallback, though Android may delay it slightly.
 - Reminder notification `VIEW` should open `dotcal://event/{eventId}` into Event Detail.
 - Reminder notification `SNOOZE 10 MIN` should fire another reminder roughly 10 minutes later.
 - Edit an event reminder time; old alarm should not fire and new alarm should.

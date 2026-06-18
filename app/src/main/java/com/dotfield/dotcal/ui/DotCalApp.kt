@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.media.MediaPlayer
@@ -285,11 +284,11 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
     }
     fun closeTopSurface() {
         when {
-            detailEvent != null -> viewModel.closeEventDetail()
             addSheet -> {
                 editingEvent = null
                 addSheet = false
             }
+            detailEvent != null -> viewModel.closeEventDetail()
             screenTab == ScreenTab.Settings && settingsScreen != SettingsScreen.Root -> {
                 settingsScreen = SettingsScreen.Root
             }
@@ -489,6 +488,29 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
             )
         }
         AnimatedVisibility(
+            visible = detailEvent != null,
+            enter = slideInHorizontally(initialOffsetX = { it }),
+            exit = slideOutHorizontally(targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            detailEvent?.let { event ->
+                EventDetailScreen(
+                    event = event,
+                    reminders = reminders.filter { it.eventId == event.baseEventId() },
+                    account = accounts.firstOrNull { it.id == event.accountId },
+                    palette = palette,
+                    onBack = viewModel::closeEventDetail,
+                    onEdit = {
+                        openEditEditor(event)
+                        viewModel.closeEventDetail()
+                    },
+                    onDelete = {
+                        pendingDelete = PendingDelete(event, RecurringEditScope.WholeSeries, DeleteSource.Detail)
+                    },
+                )
+            }
+        }
+        AnimatedVisibility(
             visible = addSheet,
             enter = slideInHorizontally(initialOffsetX = { it }),
             exit = slideOutHorizontally(targetOffsetX = { it }),
@@ -518,29 +540,6 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
                     }
                 },
             )
-        }
-        AnimatedVisibility(
-            visible = detailEvent != null,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
-        ) {
-            detailEvent?.let { event ->
-                EventDetailScreen(
-                    event = event,
-                    reminders = reminders.filter { it.eventId == event.baseEventId() },
-                    account = accounts.firstOrNull { it.id == event.accountId },
-                    palette = palette,
-                    onBack = viewModel::closeEventDetail,
-                    onEdit = {
-                        viewModel.closeEventDetail()
-                        openEditEditor(event)
-                    },
-                    onDelete = {
-                        pendingDelete = PendingDelete(event, RecurringEditScope.WholeSeries, DeleteSource.Detail)
-                    },
-                )
-            }
         }
         pendingDelete?.let { request ->
             ConfirmDeleteDialog(
@@ -2215,6 +2214,7 @@ private fun EventEditorScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusSinkRequester = remember { FocusRequester() }
     val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5),
     ) { uris ->
@@ -2239,11 +2239,19 @@ private fun EventEditorScreen(
         focusManager.clearFocus(force = true)
         runCatching { focusSinkRequester.requestFocus() }
     }
+    fun requestNotificationPermissionForReminder() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     fun trySave() {
         submitted = true
         val startDateTime = startDate.atTime(startTime)
         val endDateTime = endDate.atTime(endTime)
         if (title.isNotBlank() && (if (allDay) endDate >= startDate else endDateTime.isAfter(startDateTime))) {
+            if (reminderMinutes != null) requestNotificationPermissionForReminder()
             onSave(
                 EventEditorData(
                     eventId = draftEventId,
@@ -2502,6 +2510,7 @@ private fun EventEditorScreen(
             onDismiss = { showReminderPicker = false },
             onSelected = {
                 reminderMinutes = it
+                if (it != null) requestNotificationPermissionForReminder()
                 showReminderPicker = false
             },
         )
@@ -3987,26 +3996,14 @@ private fun List<String>.toJsonStringArray(): String {
 private fun loadImageThumbnail(context: Context, uriValue: String): Bitmap? {
     val uri = runCatching { Uri.parse(uriValue) }.getOrNull() ?: return null
     return runCatching {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            context.contentResolver.loadThumbnail(uri, Size(180, 180), null)
-        } else {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                BitmapFactory.decodeStream(input)
-            }
-        }
+        context.contentResolver.loadThumbnail(uri, Size(180, 180), null)
     }.getOrNull()
 }
 
 private fun loadImagePreview(context: Context, uriValue: String): Bitmap? {
     val uri = runCatching { Uri.parse(uriValue) }.getOrNull() ?: return null
     return runCatching {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            context.contentResolver.loadThumbnail(uri, Size(1280, 1280), null)
-        } else {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                BitmapFactory.decodeStream(input)
-            }
-        }
+        context.contentResolver.loadThumbnail(uri, Size(1280, 1280), null)
     }.getOrNull()
 }
 
