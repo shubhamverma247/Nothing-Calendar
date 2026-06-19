@@ -14,6 +14,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.os.SystemClock
+import android.widget.Toast
 import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -70,6 +71,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -212,6 +214,7 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
     var editorSessionKey by remember { mutableStateOf(UUID.randomUUID().toString()) }
     var settingsScreen by remember { mutableStateOf(SettingsScreen.Root) }
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
+    var isSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val bootPreferences = remember(context) { context.getSharedPreferences(BOOT_PREFS, android.content.Context.MODE_PRIVATE) }
@@ -327,6 +330,21 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
             screenTab == ScreenTab.Tasks -> {
                 screenTab = ScreenTab.Calendar
                 previousScreenTab = ScreenTab.Calendar
+            }
+        }
+    }
+    fun runSyncNow(showToast: Boolean = true) {
+        if (isSyncing) return
+        isSyncing = true
+        viewModel.syncNow { result ->
+            isSyncing = false
+            if (showToast) {
+                val message = if (result.isSuccess && result.getOrNull()?.permissionDenied != true) {
+                    "Calendars synced"
+                } else {
+                    "Sync failed\nCheck your internet connection"
+                }
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -516,12 +534,13 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
                 syncEnabled = syncEnabled,
                 syncIntervalMins = syncIntervalMins,
                 syncMetadata = syncMetadata,
+                isSyncing = isSyncing,
                 accounts = accounts,
                 hasCalendarPermission = hasCalendarPermission,
-                onSyncNow = viewModel::syncNow,
+                onSyncNow = { runSyncNow(showToast = true) },
                 onAccountVisibilityChange = { accountId, visible ->
                     viewModel.setAccountVisible(accountId, visible)
-                    viewModel.syncNow()
+                    runSyncNow(showToast = false)
                 },
                 onSyncEnabledChange = { enabled ->
                     scope.launch {
@@ -530,7 +549,7 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
                         }
                         if (enabled) {
                             CalendarSyncWorkScheduler.schedulePeriodic(context, syncIntervalMins)
-                            viewModel.syncNow()
+                            runSyncNow(showToast = false)
                         } else {
                             CalendarSyncWorkScheduler.cancelPeriodic(context)
                         }
@@ -549,7 +568,7 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
                 },
                 onRequestCalendarAccess = {
                     if (hasCalendarPermission) {
-                        viewModel.syncNow()
+                        runSyncNow(showToast = false)
                         settingsScreen = SettingsScreen.CalendarAccounts
                     } else {
                         if (calendarPermissionRequested) {
@@ -3532,6 +3551,7 @@ private fun SettingsPreview(
     syncEnabled: Boolean,
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
+    isSyncing: Boolean,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
@@ -3556,6 +3576,7 @@ private fun SettingsPreview(
             syncEnabled = syncEnabled,
             syncIntervalMins = syncIntervalMins,
             syncMetadata = syncMetadata,
+            isSyncing = isSyncing,
             accounts = accounts,
             hasCalendarPermission = hasCalendarPermission,
             onSyncNow = onSyncNow,
@@ -3587,6 +3608,8 @@ private fun SettingsPreview(
             accounts = accounts,
             palette = palette,
             hasCalendarPermission = hasCalendarPermission,
+            syncMetadata = syncMetadata,
+            isSyncing = isSyncing,
             onBack = { onScreenChange(SettingsScreen.Root) },
             onRequestCalendarAccess = onRequestCalendarAccess,
             onSyncNow = onSyncNow,
@@ -3605,6 +3628,7 @@ private fun SettingsRoot(
     syncEnabled: Boolean,
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
+    isSyncing: Boolean,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
@@ -3624,7 +3648,7 @@ private fun SettingsRoot(
             item {
             SettingsSectionTitle("Accounts", palette)
             SettingsMenuRow(
-                title = "Calendar accounts",
+                title = "Calendar Accounts",
                 value = calendarAccountsLabel(accounts, hasCalendarPermission),
                 palette = palette,
                 onClick = onRequestCalendarAccess,
@@ -3653,10 +3677,14 @@ private fun SettingsRoot(
 
             SettingsSectionTitle("Additional", palette)
             SettingsThemeDropdownRow(themeMode = themeMode, palette = palette, onThemeSelected = onThemeSelected)
-            SettingsMenuRow(title = "Sync now", value = "", palette = palette, onClick = onSyncNow)
-            SettingsMenuRow(title = "Last synced", value = syncMetadata.lastSyncedLabel(), palette = palette, onClick = {})
             SettingsToggleRow(title = "Sync enabled", checked = syncEnabled, palette = palette, onCheckedChange = onSyncEnabledChange)
             SettingsSyncIntervalRow(intervalMins = syncIntervalMins, palette = palette, onIntervalSelected = onSyncIntervalSelected)
+            SettingsSyncNowRow(
+                syncMetadata = syncMetadata,
+                isSyncing = isSyncing,
+                palette = palette,
+                onClick = onSyncNow,
+            )
             SettingsMenuRow(title = "About this app", value = "", palette = palette, onClick = {})
             Spacer(modifier = Modifier.height(32.dp))
             }
@@ -3743,6 +3771,8 @@ private fun CalendarAccountsSettings(
     accounts: List<CalendarAccount>,
     palette: DotCalPalette,
     hasCalendarPermission: Boolean,
+    syncMetadata: List<SyncMetadata>,
+    isSyncing: Boolean,
     onBack: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
     onSyncNow: () -> Unit,
@@ -3756,7 +3786,7 @@ private fun CalendarAccountsSettings(
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
             item {
-                SettingsLargeHeader(palette = palette, onBack = onBack, title = "Calendar accounts")
+                SettingsLargeHeader(palette = palette, onBack = onBack, title = "Calendar Accounts")
                 Spacer(modifier = Modifier.height(10.dp))
             if (!hasCalendarPermission) {
                 SettingsMenuRow(
@@ -3767,14 +3797,19 @@ private fun CalendarAccountsSettings(
                 )
                 SettingsDivider(palette)
             } else {
-                SettingsMenuRow(title = "Sync now", value = "", palette = palette, onClick = onSyncNow)
+                SettingsSyncNowRow(
+                    syncMetadata = syncMetadata,
+                    isSyncing = isSyncing,
+                    palette = palette,
+                    onClick = onSyncNow,
+                )
                 SettingsDivider(palette)
             }
         }
             if (sortedAccounts.isEmpty()) {
                 item {
                     Text(
-                        if (hasCalendarPermission) "Tap Sync now to load accounts" else "Calendar access needed",
+                        if (hasCalendarPermission) "Tap Sync Now to load accounts" else "Calendar access needed",
                         color = palette.secondaryText,
                         fontFamily = mono,
                         fontSize = 13.sp,
@@ -3788,12 +3823,13 @@ private fun CalendarAccountsSettings(
                         palette = palette,
                         onAccountVisibilityChange = onAccountVisibilityChange,
                     )
+                    SettingsContentDivider(palette)
                 }
             }
             item { Spacer(modifier = Modifier.height(28.dp)) }
         }
         if (showCompactHeader) {
-            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Calendar accounts")
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Calendar Accounts")
         }
     }
 }
@@ -3820,7 +3856,7 @@ private fun CalendarAccountToggleRow(
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    account.displayName,
+                    account.displayName.readableCalendarLabel(),
                     color = palette.primaryText,
                     fontFamily = mono,
                     fontWeight = FontWeight.SemiBold,
@@ -3829,7 +3865,7 @@ private fun CalendarAccountToggleRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    account.accountName.ifBlank { account.accountType },
+                    account.secondaryCalendarLabel(),
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 11.sp,
@@ -3838,19 +3874,11 @@ private fun CalendarAccountToggleRow(
                 )
             }
         }
-        Switch(
+        DotCalSwitch(
             checked = account.isVisible == 1,
             enabled = !isLocal,
+            palette = palette,
             onCheckedChange = { checked -> onAccountVisibilityChange(account.id, checked) },
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = NWhite,
-                checkedTrackColor = palette.accent,
-                uncheckedThumbColor = NWhite,
-                uncheckedTrackColor = palette.disabledText,
-                uncheckedBorderColor = Color.Transparent,
-                disabledCheckedThumbColor = NWhite,
-                disabledCheckedTrackColor = palette.accent.copy(alpha = 0.55f),
-            ),
         )
     }
 }
@@ -3899,6 +3927,85 @@ private fun SettingsMenuRow(
 }
 
 @Composable
+private fun SettingsSyncNowRow(
+    syncMetadata: List<SyncMetadata>,
+    isSyncing: Boolean,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .clickable(enabled = !isSyncing, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                if (isSyncing) "Syncing..." else "Sync Now",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+            )
+            Text(
+                syncMetadata.lastSyncedSubtitle(),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 11.sp,
+                lineHeight = 13.sp,
+            )
+        }
+        if (isSyncing) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                color = palette.accent,
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun DotCalSwitch(
+    checked: Boolean,
+    palette: DotCalPalette,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val trackColor = when {
+        checked && enabled -> palette.accent
+        checked -> palette.accent.copy(alpha = 0.55f)
+        else -> palette.switchOffTrack
+    }
+    Box(
+        modifier = Modifier
+            .size(width = 52.dp, height = 48.dp)
+            .clickable(enabled = enabled) { onCheckedChange(!checked) },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 52.dp, height = 32.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(trackColor)
+                .padding(4.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(if (checked) Alignment.CenterEnd else Alignment.CenterStart)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(NWhite),
+            )
+        }
+    }
+}
+
+@Composable
 private fun SettingsToggleRow(
     title: String,
     checked: Boolean,
@@ -3919,16 +4026,10 @@ private fun SettingsToggleRow(
                 Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp, lineHeight = 12.sp)
             }
         }
-        Switch(
+        DotCalSwitch(
             checked = checked,
+            palette = palette,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = NWhite,
-                checkedTrackColor = palette.accent,
-                uncheckedThumbColor = NWhite,
-                uncheckedTrackColor = palette.disabledText,
-                uncheckedBorderColor = Color.Transparent,
-            ),
         )
     }
 }
@@ -4058,6 +4159,11 @@ private fun UpDownChevron(tint: Color, modifier: Modifier = Modifier) {
 @Composable
 private fun SettingsDivider(palette: DotCalPalette) {
     HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+}
+
+@Composable
+private fun SettingsContentDivider(palette: DotCalPalette) {
+    HorizontalDivider(color = palette.line, thickness = 1.dp, modifier = Modifier.padding(start = 24.dp))
 }
 
 @Composable
@@ -4242,15 +4348,42 @@ private fun calendarAccountsLabel(accounts: List<CalendarAccount>, hasCalendarPe
 }
 
 private fun List<SyncMetadata>.lastSyncedLabel(): String {
+    return lastSyncedRelativeLabel().replaceFirstChar { char ->
+        if (char.isLowerCase()) char.titlecase(Locale.US) else char.toString()
+    }
+}
+
+private fun List<SyncMetadata>.lastSyncedSubtitle(): String {
+    return "Last synced ${lastSyncedRelativeLabel()}"
+}
+
+private fun List<SyncMetadata>.lastSyncedRelativeLabel(): String {
     val lastSyncMs = maxOfOrNull { it.lastSyncMs } ?: 0L
-    if (lastSyncMs <= 0L) return "Never"
+    if (lastSyncMs <= 0L) return "never"
     val elapsedMinutes = ((System.currentTimeMillis() - lastSyncMs) / 60_000L).coerceAtLeast(0L)
     return when {
-        elapsedMinutes < 1L -> "Just now"
+        elapsedMinutes < 1L -> "just now"
         elapsedMinutes < 60L -> "$elapsedMinutes min ago"
         elapsedMinutes < 24L * 60L -> "${elapsedMinutes / 60L} hr ago"
+        elapsedMinutes < 48L * 60L -> "yesterday"
         else -> "${elapsedMinutes / (24L * 60L)} d ago"
     }
+}
+
+private fun String.readableCalendarLabel(): String {
+    val trimmed = trim()
+    if (trimmed.isBlank()) return "Calendar"
+    if (trimmed.contains("@")) return trimmed
+    if (trimmed.any { it.isLowerCase() }) return trimmed
+    return trimmed.lowercase(Locale.US).replaceFirstChar { char ->
+        if (char.isLowerCase()) char.titlecase(Locale.US) else char.toString()
+    }
+}
+
+private fun CalendarAccount.secondaryCalendarLabel(): String {
+    val raw = accountName.ifBlank { accountType }.trim()
+    if (raw.isBlank()) return "Local"
+    return raw.readableCalendarLabel()
 }
 
 private fun nearestCircularIndex(currentIndex: Int, targetItemIndex: Int, itemCount: Int): Int {
@@ -4448,6 +4581,7 @@ private data class DotCalPalette(
     val textFieldBorder: Color,
     val segmentSelected: Color,
     val disabledText: Color,
+    val switchOffTrack: Color,
     val dot: Color,
     val yearWeekday: Color,
     val yearMonthLabel: Color,
@@ -4495,6 +4629,7 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
             textFieldBorder = Color(0xFF4A4A4A),
             segmentSelected = Color(0xFF1E1E1E),
             disabledText = Color(0xFF6E6E6E),
+            switchOffTrack = Color(0xFF3A3A3A),
             dot = Color(0xFFFFFFFF),
             yearWeekday = Color(0xFFFFFFFF),
             yearMonthLabel = Color(0xFFFFFFFF),
@@ -4522,6 +4657,7 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
             textFieldBorder = Color(0xFFDADADA),
             segmentSelected = Color(0xFFEFEFEF),
             disabledText = Color(0xFFBDBDBD),
+            switchOffTrack = Color(0xFFDADADA),
             dot = Color(0xFF101010),
             yearWeekday = Color(0xFF101010),
             yearMonthLabel = Color(0xFF101010),
@@ -4554,6 +4690,7 @@ private fun dotCalBootPalette(): DotCalPalette {
         textFieldBorder = Color(0xFF4A4A4A),
         segmentSelected = Color(0xFF1E1E1E),
         disabledText = Color(0xFF6E6E6E),
+        switchOffTrack = Color(0xFF3A3A3A),
         dot = Color(0xFFFFFFFF),
         yearWeekday = Color(0xFFFFFFFF),
         yearMonthLabel = Color(0xFFFFFFFF),

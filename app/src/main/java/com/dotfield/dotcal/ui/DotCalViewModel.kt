@@ -9,6 +9,7 @@ import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
+import com.dotfield.dotcal.sync.CalendarSyncResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -116,9 +117,10 @@ class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
         }
     }
 
-    fun syncNow() {
+    fun syncNow(onComplete: (Result<CalendarSyncResult>) -> Unit = {}) {
         viewModelScope.launch {
-            repository.syncNow()
+            val result = runCatching { repository.syncNow() }
+            onComplete(result)
         }
     }
 

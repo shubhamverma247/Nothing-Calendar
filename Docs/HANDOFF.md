@@ -25,6 +25,22 @@ Key requirements:
 Requested GitHub repo was empty, so scaffold created.
 
 Implemented:
+- Latest switch sizing polish:
+  - Calendar Accounts, Sync Enabled, and Import Contacts' Birthdays now share a custom DotCal switch visual sized exactly 52dp x 32dp with a 24dp thumb.
+  - The switch touch target is 52dp x 48dp, keeping the visual compact while meeting Android's minimum touch-target height.
+  - Calendar account switches remain vertically centered in their 68dp rows; Settings toggle rows keep existing layout and colors.
+  - The Add/Edit Event all-day switch was left unchanged because this request targeted only Calendar Accounts, Sync Enabled, and Import Contacts' Birthdays.
+  - No package name, deep link scheme, DB filename, Room schema columns, or table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this polish because phone/manual UI QA was not requested.
+- Latest sync settings/calendar accounts polish:
+  - Settings and Calendar Accounts now share one `Sync Now` row with the last-sync timestamp as subtitle; the separate `Last synced` row was removed.
+  - Tapping `Sync Now` disables repeat taps, runs the existing direct in-process CalendarProvider sync, shows an inline spinner with `Syncing...`, and shows a toast for success/failure.
+  - The sync path remains CalendarProvider-only; no Google REST/OAuth/cloud API, network sync, schema changes, package changes, deep-link changes, DB filename changes, or Room table-count changes.
+  - Calendar Accounts title is now Title Case (`Calendar Accounts`), account labels are normalized away from all-caps where possible, and account rows have content-aligned dividers.
+  - Settings/account switches now use requested theme colors: on track `#FF3B30`, white thumb, off track `#DADADA` in Light and `#3A3A3A` in Dark.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this polish because phone/manual UI QA was not requested.
 - Latest Calendar accounts UX/direct sync fix:
   - Settings > Calendar accounts now uses the same full-screen right-to-left slide overlay pattern as other top surfaces, not an inline-feeling content swap.
   - Calendar accounts screen now reuses the same large Settings back-arrow header and sticky compact header behavior.
@@ -1283,12 +1299,15 @@ Manual:
 - Open Settings > Calendar accounts. Expected: Android calendar permission prompt appears for DotCal.
 - Deny calendar access, then tap Settings > Calendar accounts again. Expected: DotCal Android App Info opens so Calendar permission can be granted manually.
 - Allow calendar access. Expected: Settings > Calendar accounts opens/refreshes provider account sync; after provider sync, the row should show selected count like `2/3 selected`.
-- Open Settings > Calendar accounts after permission is granted. Expected: nested account list shows `Personal` plus device/provider calendars, each with a switch; `Personal` stays locked on.
+- Open Settings > Calendar Accounts after permission is granted. Expected: nested account list shows `Personal` plus device/provider calendars, each with a switch; `Personal` stays locked on.
 - Calendar accounts screen should slide in from the right and use the same large back-arrow header and sticky compact header behavior as Settings.
 - Turn one provider calendar off. Expected: its imported events disappear from Calendar views and later Sync now does not reimport that account while it remains off.
-- Turn that provider calendar back on, then tap Sync now. Expected: that account's visible device-calendar events can appear again after sync.
-- Settings should show `Sync now`, `Last synced`, `Sync enabled`, and `Sync interval`.
-- Tap `Sync now` from Settings and from Calendar accounts. Expected: direct sync runs, `Last synced` updates, and existing Android CalendarProvider events within next 60 days import into DotCal if permission is allowed and selected accounts are on.
+- Turn that provider calendar back on, then tap Sync Now. Expected: that account's visible device-calendar events can appear again after sync.
+- Settings should show `Theme`, `Sync enabled`, `Sync interval`, `Sync Now` with a `Last synced ...` subtitle, and `About this app`; no separate `Last synced` row.
+- Tap `Sync Now` from Settings and from Calendar Accounts. Expected: direct sync runs inline, repeat taps are ignored while syncing, a small spinner appears, `Last synced ...` updates after success, and existing Android CalendarProvider events within next 60 days import into DotCal if permission is allowed and selected accounts are on.
+- Calendar Accounts rows should use Title Case labels where possible, show display name above account/email, include a color dot, and have dividers aligned with row content.
+- Settings and Calendar Accounts switches should show red track/white thumb when on, `#DADADA` off track in Light theme, and `#3A3A3A` off track in Dark theme.
+- Calendar Accounts, Sync Enabled, and Import Contacts' Birthdays switches should look compact: 52dp x 32dp track, 24dp thumb, at least 48dp touch height, and vertically centered in each row.
 - Toggle `Sync enabled` on, then choose a sync interval. Expected: periodic WorkManager sync is scheduled; toggling off cancels it.
 - Delete an imported Google/provider event from DotCal. Expected: event disappears locally and should not immediately reappear after `Sync now`.
 - Open DotCal, allow notification permission if prompted, and make sure Android system notification settings for DotCal and `DotCal reminders` channel are enabled.
