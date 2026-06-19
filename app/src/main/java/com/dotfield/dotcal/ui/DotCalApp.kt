@@ -1847,6 +1847,7 @@ private fun DetailSection(label: String, palette: DotCalPalette, content: @Compo
         Text(
             label,
             color = palette.secondaryText,
+            fontWeight = FontWeight.Medium,
             fontSize = 12.sp,
             letterSpacing = 0.35.sp,
             maxLines = 1,
@@ -3459,53 +3460,64 @@ private fun TaskDetailScreen(
             }
             item {
                 DetailSection(label = "STATUS", palette = palette) {
-                    Text(if (task.isCompleted == 1) "Completed" else "Open", color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                    Text(if (task.isCompleted == 1) "Completed" else "Open", color = palette.primaryText, fontSize = 20.sp, lineHeight = 27.sp)
                 }
             }
-            if (task.hasTaskDate()) {
-                item {
-                    DetailDivider(palette)
-                    DetailSection(label = "DUE", palette = palette) {
-                        Text(task.taskDueDetailLabel(), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
-                        task.recurrenceDetailLabel()?.let { label ->
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(label.toSentenceCase(), color = palette.secondaryText, fontSize = 14.sp, lineHeight = 20.sp)
-                        }
+            item {
+                DetailDivider(palette)
+                DetailSection(label = "DUE", palette = palette) {
+                    if (task.hasTaskDate()) {
+                        Text(task.taskDueDateLine(), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(task.taskDueTimeLine(), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                    } else {
+                        Text("None", color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
                     }
-                }
-            }
-            reminder?.let {
-                item {
-                    DetailDivider(palette)
-                    DetailSection(label = "REMINDER", palette = palette) {
-                        Text(it.detailLabel().toSentenceCase(), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                    task.recurrenceDetailLabel()?.let { label ->
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(label.toSentenceCase(), color = palette.secondaryText, fontSize = 14.sp, lineHeight = 20.sp)
                     }
                 }
             }
             item {
                 DetailDivider(palette)
-                Text(
-                    if (task.isCompleted == 1) "Mark Open" else "Mark Complete",
-                    color = palette.accent,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp,
-                    textAlign = TextAlign.Center,
+                DetailSection(label = "REMINDER", palette = palette) {
+                    Text(reminder?.detailLabel()?.toSentenceCase() ?: "None", color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                }
+            }
+            item {
+                DetailDivider(palette)
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(onClick = onComplete)
-                        .padding(vertical = 18.dp),
-                )
-                Text(
-                    "Delete Task",
-                    color = palette.accent,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onDelete)
-                        .padding(vertical = 18.dp),
-                )
+                        .padding(top = 24.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (task.isCompleted != 1) {
+                        Text(
+                            "Mark Complete",
+                            color = palette.accent,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .clickable(onClick = onComplete)
+                                .padding(vertical = 12.dp),
+                        )
+                        Spacer(modifier = Modifier.width(32.dp))
+                    }
+                    Text(
+                        "Delete Task",
+                        color = palette.accent,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .clickable(onClick = onDelete)
+                            .padding(vertical = 12.dp),
+                    )
+                }
             }
         }
     }
@@ -5205,6 +5217,16 @@ private fun CalendarEvent.hasTaskDate(): Boolean {
 private fun CalendarEvent.taskDueDetailLabel(): String {
     val date = localDate().format(editorDateFormatter)
     return if (isAllDay == 1) date else "$date, ${startLocalTime().format(timeFormatter)}"
+}
+
+private fun CalendarEvent.taskDueDateLine(): String {
+    return Instant.ofEpochMilli(startTimeMs)
+        .atZone(ZoneId.systemDefault())
+        .format(DateTimeFormatter.ofPattern("EEEE, d MMM yyyy", Locale.US))
+}
+
+private fun CalendarEvent.taskDueTimeLine(): String {
+    return if (isAllDay == 1) "All-day" else startLocalTime().format(timeFormatter)
 }
 
 private fun taskDateHeaderFormatter(): DateTimeFormatter {

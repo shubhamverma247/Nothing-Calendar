@@ -25,6 +25,13 @@ Key requirements:
 Requested GitHub repo was empty, so scaffold created.
 
 Implemented:
+- Latest Task Details screen refinement:
+  - Task Detail now follows the existing Event Details visual language more closely: same top bar treatment, large title, section-label/value/divider structure, no cards/icons/chips, and theme-driven light/dark colors.
+  - Status value now uses the requested larger detail emphasis, Due renders date and time on separate lines, Reminder always shows a value (`None` when unset), and completed tasks hide `Mark Complete`.
+  - Bottom task actions are centered text-only red actions with 32dp spacing when both are visible; completed tasks show only `Delete Task`.
+  - No schema columns, DB filename, package name, deep-link scheme, or Room table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - Installed latest debug APK on connected phone `4ab0d020`.
 - Latest Task reminder notification route/casing fix:
   - Task reminder notification `View Task` now opens Task Detail after landing in Tasks, instead of stopping at the Tasks tab.
   - Task reminder notification action strings are source-authored in Title Case: `View Task` and `Snooze 10 Min`.
