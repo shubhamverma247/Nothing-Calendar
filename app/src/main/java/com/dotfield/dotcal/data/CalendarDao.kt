@@ -60,6 +60,49 @@ interface CalendarDao {
     )
     fun observeTasks(): Flow<List<CalendarEvent>>
 
+    @Query(
+        """
+        SELECT * FROM calendar_events
+        WHERE isTask = 1 AND startTimeMs BETWEEN :dayStartMs AND :dayEndMs
+        ORDER BY isCompleted ASC, startTimeMs ASC
+        """,
+    )
+    fun observeTodayTasks(dayStartMs: Long, dayEndMs: Long): Flow<List<CalendarEvent>>
+
+    @Query(
+        """
+        SELECT * FROM calendar_events
+        WHERE isTask = 1 AND isCompleted = 0 AND startTimeMs > :nowMs
+        ORDER BY startTimeMs ASC
+        """,
+    )
+    fun observeUpcomingTasks(nowMs: Long): Flow<List<CalendarEvent>>
+
+    @Query(
+        """
+        SELECT * FROM calendar_events
+        WHERE isTask = 1 AND isCompleted = 1
+        ORDER BY completedAtMs DESC, startTimeMs ASC
+        """,
+    )
+    fun observeCompletedTasks(): Flow<List<CalendarEvent>>
+
+    @Query(
+        """
+        UPDATE calendar_events
+        SET isCompleted = :isCompleted,
+            completedAtMs = :completedAtMs,
+            updatedAtMs = :updatedAtMs
+        WHERE id = :eventId AND isTask = 1
+        """,
+    )
+    suspend fun updateTaskCompletion(
+        eventId: String,
+        isCompleted: Int,
+        completedAtMs: Long?,
+        updatedAtMs: Long,
+    )
+
     @Query("SELECT * FROM event_reminders ORDER BY triggerAtMs ASC")
     fun observeReminders(): Flow<List<EventReminder>>
 

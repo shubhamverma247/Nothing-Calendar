@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private val deepLinkTarget = mutableStateOf<DotCalDeepLinkTarget?>(null)
     private val viewModel: DotCalViewModel by viewModels {
         val app = application as DotCalApplication
         object : ViewModelProvider.Factory {
@@ -31,6 +33,7 @@ class MainActivity : ComponentActivity() {
         val bootTheme = bootPrefs.getString(BOOT_THEME_KEY, null)
         setTheme(if (bootTheme == "Light") R.style.Theme_DotCal_Light else R.style.Theme_DotCal_Dark)
         super.onCreate(savedInstanceState)
+        deepLinkTarget.value = intent.dotCalDeepLinkTarget()
         lifecycleScope.launch {
             val storedTheme = runCatching { calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_THEME_MODE] }.getOrNull()
             if (storedTheme != null && storedTheme != bootTheme) {
@@ -39,9 +42,20 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             DotCalTheme {
-                DotCalApp(viewModel = viewModel, initialEventId = intent.eventDetailId())
+                val target = deepLinkTarget.value
+                DotCalApp(
+                    viewModel = viewModel,
+                    initialEventId = target?.eventId,
+                    initialTaskId = target?.taskId,
+                )
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        deepLinkTarget.value = intent.dotCalDeepLinkTarget()
     }
 
     private companion object {
@@ -50,11 +64,15 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private fun android.content.Intent.eventDetailId(): String? {
+private data class DotCalDeepLinkTarget(val eventId: String? = null, val taskId: String? = null)
+
+private fun android.content.Intent.dotCalDeepLinkTarget(): DotCalDeepLinkTarget? {
     val uri = data ?: return null
     return when {
-        uri.scheme == "dotcal" && uri.host == "event" -> uri.lastPathSegment
-        uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" -> uri.pathSegments.getOrNull(1)
+        uri.scheme == "dotcal" && uri.host == "event" -> DotCalDeepLinkTarget(eventId = uri.lastPathSegment)
+        uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" -> DotCalDeepLinkTarget(eventId = uri.pathSegments.getOrNull(1))
+        uri.scheme == "dotcal" && uri.host == "task" -> DotCalDeepLinkTarget(taskId = uri.lastPathSegment)
+        uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "task" -> DotCalDeepLinkTarget(taskId = uri.pathSegments.getOrNull(1))
         else -> null
     }
 }

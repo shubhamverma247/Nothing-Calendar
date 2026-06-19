@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -60,14 +61,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
@@ -86,6 +91,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -110,12 +116,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -128,7 +136,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.zIndex
@@ -145,6 +153,7 @@ import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.isRecurrenceOccurrence
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
+import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
@@ -161,6 +170,7 @@ import java.time.format.DateTimeFormatter
 import java.io.File
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -179,6 +189,7 @@ private const val WEEK_HOUR_HEIGHT_DP = 64f
 private const val BOOT_PREFS = "dotcal_boot"
 private const val BOOT_THEME_KEY = "theme_mode"
 private val reminderOptions = listOf(null, 5, 10, 30)
+private val taskReminderOptions = listOf(null, 5, 10, 30, 1440)
 private data class RecurrenceOption(val label: String, val rrule: String?)
 private val recurrenceOptions = listOf(
     RecurrenceOption("None", null),
@@ -196,7 +207,7 @@ private data class PendingDelete(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
+fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initialTaskId: String? = null) {
     val month by viewModel.month.collectAsStateWithLifecycle()
     val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
     val events by viewModel.events.collectAsStateWithLifecycle()
@@ -211,9 +222,15 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
     var addSheet by remember { mutableStateOf(false) }
     var addStartTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
     var editingEvent by remember { mutableStateOf<CalendarEvent?>(null) }
+    var taskDetail by remember { mutableStateOf<CalendarEvent?>(null) }
+    var lastTaskDetail by remember { mutableStateOf<CalendarEvent?>(null) }
+    var editingTask by remember { mutableStateOf<CalendarEvent?>(null) }
+    var showTaskEditor by remember { mutableStateOf(false) }
     var editorSessionKey by remember { mutableStateOf(UUID.randomUUID().toString()) }
     var settingsScreen by remember { mutableStateOf(SettingsScreen.Root) }
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
+    var pendingTaskDelete by remember { mutableStateOf<CalendarEvent?>(null) }
+    var handledTaskDeepLinkId by remember { mutableStateOf<String?>(null) }
     var isSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -272,10 +289,10 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
             bootPreferences.edit().putString(BOOT_THEME_KEY, mode.name).apply()
         }
     }
-    LaunchedEffect(storedSelectedDateValue, initialEventId) {
+    LaunchedEffect(storedSelectedDateValue, initialEventId, initialTaskId) {
         val storedValue = storedSelectedDateValue ?: return@LaunchedEffect
         if (!selectedDateRestored) {
-            if (initialEventId == null && storedValue.isNotBlank()) {
+            if (initialEventId == null && initialTaskId == null && storedValue.isNotBlank()) {
                 runCatching { LocalDate.parse(storedValue) }.getOrNull()?.let(viewModel::selectDate)
             }
             selectedDateRestored = true
@@ -290,6 +307,23 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
     }
     LaunchedEffect(initialEventId) {
         initialEventId?.let(viewModel::openEventDetailById)
+    }
+    LaunchedEffect(initialTaskId, tasks) {
+        if (!initialTaskId.isNullOrBlank()) {
+            viewModel.closeEventDetail()
+            settingsScreen = SettingsScreen.Root
+            previousScreenTab = ScreenTab.Calendar
+            screenTab = ScreenTab.Tasks
+            if (handledTaskDeepLinkId != initialTaskId) {
+                tasks.firstOrNull { it.baseEventId() == initialTaskId || it.id == initialTaskId }?.let { task ->
+                    taskDetail = task
+                    handledTaskDeepLinkId = initialTaskId
+                }
+            }
+        }
+    }
+    LaunchedEffect(taskDetail) {
+        taskDetail?.let { lastTaskDetail = it }
     }
     LaunchedEffect(Unit) {
         hasCalendarPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
@@ -319,6 +353,11 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
                 editingEvent = null
                 addSheet = false
             }
+            showTaskEditor -> {
+                editingTask = null
+                showTaskEditor = false
+            }
+            taskDetail != null -> taskDetail = null
             detailEvent != null -> viewModel.closeEventDetail()
             screenTab == ScreenTab.Settings && settingsScreen != SettingsScreen.Root -> {
                 settingsScreen = SettingsScreen.Root
@@ -348,7 +387,7 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
             }
         }
     }
-    BackHandler(enabled = detailEvent != null || addSheet || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks) {
+    BackHandler(enabled = detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks) {
         closeTopSurface()
     }
 
@@ -424,9 +463,12 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
                             selectCalendarTab(it)
                         },
                     )
-                    if (activeCalendarTab != CalendarTab.Year) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
+                    Spacer(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(16.dp)
+                            .background(palette.topBarSurface),
+                    )
                 }
                 when (visibleMainTab) {
                 ScreenTab.Calendar -> {
@@ -506,7 +548,18 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
                         )
                     }
                 }
-                    ScreenTab.Tasks -> TasksPreview(tasks, palette)
+                    ScreenTab.Tasks -> TasksScreen(
+                        tasks = tasks,
+                        reminders = reminders,
+                        palette = palette,
+                        onAddClick = {
+                            editingTask = null
+                            showTaskEditor = true
+                        },
+                        onTaskClick = { taskDetail = it },
+                        onCompleteTask = viewModel::completeTask,
+                        onDeleteTask = viewModel::deleteTask,
+                    )
                     ScreenTab.Settings -> Unit
                 }
             }
@@ -614,6 +667,58 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
             }
         }
         AnimatedVisibility(
+            visible = taskDetail != null,
+            enter = slideInHorizontally(initialOffsetX = { it }),
+            exit = slideOutHorizontally(targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            lastTaskDetail?.let { task ->
+                TaskDetailScreen(
+                    task = task,
+                    reminder = reminders.firstOrNull { it.eventId == task.baseEventId() },
+                    palette = palette,
+                    onBack = { taskDetail = null },
+                    onEdit = {
+                        editingTask = task
+                        showTaskEditor = true
+                    },
+                    onComplete = {
+                        if (task.isCompleted == 1) {
+                            viewModel.reopenTask(task)
+                        } else {
+                            viewModel.completeTask(task)
+                        }
+                        taskDetail = null
+                    },
+                    onDelete = {
+                        pendingTaskDelete = task
+                    },
+                )
+            }
+        }
+        if (showTaskEditor) {
+            TaskEditorSheet(
+                task = editingTask,
+                initialReminder = editingTask?.let { task -> reminders.firstOrNull { it.eventId == task.baseEventId() } },
+                palette = palette,
+                onDismiss = {
+                    editingTask = null
+                    showTaskEditor = false
+                },
+                onSave = { data ->
+                    viewModel.saveTask(editingTask, data) {
+                        editingTask = null
+                        showTaskEditor = false
+                    }
+                },
+                onDelete = editingTask?.let { task ->
+                    {
+                        pendingTaskDelete = task
+                    }
+                },
+            )
+        }
+        AnimatedVisibility(
             visible = addSheet,
             enter = slideInHorizontally(initialOffsetX = { it }),
             exit = slideOutHorizontally(targetOffsetX = { it }),
@@ -662,6 +767,21 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null) {
                 },
             )
         }
+        pendingTaskDelete?.let { task ->
+            ConfirmDeleteDialog(
+                title = if (!task.rrule.isNullOrBlank()) "Delete task series?" else "Delete task?",
+                confirmLabel = if (!task.rrule.isNullOrBlank()) "Delete series" else "Delete",
+                palette = palette,
+                onDismiss = { pendingTaskDelete = null },
+                onConfirm = {
+                    viewModel.deleteTask(task)
+                    taskDetail = null
+                    editingTask = null
+                    showTaskEditor = false
+                    pendingTaskDelete = null
+                },
+            )
+        }
         BackHandler(enabled = addSheet) {
             editingEvent = null
             addSheet = false
@@ -694,16 +814,33 @@ private fun ConfirmDeleteDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
+    ConfirmDeleteDialog(
+        title = if (deleteSeries) "Delete series?" else "Delete event?",
+        confirmLabel = if (deleteSeries) "Delete series" else "Delete",
+        palette = palette,
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+    )
+}
+
+@Composable
+private fun ConfirmDeleteDialog(
+    title: String,
+    confirmLabel: String,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
         titleContentColor = palette.primaryText,
         textContentColor = palette.secondaryText,
-        title = { Text(if (deleteSeries) "Delete series?" else "Delete event?") },
+        title = { Text(title) },
         text = { Text("This cannot be undone.") },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(if (deleteSeries) "Delete series" else "Delete", color = palette.accent)
+                Text(confirmLabel, color = palette.accent)
             }
         },
         dismissButton = {
@@ -2650,6 +2787,7 @@ private fun EditorValueRow(
     onClick: () -> Unit,
     visible: Boolean = true,
     enabled: Boolean = true,
+    leadingIcon: ImageVector? = null,
 ) {
     if (!visible) return
     val rowTextColor = if (enabled) palette.primaryText else palette.disabledText
@@ -2664,6 +2802,9 @@ private fun EditorValueRow(
             .padding(vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        leadingIcon?.let {
+            Icon(it, contentDescription = null, tint = valueTextColor, modifier = Modifier.padding(end = 12.dp).size(18.dp))
+        }
         Text(title, color = rowTextColor, fontFamily = mono, fontSize = 15.sp, modifier = Modifier.weight(1f))
         Text(
             value,
@@ -3121,18 +3262,29 @@ private fun AgendaPreview(
                 fontWeight = FontWeight.Medium,
                 fontSize = 13.sp,
                 letterSpacing = 0.4.sp,
-                modifier = Modifier.padding(bottom = 8.dp),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             )
         }
         lazyItems(dayEvents, key = { it.id }) { event ->
             AgendaEventCard(event = event, palette = palette, onClick = { onEventClick(event) })
         }
         item {
-            AgendaEndOfDayState(
-                palette = palette,
-                topPadding = if (dayEvents.isEmpty()) 96.dp else 128.dp,
-                onAdd = onAdd,
-            )
+            if (dayEvents.isEmpty()) {
+                AgendaEndOfDayState(
+                    palette = palette,
+                    modifier = Modifier.fillParentMaxHeight(0.72f),
+                    onAdd = onAdd,
+                )
+            } else {
+                AgendaEndOfDayState(
+                    palette = palette,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 128.dp),
+                    onAdd = onAdd,
+                )
+            }
         }
     }
 }
@@ -3196,13 +3348,12 @@ private fun AgendaEventCard(
 @Composable
 private fun AgendaEndOfDayState(
     palette: DotCalPalette,
-    topPadding: Dp,
+    modifier: Modifier = Modifier,
     onAdd: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = topPadding),
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         AgendaCalendarOutlineIcon(tint = palette.dimText)
@@ -3255,22 +3406,779 @@ private fun AgendaCalendarOutlineIcon(tint: Color) {
 }
 
 @Composable
-private fun TasksPreview(tasks: List<CalendarEvent>, palette: DotCalPalette) {
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        if (tasks.isEmpty()) {
-            item { PlaceholderScreen("All done", palette) }
-        } else {
-            items(tasks.size) { index ->
-                val task = tasks[index]
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-                    Box(modifier = Modifier.size(18.dp).background(palette.cell))
+private fun TaskDetailScreen(
+    task: CalendarEvent,
+    reminder: EventReminder?,
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onEdit: () -> Unit,
+    onComplete: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .background(palette.topBarSurface)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+            }
+            Text(
+                "Task Details",
+                modifier = Modifier.weight(1f),
+                color = palette.primaryText,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+            Text(
+                "Edit",
+                color = palette.primaryText,
+                fontSize = 15.sp,
+                modifier = Modifier.clickable(onClick = onEdit).padding(horizontal = 12.dp, vertical = 10.dp),
+            )
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(palette.background),
+            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 26.dp, bottom = 28.dp),
+        ) {
+            item {
+                Text(
+                    task.title,
+                    color = palette.primaryText,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 32.sp,
+                    lineHeight = 38.sp,
+                )
+                Spacer(modifier = Modifier.height(26.dp))
+            }
+            item {
+                DetailSection(label = "STATUS", palette = palette) {
+                    Text(if (task.isCompleted == 1) "Completed" else "Open", color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                }
+            }
+            if (task.hasTaskDate()) {
+                item {
+                    DetailDivider(palette)
+                    DetailSection(label = "DUE", palette = palette) {
+                        Text(task.taskDueDetailLabel(), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                        task.recurrenceDetailLabel()?.let { label ->
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(label.toSentenceCase(), color = palette.secondaryText, fontSize = 14.sp, lineHeight = 20.sp)
+                        }
+                    }
+                }
+            }
+            reminder?.let {
+                item {
+                    DetailDivider(palette)
+                    DetailSection(label = "REMINDER", palette = palette) {
+                        Text(it.detailLabel().toSentenceCase(), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                    }
+                }
+            }
+            item {
+                DetailDivider(palette)
+                Text(
+                    if (task.isCompleted == 1) "Mark Open" else "Mark Complete",
+                    color = palette.accent,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onComplete)
+                        .padding(vertical = 18.dp),
+                )
+                Text(
+                    "Delete Task",
+                    color = palette.accent,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onDelete)
+                        .padding(vertical = 18.dp),
+                )
+            }
+        }
+    }
+}
+
+private enum class TaskFilter(val label: String) {
+    All("All"),
+    Today("Today"),
+    Upcoming("Upcoming"),
+    Completed("Completed"),
+}
+
+@Composable
+private fun TasksScreen(
+    tasks: List<CalendarEvent>,
+    reminders: List<EventReminder>,
+    palette: DotCalPalette,
+    onAddClick: () -> Unit,
+    onTaskClick: (CalendarEvent) -> Unit,
+    onCompleteTask: (CalendarEvent) -> Unit,
+    onDeleteTask: (CalendarEvent) -> Unit,
+) {
+    var filter by remember { mutableStateOf(TaskFilter.All) }
+    val today = LocalDate.now()
+    val filteredTasks = remember(tasks, filter, today) {
+        tasks
+            .filter { task ->
+                when (filter) {
+                    TaskFilter.All -> true
+                    TaskFilter.Today -> task.hasTaskDate() && task.localDate() == today
+                    TaskFilter.Upcoming -> task.isCompleted == 0 && task.hasTaskDate() && task.startTimeMs > System.currentTimeMillis()
+                    TaskFilter.Completed -> task.isCompleted == 1
+                }
+            }
+            .sortedWith(compareBy<CalendarEvent> { it.isCompleted }.thenBy { if (it.hasTaskDate()) it.startTimeMs else Long.MAX_VALUE }.thenBy { it.title })
+    }
+    val groupedTasks = remember(filteredTasks) {
+        filteredTasks.groupBy { task -> if (task.hasTaskDate()) task.localDate() else null }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(palette.background)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Spacer(modifier = Modifier.fillMaxWidth().height(12.dp).background(palette.topBarSurface))
+            TaskFilterSegmentedControl(
+                selected = filter,
+                palette = palette,
+                onSelected = { filter = it },
+            )
+            Spacer(modifier = Modifier.fillMaxWidth().height(16.dp).background(palette.topBarSurface))
+            if (filteredTasks.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    TaskEmptyState(filter = filter, palette = palette)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 96.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    groupedTasks.entries
+                        .sortedWith(compareBy<Map.Entry<LocalDate?, List<CalendarEvent>>> { it.key == null }.thenBy { it.key ?: LocalDate.MAX })
+                        .forEach { (date, group) ->
+                            item(key = "header-${date ?: "none"}") {
+                                Text(
+                                    date?.format(taskDateHeaderFormatter()) ?: "No Date",
+                                    color = palette.secondaryText,
+                                    fontFamily = mono,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 12.sp,
+                                    letterSpacing = 0.2.sp,
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+                                )
+                            }
+                            lazyItems(group, key = { it.id }) { task ->
+                                TaskRow(
+                                    task = task,
+                                    reminder = reminders.firstOrNull { it.eventId == task.baseEventId() },
+                                    palette = palette,
+                                    onClick = { onTaskClick(task) },
+                                    onComplete = { onCompleteTask(task) },
+                                    onDelete = { onDeleteTask(task) },
+                                )
+                            }
+                        }
+                }
+            }
+        }
+        Button(
+            onClick = onAddClick,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(20.dp)
+                .size(64.dp),
+            shape = CircleShape,
+            colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Add task")
+        }
+    }
+}
+
+@Composable
+private fun TaskFilterSegmentedControl(
+    selected: TaskFilter,
+    palette: DotCalPalette,
+    onSelected: (TaskFilter) -> Unit,
+) {
+    val segmentShape = RoundedCornerShape(28.dp)
+    val segmentSurface = palette.topBarSurface
+    val segmentBorder = palette.disabledText.copy(alpha = if (palette.isDark) 0.35f else 0.45f)
+    val segmentSelected = palette.segmentSelected
+    val inactiveText = palette.secondaryText
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(palette.topBarSurface)
+            .padding(horizontal = 22.dp, vertical = 0.dp)
+            .height(42.dp)
+            .clip(segmentShape)
+            .background(segmentSurface)
+            .drawBehind {
+                drawRoundRect(
+                    color = segmentBorder,
+                    size = size,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(28.dp.toPx(), 28.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            }
+            .padding(horizontal = 18.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        TaskFilter.entries.forEach { option ->
+            val isSelected = selected == option
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) segmentSelected else Color.Transparent)
+                    .clickable { onSelected(option) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier.padding(horizontal = if (isSelected) 14.dp else 0.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Text(
-                        task.title,
-                        modifier = Modifier.padding(start = 12.dp),
-                        color = if (task.isCompleted == 1) palette.secondaryText else palette.primaryText,
+                        option.label,
                         fontFamily = mono,
-                        textDecoration = if (task.isCompleted == 1) TextDecoration.LineThrough else null,
+                        color = if (isSelected) palette.primaryText else inactiveText,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskRow(
+    task: CalendarEvent,
+    reminder: EventReminder?,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+    onComplete: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var dragOffset by remember(task.id) { mutableFloatStateOf(0f) }
+    val thresholdPx = with(LocalDensity.current) { 96.dp.toPx() }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                when {
+                    dragOffset < 0f -> Color(0xFFE53935)
+                    dragOffset > 0f -> Color(0xFF2E7D32)
+                    else -> Color.Transparent
+                },
+            ),
+    ) {
+        if (dragOffset != 0f) {
+            val icon = if (dragOffset < 0f) Icons.Default.Delete else Icons.Default.Check
+            val alignment = if (dragOffset < 0f) Alignment.CenterEnd else Alignment.CenterStart
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(alignment)
+                    .padding(horizontal = 22.dp)
+                    .size(22.dp),
+            )
+        }
+        Row(
+            modifier = Modifier
+                .offset { IntOffset(dragOffset.roundToInt(), 0) }
+                .fillMaxWidth()
+                .heightIn(min = 72.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(taskCardColor(palette))
+                .border(1.dp, palette.line, RoundedCornerShape(20.dp))
+                .clickable(onClick = onClick)
+                .pointerInput(task.id) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            when {
+                                dragOffset <= -thresholdPx -> onDelete()
+                                dragOffset >= thresholdPx && task.isCompleted == 0 -> onComplete()
+                            }
+                            dragOffset = 0f
+                        },
+                        onDragCancel = { dragOffset = 0f },
+                        onHorizontalDrag = { _, amount ->
+                            dragOffset = (dragOffset + amount).coerceIn(-thresholdPx * 1.25f, thresholdPx * 1.25f)
+                        },
+                    )
+                }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val completed = task.isCompleted == 1
+            val titleColor = if (completed) palette.primaryText.copy(alpha = 0.6f) else palette.primaryText
+            val metadataColor = if (completed) palette.secondaryText.copy(alpha = 0.6f) else palette.secondaryText
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .border(1.dp, if (completed) palette.secondaryText else palette.primaryText, RoundedCornerShape(4.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (completed) {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(15.dp))
+                }
+            }
+            Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
+                Text(
+                    task.title,
+                    color = titleColor,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 18.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textDecoration = if (completed) TextDecoration.LineThrough else null,
+                )
+                if ((task.hasTaskDate() && task.isAllDay == 0) || reminder != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (task.hasTaskDate() && task.isAllDay == 0) {
+                            TaskMetadata(label = task.startLocalTime().format(timeFormatter), icon = Icons.Default.AccessTime, color = metadataColor)
+                        }
+                        reminder?.let {
+                            TaskMetadata(label = taskReminderMetadataLabel(it.minutesBefore), icon = Icons.Default.Notifications, color = metadataColor)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskMetadata(label: String, icon: ImageVector, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(label, color = color, fontFamily = mono, fontSize = 14.sp, maxLines = 1)
+    }
+}
+
+private fun taskCardColor(palette: DotCalPalette): Color {
+    return if (palette.isDark) Color(0xFF0A0A0A) else Color(0xFFFFFFFF)
+}
+
+private fun taskReminderMetadataLabel(minutes: Int): String {
+    return when (minutes) {
+        5 -> "5 min before"
+        10 -> "10 min before"
+        30 -> "30 min before"
+        1440 -> "1 day before"
+        else -> "Reminder"
+    }
+}
+
+@Composable
+private fun TaskEmptyState(filter: TaskFilter, palette: DotCalPalette) {
+    val title = when (filter) {
+        TaskFilter.All -> "No tasks yet"
+        TaskFilter.Today -> "Nothing due today"
+        TaskFilter.Upcoming -> "All clear"
+        TaskFilter.Completed -> "No completed tasks"
+    }
+    val subtitle = if (filter == TaskFilter.All) "Tap + to create your first task" else null
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Medium, fontSize = 18.sp, textAlign = TextAlign.Center)
+        subtitle?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(it, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TaskEditorSheet(
+    task: CalendarEvent?,
+    initialReminder: EventReminder?,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSave: (TaskEditorData) -> Unit,
+    onDelete: (() -> Unit)? = null,
+) {
+    val taskKey = task?.id ?: "new-task"
+    var title by remember(taskKey) { mutableStateOf(task?.title.orEmpty()) }
+    var titleError by remember { mutableStateOf(false) }
+    var dueDate by remember(taskKey) { mutableStateOf<LocalDate?>(task?.takeIf { it.hasTaskDate() }?.localDate() ?: LocalDate.now()) }
+    var dueTime by remember(taskKey) { mutableStateOf<LocalTime?>(task?.takeIf { it.hasTaskDate() && it.isAllDay == 0 }?.startLocalTime()) }
+    var reminderMinutes by remember(taskKey, initialReminder?.minutesBefore) { mutableStateOf<Int?>(initialReminder?.minutesBefore) }
+    var recurrenceRule by remember(taskKey) { mutableStateOf(task?.rrule) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var showReminderPicker by remember { mutableStateOf(false) }
+    var showRepeatPicker by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusSinkRequester = remember { FocusRequester() }
+    val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val taskSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    fun clearTaskFocus() {
+        keyboardController?.hide()
+        focusManager.clearFocus(force = true)
+        runCatching { focusSinkRequester.requestFocus() }
+    }
+
+    fun requestNotificationPermissionForTaskReminder() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = taskSheetState,
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(palette.dialogSurface)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val pointerEvent = awaitPointerEvent(PointerEventPass.Initial)
+                            if (pointerEvent.changes.any { it.pressed && !it.previousPressed }) {
+                                clearTaskFocus()
+                            }
+                        }
+                    }
+                }
+                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 22.dp),
+        ) {
+            Box(modifier = Modifier.size(1.dp).focusRequester(focusSinkRequester).focusable())
+            Text(if (task == null) "Add Task" else "Edit Task", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 22.sp)
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = title,
+                onValueChange = {
+                    title = it
+                    titleError = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Title") },
+                isError = titleError,
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = palette.secondaryText) },
+                colors = dotCalTextFieldColors(palette),
+                textStyle = TextStyle(fontFamily = mono, fontSize = 16.sp),
+            )
+            if (titleError) {
+                Text("Title required", color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            EditorValueRow(
+                title = "Date",
+                value = dueDate?.format(editorDateFormatter) ?: "None",
+                palette = palette,
+                leadingIcon = Icons.Default.CalendarMonth,
+                onClick = {
+                    clearTaskFocus()
+                    showDatePicker = true
+                },
+            )
+            if (dueDate != null) {
+                Text(
+                    "Clear date",
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 13.sp,
+                    modifier = Modifier.clickable {
+                        clearTaskFocus()
+                        dueDate = null
+                        dueTime = null
+                        reminderMinutes = null
+                        recurrenceRule = null
+                    }.padding(vertical = 8.dp),
+                )
+            }
+            EditorValueRow(
+                title = "Time",
+                value = dueTime?.format(timeFormatter) ?: "None",
+                palette = palette,
+                enabled = dueDate != null,
+                leadingIcon = Icons.Default.AccessTime,
+                onClick = {
+                    clearTaskFocus()
+                    showTimePicker = true
+                },
+            )
+            if (dueTime != null) {
+                Text(
+                    "Clear time",
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 13.sp,
+                    modifier = Modifier.clickable {
+                        clearTaskFocus()
+                        dueTime = null
+                    }.padding(vertical = 8.dp),
+                )
+            }
+            EditorValueRow(
+                title = "Reminder",
+                value = reminderLabel(reminderMinutes),
+                palette = palette,
+                enabled = dueDate != null,
+                leadingIcon = Icons.Default.Notifications,
+                onClick = {
+                    clearTaskFocus()
+                    showReminderPicker = true
+                },
+            )
+            EditorValueRow(
+                title = "Repeat",
+                value = recurrenceOptions.firstOrNull { it.rrule == recurrenceRule }?.label ?: "None",
+                palette = palette,
+                enabled = dueDate != null,
+                leadingIcon = Icons.Default.CalendarMonth,
+                onClick = {
+                    clearTaskFocus()
+                    showReminderPicker = false
+                    showDatePicker = false
+                    showTimePicker = false
+                    showRepeatPicker = true
+                },
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Button(
+                onClick = {
+                    if (title.isBlank()) {
+                        titleError = true
+                    } else {
+                        onSave(
+                            TaskEditorData(
+                                title = title,
+                                date = dueDate,
+                                time = dueTime,
+                                reminderMinutes = reminderMinutes,
+                                rrule = if (dueDate == null) null else recurrenceRule,
+                            ),
+                        )
+                        if (reminderMinutes != null) requestNotificationPermissionForTaskReminder()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Text("SAVE TASK", fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            }
+            onDelete?.let { delete ->
+                Text(
+                    "Delete Task",
+                    color = palette.accent,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 15.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = delete)
+                        .padding(top = 18.dp, bottom = 4.dp),
+                )
+            }
+        }
+    }
+    if (showDatePicker) {
+        DateTimeChoiceSheet(
+            title = "Date",
+            selectedDate = dueDate ?: LocalDate.now(),
+            selectedTime = dueTime ?: LocalTime.of(9, 0),
+            minDate = null,
+            includeTime = false,
+            palette = palette,
+            onDismiss = { showDatePicker = false },
+            onSelected = { date, _ ->
+                dueDate = date
+                showDatePicker = false
+            },
+        )
+    }
+    if (showTimePicker && dueDate != null) {
+        TaskTimeChoiceSheet(
+            title = "Time",
+            selected = dueTime ?: LocalTime.of(9, 0),
+            palette = palette,
+            onDismiss = { showTimePicker = false },
+            onSelected = {
+                dueTime = it
+                showTimePicker = false
+            },
+        )
+    }
+    if (showReminderPicker && dueDate != null) {
+        ModalBottomSheet(
+            onDismissRequest = { showReminderPicker = false },
+            containerColor = palette.dialogSurface,
+            contentColor = palette.primaryText,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            dragHandle = { BottomSheetDragHandle(palette) },
+        ) {
+            ChoiceSheetContent(
+                title = "Reminder",
+                items = taskReminderOptions,
+                selected = reminderMinutes,
+                label = { reminderLabel(it) },
+                palette = palette,
+                onSelected = {
+                    reminderMinutes = it
+                    if (it != null) requestNotificationPermissionForTaskReminder()
+                    showReminderPicker = false
+                },
+            )
+        }
+    }
+    if (showRepeatPicker && dueDate != null) {
+        RepeatChoiceSheet(
+            selected = recurrenceRule,
+            palette = palette,
+            onDismiss = { showRepeatPicker = false },
+            onSelected = {
+                recurrenceRule = it
+                showRepeatPicker = false
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TaskTimeChoiceSheet(
+    title: String,
+    selected: LocalTime,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (LocalTime) -> Unit,
+) {
+    val hours = remember { (0..23).toList() }
+    val minutes = remember { (0..59).toList() }
+    var pickedHour by remember(selected) { mutableStateOf(selected.hour) }
+    var pickedMinute by remember(selected) { mutableStateOf(selected.minute) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(palette.dialogSurface)
+                .padding(horizontal = 20.dp)
+                .padding(top = 4.dp, bottom = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(title, color = palette.primaryText, fontFamily = mono, fontSize = 20.sp)
+            Text(
+                LocalTime.of(pickedHour, pickedMinute).format(timeFormatter),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 15.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().height(188.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WheelColumn(
+                    items = hours,
+                    selected = pickedHour,
+                    label = { it.toString().padStart(2, '0') },
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    circular = true,
+                    onSelected = { pickedHour = it },
+                )
+                WheelColumn(
+                    items = minutes,
+                    selected = pickedMinute,
+                    label = { it.toString().padStart(2, '0') },
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    circular = true,
+                    onSelected = { pickedMinute = it },
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = palette.cancelSurface,
+                        contentColor = palette.primaryText,
+                    ),
+                    shape = RoundedCornerShape(18.dp),
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .border(1.dp, palette.cancelBorder, RoundedCornerShape(18.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("Cancel", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Button(
+                    onClick = { onSelected(LocalTime.of(pickedHour, pickedMinute)) },
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
+                    shape = RoundedCornerShape(18.dp),
+                ) {
+                    Text("OK", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -4288,6 +5196,19 @@ private fun weekDays(date: LocalDate): List<LocalDate> {
 
 private fun CalendarEvent.localDate(): LocalDate {
     return Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault()).toLocalDate()
+}
+
+private fun CalendarEvent.hasTaskDate(): Boolean {
+    return startTimeMs > 0L
+}
+
+private fun CalendarEvent.taskDueDetailLabel(): String {
+    val date = localDate().format(editorDateFormatter)
+    return if (isAllDay == 1) date else "$date, ${startLocalTime().format(timeFormatter)}"
+}
+
+private fun taskDateHeaderFormatter(): DateTimeFormatter {
+    return DateTimeFormatter.ofPattern("EEE, dd MMM", Locale.US)
 }
 
 private fun CalendarEvent.startLocalTime(): LocalTime {

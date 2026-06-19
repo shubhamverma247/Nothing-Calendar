@@ -36,6 +36,14 @@ data class EventEditorData(
     val voiceNotePath: String? = null,
 )
 
+data class TaskEditorData(
+    val title: String,
+    val date: LocalDate?,
+    val time: LocalTime?,
+    val reminderMinutes: Int?,
+    val rrule: String? = null,
+)
+
 enum class RecurringEditScope {
     ThisEvent,
     WholeSeries,
@@ -63,6 +71,16 @@ class DotCalRepository(
     }
 
     fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks()
+        .map { tasks -> expandRecurringTasks(tasks) }
+
+    fun observeTodayTasks(day: LocalDate): Flow<List<CalendarEvent>> {
+        val start = day.atStartMs()
+        return dao.observeTodayTasks(start, day.plusDays(1).atStartMs() - 1)
+    }
+
+    fun observeUpcomingTasks(nowMs: Long = System.currentTimeMillis()): Flow<List<CalendarEvent>> = dao.observeUpcomingTasks(nowMs)
+
+    fun observeCompletedTasks(): Flow<List<CalendarEvent>> = dao.observeCompletedTasks()
 
     fun observeReminders(): Flow<List<EventReminder>> = dao.observeReminders()
 
@@ -244,6 +262,91 @@ class DotCalRepository(
         )
     }
 
+    suspend fun saveLocalTask(existing: CalendarEvent?, data: TaskEditorData) {
+        require(data.title.isNotBlank()) { "TITLE REQUIRED" }
+        ensureLocalAccount()
+        val now = System.currentTimeMillis()
+        val zoneId = ZoneId.systemDefault()
+        val taskId = existing?.baseEventId() ?: UUID.randomUUID().toString()
+        val hasDueDate = data.date != null
+        val start = when {
+            data.date == null -> 0L
+            data.time == null -> data.date.atStartOfDay(zoneId).toInstant().toEpochMilli()
+            else -> data.date.atTime(data.time).atZone(zoneId).toInstant().toEpochMilli()
+        }
+        val end = when {
+            data.date == null -> 0L
+            data.time == null -> data.date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+            else -> start + 30 * 60_000L
+        }
+        val existingMaster = existing?.baseEventId()?.let { dao.getEvent(it) } ?: existing
+        val task = existingMaster?.copy(
+            id = taskId,
+            title = data.title.trim(),
+            startTimeMs = start,
+            endTimeMs = end,
+            timeZone = zoneId.id,
+            isAllDay = if (data.time == null) 1 else 0,
+            rrule = if (hasDueDate) data.rrule else null,
+            isTask = 1,
+            updatedAtMs = now,
+        ) ?: CalendarEvent(
+                id = taskId,
+                accountId = LOCAL_ACCOUNT_ID,
+                title = data.title.trim(),
+                description = "",
+                location = "",
+                startTimeMs = start,
+                endTimeMs = end,
+                timeZone = zoneId.id,
+                isAllDay = if (data.time == null) 1 else 0,
+                colorHex = null,
+                rrule = if (hasDueDate) data.rrule else null,
+                source = "LOCAL",
+                googleEventId = null,
+                googleCalendarId = null,
+                isTask = 1,
+                isCompleted = 0,
+                completedAtMs = null,
+                imageUris = "[]",
+                voiceNotePath = null,
+                createdAtMs = now,
+                updatedAtMs = now,
+            )
+        dao.getRemindersForEvent(taskId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        dao.upsertEvent(task)
+        dao.deleteRemindersForEvent(taskId)
+        if (hasDueDate) {
+            data.reminderMinutes?.let { minutes ->
+                val reminder = EventReminder(
+                    eventId = taskId,
+                    minutesBefore = minutes,
+                    triggerAtMs = start - minutes * 60_000L,
+                    alarmRequestCode = "$taskId-$minutes".hashCode().absoluteValue,
+                )
+                dao.insertReminders(listOf(reminder))
+                reminderScheduler.scheduleReminder(reminder, task)
+            }
+        }
+    }
+
+    suspend fun setTaskCompleted(task: CalendarEvent, completed: Boolean) {
+        val now = System.currentTimeMillis()
+        dao.updateTaskCompletion(
+            eventId = task.baseEventId(),
+            isCompleted = if (completed) 1 else 0,
+            completedAtMs = if (completed) now else null,
+            updatedAtMs = now,
+        )
+    }
+
+    suspend fun deleteTask(task: CalendarEvent) {
+        val taskId = task.baseEventId()
+        dao.getRemindersForEvent(taskId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        dao.deleteRemindersForEvent(taskId)
+        dao.deleteEvent(taskId)
+    }
+
     private fun LocalDate.atStartMs(): Long {
         return atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
@@ -318,6 +421,20 @@ class DotCalRepository(
             }
         }
         return expanded.sortedWith(compareBy<CalendarEvent> { it.startTimeMs }.thenBy { it.title })
+    }
+
+    private fun expandRecurringTasks(tasks: List<CalendarEvent>): List<CalendarEvent> {
+        val today = LocalDate.now()
+        val rangeEnd = today.plusYears(1)
+        val expanded = tasks.flatMap { task ->
+            when (task.rrule?.trim()) {
+                "FREQ=DAILY" -> task.expandDaily(today, rangeEnd)
+                "FREQ=WEEKLY" -> task.expandWeekly(today, rangeEnd)
+                "FREQ=MONTHLY" -> task.expandMonthly(today, rangeEnd)
+                else -> listOf(task)
+            }
+        }
+        return expanded.sortedWith(compareBy<CalendarEvent> { it.isCompleted }.thenBy { if (it.startTimeMs > 0L) it.startTimeMs else Long.MAX_VALUE }.thenBy { it.title })
     }
 
     private fun CalendarEvent.expandDaily(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {

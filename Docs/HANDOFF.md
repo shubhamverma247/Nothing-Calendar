@@ -25,6 +25,91 @@ Key requirements:
 Requested GitHub repo was empty, so scaffold created.
 
 Implemented:
+- Latest Task reminder notification route/casing fix:
+  - Task reminder notification `View Task` now opens Task Detail after landing in Tasks, instead of stopping at the Tasks tab.
+  - Task reminder notification action strings are source-authored in Title Case: `View Task` and `Snooze 10 Min`.
+  - Added/retained handoff rule: notification action labels must stay Title Case across Calendar and Tasks; do not reintroduce all-caps source strings for new reminder actions.
+  - No schema columns, DB filename, package name, deep-link scheme, or Room table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - Installed latest debug APK on connected phone `4ab0d020`.
+- Latest Task editor sheet visibility fix:
+  - Add/Edit Task bottom sheet now skips the partially-expanded state and opens expanded so `SAVE TASK` is visible without dragging the sheet.
+  - Task editor content is still scrollable as a fallback for small screens/keyboards, but the primary save action should be initially reachable.
+  - No schema columns, DB filename, package name, deep-link scheme, or Room table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - Installed latest debug APK on connected phone `4ab0d020`.
+- Latest Task detail behavior consistency fix:
+  - Matched existing Event Detail behavior rules for Tasks: completing/reopening a task now keeps detail content alive through the slide-out instead of disappearing abruptly.
+  - Delete Task from Task Detail and Edit Task now shows the same confirmation-dialog pattern as Delete Event before deleting.
+  - Added an explicit project rule from user feedback: when a behavior pattern is established for one feature, reuse it for future similar features unless the user says otherwise. Example: destructive actions require confirmation; full-screen surfaces should close with the existing slide transition.
+  - No schema columns, DB filename, package name, deep-link scheme, or Room table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - Installed latest debug APK on connected phone `4ab0d020`.
+- Latest Task detail/edit/repeat slice:
+  - Task Detail uses the existing full-screen right-slide detail layout pattern from Event Detail, but with task-specific sections: status, due, repeat, reminder, complete/open, and delete.
+  - Edit Task uses the existing Add Task bottom-sheet layout, prefilled for the selected task, with Save Task, Delete Task, Date, Time, Reminder, and Repeat rows.
+  - Recurring tasks use the existing neutral Repeat row/sheet pattern and store repeat values in the existing `calendar_events.rrule` column.
+  - Recurring tasks expand in the Tasks list for the next year using existing recurrence helpers; completion/delete/edit operate on the saved task series/master row.
+  - Task reminder/deep-link behavior from the previous fix is preserved; task notification View opens the Tasks tab, not Event Detail.
+  - No schema columns, DB filename, package name, deep-link scheme, or Room table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this slice because phone/manual UI QA was not requested.
+- Latest Tasks spacing/task-notification View fix:
+  - Added the same 12dp top-surface gap between the Tasks title row and Tasks segmented control that Calendar uses between the `YYYY/M` title row and Calendar segmented control.
+  - Task reminder notifications now route `View` through `dotcal://task/{taskId}` instead of the event-detail route.
+  - MainActivity now parses both `dotcal://event/{eventId}` and `dotcal://task/{taskId}` and handles warm `onNewIntent` notification taps.
+  - Opening a task notification switches to the Tasks tab and does not open Event Detail.
+  - No schema columns, DB filename, package name, deep-link scheme, or Room table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this fix because phone/manual UI QA was not requested.
+- Latest Tasks/Agenda/reminder fix:
+  - Kept Tasks and Calendar segmented-control spacing aligned with the same 16dp top-surface gap below the control.
+  - Centered Agenda's empty/end-of-day state in the remaining visible Agenda area when the selected day has no events.
+  - Add Task now clears title focus and hides the keyboard when tapping Date, Time, Reminder, clear actions, Save, or sheet whitespace.
+  - Add Task now requests `POST_NOTIFICATIONS` when a task reminder is selected/saved on Android 13+.
+  - Task reminders now use the AlarmClock scheduling path for higher reliability while still storing reminders in existing `event_reminders`.
+  - No schema columns, DB filename, package name, deep-link scheme, or Room table count changed; still exactly 5 Room tables.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this fix because phone/manual UI QA was not requested.
+- Latest Tasks segmented-control match:
+  - Replaced the Tasks filter-chip row with the same segmented-control visual pattern used by Calendar's top view switcher: same 42dp height, 28dp outer radius, subtle outline, top-bar surface, selected pill, typography, and spacing.
+  - Task filters remain `All`, `Today`, `Upcoming`, and `Completed`; only the UI treatment changed.
+  - No schema columns, DB filename, package name, deep-link scheme, or Room table count changed.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this polish because phone/manual UI QA was not requested.
+- Latest Tasks/Calendar top-surface spacing fix:
+  - Restored the Tasks filter-chip strip and the gap beneath it to `palette.topBarSurface`, preserving the light/white top section the user wanted.
+  - Calendar segmented controls now use the same top-surface colored gap between the controls and calendar content.
+  - Agenda date header text is now centered across the full row.
+  - No schema columns, DB filename, package name, deep-link scheme, or Room table count changed.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this polish because phone/manual UI QA was not requested.
+- Latest Tasks empty-state/time-picker spacing fix:
+  - Centered every Tasks empty state (`All`, `Today`, `Upcoming`, `Completed`) in the remaining Tasks tab content area below the filter chips instead of using a fixed-height list item.
+  - Matched Calendar tab spacing under the segmented view control to the Tasks screen's section gap by using a 16dp spacer before Calendar content.
+  - Replaced Add Task's time selector with a bottom-sheet hour/minute wheel picker; task time no longer uses the old 15-minute list picker.
+  - No schema columns, DB filename, package name, deep-link scheme, or Room table count changed.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this polish because phone/manual UI QA was not requested.
+- Latest Tasks Tab UI polish:
+  - Polished the existing Tasks screen only; no schema columns, DB filename, package name, deep-link scheme, or Room table count changed.
+  - Tasks now use theme-specific backgrounds/card colors: Light `#F7F7F7` / `#FFFFFF`, Dark `#000000` / `#0A0A0A`, with existing System theme following device theme through DotCal's theme flow.
+  - Task filters are Title Case, 44dp tall, 22dp radius chips with red selected state and subtle theme borders when inactive.
+  - Date section headers now use Title Case like `Fri, 19 Jun` and `No Date`, medium 12sp text, secondary color, and slight letter spacing.
+  - Task cards now use 20dp radius, subtle borders, compact 72dp+ height, 22dp checkbox, 18sp medium title, 60% completed opacity, and metadata rows with muted time/reminder icons.
+  - Empty state now reads `No tasks yet` and `Tap + to create your first task`, centered vertically.
+  - Tasks FAB is now 64dp with red background and white icon.
+  - Add Task sheet keeps the same layout but adds subtle secondary-color icons for title, date, time, and reminder; Save Task is 56dp with 16dp radius.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this polish because phone/manual UI QA was not requested.
+- Latest Tasks Tab completion:
+  - Replaced the placeholder Tasks tab with a full Tasks screen backed by existing `calendar_events` rows where `isTask = 1`; no schema columns, DB filename, package name, deep-link scheme, or Room table count changed.
+  - Added task filters `ALL`, `TODAY`, `UPCOMING`, and `COMPLETED`, plus grouped task sections by due date with a `NO DATE` group for task rows that intentionally have no due date.
+  - Added task row completion styling with square checkbox, strikethrough completed titles, optional due time, swipe right to complete, and swipe left to delete.
+  - Added Add Task bottom sheet with required title, optional date, optional time, optional reminder (`None`, `5m`, `10m`, `30m`, `1 day`), and task-only saves with no repeat/images/voice/calendar selector.
+  - Task reminders reuse the existing `event_reminders` table and existing reminder scheduler only when a task has a due date.
+  - Verified debug build succeeds with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - APK was not installed after this step because phone/manual UI QA was not requested.
 - Latest switch sizing polish:
   - Calendar Accounts, Sync Enabled, and Import Contacts' Birthdays now share a custom DotCal switch visual sized exactly 52dp x 32dp with a 24dp thumb.
   - The switch touch target is 52dp x 48dp, keeping the visual compact while meeting Android's minimum touch-target height.
@@ -1276,7 +1361,7 @@ Conflict check:
 ## Next Step
 
 Next implementation step:
-- Step 6 from Continuation Roadmap: Tasks Tab Complete.
+- Step 7 from Continuation Roadmap: Birthday Calendar.
 - Preserve schema columns/current UI rules and exactly 5 Room tables.
 - Do not run phone/manual UI testing by default; update `What To Test Now` instead.
 - Use stored week start preference later instead of hardcoded Sunday, if user wants configurable week start.
@@ -1295,6 +1380,29 @@ app\build\outputs\apk\debug\app-debug.apk
 
 Manual:
 - Install the new debug APK manually if testing this fix; APK was not installed by Codex.
+- Tap bottom-nav `Tasks`. Expected: Tasks tab opens with `All`, `Today`, `Upcoming`, and `Completed` horizontal filter chips.
+- Verify Tasks filters use the same segmented-control UI as Calendar's top view switcher: one outlined pill, selected inner chip, same height/spacing/typography.
+- Verify the Tasks filter-chip strip and the gap below it keep the same top-bar surface color (white in Light theme).
+- Verify Tasks date headers are Title Case (`Fri, 19 Jun`, `No Date`), not all-caps.
+- Verify task cards feel compact, use 20dp corners, no shadow, and use `#FFFFFF` cards in Light theme and near-black `#0A0A0A` cards in Dark theme.
+- Verify completed task title stays strikethrough with reduced opacity while checkbox remains visible.
+- Verify tasks with time show a small muted clock icon plus time, and tasks with reminders show a muted reminder icon plus reminder text.
+- Verify empty All state reads `No tasks yet` and `Tap + to create your first task`, centered vertically.
+- Verify Today/Upcoming/Completed empty states are also centered vertically in the Tasks content area.
+- Verify Tasks FAB is 64dp, red, white plus icon, and keeps its bottom-right position.
+- Verify Add Task sheet shows subtle secondary-color icons for Title, Date, Time, and Reminder rows, with no large/colorful icons.
+- In Add Task, tap Time. Expected: bottom sheet shows hour and minute wheel columns with Cancel/OK, not the old single 15-minute interval list.
+- In Calendar tab, verify spacing between the segmented view buttons and Month/Week/Day/Agenda/Year content matches the Tasks tab spacing under filter chips.
+- In Calendar tab, verify the gap under the segmented controls uses the same top-bar surface color (white in Light theme), not the gray content background.
+- In Agenda tab, verify the selected date label is centered horizontally.
+- Switch Light/Dark/System themes and reopen Tasks. Expected: only colors change; layout and spacing stay the same.
+- In Tasks, tap `+`, save with empty title. Expected: `Title required`.
+- Add a task with title only after clearing date. Expected: task saves under `NO DATE`, with no calendar event dot.
+- Add a task with today's date and a time. Expected: task appears under today's date; time appears in small secondary text.
+- Switch task filters. Expected: Today shows today's due tasks, Upcoming shows incomplete future due tasks, Completed shows completed tasks.
+- Swipe a task right. Expected: task marks complete with strikethrough title and appears in Completed.
+- Swipe a task left. Expected: task is deleted.
+- Add a task with due date/time and reminder. Expected: reminder row is stored through existing reminder path; no repeat/images/voice/calendar selector appears in Add Task.
 - With Calendar permission denied, Calendar screen should stay usable as local-only and should not show the old local-mode banner.
 - Open Settings > Calendar accounts. Expected: Android calendar permission prompt appears for DotCal.
 - Deny calendar access, then tap Settings > Calendar accounts again. Expected: DotCal Android App Info opens so Calendar permission can be granted manually.
@@ -1529,4 +1637,4 @@ Do not change package name, deep link scheme, or DB filename. Do not run phone/m
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
 ```
 
-Current next implementation step: Continuation Roadmap Step 6, Tasks Tab Complete, but keep existing app behavior as source of truth where conflicts exist.
+Current next implementation step: Continuation Roadmap Step 7, Birthday Calendar, but keep existing app behavior as source of truth where conflicts exist.
