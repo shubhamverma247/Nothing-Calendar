@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
                     initialEventId = target?.eventId,
                     initialTaskId = target?.taskId,
                     initialCalendarTab = target?.calendarTab,
+                    initialCalendarDate = target?.calendarDate,
                     initialAddEvent = target?.addEvent == true,
                     initialRouteToken = target?.routeToken,
                 )
@@ -77,8 +78,8 @@ class MainActivity : ComponentActivity() {
             uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" -> DotCalDeepLinkTarget(eventId = uri.pathSegments.getOrNull(1), routeToken = token)
             uri.scheme == "dotcal" && uri.host == "task" -> DotCalDeepLinkTarget(taskId = uri.lastPathSegment, routeToken = token)
             uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "task" -> DotCalDeepLinkTarget(taskId = uri.pathSegments.getOrNull(1), routeToken = token)
-            uri.scheme == "dotcal" && uri.host == "calendar" -> DotCalDeepLinkTarget(calendarTab = uri.lastPathSegment, routeToken = token)
-            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "calendar" -> DotCalDeepLinkTarget(calendarTab = uri.pathSegments.getOrNull(1), routeToken = token)
+            uri.scheme == "dotcal" && uri.host == "calendar" -> DotCalDeepLinkTarget(calendarTab = uri.lastPathSegment, calendarDate = uri.getQueryParameter("date"), routeToken = token)
+            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "calendar" -> DotCalDeepLinkTarget(calendarTab = uri.pathSegments.getOrNull(1), calendarDate = uri.getQueryParameter("date"), routeToken = token)
             else -> null
         }
     }
@@ -88,6 +89,7 @@ private data class DotCalDeepLinkTarget(
     val eventId: String? = null,
     val taskId: String? = null,
     val calendarTab: String? = null,
+    val calendarDate: String? = null,
     val addEvent: Boolean = false,
     val routeToken: Long,
 )

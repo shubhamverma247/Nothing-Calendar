@@ -140,7 +140,7 @@ Tasks:
 
 ## Latest Committed Work
 
-Latest commit: `9d8ad26 Optimize calendar rendering`.
+Latest commit: widget refinement commit after `340b036 Add home screen widgets`.
 
 Latest committed behavior:
 - Birthday calendar import is implemented.
@@ -159,14 +159,14 @@ Latest committed behavior:
   - Widgets read visible calendar events only; tasks are intentionally excluded for separate future task widgets. No schema/table/column changes.
   - Widgets update after event save/delete, account visibility changes, theme changes, app launch, date/timezone change, boot, direct sync completion, and background sync completion.
   - Widget rows deep link to existing Event Detail using `dotcal://event/{id}`.
-- 2026-06-20 widget visuals revised toward provided 2x2, 4x2, and 4x4 references: 28dp corners, red date circle, 4x2/4x4 top-right DotCal icon, event-only agenda, light/dark widget palette from app theme.
+- 2026-06-20 widget visuals revised toward provided 2x2, 4x2, and 4x4 references: native-style shared corners, red date circle, event-only agenda, light/dark widget palette from app theme.
 - 2026-06-20 widget density/click pass:
   - 2x2 removes DotCal title/full date/count/app-icon clutter; shows date circle, one event title/time.
   - 2x2 current display: smaller red date circle, compact date label, one-line event title, and time/location line.
   - 4x2 removes DotCal title, UPCOMING label, vertical divider, app icon, and counter; shows date circle plus compact date/title/time-location group.
-  - 4x4 gives the mini month full width for better readability and lists up to 5 event agenda rows.
+  - 4x4 gives the mini month full width for better readability and lists up to 3 event agenda rows.
   - Widget row clicks route events to `dotcal://event/{id}`.
-  - Widget date-circle/month-grid clicks route to `dotcal://calendar/month`.
+  - Widget date-circle clicks route to `dotcal://calendar/month`; 4x4 month-grid date clicks route to `dotcal://calendar/month?date=YYYY-MM-DD`.
   - 2x2 empty state routes to Add Event via `dotcal://event/new`.
   - Widget deep links use `MainActivity` singleTop route tokens so repeat taps on same widget target are handled and event-detail launches no longer flash Month first.
   - Widget palette uses resource-backed color providers for System mode so launcher can resolve day/night colors after phone theme changes. Dark widget bg currently `#1E1E1E` to match the native-looking reference; light bg `#F5F5F5`.
@@ -176,6 +176,12 @@ Latest committed behavior:
 - 2026-06-20 shared widget corner radius reduced from 34dp to 28dp across 2x2, 4x2, and 4x4 to better match the native launcher widget reference.
 - 2026-06-20 shared dark widget background lightened from `#181818` to `#1E1E1E` across resource-backed System mode and forced Dark mode.
 - 2026-06-20 launcher icon replaced old `N` mark with DotCal calendar mark using black/white/red palette.
+- 2026-06-20 4x4 widget final refinement keeps existing structure but removes the header icon, moves/centers month title with the grid, increases calendar cells slightly, uses a filled red current-day circle, shows subtle event dots, limits upcoming events to 3 with `+X more`, routes empty state to Add Event, and reduces shared widget radius to 24dp.
+- 2026-06-20 4x4 widget follow-up refinement keeps header/month/current-day structure, increases calendar cell footprint again, keeps event dots under event dates, changes upcoming rows to stacked time/title/location, limits 4x4 upcoming events to 2 with `+X more`, and tightens bottom whitespace.
+- 2026-06-20 4x2 widget final polish moves the date circle closer to the left edge, keeps the event block aligned/centered, allows the event title to wrap to 2 lines, keeps single-event focus, and slightly increases dark secondary-text contrast.
+- 2026-06-20 widget picker previews now use themed realistic `previewLayout` resources for 2x2, 4x2, and 4x4 instead of icon-only previews; picker names are `Next Event (2x2)`, `Event Details (4x2)`, and `Calendar Dashboard (4x4)`.
+- 2026-06-20 widget picker crash/load fix: 4x4 preview no longer uses `TableLayout/TableRow`; preview is RemoteViews-safe nested `LinearLayout`/`TextView` only.
+- 2026-06-20 final widget picker polish removes size suffixes from picker names (`Next Event`, `Event Details`, `Calendar Dashboard`), tightens 2x2 preview top-left/date/content spacing with 2-line title support, and reduces 4x2 preview left padding.
 
 ## Completed Roadmap Steps
 
@@ -316,6 +322,11 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after final widget picker naming/spacing polish; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after replacing 4x4 picker preview table layout with RemoteViews-safe linear rows; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 4x2 widget polish and widget picker preview/name updates; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 4x4 calendar-size and stacked upcoming-events refinement; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 4x4 widget final refinement and shared radius reduction to 24dp; no phone/manual UI QA run.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after shared widget dark background lightening; no phone/manual UI QA run.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after shared widget corner-radius reduction; no phone/manual UI QA run.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 2x2 widget balance/readability refinement; no phone/manual UI QA run.
@@ -344,14 +355,20 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from widget density/click build is available at `app/build/outputs/apk/debug/app-debug.apk`; not installed in this pass.
+- Latest debug APK from 4x2 polish and widget picker preview update build is available at `app/build/outputs/apk/debug/app-debug.apk`; not installed in this pass.
 - Confirm package `com.dotfield.dotcal`, label `DotCal`.
 - Launcher widgets: add DotCal small 2x2, medium 4x2, and large 4x4 widgets.
 - Widgets: visible-calendar events render; tasks do not render; hidden calendar events do not render.
 - 2x2 widget: no app icon; red date circle, date label, one-line event title, time/location; empty state opens Add Event.
 - 4x2 widget: no app icon; red date circle and date/title/time-location group; date circle opens Month.
+- 4x2 widget: date circle sits closer to the left edge; title remains strongest and can wrap to 2 lines; empty state keeps the same left circle/content structure.
+- Widget picker: 2x2, 4x2, and 4x4 previews show realistic themed content, not icon-only previews; picker names are `Next Event`, `Event Details`, and `Calendar Dashboard`.
+- Widget picker: 4x4 preview uses RemoteViews-safe linear rows to avoid launcher `Can't load widget` preview failure.
 - Widgets: change phone light/dark theme while app theme is System; widget colors should refresh.
-- Widgets: 2x2, 4x2, and 4x4 match provided reference structure: red date circle, DotCal header where intended, 4x4 top-right app icon, event-only agenda/month dashboard.
+- Widgets: 2x2, 4x2, and 4x4 share 24dp corners and match current reference structure: red date circle, event-only agenda/month dashboard, no app/calendar icon clutter.
+- 4x4 widget: month title sits above centered weekday/grid layout; today uses filled red circle with white text; event days show subtle red dots; no-event state opens Add Event.
+- 4x4 widget: upcoming section shows up to 2 stacked event rows as time, title, optional location; `+X more` opens Calendar.
+- 4x4 widget: tapping month date opens Month with that date selected; tapping `+X more` opens Calendar.
 - Widgets: tapping event rows opens Event Detail.
 - Widgets: save/delete an event, toggle calendar account visibility, change app theme, and run Sync Now; widgets refresh.
 - Calendar: `Year`, `Month`, `Week`, `Day`, `Agenda` switch immediately and persist.
@@ -381,6 +398,13 @@ Do not change package name, deep link scheme, or DB filename. Do not run phone/m
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
 ```
 
-Latest committed work: `3b0f10f Add birthday calendar import`. Current uncommitted work is a behavior-preserving optimization pass: lifecycle-aware DataStore collection, memoized Week/Day filters, and recurrence expansion moved off main dispatcher. Required debug build passed and APK was installed on connected phone `4ab0d020`.
+Latest completed work: widget refinement pass after `340b036 Add home screen widgets`.
+- Shared widget radius is 24dp.
+- 4x4 widget dashboard refinements are complete: no header icon, larger month grid, filled current-day circle, event dots, 2 stacked upcoming events, `+X more`, Add Event empty state, and date-specific month deep links.
+- 4x2 widget balance/readability polish is complete: date circle moved left, event block remains centered, title supports 2 lines, and dark secondary contrast is improved.
+- Widget picker previews are realistic themed `previewLayout` resources for 2x2, 4x2, and 4x4.
+- 4x4 picker preview is RemoteViews-safe nested `LinearLayout`/`TextView` only; no `TableLayout/TableRow`.
+- Widget picker names are `Next Event`, `Event Details`, and `Calendar Dashboard`.
+- Required debug build passed; no phone/manual UI QA run.
 
-Current next implementation step: Continuation Roadmap Step 8, Home Screen Widgets, but keep existing app behavior as source of truth where conflicts exist.
+Current next implementation step: Continuation Roadmap Step 9, Onboarding, but keep existing app behavior as source of truth where conflicts exist.

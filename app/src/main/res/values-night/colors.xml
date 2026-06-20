@@ -2,7 +2,11 @@
 <resources>
     <color name="widget_background">#1E1E1E</color>
     <color name="widget_primary">#FFFFFF</color>
-    <color name="widget_secondary">#B3B3B3</color>
+    <color name="widget_secondary">#C2C2C2</color>
     <color name="widget_border">#2A2A2A</color>
     <color name="widget_inactive">#666666</color>
+    <color name="widget_preview_background">#141414</color>
+    <color name="widget_preview_primary">#FFFFFF</color>
+    <color name="widget_preview_secondary">#A0A0A0</color>
+    <color name="widget_accent">#FF3B30</color>
 </resources>

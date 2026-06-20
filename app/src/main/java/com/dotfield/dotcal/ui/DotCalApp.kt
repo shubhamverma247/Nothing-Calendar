@@ -213,6 +213,7 @@ fun DotCalApp(
     initialEventId: String? = null,
     initialTaskId: String? = null,
     initialCalendarTab: String? = null,
+    initialCalendarDate: String? = null,
     initialAddEvent: Boolean = false,
     initialRouteToken: Long? = null,
 ) {
@@ -241,7 +242,7 @@ fun DotCalApp(
     var handledTaskDeepLinkId by remember { mutableStateOf<String?>(null) }
     var handledRouteToken by remember { mutableStateOf<Long?>(null) }
     var routePending by remember(initialRouteToken) {
-        mutableStateOf(initialRouteToken != null && (initialEventId != null || !initialTaskId.isNullOrBlank() || initialAddEvent))
+        mutableStateOf(initialRouteToken != null && (initialEventId != null || !initialTaskId.isNullOrBlank() || initialAddEvent || initialCalendarDate != null))
     }
     var isSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -321,10 +322,10 @@ fun DotCalApp(
             bootPreferences.edit().putString(BOOT_THEME_KEY, mode.name).apply()
         }
     }
-    LaunchedEffect(storedSelectedDateValue, initialEventId, initialTaskId) {
+    LaunchedEffect(storedSelectedDateValue, initialEventId, initialTaskId, initialCalendarDate) {
         val storedValue = storedSelectedDateValue ?: return@LaunchedEffect
         if (!selectedDateRestored) {
-            if (initialEventId == null && initialTaskId == null && storedValue.isNotBlank()) {
+            if (initialEventId == null && initialTaskId == null && initialCalendarDate == null && storedValue.isNotBlank()) {
                 runCatching { LocalDate.parse(storedValue) }.getOrNull()?.let(viewModel::selectDate)
             }
             selectedDateRestored = true
@@ -367,7 +368,7 @@ fun DotCalApp(
             }
         }
     }
-    LaunchedEffect(initialRouteToken, initialCalendarTab) {
+    LaunchedEffect(initialRouteToken, initialCalendarTab, initialCalendarDate) {
         if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialCalendarTab.equals("month", ignoreCase = true)) {
             viewModel.closeEventDetail()
             taskDetail = null
@@ -375,6 +376,9 @@ fun DotCalApp(
             previousScreenTab = ScreenTab.Calendar
             screenTab = ScreenTab.Calendar
             calendarTab = CalendarTab.Month
+            initialCalendarDate?.let { date ->
+                runCatching { LocalDate.parse(date) }.getOrNull()?.let(viewModel::selectDate)
+            }
             handledRouteToken = initialRouteToken
             routePending = false
         }

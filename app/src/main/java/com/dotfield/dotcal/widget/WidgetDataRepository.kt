@@ -27,6 +27,7 @@ data class WidgetEventItem(
 
 data class WidgetCalendarDay(
     val dayOfMonth: Int?,
+    val dateIso: String? = null,
     val isToday: Boolean = false,
     val hasEvents: Boolean = false,
 )
@@ -206,7 +207,8 @@ class WidgetDataRepository(
             .toSet()
         val days = MutableList(leadingBlanks) { WidgetCalendarDay(dayOfMonth = null) }
         days += (1..month.lengthOfMonth()).map { day ->
-            WidgetCalendarDay(dayOfMonth = day, isToday = day == today.dayOfMonth, hasEvents = day in eventDays)
+            val date = month.atDay(day)
+            WidgetCalendarDay(dayOfMonth = day, dateIso = date.toString(), isToday = day == today.dayOfMonth, hasEvents = day in eventDays)
         }
         while (days.size % 7 != 0) days += WidgetCalendarDay(dayOfMonth = null)
         return days

@@ -44,7 +44,7 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
         DotCalWidgetPalette(
             background = ColorProvider(Color(0xFF1E1E1E)),
             primary = ColorProvider(Color(0xFFFFFFFF)),
-            secondary = ColorProvider(Color(0xFFB3B3B3)),
+            secondary = ColorProvider(Color(0xFFC2C2C2)),
             border = ColorProvider(Color(0xFF2A2A2A)),
             inactive = ColorProvider(Color(0xFF666666)),
         )
