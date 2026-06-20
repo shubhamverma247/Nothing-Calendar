@@ -3,6 +3,7 @@ package com.dotfield.dotcal.data
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
+import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
 import com.dotfield.dotcal.reminders.ReminderScheduler
 import com.dotfield.dotcal.sync.CalendarSyncRepository
 import com.dotfield.dotcal.sync.CalendarSyncResult
@@ -10,6 +11,7 @@ import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -44,6 +46,11 @@ data class TaskEditorData(
     val rrule: String? = null,
 )
 
+data class BirthdayImportResult(
+    val importedCount: Int,
+    val permissionDenied: Boolean = false,
+)
+
 enum class RecurringEditScope {
     ThisEvent,
     WholeSeries,
@@ -54,6 +61,7 @@ class DotCalRepository(
     private val context: Context,
 ) {
     private val reminderScheduler = ReminderScheduler(context)
+    private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
     private val syncRepository = CalendarSyncRepository(
         dao = dao,
         providerDataSource = CalendarProviderDataSource(context.applicationContext),
@@ -128,6 +136,54 @@ class DotCalRepository(
             }
         }
         result
+    }
+
+    suspend fun setBirthdayCalendarEnabled(enabled: Boolean): BirthdayImportResult = withContext(Dispatchers.IO) {
+        if (!enabled) {
+            disableBirthdayCalendar()
+            return@withContext BirthdayImportResult(importedCount = 0)
+        }
+        if (!contactsProviderDataSource.hasContactsReadPermission()) {
+            context.calendarPreferencesDataStore.edit { preferences ->
+                preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] = false
+            }
+            return@withContext BirthdayImportResult(importedCount = 0, permissionDenied = true)
+        }
+        val events = contactsProviderDataSource.getBirthdays(BIRTHDAY_ACCOUNT_ID)
+        val reminders = events.mapNotNull(::birthdayReminderFor)
+        dao.getBirthdayReminders().forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        dao.replaceBirthdayCalendar(
+            account = CalendarAccount(
+                id = BIRTHDAY_ACCOUNT_ID,
+                accountName = "BIRTHDAY",
+                displayName = "Birthdays",
+                accountType = "DEVICE",
+                color = BIRTHDAY_COLOR,
+                isVisible = 1,
+                isPrimary = 0,
+                sortOrder = BIRTHDAY_SORT_ORDER,
+            ),
+            events = events,
+            reminders = reminders,
+        )
+        reminders.forEach { reminder ->
+            events.firstOrNull { it.id == reminder.eventId }?.let { event ->
+                reminderScheduler.scheduleReminder(reminder, event)
+            }
+        }
+        context.calendarPreferencesDataStore.edit { preferences ->
+            preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] = true
+        }
+        BirthdayImportResult(importedCount = events.size)
+    }
+
+    suspend fun refreshBirthdayCalendarIfEnabled() = withContext(Dispatchers.IO) {
+        val enabled = context.calendarPreferencesDataStore.data
+            .map { preferences -> preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] ?: false }
+            .first()
+        if (enabled && contactsProviderDataSource.hasContactsReadPermission()) {
+            setBirthdayCalendarEnabled(true)
+        }
     }
 
     suspend fun saveLocalEvent(
@@ -417,6 +473,7 @@ class DotCalRepository(
                 "FREQ=DAILY" -> event.expandDaily(rangeStart, rangeEndExclusive)
                 "FREQ=WEEKLY" -> event.expandWeekly(rangeStart, rangeEndExclusive)
                 "FREQ=MONTHLY" -> event.expandMonthly(rangeStart, rangeEndExclusive)
+                "FREQ=YEARLY" -> event.expandYearly(rangeStart, rangeEndExclusive)
                 else -> listOf(event)
             }
         }
@@ -431,6 +488,7 @@ class DotCalRepository(
                 "FREQ=DAILY" -> task.expandDaily(today, rangeEnd)
                 "FREQ=WEEKLY" -> task.expandWeekly(today, rangeEnd)
                 "FREQ=MONTHLY" -> task.expandMonthly(today, rangeEnd)
+                "FREQ=YEARLY" -> task.expandYearly(today, rangeEnd)
                 else -> listOf(task)
             }
         }
@@ -464,6 +522,20 @@ class DotCalRepository(
                 occurrenceOn(date)?.let { occurrences += it }
             }
             cursorMonth = cursorMonth.plusMonths(1)
+        }
+        return occurrences
+    }
+
+    private fun CalendarEvent.expandYearly(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
+        val firstDate = startDate()
+        var cursorYear = maxOf(firstDate.year, rangeStart.year)
+        val occurrences = mutableListOf<CalendarEvent>()
+        while (cursorYear <= rangeEndExclusive.year) {
+            val date = LocalDate.of(cursorYear, 1, 1).monthDayOrNull(firstDate.monthValue, firstDate.dayOfMonth)
+            if (date != null && date >= firstDate && date >= rangeStart && date < rangeEndExclusive) {
+                occurrenceOn(date)?.let { occurrences += it }
+            }
+            cursorYear += 1
         }
         return occurrences
     }
@@ -505,8 +577,51 @@ class DotCalRepository(
         return if (day <= yearMonth.lengthOfMonth()) withDayOfMonth(day) else null
     }
 
+    private fun LocalDate.monthDayOrNull(month: Int, day: Int): LocalDate? {
+        return runCatching { withMonth(month).dayOrNull(day) }.getOrNull()
+    }
+
+    private suspend fun disableBirthdayCalendar() {
+        dao.getBirthdayReminders().forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        dao.deleteBirthdayEvents()
+        context.calendarPreferencesDataStore.edit { preferences ->
+            preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] = false
+        }
+    }
+
+    private fun birthdayReminderFor(event: CalendarEvent): EventReminder? {
+        val nextStart = nextBirthdayStartMs(event) ?: return null
+        val triggerAtMs = nextStart - BIRTHDAY_REMINDER_MINUTES * 60_000L
+        if (triggerAtMs <= System.currentTimeMillis()) return null
+        return EventReminder(
+            eventId = event.id,
+            minutesBefore = BIRTHDAY_REMINDER_MINUTES,
+            triggerAtMs = triggerAtMs,
+            alarmRequestCode = "${event.id}-$BIRTHDAY_REMINDER_MINUTES".hashCode().absoluteValue,
+        )
+    }
+
+    private fun nextBirthdayStartMs(event: CalendarEvent): Long? {
+        val zoneId = ZoneId.of(event.timeZone)
+        val birthday = java.time.Instant.ofEpochMilli(event.startTimeMs).atZone(zoneId).toLocalDate()
+        val today = LocalDate.now(zoneId)
+        var year = today.year
+        repeat(8) {
+            val candidate = runCatching { LocalDate.of(year, birthday.monthValue, birthday.dayOfMonth) }.getOrNull()
+            if (candidate != null && candidate >= today) {
+                return candidate.atStartOfDay(zoneId).toInstant().toEpochMilli()
+            }
+            year += 1
+        }
+        return null
+    }
+
     companion object {
         const val LOCAL_ACCOUNT_ID = "local-primary"
+        private const val BIRTHDAY_ACCOUNT_ID = ContactsProviderDataSource.BIRTHDAY_ACCOUNT_ID
+        private const val BIRTHDAY_COLOR = ContactsProviderDataSource.BIRTHDAY_COLOR
+        private const val BIRTHDAY_REMINDER_MINUTES = 1440
+        private const val BIRTHDAY_SORT_ORDER = 10
     }
 }
 

@@ -2,6 +2,7 @@ package com.dotfield.dotcal.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dotfield.dotcal.data.BirthdayImportResult
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalRepository
@@ -147,6 +148,19 @@ class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
         viewModelScope.launch {
             val result = runCatching { repository.syncNow() }
             onComplete(result)
+        }
+    }
+
+    fun setBirthdayCalendarEnabled(enabled: Boolean, onComplete: (Result<BirthdayImportResult>) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = runCatching { repository.setBirthdayCalendarEnabled(enabled) }
+            onComplete(result)
+        }
+    }
+
+    fun refreshBirthdayCalendarIfEnabled() {
+        viewModelScope.launch {
+            repository.refreshBirthdayCalendarIfEnabled()
         }
     }
 

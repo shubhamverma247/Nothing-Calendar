@@ -39,6 +39,15 @@ interface CalendarDao {
     @Query("SELECT * FROM event_reminders WHERE eventId = :eventId ORDER BY triggerAtMs ASC")
     suspend fun getRemindersForEvent(eventId: String): List<EventReminder>
 
+    @Query(
+        """
+        SELECT event_reminders.* FROM event_reminders
+        INNER JOIN calendar_events ON calendar_events.id = event_reminders.eventId
+        WHERE calendar_events.source = 'BIRTHDAY'
+        """,
+    )
+    suspend fun getBirthdayReminders(): List<EventReminder>
+
     @Query("SELECT * FROM event_reminders WHERE alarmRequestCode = :alarmRequestCode LIMIT 1")
     suspend fun getReminderByRequestCode(alarmRequestCode: Int): EventReminder?
 
@@ -178,6 +187,9 @@ interface CalendarDao {
     @Query("DELETE FROM calendar_events WHERE id = :eventId")
     suspend fun deleteEvent(eventId: String)
 
+    @Query("DELETE FROM calendar_events WHERE source = 'BIRTHDAY'")
+    suspend fun deleteBirthdayEvents()
+
     @Query("DELETE FROM calendar_events WHERE id IN (:eventIds)")
     suspend fun deleteEvents(eventIds: List<String>)
 
@@ -212,5 +224,17 @@ interface CalendarDao {
         if (deleteIds.isNotEmpty()) deleteEvents(deleteIds)
         deleteOldDeletedEventLogs(tombstoneCutoffMs)
         upsertSyncMetadata(metadata)
+    }
+
+    @Transaction
+    suspend fun replaceBirthdayCalendar(
+        account: CalendarAccount,
+        events: List<CalendarEvent>,
+        reminders: List<EventReminder>,
+    ) {
+        upsertAccountPreservingEvents(account)
+        deleteBirthdayEvents()
+        if (events.isNotEmpty()) upsertEvents(events)
+        if (reminders.isNotEmpty()) insertReminders(reminders)
     }
 }

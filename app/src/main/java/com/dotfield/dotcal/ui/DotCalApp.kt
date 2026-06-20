@@ -28,6 +28,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.rememberScrollState
@@ -263,14 +264,34 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initia
             preferences[CalendarPreferences.KEY_SYNC_INTERVAL_MINS] ?: CalendarSyncWorkScheduler.DEFAULT_SYNC_INTERVAL_MINS
         }
     }.collectAsState(initial = CalendarSyncWorkScheduler.DEFAULT_SYNC_INTERVAL_MINS)
+    val birthdayEnabled by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] ?: false
+        }
+    }.collectAsState(initial = false)
     var hasCalendarPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED)
+    }
+    var hasContactsPermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED)
     }
     val calendarPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         hasCalendarPermission = grants[Manifest.permission.READ_CALENDAR] == true ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
         if (hasCalendarPermission) {
             viewModel.syncNow()
+        }
+    }
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasContactsPermission = granted ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+        if (hasContactsPermission) {
+            viewModel.setBirthdayCalendarEnabled(true) { result ->
+                val imported = result.getOrNull()?.importedCount ?: 0
+                Toast.makeText(context, "$imported Birthdays Imported", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(context, "Contacts access needed", Toast.LENGTH_SHORT).show()
         }
     }
     var calendarPermissionRequested by remember { mutableStateOf(false) }
@@ -327,6 +348,12 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initia
     }
     LaunchedEffect(Unit) {
         hasCalendarPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+        hasContactsPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    }
+    LaunchedEffect(birthdayEnabled, hasContactsPermission) {
+        if (birthdayEnabled && hasContactsPermission) {
+            viewModel.refreshBirthdayCalendarIfEnabled()
+        }
     }
     fun selectCalendarTab(tab: CalendarTab) {
         calendarTab = tab
@@ -588,6 +615,7 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initia
                 syncIntervalMins = syncIntervalMins,
                 syncMetadata = syncMetadata,
                 isSyncing = isSyncing,
+                birthdayEnabled = birthdayEnabled,
                 accounts = accounts,
                 hasCalendarPermission = hasCalendarPermission,
                 onSyncNow = { runSyncNow(showToast = true) },
@@ -616,6 +644,28 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initia
                         if (syncEnabled) {
                             CalendarSyncWorkScheduler.cancelPeriodic(context)
                             CalendarSyncWorkScheduler.schedulePeriodic(context, interval)
+                        }
+                    }
+                },
+                onBirthdayEnabledChange = { enabled ->
+                    if (enabled) {
+                        hasContactsPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+                        if (hasContactsPermission) {
+                            viewModel.setBirthdayCalendarEnabled(true) { result ->
+                                val birthdayResult = result.getOrNull()
+                                val message = if (result.isSuccess && birthdayResult?.permissionDenied != true) {
+                                    "${birthdayResult?.importedCount ?: 0} Birthdays Imported"
+                                } else {
+                                    "Contacts access needed"
+                                }
+                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                        }
+                    } else {
+                        viewModel.setBirthdayCalendarEnabled(false) {
+                            Toast.makeText(context, "Birthdays disabled", Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
@@ -976,7 +1026,7 @@ private fun BottomNavItem(
         modifier = Modifier
             .width(72.dp)
             .fillMaxHeight()
-            .clickable(onClick = onClick),
+            .noRippleClickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -1032,7 +1082,7 @@ private fun CalendarViewSegmentedControl(
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (isSelected) segmentSelected else Color.Transparent)
-                    .clickable { onSelected(tab) },
+                    .noRippleClickable { onSelected(tab) },
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
@@ -1118,6 +1168,20 @@ private fun BottomSettingsIcon(tint: Color) {
 }
 
 @Composable
+private fun Modifier.noRippleClickable(
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+): Modifier {
+    val interactionSource = remember { MutableInteractionSource() }
+    return clickable(
+        interactionSource = interactionSource,
+        indication = null,
+        enabled = enabled,
+        onClick = onClick,
+    )
+}
+
+@Composable
 private fun MonthView(
     month: LocalDate,
     selectedDate: LocalDate,
@@ -1192,7 +1256,7 @@ private fun DayCell(
         modifier = Modifier
             .aspectRatio(1f)
             .background(palette.calendarSurface)
-            .clickable {
+            .noRippleClickable {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             },
@@ -1206,7 +1270,7 @@ private fun DayCell(
                         .then(
                             when {
                                 isToday -> Modifier.clip(CircleShape).background(palette.accent)
-                                isSelected -> Modifier.clip(CircleShape).background(palette.dimText.copy(alpha = 0.45f))
+                                isSelected -> Modifier.border(1.5.dp, palette.accent, CircleShape)
                                 else -> Modifier
                             },
                         ),
@@ -1259,6 +1323,9 @@ private fun WeekView(
     val timedEvents = events.filter { it.isAllDay == 0 && it.localDate() in weekStart..weekEnd }
     val allDayEvents = events.filter { it.isAllDay == 1 && it.localDate() in weekStart..weekEnd }
     val eventLayouts = remember(timedEvents) { layoutTimedEvents(timedEvents) }
+    val timedEventsByDayHour = remember(timedEvents) {
+        timedEvents.groupBy { event -> event.localDate() to event.startLocalTime().hour }
+    }
 
     var dragTotal by remember { mutableFloatStateOf(0f) }
     Column(
@@ -1313,7 +1380,7 @@ private fun WeekView(
                     hour = hour,
                     days = days,
                     selectedDate = selectedDate,
-                    events = timedEvents,
+                    eventsByDayHour = timedEventsByDayHour,
                     eventLayouts = eventLayouts,
                     palette = palette,
                     onAddAtDate = onAddAtDate,
@@ -1334,7 +1401,7 @@ private fun WeekDayHeader(
 ) {
     val today = date == LocalDate.now()
     Column(
-        modifier = modifier.clickable(onClick = onClick).padding(vertical = 8.dp),
+        modifier = modifier.noRippleClickable(onClick = onClick).padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -1370,7 +1437,7 @@ private fun WeekHourRow(
     hour: Int,
     days: List<LocalDate>,
     selectedDate: LocalDate,
-    events: List<CalendarEvent>,
+    eventsByDayHour: Map<Pair<LocalDate, Int>, List<CalendarEvent>>,
     eventLayouts: Map<String, WeekEventLayout>,
     palette: DotCalPalette,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
@@ -1400,9 +1467,7 @@ private fun WeekHourRow(
             }
         }
         days.forEach { day ->
-            val dayEvents = events.filter { event ->
-                event.localDate() == day && event.startLocalTime().hour == hour
-            }
+            val dayEvents = eventsByDayHour[day to hour].orEmpty()
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -1473,7 +1538,7 @@ private fun WeekEventBlock(
         modifier = modifier
             .fillMaxWidth()
             .background(Color(parseColor(event.colorHex ?: "#FF0000")).copy(alpha = 0.80f))
-            .clickable(enabled = onClick != null) { onClick?.invoke() }
+            .noRippleClickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1495,6 +1560,7 @@ private fun DayView(
     val dayEvents = events.filter { it.isTask == 0 && it.localDate() == selectedDate }
     val allDayEvents = dayEvents.filter { it.isAllDay == 1 }
     val timedEvents = dayEvents.filter { it.isAllDay == 0 }
+    val timedEventsByHour = remember(timedEvents) { timedEvents.groupBy { it.startLocalTime().hour } }
     val tasks = events.filter { it.isTask == 1 && it.localDate() == selectedDate }
 
     Column(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
@@ -1522,7 +1588,7 @@ private fun DayView(
                 DayHourRow(
                     hour = hour,
                     selectedDate = selectedDate,
-                    events = timedEvents,
+                    eventsByHour = timedEventsByHour,
                     palette = palette,
                     onAddAtDate = onAddAtDate,
                     onEventClick = onEventClick,
@@ -1558,14 +1624,14 @@ private fun DayView(
 private fun DayHourRow(
     hour: Int,
     selectedDate: LocalDate,
-    events: List<CalendarEvent>,
+    eventsByHour: Map<Int, List<CalendarEvent>>,
     palette: DotCalPalette,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
 ) {
     val now = LocalTime.now()
     val showNow = selectedDate == LocalDate.now() && hour == now.hour
-    val hourEvents = events.filter { it.startLocalTime().hour == hour }
+    val hourEvents = eventsByHour[hour].orEmpty()
 
     Row(modifier = Modifier.fillMaxWidth().height(72.dp).background(palette.calendarSurface)) {
         Box(
@@ -3185,7 +3251,7 @@ private fun EventRow(event: CalendarEvent, palette: DotCalPalette, onClick: (() 
             .clip(RoundedCornerShape(16.dp))
             .background(palette.eventCardSurface)
             .border(1.dp, palette.eventCardBorder, RoundedCornerShape(16.dp))
-            .clickable(enabled = onClick != null) { onClick?.invoke() }
+            .noRippleClickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -3302,7 +3368,7 @@ private fun AgendaEventCard(
             .clip(RoundedCornerShape(20.dp))
             .background(if (palette.isDark) palette.dialogSurface else palette.eventCardSurface)
             .border(1.dp, palette.eventCardBorder, RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
+            .noRippleClickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Text(
@@ -3664,7 +3730,7 @@ private fun TaskFilterSegmentedControl(
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (isSelected) segmentSelected else Color.Transparent)
-                    .clickable { onSelected(option) },
+                    .noRippleClickable { onSelected(option) },
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
@@ -3731,7 +3797,7 @@ private fun TaskRow(
                 .clip(RoundedCornerShape(20.dp))
                 .background(taskCardColor(palette))
                 .border(1.dp, palette.line, RoundedCornerShape(20.dp))
-                .clickable(onClick = onClick)
+                .noRippleClickable(onClick = onClick)
                 .pointerInput(task.id) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
@@ -4211,6 +4277,9 @@ private fun ThreeDayView(
 ) {
     val days = remember(selectedDate) { List(3) { selectedDate.plusDays(it.toLong()) } }
     val rangeEvents = events.filter { it.isAllDay == 0 && it.localDate() in days.first()..days.last() }
+    val rangeEventsByDayHour = remember(rangeEvents) {
+        rangeEvents.groupBy { event -> event.localDate() to event.startLocalTime().hour }
+    }
     var dragTotal by remember { mutableFloatStateOf(0f) }
 
     Column(
@@ -4246,7 +4315,7 @@ private fun ThreeDayView(
                     hour = hour,
                     days = days,
                     selectedDate = selectedDate,
-                    events = rangeEvents,
+                    eventsByDayHour = rangeEventsByDayHour,
                     palette = palette,
                     onAddAtDate = onAddAtDate,
                     onEventClick = onEventClick,
@@ -4261,7 +4330,7 @@ private fun ThreeDayHourRow(
     hour: Int,
     days: List<LocalDate>,
     selectedDate: LocalDate,
-    events: List<CalendarEvent>,
+    eventsByDayHour: Map<Pair<LocalDate, Int>, List<CalendarEvent>>,
     palette: DotCalPalette,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
@@ -4273,7 +4342,7 @@ private fun ThreeDayHourRow(
             Text("${hour.toString().padStart(2, '0')}:00", color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
         }
         days.forEach { day ->
-            val dayEvents = events.filter { it.localDate() == day && it.startLocalTime().hour == hour }
+            val dayEvents = eventsByDayHour[day to hour].orEmpty()
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -4379,7 +4448,7 @@ private fun YearMonthCell(
             .padding(3.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(if (selected) palette.cell else Color.Transparent)
-            .clickable(onClick = onClick)
+            .noRippleClickable(onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 7.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -4472,12 +4541,14 @@ private fun SettingsPreview(
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
     isSyncing: Boolean,
+    birthdayEnabled: Boolean,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
     onAccountVisibilityChange: (String, Boolean) -> Unit,
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
+    onBirthdayEnabledChange: (Boolean) -> Unit,
     onRequestCalendarAccess: () -> Unit,
 ) {
     BackHandler {
@@ -4497,12 +4568,14 @@ private fun SettingsPreview(
             syncIntervalMins = syncIntervalMins,
             syncMetadata = syncMetadata,
             isSyncing = isSyncing,
+            birthdayEnabled = birthdayEnabled,
             accounts = accounts,
             hasCalendarPermission = hasCalendarPermission,
             onSyncNow = onSyncNow,
             onAccountVisibilityChange = onAccountVisibilityChange,
             onSyncEnabledChange = onSyncEnabledChange,
             onSyncIntervalSelected = onSyncIntervalSelected,
+            onBirthdayEnabledChange = onBirthdayEnabledChange,
             onRequestCalendarAccess = onRequestCalendarAccess,
         )
         AnimatedVisibility(
@@ -4549,12 +4622,14 @@ private fun SettingsRoot(
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
     isSyncing: Boolean,
+    birthdayEnabled: Boolean,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
     onAccountVisibilityChange: (String, Boolean) -> Unit,
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
+    onBirthdayEnabledChange: (Boolean) -> Unit,
     onRequestCalendarAccess: () -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -4590,8 +4665,9 @@ private fun SettingsRoot(
             SettingsToggleRow(
                 title = "Import contacts' birthdays",
                 subtitle = "Automatically import and display contacts' birthdays",
-                checked = false,
+                checked = birthdayEnabled,
                 palette = palette,
+                onCheckedChange = onBirthdayEnabledChange,
             )
             SettingsDivider(palette)
 
@@ -4826,7 +4902,7 @@ private fun SettingsMenuRow(
         modifier = Modifier
             .fillMaxWidth()
             .height(52.dp)
-            .clickable(onClick = onClick)
+            .noRippleClickable(onClick = onClick)
             .padding(horizontal = 0.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -4857,7 +4933,7 @@ private fun SettingsSyncNowRow(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .clickable(enabled = !isSyncing, onClick = onClick),
+            .noRippleClickable(enabled = !isSyncing, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -4904,7 +4980,7 @@ private fun DotCalSwitch(
     Box(
         modifier = Modifier
             .size(width = 52.dp, height = 48.dp)
-            .clickable(enabled = enabled) { onCheckedChange(!checked) },
+            .noRippleClickable(enabled = enabled) { onCheckedChange(!checked) },
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -4967,7 +5043,7 @@ private fun SettingsSyncIntervalRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)
-                .clickable { expanded = true },
+                .noRippleClickable { expanded = true },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -5023,7 +5099,7 @@ private fun SettingsThemeDropdownRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)
-                .clickable { expanded = true },
+                .noRippleClickable { expanded = true },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -5099,7 +5175,7 @@ private fun ThemeOptionRow(
             .height(72.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(if (selected) palette.cell else Color.Transparent)
-            .clickable(onClick = onClick)
+            .noRippleClickable(onClick = onClick)
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -5382,6 +5458,7 @@ private fun CalendarEvent.recurrenceDetailLabel(): String? {
         "FREQ=DAILY" -> "REPEATS DAILY"
         "FREQ=WEEKLY" -> "REPEATS WEEKLY"
         "FREQ=MONTHLY" -> "REPEATS MONTHLY"
+        "FREQ=YEARLY" -> "REPEATS YEARLY"
         else -> null
     }
 }
