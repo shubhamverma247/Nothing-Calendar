@@ -9,6 +9,7 @@ import com.dotfield.dotcal.sync.CalendarSyncRepository
 import com.dotfield.dotcal.sync.CalendarSyncResult
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -130,6 +131,7 @@ class DotCalRepository(
     suspend fun setAccountVisible(accountId: String, visible: Boolean) {
         if (accountId == LOCAL_ACCOUNT_ID) return
         dao.updateAccountVisibility(accountId, if (visible) 1 else 0)
+        updateWidgets()
     }
 
     suspend fun syncNow(): CalendarSyncResult = withContext(Dispatchers.IO) {
@@ -138,6 +140,7 @@ class DotCalRepository(
             context.calendarPreferencesDataStore.edit { preferences ->
                 preferences[CalendarPreferences.KEY_LAST_SYNC_MS] = System.currentTimeMillis()
             }
+            updateWidgets()
         }
         result
     }
@@ -278,6 +281,7 @@ class DotCalRepository(
             dao.insertReminders(listOf(reminder))
             reminderScheduler.scheduleReminder(reminder, event)
         }
+        updateWidgets()
     }
 
     suspend fun deleteLocalEvent(
@@ -300,6 +304,7 @@ class DotCalRepository(
         }
         dao.deleteRemindersForEvent(eventId)
         dao.deleteEvent(eventId)
+        updateWidgets()
     }
 
     suspend fun addLocalEvent(title: String, date: LocalDate, startTime: LocalTime = LocalTime.of(9, 0)) {
@@ -388,6 +393,7 @@ class DotCalRepository(
                 reminderScheduler.scheduleReminder(reminder, task)
             }
         }
+        updateWidgets()
     }
 
     suspend fun setTaskCompleted(task: CalendarEvent, completed: Boolean) {
@@ -398,6 +404,7 @@ class DotCalRepository(
             completedAtMs = if (completed) now else null,
             updatedAtMs = now,
         )
+        updateWidgets()
     }
 
     suspend fun deleteTask(task: CalendarEvent) {
@@ -405,6 +412,7 @@ class DotCalRepository(
         dao.getRemindersForEvent(taskId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
         dao.deleteRemindersForEvent(taskId)
         dao.deleteEvent(taskId)
+        updateWidgets()
     }
 
     private fun LocalDate.atStartMs(): Long {
@@ -456,6 +464,7 @@ class DotCalRepository(
             dao.insertReminders(listOf(reminder))
             reminderScheduler.scheduleReminder(reminder, detachedEvent)
         }
+        updateWidgets()
     }
 
     private suspend fun excludeOccurrence(event: CalendarEvent): CalendarEvent? {
@@ -468,7 +477,12 @@ class DotCalRepository(
             updatedAtMs = System.currentTimeMillis(),
         )
         dao.upsertEvent(updatedMaster)
+        updateWidgets()
         return updatedMaster
+    }
+
+    private fun updateWidgets() {
+        WidgetUpdateWorker.enqueue(context)
     }
 
     private fun expandRecurringEvents(events: List<CalendarEvent>, rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {

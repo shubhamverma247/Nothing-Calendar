@@ -72,12 +72,18 @@ class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
         _detailEvent.value = event
     }
 
-    fun openEventDetailById(eventId: String) {
+    fun openEventDetailById(eventId: String, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
-            repository.getEvent(eventId)?.let { event ->
+            val event = repository.getEvent(eventId)
+            if (event == null) {
+                onComplete()
+                return@launch
+            }
+            event.let {
                 selectDate(event.startDate())
                 _detailEvent.value = event
             }
+            onComplete()
         }
     }
 

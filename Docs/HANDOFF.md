@@ -140,7 +140,7 @@ Tasks:
 
 ## Latest Committed Work
 
-Latest commit: `3b0f10f Add birthday calendar import`.
+Latest commit: `9d8ad26 Optimize calendar rendering`.
 
 Latest committed behavior:
 - Birthday calendar import is implemented.
@@ -153,6 +153,29 @@ Latest committed behavior:
 - Completed tasks hide `Mark Complete`.
 - Bottom actions are centered red text-only actions.
 - 2026-06-20 optimization pass kept UI/functionality unchanged: lifecycle-aware DataStore collection, memoized Week/Day filters, and recurrence expansion moved off main dispatcher.
+- 2026-06-20 Step 8 Home Screen Widgets implemented with Jetpack Glance only:
+  - Added small 2x2, medium 4x2, and large 4x4 Glance widgets.
+  - Added `WidgetDataRepository`, `WidgetUpdateWorker`, and `DotCalGlanceTheme`.
+  - Widgets read visible calendar events only; tasks are intentionally excluded for separate future task widgets. No schema/table/column changes.
+  - Widgets update after event save/delete, account visibility changes, theme changes, app launch, date/timezone change, boot, direct sync completion, and background sync completion.
+  - Widget rows deep link to existing Event Detail using `dotcal://event/{id}`.
+- 2026-06-20 widget visuals revised toward provided 2x2, 4x2, and 4x4 references: 28dp corners, red date circle, 4x2/4x4 top-right DotCal icon, event-only agenda, light/dark widget palette from app theme.
+- 2026-06-20 widget density/click pass:
+  - 2x2 removes DotCal title/full date/count/app-icon clutter; shows date circle, one event title/time.
+  - 2x2 current display: smaller red date circle, compact date label, one-line event title, and time/location line.
+  - 4x2 removes DotCal title, UPCOMING label, vertical divider, app icon, and counter; shows date circle plus compact date/title/time-location group.
+  - 4x4 gives the mini month full width for better readability and lists up to 5 event agenda rows.
+  - Widget row clicks route events to `dotcal://event/{id}`.
+  - Widget date-circle/month-grid clicks route to `dotcal://calendar/month`.
+  - 2x2 empty state routes to Add Event via `dotcal://event/new`.
+  - Widget deep links use `MainActivity` singleTop route tokens so repeat taps on same widget target are handled and event-detail launches no longer flash Month first.
+  - Widget palette uses resource-backed color providers for System mode so launcher can resolve day/night colors after phone theme changes. Dark widget bg currently `#1E1E1E` to match the native-looking reference; light bg `#F5F5F5`.
+  - `WidgetMaintenanceReceiver` listens for `CONFIGURATION_CHANGED` so System-theme widgets refresh after phone light/dark theme changes.
+- 2026-06-20 4x2 widget refinement pass keeps the existing minimal layout while tightening hierarchy: current date circle size retained, text block moved 8dp closer to the circle, uppercased AM/PM with bullet location separator, lighter time/location text, and centered `No Events` empty state.
+- 2026-06-20 2x2 widget refinement pass keeps the existing layout/date circle/background/radius while moving content 8dp closer to the date circle, reducing the date label to 9sp, preserving bullet time/location format, and vertically centering the `No Events` empty state.
+- 2026-06-20 shared widget corner radius reduced from 34dp to 28dp across 2x2, 4x2, and 4x4 to better match the native launcher widget reference.
+- 2026-06-20 shared dark widget background lightened from `#181818` to `#1E1E1E` across resource-backed System mode and forced Dark mode.
+- 2026-06-20 launcher icon replaced old `N` mark with DotCal calendar mark using black/white/red palette.
 
 ## Completed Roadmap Steps
 
@@ -163,12 +186,13 @@ Latest committed behavior:
 5. Google Calendar Sync: complete as CalendarProvider-only.
 6. Tasks Tab Complete: complete, with later task detail/edit/repeat refinements.
 7. Birthday Calendar: complete.
+8. Home Screen Widgets: complete.
 
 ## Current Next Step
 
-Continuation Roadmap Step 8: Home Screen Widgets.
+Continuation Roadmap Step 9: Onboarding.
 
-Keep existing app behavior source of truth. Widget work must not change package, scheme, DB filename, schema columns, or 5-table count.
+Keep existing app behavior source of truth. Onboarding work must not change package, scheme, DB filename, schema columns, or 5-table count.
 
 ## Step 7 Spec: Birthday Calendar
 
@@ -235,12 +259,6 @@ Birthday UI behavior:
 
 ## Remaining Roadmap
 
-8. Home Screen Widgets:
-- Use Jetpack Glance only, not legacy `AppWidgetProvider`/`RemoteViews`.
-- Widgets: small 2x2, medium 4x2, large 4x4.
-- Add `WidgetDataRepository`, `WidgetUpdateWorker`, `DotCalGlanceTheme`.
-- Update after event save/delete and sync completion.
-
 9. Onboarding:
 - Show once using `KEY_ONBOARDING_DONE`.
 - 5 pages: Welcome, Calendar permission, Notifications, Contacts, Ready.
@@ -298,6 +316,18 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after shared widget dark background lightening; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after shared widget corner-radius reduction; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 2x2 widget balance/readability refinement; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 4x2 widget gap/date-circle correction; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 4x2 widget readability/spacing refinement; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after widget dark background/corner-radius match pass; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after resource-backed widget day/night colors; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 2x2/4x2 layout and system-theme refresh pass; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after widget deep-link routing fix; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 2x2 widget icon removal and empty-state Add Event route; no phone/manual UI QA run.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after widget visual/theme/data revision; no phone connected at install check.
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed for Step 8 Home Screen Widgets.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after behavior-preserving optimization pass; APK installed on phone `4ab0d020`.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed for Step 7 Birthday Calendar.
 - First build attempt timed out after 124s with no result; rerun with longer timeout passed.
@@ -314,8 +344,16 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from optimization pass installed on phone `4ab0d020`.
+- Latest debug APK from widget density/click build is available at `app/build/outputs/apk/debug/app-debug.apk`; not installed in this pass.
 - Confirm package `com.dotfield.dotcal`, label `DotCal`.
+- Launcher widgets: add DotCal small 2x2, medium 4x2, and large 4x4 widgets.
+- Widgets: visible-calendar events render; tasks do not render; hidden calendar events do not render.
+- 2x2 widget: no app icon; red date circle, date label, one-line event title, time/location; empty state opens Add Event.
+- 4x2 widget: no app icon; red date circle and date/title/time-location group; date circle opens Month.
+- Widgets: change phone light/dark theme while app theme is System; widget colors should refresh.
+- Widgets: 2x2, 4x2, and 4x4 match provided reference structure: red date circle, DotCal header where intended, 4x4 top-right app icon, event-only agenda/month dashboard.
+- Widgets: tapping event rows opens Event Detail.
+- Widgets: save/delete an event, toggle calendar account visibility, change app theme, and run Sync Now; widgets refresh.
 - Calendar: `Year`, `Month`, `Week`, `Day`, `Agenda` switch immediately and persist.
 - Calendar: Week/Day event placement and Day task rows look identical to previous build.
 - Add/Edit Event: full-screen slide, X/check top bar, start/end picker sheets, reminder/repeat neutral sheets.

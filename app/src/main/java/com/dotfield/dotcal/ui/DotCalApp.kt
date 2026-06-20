@@ -157,6 +157,7 @@ import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
+import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import com.dotfield.dotcal.ui.theme.NBlack
 import com.dotfield.dotcal.ui.theme.NRed
 import com.dotfield.dotcal.ui.theme.NWhite
@@ -207,7 +208,14 @@ private data class PendingDelete(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initialTaskId: String? = null) {
+fun DotCalApp(
+    viewModel: DotCalViewModel,
+    initialEventId: String? = null,
+    initialTaskId: String? = null,
+    initialCalendarTab: String? = null,
+    initialAddEvent: Boolean = false,
+    initialRouteToken: Long? = null,
+) {
     val month by viewModel.month.collectAsStateWithLifecycle()
     val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
     val events by viewModel.events.collectAsStateWithLifecycle()
@@ -231,6 +239,10 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initia
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
     var pendingTaskDelete by remember { mutableStateOf<CalendarEvent?>(null) }
     var handledTaskDeepLinkId by remember { mutableStateOf<String?>(null) }
+    var handledRouteToken by remember { mutableStateOf<Long?>(null) }
+    var routePending by remember(initialRouteToken) {
+        mutableStateOf(initialRouteToken != null && (initialEventId != null || !initialTaskId.isNullOrBlank() || initialAddEvent))
+    }
     var isSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -325,21 +337,46 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initia
             }
         }
     }
-    LaunchedEffect(initialEventId) {
-        initialEventId?.let(viewModel::openEventDetailById)
+    LaunchedEffect(initialRouteToken, initialEventId) {
+        if (initialRouteToken != null && handledRouteToken != initialRouteToken && !initialEventId.isNullOrBlank()) {
+            routePending = true
+            viewModel.closeEventDetail()
+            settingsScreen = SettingsScreen.Root
+            previousScreenTab = ScreenTab.Calendar
+            screenTab = ScreenTab.Calendar
+            viewModel.openEventDetailById(initialEventId) {
+                handledRouteToken = initialRouteToken
+                routePending = false
+            }
+        }
     }
-    LaunchedEffect(initialTaskId, tasks) {
-        if (!initialTaskId.isNullOrBlank()) {
+    LaunchedEffect(initialRouteToken, initialTaskId, tasks) {
+        if (initialRouteToken != null && handledRouteToken != initialRouteToken && !initialTaskId.isNullOrBlank()) {
+            routePending = true
             viewModel.closeEventDetail()
             settingsScreen = SettingsScreen.Root
             previousScreenTab = ScreenTab.Calendar
             screenTab = ScreenTab.Tasks
-            if (handledTaskDeepLinkId != initialTaskId) {
-                tasks.firstOrNull { it.baseEventId() == initialTaskId || it.id == initialTaskId }?.let { task ->
-                    taskDetail = task
-                    handledTaskDeepLinkId = initialTaskId
-                }
+            tasks.firstOrNull { it.baseEventId() == initialTaskId || it.id == initialTaskId }?.let { task ->
+                taskDetail = task
+                handledTaskDeepLinkId = initialTaskId
+                handledRouteToken = initialRouteToken
+                routePending = false
+            } ?: run {
+                if (tasks.isNotEmpty()) routePending = false
             }
+        }
+    }
+    LaunchedEffect(initialRouteToken, initialCalendarTab) {
+        if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialCalendarTab.equals("month", ignoreCase = true)) {
+            viewModel.closeEventDetail()
+            taskDetail = null
+            settingsScreen = SettingsScreen.Root
+            previousScreenTab = ScreenTab.Calendar
+            screenTab = ScreenTab.Calendar
+            calendarTab = CalendarTab.Month
+            handledRouteToken = initialRouteToken
+            routePending = false
         }
     }
     LaunchedEffect(taskDetail) {
@@ -367,6 +404,18 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initia
         addStartTime = startTime
         editingEvent = null
         addSheet = true
+    }
+    LaunchedEffect(initialRouteToken, initialAddEvent) {
+        if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialAddEvent) {
+            viewModel.closeEventDetail()
+            taskDetail = null
+            settingsScreen = SettingsScreen.Root
+            previousScreenTab = ScreenTab.Calendar
+            screenTab = ScreenTab.Calendar
+            openAddEditor()
+            handledRouteToken = initialRouteToken
+            routePending = false
+        }
     }
     fun openEditEditor(event: CalendarEvent) {
         editorSessionKey = UUID.randomUUID().toString()
@@ -590,6 +639,9 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initia
                 }
             }
         }
+        if (routePending) {
+            Box(modifier = Modifier.fillMaxSize().background(palette.background))
+        }
         AnimatedVisibility(
             visible = screenTab == ScreenTab.Settings,
             enter = slideInHorizontally(initialOffsetX = { it }),
@@ -608,6 +660,7 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initia
                         context.calendarPreferencesDataStore.edit { preferences ->
                             preferences[CalendarPreferences.KEY_THEME_MODE] = selectedTheme.name
                         }
+                        WidgetUpdateWorker.enqueue(context)
                     }
                 },
                 syncEnabled = syncEnabled,

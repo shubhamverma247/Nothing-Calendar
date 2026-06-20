@@ -13,6 +13,7 @@ import com.dotfield.dotcal.data.DotCalDatabase
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
@@ -32,6 +33,7 @@ class CalendarSyncWorker(
                 applicationContext.calendarPreferencesDataStore.edit { preferences ->
                     preferences[CalendarPreferences.KEY_LAST_SYNC_MS] = System.currentTimeMillis()
                 }
+                WidgetUpdateWorker.enqueue(applicationContext)
             }
             Result.success()
         } catch (_: SecurityException) {

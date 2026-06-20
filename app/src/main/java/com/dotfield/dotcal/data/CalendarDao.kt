@@ -62,6 +62,33 @@ interface CalendarDao {
 
     @Query(
         """
+        SELECT calendar_events.* FROM calendar_events
+        INNER JOIN calendar_accounts ON calendar_accounts.id = calendar_events.accountId
+        WHERE calendar_accounts.isVisible = 1
+        AND calendar_events.isTask = 0
+        AND (
+            (calendar_events.startTimeMs < :rangeEndMs AND calendar_events.endTimeMs >= :rangeStartMs)
+            OR (calendar_events.rrule IS NOT NULL AND calendar_events.rrule != '' AND calendar_events.startTimeMs < :rangeEndMs)
+        )
+        ORDER BY calendar_events.startTimeMs ASC
+        """,
+    )
+    suspend fun getVisibleEventsForWidget(rangeStartMs: Long, rangeEndMs: Long): List<CalendarEvent>
+
+    @Query(
+        """
+        SELECT * FROM calendar_events
+        WHERE isTask = 1
+        AND isCompleted = 0
+        AND startTimeMs > 0
+        AND startTimeMs < :rangeEndMs
+        ORDER BY startTimeMs ASC
+        """,
+    )
+    suspend fun getOpenTasksForWidget(rangeEndMs: Long): List<CalendarEvent>
+
+    @Query(
+        """
         SELECT * FROM calendar_events
         WHERE isTask = 1
         ORDER BY isCompleted ASC, startTimeMs ASC

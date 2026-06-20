@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val deepLinkTarget = mutableStateOf<DotCalDeepLinkTarget?>(null)
+    private var deepLinkSequence = 0L
     private val viewModel: DotCalViewModel by viewModels {
         val app = application as DotCalApplication
         object : ViewModelProvider.Factory {
@@ -47,6 +48,9 @@ class MainActivity : ComponentActivity() {
                     viewModel = viewModel,
                     initialEventId = target?.eventId,
                     initialTaskId = target?.taskId,
+                    initialCalendarTab = target?.calendarTab,
+                    initialAddEvent = target?.addEvent == true,
+                    initialRouteToken = target?.routeToken,
                 )
             }
         }
@@ -62,17 +66,28 @@ class MainActivity : ComponentActivity() {
         const val BOOT_PREFS = "dotcal_boot"
         const val BOOT_THEME_KEY = "theme_mode"
     }
-}
 
-private data class DotCalDeepLinkTarget(val eventId: String? = null, val taskId: String? = null)
-
-private fun android.content.Intent.dotCalDeepLinkTarget(): DotCalDeepLinkTarget? {
-    val uri = data ?: return null
-    return when {
-        uri.scheme == "dotcal" && uri.host == "event" -> DotCalDeepLinkTarget(eventId = uri.lastPathSegment)
-        uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" -> DotCalDeepLinkTarget(eventId = uri.pathSegments.getOrNull(1))
-        uri.scheme == "dotcal" && uri.host == "task" -> DotCalDeepLinkTarget(taskId = uri.lastPathSegment)
-        uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "task" -> DotCalDeepLinkTarget(taskId = uri.pathSegments.getOrNull(1))
-        else -> null
+    private fun android.content.Intent.dotCalDeepLinkTarget(): DotCalDeepLinkTarget? {
+        val uri = data ?: return null
+        val token = ++deepLinkSequence
+        return when {
+            uri.scheme == "dotcal" && uri.host == "event" && uri.lastPathSegment == "new" -> DotCalDeepLinkTarget(addEvent = true, routeToken = token)
+            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" && uri.pathSegments.getOrNull(1) == "new" -> DotCalDeepLinkTarget(addEvent = true, routeToken = token)
+            uri.scheme == "dotcal" && uri.host == "event" -> DotCalDeepLinkTarget(eventId = uri.lastPathSegment, routeToken = token)
+            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" -> DotCalDeepLinkTarget(eventId = uri.pathSegments.getOrNull(1), routeToken = token)
+            uri.scheme == "dotcal" && uri.host == "task" -> DotCalDeepLinkTarget(taskId = uri.lastPathSegment, routeToken = token)
+            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "task" -> DotCalDeepLinkTarget(taskId = uri.pathSegments.getOrNull(1), routeToken = token)
+            uri.scheme == "dotcal" && uri.host == "calendar" -> DotCalDeepLinkTarget(calendarTab = uri.lastPathSegment, routeToken = token)
+            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "calendar" -> DotCalDeepLinkTarget(calendarTab = uri.pathSegments.getOrNull(1), routeToken = token)
+            else -> null
+        }
     }
 }
+
+private data class DotCalDeepLinkTarget(
+    val eventId: String? = null,
+    val taskId: String? = null,
+    val calendarTab: String? = null,
+    val addEvent: Boolean = false,
+    val routeToken: Long,
+)
