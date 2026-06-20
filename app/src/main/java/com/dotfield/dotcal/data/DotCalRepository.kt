@@ -75,11 +75,15 @@ class DotCalRepository(
         val start = month.withDayOfMonth(1)
         val end = start.plusMonths(1)
         return dao.observeEvents(start.atStartMs(), end.atStartMs())
-            .map { events -> expandRecurringEvents(events, start, end) }
+            .map { events ->
+                withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
+            }
     }
 
     fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks()
-        .map { tasks -> expandRecurringTasks(tasks) }
+        .map { tasks ->
+            withContext(Dispatchers.Default) { expandRecurringTasks(tasks) }
+        }
 
     fun observeTodayTasks(day: LocalDate): Flow<List<CalendarEvent>> {
         val start = day.atStartMs()

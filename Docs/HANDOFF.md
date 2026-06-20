@@ -140,16 +140,19 @@ Tasks:
 
 ## Latest Committed Work
 
-Latest commit: `b3bdc50 Refine task details screen`.
+Latest commit: `3b0f10f Add birthday calendar import`.
 
 Latest committed behavior:
+- Birthday calendar import is implemented.
+- Contacts birthdays import as read-only yearly all-day events using existing rows/tables.
+- Birthday account/reminders use existing `calendar_accounts`, `calendar_events`, and `event_reminders`.
 - Task Detail visual language aligned with Event Details.
 - Task Detail: same toolbar/title/section/divider structure, no cards/icons/chips.
 - Due date/time split.
 - Reminder shows `None` when unset.
 - Completed tasks hide `Mark Complete`.
 - Bottom actions are centered red text-only actions.
-- Latest debug APK from that work was installed on phone `4ab0d020`.
+- 2026-06-20 optimization pass kept UI/functionality unchanged: lifecycle-aware DataStore collection, memoized Week/Day filters, and recurrence expansion moved off main dispatcher.
 
 ## Completed Roadmap Steps
 
@@ -295,6 +298,7 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after behavior-preserving optimization pass; APK installed on phone `4ab0d020`.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed for Step 7 Birthday Calendar.
 - First build attempt timed out after 124s with no result; rerun with longer timeout passed.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after month selected-date/ripple polish; APK installed on phone `4ab0d020`.
@@ -310,10 +314,10 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Build debug APK with required command above.
-- Install manually only if testing; Codex should not install unless asked.
+- Latest debug APK from optimization pass installed on phone `4ab0d020`.
 - Confirm package `com.dotfield.dotcal`, label `DotCal`.
 - Calendar: `Year`, `Month`, `Week`, `Day`, `Agenda` switch immediately and persist.
+- Calendar: Week/Day event placement and Day task rows look identical to previous build.
 - Add/Edit Event: full-screen slide, X/check top bar, start/end picker sheets, reminder/repeat neutral sheets.
 - Event Detail: event taps open detail; edit pencil opens editor; delete confirms.
 - Tasks: bottom nav opens Tasks; filters work; add/edit/detail/delete/complete behavior matches Task Detail rules above.
@@ -339,6 +343,6 @@ Do not change package name, deep link scheme, or DB filename. Do not run phone/m
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
 ```
 
-Latest committed work: `b3bdc50 Refine task details screen`. Task Detail now follows Event Details visual language more closely: same toolbar/title/section/divider structure, no cards/icons/chips, date/time split in Due, Reminder shows `None` when unset, completed tasks hide `Mark Complete`, bottom actions are centered red text-only actions, and latest debug APK was installed on connected phone `4ab0d020`.
+Latest committed work: `3b0f10f Add birthday calendar import`. Current uncommitted work is a behavior-preserving optimization pass: lifecycle-aware DataStore collection, memoized Week/Day filters, and recurrence expansion moved off main dispatcher. Required debug build passed and APK was installed on connected phone `4ab0d020`.
 
 Current next implementation step: Continuation Roadmap Step 8, Home Screen Widgets, but keep existing app behavior as source of truth where conflicts exist.

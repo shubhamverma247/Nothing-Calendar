@@ -97,7 +97,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -243,32 +242,32 @@ fun DotCalApp(viewModel: DotCalViewModel, initialEventId: String? = null, initia
         context.calendarPreferencesDataStore.data.map { preferences ->
             DotCalThemeMode.fromStorage(preferences[CalendarPreferences.KEY_THEME_MODE])
         }
-    }.collectAsState(initial = bootThemeMode)
+    }.collectAsStateWithLifecycle(initialValue = bootThemeMode)
     val storedCalendarTab by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             CalendarTab.fromStorage(preferences[CalendarPreferences.KEY_DEFAULT_VIEW])
         }
-    }.collectAsState(initial = CalendarTab.Month)
+    }.collectAsStateWithLifecycle(initialValue = CalendarTab.Month)
     val storedSelectedDateValue by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_LAST_SELECTED_DATE].orEmpty()
         }
-    }.collectAsState(initial = null)
+    }.collectAsStateWithLifecycle(initialValue = null)
     val syncEnabled by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_SYNC_ENABLED] ?: false
         }
-    }.collectAsState(initial = false)
+    }.collectAsStateWithLifecycle(initialValue = false)
     val syncIntervalMins by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_SYNC_INTERVAL_MINS] ?: CalendarSyncWorkScheduler.DEFAULT_SYNC_INTERVAL_MINS
         }
-    }.collectAsState(initial = CalendarSyncWorkScheduler.DEFAULT_SYNC_INTERVAL_MINS)
+    }.collectAsStateWithLifecycle(initialValue = CalendarSyncWorkScheduler.DEFAULT_SYNC_INTERVAL_MINS)
     val birthdayEnabled by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] ?: false
         }
-    }.collectAsState(initial = false)
+    }.collectAsStateWithLifecycle(initialValue = false)
     var hasCalendarPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED)
     }
@@ -1320,8 +1319,12 @@ private fun WeekView(
     val days = remember(selectedDate) { weekDays(selectedDate) }
     val weekStart = days.first()
     val weekEnd = days.last()
-    val timedEvents = events.filter { it.isAllDay == 0 && it.localDate() in weekStart..weekEnd }
-    val allDayEvents = events.filter { it.isAllDay == 1 && it.localDate() in weekStart..weekEnd }
+    val timedEvents = remember(events, weekStart, weekEnd) {
+        events.filter { it.isAllDay == 0 && it.localDate() in weekStart..weekEnd }
+    }
+    val allDayEvents = remember(events, weekStart, weekEnd) {
+        events.filter { it.isAllDay == 1 && it.localDate() in weekStart..weekEnd }
+    }
     val eventLayouts = remember(timedEvents) { layoutTimedEvents(timedEvents) }
     val timedEventsByDayHour = remember(timedEvents) {
         timedEvents.groupBy { event -> event.localDate() to event.startLocalTime().hour }
@@ -1557,11 +1560,15 @@ private fun DayView(
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
 ) {
-    val dayEvents = events.filter { it.isTask == 0 && it.localDate() == selectedDate }
-    val allDayEvents = dayEvents.filter { it.isAllDay == 1 }
-    val timedEvents = dayEvents.filter { it.isAllDay == 0 }
+    val dayEvents = remember(events, selectedDate) {
+        events.filter { it.isTask == 0 && it.localDate() == selectedDate }
+    }
+    val allDayEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 1 } }
+    val timedEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 0 } }
     val timedEventsByHour = remember(timedEvents) { timedEvents.groupBy { it.startLocalTime().hour } }
-    val tasks = events.filter { it.isTask == 1 && it.localDate() == selectedDate }
+    val tasks = remember(events, selectedDate) {
+        events.filter { it.isTask == 1 && it.localDate() == selectedDate }
+    }
 
     Column(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         if (allDayEvents.isNotEmpty()) {
