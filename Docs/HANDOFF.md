@@ -59,6 +59,7 @@ Keys:
 - `KEY_DEFAULT_VIEW`
 - `KEY_WEEK_START`
 - `KEY_DEFAULT_REMINDER`
+- `KEY_DEFAULT_ALL_DAY_REMINDER_TIME`
 - `KEY_SYNC_ENABLED`
 - `KEY_SYNC_INTERVAL_MINS`
 - `KEY_BIRTHDAY_ENABLED`
@@ -220,6 +221,10 @@ Latest committed behavior:
   - Centered the onboarding progress dots at the bottom of the screen while keeping the page indicator text ("N / 5") left-aligned.
   - Inserted a `24.dp` top spacer below the header row to comfortably push the illustration and text labels downward.
   - Successfully compiled the APK and installed it directly on phone `4ab0d020`.
+- 2026-06-21 onboarding screen 2 asset integration and light/dark theme distinction:
+  - Integrated `screen2.png` asset for Screen 2 (`CalendarPermission`) in Light Mode, scaled by `1.72f` and offset by `20.dp`.
+  - Configured Onboarding screens 1 and 2 to fall back to premium Canvas-drawn illustrations in Dark Mode since only light theme assets are provided.
+  - Implemented missing settings helpers (`parseStoredTime`, `toHour12`, `toHour24`, `allDayReminderTimeLabel`) in `DotCalApp.kt` to fix unresolved settings compilation errors.
 - 2026-06-21 Step 10 Settings Missing Items implemented:
   - Settings now has a functional `Default reminder` picker stored in existing `KEY_DEFAULT_REMINDER`; new Add Event uses it as the preselected reminder while existing event edits preserve their stored reminder/none state.
   - Reminder options are `None`, `5 minutes before`, `10 minutes before`, `30 minutes before`, `1 hour before`, and `1 day before`.
@@ -227,6 +232,14 @@ Latest committed behavior:
   - `Sync interval` now includes `Manual`, `15 min`, `30 min`, and `1 hour`; Manual cancels periodic WorkManager sync while leaving manual Sync Now available.
   - Added About rows: `Privacy Policy` opens an in-app WebView at `https://dotfieldstudio.com/dotcal/privacy`, `Rate DotCal` opens the Play Store listing, and `Version` reads `BuildConfig.VERSION_NAME`.
   - Enabled app `BuildConfig` and added `INTERNET` permission only for the in-app privacy WebView.
+  - No package, deep link scheme, DB filename, Room table, column, or schema changes.
+- 2026-06-21 Step 11 Release Rules implemented:
+  - Added requested R8/ProGuard keep rules for Room, Hilt ViewModels, Kotlin Serialization annotations/classes, Glance, and coroutine dispatcher/exception handler names.
+  - No package, deep link scheme, DB filename, Room table, column, schema, or UI behavior changes.
+- 2026-06-21 Settings cleanup/all-day reminder picker follow-up:
+  - Removed static Settings rows: `Time zone`, `Show week number`, and `Other calendars`.
+  - Replaced static `Default all-day reminder time` row with a persisted picker stored in `KEY_DEFAULT_ALL_DAY_REMINDER_TIME`.
+  - Picker uses three wheel rollers: hour, minute, and AM/PM. AM/PM is not a toggle.
   - No package, deep link scheme, DB filename, Room table, column, or schema changes.
 
 ## Completed Roadmap Steps
@@ -241,12 +254,13 @@ Latest committed behavior:
 8. Home Screen Widgets: complete.
 9. Onboarding: complete.
 10. Settings Missing Items: complete.
+11. Release Rules: complete.
 
 ## Current Next Step
 
-Continuation Roadmap Step 11: Release Rules.
+Continuation roadmap implementation is complete through Step 11.
 
-Keep existing app behavior source of truth. Release work must not change package, scheme, DB filename, schema columns, or 5-table count.
+Keep existing app behavior source of truth. Future work must not change package, scheme, DB filename, schema columns, or 5-table count unless explicitly requested.
 
 ## Step 7 Spec: Birthday Calendar
 
@@ -365,6 +379,8 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Settings cleanup/all-day reminder picker follow-up; no phone/manual UI QA run.
+- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Step 11 Release Rules; no phone/manual UI QA run.
 - 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Step 10 Settings Missing Items; no phone/manual UI QA run.
 - 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed before committing onboarding/splash/theme changes; no phone/manual UI QA run.
 - 2026-06-21: APK installed on phone `4ab0d020` after onboarding reference correction retry with `adb install -r app\build\outputs\apk\debug\app-debug.apk`; no manual UI QA run.
@@ -408,7 +424,7 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from Step 10 Settings Missing Items build is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run in this pass.
+- Latest debug APK from Settings cleanup/all-day reminder picker build is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run in this pass.
 - Confirm package `com.dotfield.dotcal`, label `DotCal`.
 - First normal app launch: onboarding appears once with 5 pages: DotCal, Calendar Access, Reminders, Birthdays, Ready.
 - First normal app launch: Calendar Month should not flash before onboarding appears.
@@ -441,6 +457,8 @@ For current latest app state:
 - Tasks: bottom nav opens Tasks; filters work; add/edit/detail/delete/complete behavior matches Task Detail rules above.
 - Settings: theme, sync, calendar accounts, switches, and back behavior match current UI.
 - Settings > Reminders: `Default reminder` picker persists `None`, `5 min`, `10 min`, `30 min`, `1 hour`, and `1 day`; new Add Event opens with the selected default reminder.
+- Settings > Reminders: `Default all-day reminder time` opens a three-wheel picker for hour, minute, and AM/PM; selected time persists after reopening Settings.
+- Settings > General: `Time zone`, `Show week number`, and `Other calendars` should no longer appear.
 - Settings > Additional: `Birthday calendar` toggle, `Sync enabled`, `Sync interval`, and `Sync Now` preserve existing behavior; `Manual` sync interval cancels periodic background sync but leaves `Sync Now` usable.
 - Settings > About: Privacy Policy opens in-app WebView, Rate DotCal opens Play Store, and Version shows `1.0.0` from `BuildConfig.VERSION_NAME`.
 - Reminders: future event/task reminders fire; View/Snooze actions route correctly.
@@ -464,16 +482,13 @@ Do not change package name, deep link scheme, or DB filename. Do not run phone/m
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
 ```
 
-Latest completed work: Continuation Roadmap Step 9, Onboarding.
-- Shows once using existing `KEY_ONBOARDING_DONE`.
-- 5 pages: Welcome (using screen1.png asset scaled by 1.72f, offset by 20.dp, and separated by a 24.dp spacer), Calendar Access, Reminders, Birthdays, Ready.
-- Calendar/notification/contacts permissions are optional; app stays usable when skipped or denied.
-- Routed deep links skip onboarding overlay for direct widget/reminder/event/task launches.
-- First-launch flicker fix waits for onboarding preference load before revealing Calendar Month.
-- Launch/splash theme follows system day/night resources before Compose starts.
-- Premium onboarding redesign uses shared editorial layout, large semi-3D Compose Canvas illustrations, requested light/dark palette, centered progress dots with left-aligned progress text count, rounded full-width CTA, and generic no-brand calendar/event visuals.
-- Latest correction: progress indicator left-aligned, welcome angled side panel, calendar access border details match reference, and floating cards render realistic texts/shapes. Build passed.
-- No package, deep link scheme, DB filename, Room table, or schema changes.
-- Required debug build passed after redesign; latest APK installed on phone `4ab0d020`; no manual UI QA run.
+Latest completed work: Settings cleanup/all-day reminder picker follow-up after Continuation Roadmap Step 11.
+- Roadmap Steps 1-11 are implemented.
+- Added R8/ProGuard keep rules for Room, Hilt ViewModels, Kotlin Serialization, Glance, and coroutines.
+- Removed static Settings rows: `Time zone`, `Show week number`, and `Other calendars`.
+- `Default all-day reminder time` now opens a three-wheel picker for hour, minute, and AM/PM; AM/PM is a roller, not a toggle.
+- The selected all-day reminder time is stored in existing DataStore file `calendar_preferences` using `KEY_DEFAULT_ALL_DAY_REMINDER_TIME`.
+- No package, deep link scheme, DB filename, Room table, column, or schema changes.
+- Required debug build passed after this settings follow-up; no phone/manual UI QA run.
 
-Current next implementation step: Continuation Roadmap Step 11, Release Rules, but keep existing app behavior as source of truth where conflicts exist.
+Current continuation roadmap status: Steps 1-11 implemented. Keep existing app behavior as source of truth where future roadmap text conflicts.
