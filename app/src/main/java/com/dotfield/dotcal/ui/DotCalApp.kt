@@ -111,9 +111,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -198,6 +203,13 @@ private val recurrenceOptions = listOf(
     RecurrenceOption("Weekly", "FREQ=WEEKLY"),
     RecurrenceOption("Monthly", "FREQ=MONTHLY"),
 )
+private val onboardingPages = listOf(
+    OnboardingPage.Welcome,
+    OnboardingPage.CalendarPermission,
+    OnboardingPage.Notifications,
+    OnboardingPage.Contacts,
+    OnboardingPage.Ready,
+)
 private enum class DateTimeField { Start, End }
 private enum class DeleteSource { Editor, Detail }
 private data class PendingDelete(
@@ -281,11 +293,22 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] ?: false
         }
     }.collectAsStateWithLifecycle(initialValue = false)
+    val onboardingDone by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_ONBOARDING_DONE] ?: false
+        }
+    }.collectAsStateWithLifecycle<Boolean?>(initialValue = null)
     var hasCalendarPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED)
     }
     var hasContactsPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED)
+    }
+    var hasNotificationPermission by remember {
+        mutableStateOf(
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
+        )
     }
     val calendarPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         hasCalendarPermission = grants[Manifest.permission.READ_CALENDAR] == true ||
@@ -306,7 +329,22 @@ fun DotCalApp(
             Toast.makeText(context, "Contacts access needed", Toast.LENGTH_SHORT).show()
         }
     }
+    val onboardingCalendarPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+        hasCalendarPermission = grants[Manifest.permission.READ_CALENDAR] == true ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+        if (hasCalendarPermission) viewModel.syncNow()
+    }
+    val onboardingNotificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasNotificationPermission = granted ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    }
+    val onboardingContactsPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasContactsPermission = granted ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    }
     var calendarPermissionRequested by remember { mutableStateOf(false) }
+    var onboardingPageIndex by remember { mutableStateOf(0) }
     var selectedDateRestored by remember { mutableStateOf(false) }
     var calendarTab by remember { mutableStateOf<CalendarTab?>(null) }
     LaunchedEffect(storedCalendarTab) {
@@ -389,6 +427,8 @@ fun DotCalApp(
     LaunchedEffect(Unit) {
         hasCalendarPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
         hasContactsPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+        hasNotificationPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
     LaunchedEffect(birthdayEnabled, hasContactsPermission) {
         if (birthdayEnabled && hasContactsPermission) {
@@ -466,7 +506,58 @@ fun DotCalApp(
             }
         }
     }
-    BackHandler(enabled = detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks) {
+    val onboardingPreferenceLoaded = onboardingDone != null
+    val showOnboarding = onboardingDone == false && initialRouteToken == null
+    fun finishOnboarding() {
+        scope.launch {
+            context.calendarPreferencesDataStore.edit { preferences ->
+                preferences[CalendarPreferences.KEY_ONBOARDING_DONE] = true
+            }
+        }
+    }
+    fun advanceOnboarding() {
+        if (onboardingPageIndex < onboardingPages.lastIndex) {
+            onboardingPageIndex += 1
+        } else {
+            finishOnboarding()
+        }
+    }
+    fun requestCurrentOnboardingPermission() {
+        when (onboardingPages[onboardingPageIndex]) {
+            OnboardingPage.CalendarPermission -> {
+                if (!hasCalendarPermission) {
+                    onboardingCalendarPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.READ_CALENDAR,
+                            Manifest.permission.WRITE_CALENDAR,
+                        ),
+                    )
+                } else {
+                    advanceOnboarding()
+                }
+            }
+            OnboardingPage.Notifications -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
+                    onboardingNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    advanceOnboarding()
+                }
+            }
+            OnboardingPage.Contacts -> {
+                if (!hasContactsPermission) {
+                    onboardingContactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                } else {
+                    advanceOnboarding()
+                }
+            }
+            OnboardingPage.Welcome,
+            OnboardingPage.Ready -> advanceOnboarding()
+        }
+    }
+    BackHandler(enabled = showOnboarding) {
+        if (onboardingPageIndex > 0) onboardingPageIndex -= 1 else finishOnboarding()
+    }
+    BackHandler(enabled = !showOnboarding && (detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -645,6 +736,29 @@ fun DotCalApp(
         }
         if (routePending) {
             Box(modifier = Modifier.fillMaxSize().background(palette.background))
+        }
+        if (!onboardingPreferenceLoaded && initialRouteToken == null) {
+            Box(modifier = Modifier.fillMaxSize().background(palette.background))
+        }
+        AnimatedVisibility(
+            visible = showOnboarding,
+            enter = slideInHorizontally(initialOffsetX = { it }),
+            exit = slideOutHorizontally(targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            OnboardingScreen(
+                page = onboardingPages[onboardingPageIndex],
+                pageIndex = onboardingPageIndex,
+                pageCount = onboardingPages.size,
+                palette = palette,
+                hasCalendarPermission = hasCalendarPermission,
+                hasNotificationPermission = hasNotificationPermission,
+                hasContactsPermission = hasContactsPermission,
+                onBack = { if (onboardingPageIndex > 0) onboardingPageIndex -= 1 else finishOnboarding() },
+                onSkip = ::finishOnboarding,
+                onPrimary = ::requestCurrentOnboardingPermission,
+                onSecondary = ::advanceOnboarding,
+            )
         }
         AnimatedVisibility(
             visible = screenTab == ScreenTab.Settings,
@@ -955,6 +1069,733 @@ private fun ConfirmDeleteDialog(
             }
         },
     )
+}
+
+@Composable
+private fun OnboardingScreen(
+    page: OnboardingPage,
+    pageIndex: Int,
+    pageCount: Int,
+    palette: DotCalPalette,
+    hasCalendarPermission: Boolean,
+    hasNotificationPermission: Boolean,
+    hasContactsPermission: Boolean,
+    onBack: () -> Unit,
+    onSkip: () -> Unit,
+    onPrimary: () -> Unit,
+    onSecondary: () -> Unit,
+) {
+    val copy = onboardingCopy(
+        page = page,
+        hasCalendarPermission = hasCalendarPermission,
+        hasNotificationPermission = hasNotificationPermission,
+        hasContactsPermission = hasContactsPermission,
+    )
+    val colors = remember(palette.isDark) { onboardingColors(palette.isDark) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.background)
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(46.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.primaryText)
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                TextButton(onClick = onSkip) {
+                    Text("Skip", color = colors.secondaryText, fontFamily = mono, fontSize = 14.sp)
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            OnboardingHero(
+                page = page,
+                colors = colors,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1.05f),
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+            Text(
+                text = copy.label,
+                color = colors.accent,
+                fontFamily = mono,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = copy.title,
+                color = colors.primaryText,
+                fontFamily = mono,
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 40.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = copy.description,
+                color = colors.secondaryText,
+                fontFamily = mono,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            OnboardingProgress(pageIndex = pageIndex, pageCount = pageCount, colors = colors)
+            Spacer(modifier = Modifier.height(20.dp))
+            Button(
+                onClick = onPrimary,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.accent,
+                    contentColor = Color.White,
+                ),
+                shape = RoundedCornerShape(22.dp),
+                modifier = Modifier.fillMaxWidth().height(60.dp),
+                contentPadding = PaddingValues(horizontal = 18.dp),
+            ) {
+                Text(copy.primaryLabel, fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+            if (page != OnboardingPage.Welcome && page != OnboardingPage.Ready) {
+                TextButton(
+                    onClick = onSecondary,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                ) {
+                    Text("Not Now", color = colors.secondaryText, fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            } else {
+                Spacer(modifier = Modifier.height(48.dp))
+            }
+        }
+    }
+}
+
+private data class OnboardingCopy(
+    val label: String,
+    val title: String,
+    val description: String,
+    val primaryLabel: String,
+)
+
+private data class OnboardingColors(
+    val background: Color,
+    val surface: Color,
+    val elevatedSurface: Color,
+    val primaryText: Color,
+    val secondaryText: Color,
+    val mutedText: Color,
+    val accent: Color,
+    val glow: Color,
+    val shadow: Color,
+    val line: Color,
+    val isDark: Boolean,
+)
+
+private fun onboardingCopy(
+    page: OnboardingPage,
+    hasCalendarPermission: Boolean,
+    hasNotificationPermission: Boolean,
+    hasContactsPermission: Boolean,
+): OnboardingCopy {
+    return when (page) {
+        OnboardingPage.Welcome -> OnboardingCopy(
+            label = "DOTCAL",
+            title = "DotCal",
+            description = "A focused calendar for events, tasks, reminders, birthdays, and widgets.",
+            primaryLabel = "Continue",
+        )
+        OnboardingPage.CalendarPermission -> OnboardingCopy(
+            label = "OPTIONAL",
+            title = "Calendar Access",
+            description = "Connect device calendars for local CalendarProvider sync. Local DotCal events still work without it.",
+            primaryLabel = if (hasCalendarPermission) "Continue" else "Allow Calendar",
+        )
+        OnboardingPage.Notifications -> OnboardingCopy(
+            label = "OPTIONAL",
+            title = "Reminders",
+            description = "Allow notifications so event and task reminders can appear at the scheduled time.",
+            primaryLabel = if (hasNotificationPermission) "Continue" else "Allow Reminders",
+        )
+        OnboardingPage.Contacts -> OnboardingCopy(
+            label = "OPTIONAL",
+            title = "Birthdays",
+            description = "Allow contacts to import birthdays as read-only yearly events. You can skip this now.",
+            primaryLabel = if (hasContactsPermission) "Continue" else "Allow Contacts",
+        )
+        OnboardingPage.Ready -> OnboardingCopy(
+            label = "READY",
+            title = "You're all set",
+            description = "Your calendar is ready.",
+            primaryLabel = "Start",
+        )
+    }
+}
+
+private fun onboardingColors(isDark: Boolean): OnboardingColors {
+    return if (isDark) {
+        OnboardingColors(
+            background = Color(0xFF0B0B0D),
+            surface = Color(0xFF121216),
+            elevatedSurface = Color(0xFF1A1A20),
+            primaryText = Color.White,
+            secondaryText = Color(0xFF9CA3AF),
+            mutedText = Color(0xFF5B626E),
+            accent = Color(0xFFFF3B30),
+            glow = Color(0xFFFF3B30).copy(alpha = 0.22f),
+            shadow = Color.Black.copy(alpha = 0.55f),
+            line = Color(0xFF2A2A32),
+            isDark = true,
+        )
+    } else {
+        OnboardingColors(
+            background = Color(0xFFFAFAFA),
+            surface = Color.White,
+            elevatedSurface = Color(0xFFF7F7F8),
+            primaryText = Color(0xFF111111),
+            secondaryText = Color(0xFF6B7280),
+            mutedText = Color(0xFFD1D5DB),
+            accent = Color(0xFFFF3B30),
+            glow = Color(0xFFFF3B30).copy(alpha = 0.13f),
+            shadow = Color(0xFF111827).copy(alpha = 0.13f),
+            line = Color(0xFFE5E7EB),
+            isDark = false,
+        )
+    }
+}
+
+@Composable
+private fun OnboardingHero(page: OnboardingPage, colors: OnboardingColors, modifier: Modifier = Modifier) {
+    Box(
+        modifier = Modifier
+            .then(modifier)
+            .heightIn(min = 270.dp, max = 360.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (page == OnboardingPage.Welcome) {
+            Image(
+                painter = androidx.compose.ui.res.painterResource(id = com.dotfield.dotcal.R.drawable.screen1),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .scale(1.72f)
+                    .offset(y = 20.dp)
+                    .padding(vertical = 12.dp),
+                contentScale = ContentScale.Fit
+            )
+        } else {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawHeroAtmosphere(colors)
+                when (page) {
+                    OnboardingPage.CalendarPermission -> drawCalendarHubHero(colors)
+                    OnboardingPage.Notifications -> drawReminderHero(colors)
+                    OnboardingPage.Contacts -> drawBirthdayHero(colors)
+                    OnboardingPage.Ready -> drawReadyHero(colors)
+                    else -> {}
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingProgress(pageIndex: Int, pageCount: Int, colors: OnboardingColors) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            modifier = Modifier.align(Alignment.CenterStart),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "${pageIndex + 1}",
+                color = colors.accent,
+                fontFamily = mono,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = " / $pageCount",
+                color = colors.primaryText,
+                fontFamily = mono,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            repeat(pageCount) { index ->
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 5.dp)
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(if (index == pageIndex) colors.accent else colors.mutedText.copy(alpha = if (colors.isDark) 0.55f else 0.75f)),
+                )
+            }
+        }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHeroAtmosphere(colors: OnboardingColors) {
+    val center = Offset(size.width * 0.52f, size.height * 0.47f)
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(colors.glow, Color.Transparent),
+            center = center,
+            radius = size.minDimension * 0.52f,
+        ),
+        radius = size.minDimension * 0.52f,
+        center = center,
+    )
+    repeat(5) { index ->
+        val x = size.width * (0.18f + index * 0.16f)
+        val y = size.height * (0.22f + (index % 3) * 0.18f)
+        drawCircle(colors.accent.copy(alpha = 0.75f - index * 0.08f), radius = 2.2.dp.toPx(), center = Offset(x, y))
+    }
+    repeat(3) { index ->
+        val x = size.width * (0.22f + index * 0.28f)
+        val y = size.height * (0.74f - index * 0.08f)
+        drawCircle(colors.mutedText.copy(alpha = 0.35f), radius = 1.6.dp.toPx(), center = Offset(x, y))
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCalendarHero(colors: OnboardingColors) {
+    drawLeafCluster(colors, Offset(size.width * 0.15f, size.height * 0.68f), -1f)
+    drawLeafCluster(colors, Offset(size.width * 0.85f, size.height * 0.68f), 1f)
+    drawSoftShadow(colors, Offset(size.width * 0.5f, size.height * 0.78f), size.width * 0.34f, size.height * 0.055f)
+    
+    val left = size.width * 0.19f
+    val top = size.height * 0.28f
+    val width = size.width * 0.56f
+    val height = size.height * 0.42f
+    
+    val standPath = androidx.compose.ui.graphics.Path().apply {
+        moveTo(left + width - 12.dp.toPx(), top + 10.dp.toPx())
+        lineTo(left + width + 24.dp.toPx(), top + height - 4.dp.toPx())
+        lineTo(left + width, top + height)
+        close()
+    }
+    drawPath(standPath, colors.elevatedSurface)
+    drawPath(standPath, colors.line.copy(alpha = 0.55f), style = Stroke(1.dp.toPx()))
+
+    drawRoundRect(
+        color = colors.line.copy(alpha = 0.4f),
+        topLeft = Offset(left + 3.dp.toPx(), top - 5.dp.toPx()),
+        size = androidx.compose.ui.geometry.Size(width - 6.dp.toPx(), height),
+        cornerRadius = CornerRadius(16.dp.toPx(), 16.dp.toPx())
+    )
+    drawRoundRect(
+        color = colors.elevatedSurface,
+        topLeft = Offset(left + 6.dp.toPx(), top - 2.dp.toPx()),
+        size = androidx.compose.ui.geometry.Size(width - 12.dp.toPx(), height),
+        cornerRadius = CornerRadius(16.dp.toPx(), 16.dp.toPx())
+    )
+
+    drawRoundRect(colors.surface, Offset(left, top), androidx.compose.ui.geometry.Size(width, height), CornerRadius(16.dp.toPx(), 16.dp.toPx()))
+    drawRoundRect(colors.line.copy(alpha = 0.55f), Offset(left, top), androidx.compose.ui.geometry.Size(width, height), CornerRadius(16.dp.toPx(), 16.dp.toPx()), style = Stroke(1.dp.toPx()))
+    
+    drawRoundRect(
+        brush = Brush.verticalGradient(listOf(colors.accent, Color(0xFFFF2A22))),
+        topLeft = Offset(left, top),
+        size = androidx.compose.ui.geometry.Size(width, height * 0.24f),
+        cornerRadius = CornerRadius(16.dp.toPx(), 16.dp.toPx()),
+    )
+    drawRect(
+        brush = Brush.verticalGradient(listOf(colors.accent, Color(0xFFFF2A22))),
+        topLeft = Offset(left, top + height * 0.12f),
+        size = androidx.compose.ui.geometry.Size(width, height * 0.12f)
+    )
+
+    val ringCount = 5
+    val ringWidth = 10.dp.toPx()
+    val ringHeight = 18.dp.toPx()
+    repeat(ringCount) { i ->
+        val x = left + width * (0.16f + i * 0.17f)
+        drawCircle(
+            color = Color.Black.copy(alpha = 0.3f),
+            radius = 2.dp.toPx(),
+            center = Offset(x, top + height * 0.08f)
+        )
+        drawArc(
+            color = colors.primaryText.copy(alpha = 0.85f),
+            startAngle = 180f,
+            sweepAngle = 200f,
+            useCenter = false,
+            topLeft = Offset(x - ringWidth / 2f, top - 10.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size(ringWidth, ringHeight),
+            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+        )
+    }
+
+    val colStep = width * 0.17f
+    val rowStep = height * 0.16f
+    val gridStartX = left + width * 0.16f
+    val gridStartY = top + height * 0.35f
+    val cellW = colStep * 0.65f
+    val cellH = rowStep * 0.65f
+
+    repeat(3) { row ->
+        repeat(4) { col ->
+            val x = gridStartX + col * colStep
+            val y = gridStartY + row * rowStep
+            val active = row == 2 && col == 2
+            
+            drawRoundRect(
+                color = if (active) colors.accent else colors.line.copy(alpha = if (colors.isDark) 0.6f else 0.4f),
+                topLeft = Offset(x, y),
+                size = androidx.compose.ui.geometry.Size(cellW, cellH),
+                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+            )
+            
+            if (active) {
+                val checkPath = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(x + cellW * 0.25f, y + cellH * 0.5f)
+                    lineTo(x + cellW * 0.45f, y + cellH * 0.7f)
+                    lineTo(x + cellW * 0.75f, y + cellH * 0.3f)
+                }
+                drawPath(
+                    path = checkPath,
+                    color = Color.White,
+                    style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
+            } else if (row == 0 && col == 2) {
+                val checkPath = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(x + cellW * 0.25f, y + cellH * 0.5f)
+                    lineTo(x + cellW * 0.45f, y + cellH * 0.7f)
+                    lineTo(x + cellW * 0.75f, y + cellH * 0.3f)
+                }
+                drawPath(
+                    path = checkPath,
+                    color = colors.accent.copy(alpha = 0.55f),
+                    style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
+            } else if (row == 1 && col == 1) {
+                val checkPath = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(x + cellW * 0.25f, y + cellH * 0.5f)
+                    lineTo(x + cellW * 0.45f, y + cellH * 0.7f)
+                    lineTo(x + cellW * 0.75f, y + cellH * 0.3f)
+                }
+                drawPath(
+                    path = checkPath,
+                    color = colors.secondaryText.copy(alpha = 0.45f),
+                    style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
+            } else if (row == 1 && col == 3) {
+                drawCircle(
+                    color = colors.accent.copy(alpha = 0.85f),
+                    radius = 3.dp.toPx(),
+                    center = Offset(x + cellW / 2f, y + cellH / 2f)
+                )
+            }
+        }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCalendarHubHero(colors: OnboardingColors) {
+    val center = Offset(size.width * 0.5f, size.height * 0.48f)
+    drawConnectionDots(colors, center, Offset(size.width * 0.22f, size.height * 0.28f))
+    drawConnectionDots(colors, center, Offset(size.width * 0.78f, size.height * 0.3f))
+    drawConnectionDots(colors, center, Offset(size.width * 0.23f, size.height * 0.68f))
+    drawConnectionDots(colors, center, Offset(size.width * 0.76f, size.height * 0.64f))
+
+    drawFloatingCard(colors, Offset(size.width * 0.06f, size.height * 0.2f), size.width * 0.34f, "calendar", "Team Meeting", "10:00 AM")
+    drawFloatingCard(colors, Offset(size.width * 0.61f, size.height * 0.22f), size.width * 0.34f, "calendar", "Project Review", "2:30 PM")
+    drawFloatingCard(colors, Offset(size.width * 0.08f, size.height * 0.62f), size.width * 0.36f, "calendar", "Dinner with Alex", "7:00 PM")
+    drawFloatingCard(colors, Offset(size.width * 0.58f, size.height * 0.58f), size.width * 0.34f, "grid")
+
+    drawSoftShadow(colors, Offset(center.x, size.height * 0.76f), size.width * 0.22f, size.height * 0.04f)
+    drawRoundRect(colors.surface, Offset(center.x - size.width * 0.18f, center.y - size.height * 0.16f), androidx.compose.ui.geometry.Size(size.width * 0.36f, size.height * 0.32f), CornerRadius(22.dp.toPx(), 22.dp.toPx()))
+    drawRoundRect(colors.line.copy(alpha = 0.5f), Offset(center.x - size.width * 0.18f, center.y - size.height * 0.16f), androidx.compose.ui.geometry.Size(size.width * 0.36f, size.height * 0.32f), CornerRadius(22.dp.toPx(), 22.dp.toPx()), style = Stroke(1.dp.toPx()))
+    drawRoundRect(colors.accent, Offset(center.x - size.width * 0.18f, center.y - size.height * 0.16f), androidx.compose.ui.geometry.Size(size.width * 0.36f, size.height * 0.09f), CornerRadius(22.dp.toPx(), 22.dp.toPx()))
+    repeat(3) { i ->
+        val x = center.x - size.width * 0.08f + i * size.width * 0.08f
+        drawLine(colors.primaryText.copy(alpha = 0.35f), Offset(x, center.y - size.height * 0.19f), Offset(x, center.y - size.height * 0.105f), strokeWidth = 3.dp.toPx())
+    }
+    repeat(3) { row ->
+        repeat(3) { col ->
+            val x = center.x - size.width * 0.09f + col * size.width * 0.09f
+            val y = center.y - size.height * 0.02f + row * size.height * 0.075f
+            drawRoundRect(if (row == 1 && col == 1) colors.accent else colors.line, Offset(x, y), androidx.compose.ui.geometry.Size(14.dp.toPx(), 14.dp.toPx()), CornerRadius(4.dp.toPx(), 4.dp.toPx()))
+        }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawReminderHero(colors: OnboardingColors) {
+    val c = Offset(size.width * 0.52f, size.height * 0.44f)
+    repeat(4) { index ->
+        drawCircle(colors.accent.copy(alpha = 0.06f - index * 0.01f), radius = size.minDimension * (0.2f + index * 0.09f), center = c, style = Stroke(1.dp.toPx()))
+    }
+    drawLeafCluster(colors, Offset(size.width * 0.13f, size.height * 0.7f), -1f)
+    drawLeafCluster(colors, Offset(size.width * 0.88f, size.height * 0.64f), 1f)
+    drawFloatingCard(colors, Offset(size.width * 0.05f, size.height * 0.18f), size.width * 0.35f, "bell", "Meeting", "in 10 min")
+    drawFloatingCard(colors, Offset(size.width * 0.58f, size.height * 0.66f), size.width * 0.36f, "check", "Buy groceries", "Today, 6:00 PM")
+    drawSoftShadow(colors, Offset(c.x, size.height * 0.72f), size.width * 0.25f, size.height * 0.05f)
+    drawCircle(colors.accent.copy(alpha = 0.34f), size.width * 0.19f, c)
+    drawRoundRect(
+        brush = Brush.verticalGradient(listOf(Color(0xFFFF6A60), colors.accent, Color(0xFFD82018))),
+        topLeft = Offset(c.x - size.width * 0.15f, c.y - size.height * 0.1f),
+        size = androidx.compose.ui.geometry.Size(size.width * 0.3f, size.height * 0.26f),
+        cornerRadius = CornerRadius(90.dp.toPx(), 90.dp.toPx()),
+    )
+    drawRoundRect(Color(0xFFFF6A60), Offset(c.x - size.width * 0.05f, c.y - size.height * 0.15f), androidx.compose.ui.geometry.Size(size.width * 0.1f, size.height * 0.06f), CornerRadius(12.dp.toPx(), 12.dp.toPx()))
+    drawRoundRect(colors.accent, Offset(c.x - size.width * 0.2f, c.y + size.height * 0.12f), androidx.compose.ui.geometry.Size(size.width * 0.4f, size.height * 0.06f), CornerRadius(26.dp.toPx(), 26.dp.toPx()))
+    drawCircle(Color(0xFFD82018), 10.dp.toPx(), Offset(c.x, c.y + size.height * 0.19f))
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBirthdayHero(colors: OnboardingColors) {
+    val cardLeft = size.width * 0.18f
+    val cardTop = size.height * 0.36f
+    drawSoftShadow(colors, Offset(size.width * 0.5f, size.height * 0.76f), size.width * 0.32f, size.height * 0.055f)
+    drawRoundRect(colors.surface, Offset(cardLeft, cardTop), androidx.compose.ui.geometry.Size(size.width * 0.64f, size.height * 0.25f), CornerRadius(26.dp.toPx(), 26.dp.toPx()))
+    drawRoundRect(colors.line.copy(alpha = 0.75f), Offset(cardLeft, cardTop), androidx.compose.ui.geometry.Size(size.width * 0.64f, size.height * 0.25f), CornerRadius(26.dp.toPx(), 26.dp.toPx()), style = Stroke(1.dp.toPx()))
+    
+    val avatarCenter = Offset(cardLeft + size.width * 0.12f, cardTop + size.height * 0.11f)
+    drawCircle(colors.accent.copy(alpha = 0.85f), 22.dp.toPx(), avatarCenter)
+    drawCircle(colors.surface, 8.dp.toPx(), avatarCenter - Offset(0f, 3.dp.toPx()))
+    drawRoundRect(colors.surface, Offset(avatarCenter.x - 9.dp.toPx(), avatarCenter.y + 2.dp.toPx()), androidx.compose.ui.geometry.Size(18.dp.toPx(), 11.dp.toPx()), CornerRadius(6.dp.toPx(), 6.dp.toPx()))
+    
+    val nativeCanvas = drawContext.canvas.nativeCanvas
+    val textStartX = cardLeft + size.width * 0.22f
+    val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = colors.primaryText.toArgb()
+        textSize = 10.sp.toPx()
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    val subtitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = colors.secondaryText.toArgb()
+        textSize = 8.sp.toPx()
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+    }
+    val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = colors.accent.toArgb()
+        textSize = 9.sp.toPx()
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    nativeCanvas.drawText("Alex Smith", textStartX, cardTop + size.height * 0.08f, namePaint)
+    nativeCanvas.drawText("Birthday", textStartX, cardTop + size.height * 0.14f, subtitlePaint)
+    nativeCanvas.drawText("May 20", textStartX, cardTop + size.height * 0.21f, datePaint)
+
+    drawCake(colors, Offset(cardLeft + size.width * 0.44f, cardTop - size.height * 0.06f))
+    drawGift(colors, Offset(cardLeft + size.width * 0.55f, cardTop + size.height * 0.15f))
+    drawLockBadge(colors, Offset(cardLeft + size.width * 0.58f, cardTop + size.height * 0.21f))
+    drawLeafCluster(colors, Offset(size.width * 0.18f, size.height * 0.68f), -1f)
+    drawLeafCluster(colors, Offset(size.width * 0.82f, size.height * 0.65f), 1f)
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawReadyHero(colors: OnboardingColors) {
+    val c = Offset(size.width * 0.5f, size.height * 0.47f)
+    repeat(5) { index ->
+        drawCircle(colors.accent.copy(alpha = 0.1f - index * 0.014f), size.minDimension * (0.18f + index * 0.075f), c)
+    }
+    drawCircle(
+        brush = Brush.verticalGradient(listOf(Color(0xFFFF7168), colors.accent, Color(0xFFD71912))),
+        radius = size.minDimension * 0.18f,
+        center = c,
+    )
+    val checkPath = androidx.compose.ui.graphics.Path().apply {
+        moveTo(c.x - 28.dp.toPx(), c.y - 2.dp.toPx())
+        lineTo(c.x - 7.dp.toPx(), c.y + 19.dp.toPx())
+        lineTo(c.x + 28.dp.toPx(), c.y - 19.dp.toPx())
+    }
+    drawPath(
+        path = checkPath,
+        color = Color.White,
+        style = Stroke(width = 7.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+    )
+    repeat(8) { index ->
+        val angle = index * 0.78f
+        val x = c.x + kotlin.math.cos(angle) * size.width * 0.33f
+        val y = c.y + kotlin.math.sin(angle) * size.height * 0.27f
+        if (index % 2 == 0) {
+            drawCircle(colors.accent.copy(alpha = 0.8f), 2.5.dp.toPx(), Offset(x, y))
+        } else {
+            val starPath = androidx.compose.ui.graphics.Path().apply {
+                moveTo(x, y - 6.dp.toPx())
+                lineTo(x + 2.dp.toPx(), y - 2.dp.toPx())
+                lineTo(x + 6.dp.toPx(), y)
+                lineTo(x + 2.dp.toPx(), y + 2.dp.toPx())
+                lineTo(x, y + 6.dp.toPx())
+                lineTo(x - 2.dp.toPx(), y + 2.dp.toPx())
+                lineTo(x - 6.dp.toPx(), y)
+                lineTo(x - 2.dp.toPx(), y - 2.dp.toPx())
+                close()
+            }
+            drawPath(starPath, colors.accent.copy(alpha = 0.65f))
+        }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFloatingCard(
+    colors: OnboardingColors,
+    topLeft: Offset,
+    width: Float,
+    type: String,
+    titleText: String = "",
+    subtitleText: String = ""
+) {
+    val height = width * 0.42f
+    drawRoundRect(colors.shadow, topLeft + Offset(0f, 6.dp.toPx()), androidx.compose.ui.geometry.Size(width, height), CornerRadius(12.dp.toPx(), 12.dp.toPx()))
+    drawRoundRect(colors.surface, topLeft, androidx.compose.ui.geometry.Size(width, height), CornerRadius(12.dp.toPx(), 12.dp.toPx()))
+    drawRoundRect(colors.line.copy(alpha = 0.7f), topLeft, androidx.compose.ui.geometry.Size(width, height), CornerRadius(12.dp.toPx(), 12.dp.toPx()), style = Stroke(1.dp.toPx()))
+    val dotCenter = topLeft + Offset(15.dp.toPx(), height * 0.5f)
+    if (type == "grid") {
+        val gridStart = topLeft + Offset(14.dp.toPx(), height * 0.22f)
+        val gridWidth = width - 28.dp.toPx()
+        val gridHeight = height * 0.56f
+        repeat(3) { row ->
+            repeat(4) { col ->
+                val dotX = gridStart.x + col * (gridWidth / 3f)
+                val dotY = gridStart.y + row * (gridHeight / 2f)
+                drawCircle(
+                    color = if (row == 1 && col == 2) colors.accent else colors.line.copy(alpha = if (colors.isDark) 0.8f else 0.6f),
+                    radius = 2.dp.toPx(),
+                    center = Offset(dotX, dotY)
+                )
+            }
+        }
+    } else {
+        when (type) {
+            "calendar" -> drawMiniCalendarIcon(colors, dotCenter)
+            "bell" -> drawMiniBellIcon(colors, dotCenter)
+            "check" -> drawMiniCheckIcon(colors, dotCenter)
+            else -> drawCircle(colors.accent, 5.dp.toPx(), dotCenter)
+        }
+        if (titleText.isNotEmpty()) {
+            val nativeCanvas = drawContext.canvas.nativeCanvas
+            val textStartX = topLeft.x + 29.dp.toPx()
+            val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = colors.primaryText.toArgb()
+                textSize = 9.sp.toPx()
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            val subtitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = colors.secondaryText.toArgb()
+                textSize = 7.5.sp.toPx()
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            }
+            nativeCanvas.drawText(titleText, textStartX, topLeft.y + height * 0.44f, titlePaint)
+            if (subtitleText.isNotEmpty()) {
+                nativeCanvas.drawText(subtitleText, textStartX, topLeft.y + height * 0.78f, subtitlePaint)
+            }
+        } else {
+            drawRoundRect(colors.primaryText.copy(alpha = if (colors.isDark) 0.8f else 0.55f), topLeft + Offset(30.dp.toPx(), height * 0.28f), androidx.compose.ui.geometry.Size(width * 0.42f, 4.dp.toPx()), CornerRadius(2.dp.toPx(), 2.dp.toPx()))
+            drawRoundRect(colors.secondaryText.copy(alpha = 0.55f), topLeft + Offset(30.dp.toPx(), height * 0.54f), androidx.compose.ui.geometry.Size(width * 0.32f, 4.dp.toPx()), CornerRadius(2.dp.toPx(), 2.dp.toPx()))
+        }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawConnectionDots(colors: OnboardingColors, start: Offset, end: Offset) {
+    repeat(9) { index ->
+        val t = index / 8f
+        val x = start.x + (end.x - start.x) * t
+        val y = start.y + (end.y - start.y) * t
+        drawCircle(if (index % 2 == 0) colors.accent.copy(alpha = 0.7f) else colors.line, 1.8.dp.toPx(), Offset(x, y))
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSoftShadow(colors: OnboardingColors, center: Offset, width: Float, height: Float) {
+    drawOval(colors.shadow, topLeft = Offset(center.x - width / 2f, center.y - height / 2f), size = androidx.compose.ui.geometry.Size(width, height))
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCake(colors: OnboardingColors, topLeft: Offset) {
+    drawRoundRect(colors.accent, topLeft + Offset(0f, 18.dp.toPx()), androidx.compose.ui.geometry.Size(58.dp.toPx(), 26.dp.toPx()), CornerRadius(8.dp.toPx(), 8.dp.toPx()))
+    drawRoundRect(colors.surface, topLeft + Offset(7.dp.toPx(), 8.dp.toPx()), androidx.compose.ui.geometry.Size(44.dp.toPx(), 14.dp.toPx()), CornerRadius(6.dp.toPx(), 6.dp.toPx()))
+    repeat(3) { index ->
+        val x = topLeft.x + 15.dp.toPx() + index * 14.dp.toPx()
+        drawLine(colors.accent, Offset(x, topLeft.y + 2.dp.toPx()), Offset(x, topLeft.y + 11.dp.toPx()), strokeWidth = 2.dp.toPx())
+        drawCircle(Color(0xFFFFD166), 2.dp.toPx(), Offset(x, topLeft.y))
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGift(colors: OnboardingColors, topLeft: Offset) {
+    drawCircle(colors.shadow, 24.dp.toPx(), topLeft + Offset(22.dp.toPx(), 24.dp.toPx()))
+    drawRoundRect(colors.elevatedSurface, topLeft, androidx.compose.ui.geometry.Size(44.dp.toPx(), 44.dp.toPx()), CornerRadius(14.dp.toPx(), 14.dp.toPx()))
+    drawLine(colors.accent, topLeft + Offset(22.dp.toPx(), 4.dp.toPx()), topLeft + Offset(22.dp.toPx(), 39.dp.toPx()), strokeWidth = 4.dp.toPx())
+    drawLine(colors.accent, topLeft + Offset(8.dp.toPx(), 18.dp.toPx()), topLeft + Offset(36.dp.toPx(), 18.dp.toPx()), strokeWidth = 4.dp.toPx())
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMiniCalendarIcon(colors: OnboardingColors, center: Offset) {
+    val s = 14.dp.toPx()
+    val left = center.x - s / 2f
+    val top = center.y - s / 2f
+    drawRoundRect(colors.accent, Offset(left, top), androidx.compose.ui.geometry.Size(s, s), CornerRadius(3.dp.toPx(), 3.dp.toPx()))
+    drawRoundRect(Color.White.copy(alpha = 0.95f), Offset(left + 3.dp.toPx(), top + 5.dp.toPx()), androidx.compose.ui.geometry.Size(8.dp.toPx(), 6.dp.toPx()), CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()))
+    drawCircle(colors.accent, 1.2.dp.toPx(), Offset(left + 6.dp.toPx(), top + 8.dp.toPx()))
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMiniBellIcon(colors: OnboardingColors, center: Offset) {
+    drawCircle(colors.accent, 8.dp.toPx(), center)
+    drawRoundRect(Color.White, Offset(center.x - 4.5.dp.toPx(), center.y - 4.dp.toPx()), androidx.compose.ui.geometry.Size(9.dp.toPx(), 9.dp.toPx()), CornerRadius(7.dp.toPx(), 7.dp.toPx()))
+    drawRoundRect(Color.White, Offset(center.x - 7.dp.toPx(), center.y + 3.dp.toPx()), androidx.compose.ui.geometry.Size(14.dp.toPx(), 3.dp.toPx()), CornerRadius(2.dp.toPx(), 2.dp.toPx()))
+    drawCircle(Color.White, 1.8.dp.toPx(), Offset(center.x, center.y + 8.dp.toPx()))
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMiniCheckIcon(colors: OnboardingColors, center: Offset) {
+    drawCircle(colors.accent, 8.dp.toPx(), center)
+    drawLine(Color.White, center + Offset(-4.dp.toPx(), 0f), center + Offset(-1.dp.toPx(), 4.dp.toPx()), strokeWidth = 2.dp.toPx())
+    drawLine(Color.White, center + Offset(-1.dp.toPx(), 4.dp.toPx()), center + Offset(5.dp.toPx(), -5.dp.toPx()), strokeWidth = 2.dp.toPx())
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLockBadge(colors: OnboardingColors, center: Offset) {
+    drawCircle(colors.shadow, 24.dp.toPx(), center + Offset(0f, 5.dp.toPx()))
+    drawCircle(colors.elevatedSurface, 23.dp.toPx(), center)
+    drawCircle(colors.accent, 15.dp.toPx(), center)
+    drawRoundRect(Color.White, Offset(center.x - 6.dp.toPx(), center.y - 1.dp.toPx()), androidx.compose.ui.geometry.Size(12.dp.toPx(), 10.dp.toPx()), CornerRadius(3.dp.toPx(), 3.dp.toPx()))
+    drawArc(Color.White, startAngle = 200f, sweepAngle = 140f, useCenter = false, topLeft = Offset(center.x - 7.dp.toPx(), center.y - 10.dp.toPx()), size = androidx.compose.ui.geometry.Size(14.dp.toPx(), 14.dp.toPx()), style = Stroke(2.dp.toPx()))
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLeafCluster(
+    colors: OnboardingColors,
+    origin: Offset,
+    direction: Float
+) {
+    val leafColor = if (direction < 0) {
+        colors.accent.copy(alpha = 0.35f)
+    } else {
+        colors.mutedText.copy(alpha = 0.35f)
+    }
+    
+    val leafCount = 4
+    repeat(leafCount) { index ->
+        val angle = if (direction < 0) {
+            -45f + index * 20f
+        } else {
+            15f + index * 20f
+        }
+        val distance = (index * 8).dp.toPx()
+        val leafX = origin.x + direction * distance
+        val leafY = origin.y - (index * 6).dp.toPx()
+        
+        rotate(degrees = angle, pivot = Offset(leafX, leafY)) {
+            drawOval(
+                color = leafColor,
+                topLeft = Offset(leafX - 7.dp.toPx(), leafY - 18.dp.toPx()),
+                size = androidx.compose.ui.geometry.Size(14.dp.toPx(), 36.dp.toPx())
+            )
+        }
+    }
+    
+    val accentAngle = if (direction < 0) -25f else 25f
+    val mainLeafX = origin.x + direction * 10.dp.toPx()
+    val mainLeafY = origin.y + 4.dp.toPx()
+    rotate(degrees = accentAngle, pivot = Offset(mainLeafX, mainLeafY)) {
+        drawOval(
+            color = colors.accent.copy(alpha = 0.85f),
+            topLeft = Offset(mainLeafX - 9.dp.toPx(), mainLeafY - 22.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size(18.dp.toPx(), 44.dp.toPx())
+        )
+    }
 }
 
 @Composable
@@ -5643,6 +6484,14 @@ private enum class SettingsScreen {
     Root,
     Theme,
     CalendarAccounts,
+}
+
+private enum class OnboardingPage {
+    Welcome,
+    CalendarPermission,
+    Notifications,
+    Contacts,
+    Ready,
 }
 
 private data class DotCalPalette(

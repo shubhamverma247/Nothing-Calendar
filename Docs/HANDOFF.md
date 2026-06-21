@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-06-20
+Updated: 2026-06-21
 
 ## Purpose
 
@@ -182,6 +182,44 @@ Latest committed behavior:
 - 2026-06-20 widget picker previews now use themed realistic `previewLayout` resources for 2x2, 4x2, and 4x4 instead of icon-only previews; picker names are `Next Event (2x2)`, `Event Details (4x2)`, and `Calendar Dashboard (4x4)`.
 - 2026-06-20 widget picker crash/load fix: 4x4 preview no longer uses `TableLayout/TableRow`; preview is RemoteViews-safe nested `LinearLayout`/`TextView` only.
 - 2026-06-20 final widget picker polish removes size suffixes from picker names (`Next Event`, `Event Details`, `Calendar Dashboard`), tightens 2x2 preview top-left/date/content spacing with 2-line title support, and reduces 4x2 preview left padding.
+- 2026-06-21 Step 9 Onboarding implemented:
+  - Onboarding shows once from existing `KEY_ONBOARDING_DONE`.
+  - 5 pages: Welcome, Calendar Access, Reminders, Birthdays, Ready.
+  - Calendar, notification, and contacts permission requests are optional; skipping/denying keeps the app usable.
+  - Deep links skip onboarding overlay for routed launches so widget/reminder/event/task routes still open directly.
+  - No package, scheme, DB filename, Room table, or schema changes.
+- 2026-06-21 onboarding launch flicker fix: app now waits for the first `KEY_ONBOARDING_DONE` DataStore value before revealing main Calendar UI, preventing Month view from flashing before onboarding on first launch.
+- 2026-06-21 launch/splash theme fix: manifest launch theme now resolves Light in normal resources and Dark in night resources, including Android 12+ splash attrs, so the black app-icon splash follows system theme instead of always using black.
+- 2026-06-21 onboarding premium redesign:
+  - Reworked all 5 onboarding pages with a shared editorial mobile layout, larger 40-50% hero area, high-contrast labels/headings, 20dp+ button radius, and compact `N / 5` progress indicator.
+  - Added custom Compose Canvas semi-3D illustrations for Welcome calendar, Calendar Access hub, Reminders bell, Birthdays card/timeline, and Ready success state.
+  - Uses dedicated onboarding light/dark colors matching requested palette: light `#FAFAFA` / `#FFFFFF`; dark `#0B0B0D` / `#121216`; accent `#FF3B30`.
+  - Illustrations use generic event/calendar/card shapes only; no third-party calendar brand logos.
+  - No image assets, package, scheme, DB filename, Room table, or schema changes.
+- 2026-06-21 onboarding icon/UI reference-match pass:
+  - Added reference-style mini calendar, bell, check, and lock icons inside floating cards/badges.
+  - Added side foliage/accent shapes around Welcome, Reminders, and Birthdays hero compositions.
+  - Moved progress dots closer to the `N / 5` count to match the reference structure.
+  - Build passed; latest APK not installed in this pass.
+- 2026-06-21 onboarding reference correction pass:
+  - Progress indicator now uses a left-aligned group with red current count and dots near the `N / 5` label instead of reading as centered.
+  - Welcome hero calendar now has an angled side panel for a closer semi-3D reference shape.
+  - Calendar Access central calendar has border and binding details closer to the reference.
+  - Build passed; APK installed on phone `4ab0d020` after retry.
+- 2026-06-21 onboarding visual redesign execution:
+  - Added actual titles and subtitles inside all illustration floating cards on Screens 2 and 3 using Paint text drawing on Canvas.
+  - Added the fourth connection path and the fourth mini-grid card on Screen 2 (Calendar Access) to match the reference.
+  - Replaced the placeholder lines on the birthday card with actual text on Screen 4: "Alex Smith", "Birthday", and "May 20" (in red accent).
+  - Redesigned the Screen 5 completion checkmark to be drawn as a single Path with smooth round caps and joins.
+  - Updated Screen 5 celebratory particles to render 4-pointed stars (diamonds) and circles.
+  - Redesigned the Screen 1 Welcome calendar object with curved rings looping over the top, stacked page layers, a non-overlapping grid layout preventing cells from overlapping, and organic fanning leaf clusters on both left and right.
+  - Verified layout, typography, spacings, and build compiled successfully.
+- 2026-06-21 onboarding screen 1 asset integration:
+  - Replaced custom Welcome page drawing with the premium `screen1.png` asset.
+  - Tuned the Welcome illustration layout (scaled by `1.72f` and offset vertically by `20.dp`).
+  - Centered the onboarding progress dots at the bottom of the screen while keeping the page indicator text ("N / 5") left-aligned.
+  - Inserted a `24.dp` top spacer below the header row to comfortably push the illustration and text labels downward.
+  - Successfully compiled the APK and installed it directly on phone `4ab0d020`.
 
 ## Completed Roadmap Steps
 
@@ -193,12 +231,13 @@ Latest committed behavior:
 6. Tasks Tab Complete: complete, with later task detail/edit/repeat refinements.
 7. Birthday Calendar: complete.
 8. Home Screen Widgets: complete.
+9. Onboarding: complete.
 
 ## Current Next Step
 
-Continuation Roadmap Step 9: Onboarding.
+Continuation Roadmap Step 10: Settings Missing Items.
 
-Keep existing app behavior source of truth. Onboarding work must not change package, scheme, DB filename, schema columns, or 5-table count.
+Keep existing app behavior source of truth. Settings work must not rebuild Settings from scratch and must not change package, scheme, DB filename, schema columns, or 5-table count.
 
 ## Step 7 Spec: Birthday Calendar
 
@@ -265,11 +304,6 @@ Birthday UI behavior:
 
 ## Remaining Roadmap
 
-9. Onboarding:
-- Show once using `KEY_ONBOARDING_DONE`.
-- 5 pages: Welcome, Calendar permission, Notifications, Contacts, Ready.
-- App degrades gracefully when permissions skipped/denied.
-
 10. Settings Missing Items:
 - Reminders: `Default reminder` picker stored in `KEY_DEFAULT_REMINDER`.
 - Additional: Birthday calendar, Sync enabled, Sync interval.
@@ -322,6 +356,15 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed before committing onboarding/splash/theme changes; no phone/manual UI QA run.
+- 2026-06-21: APK installed on phone `4ab0d020` after onboarding reference correction retry with `adb install -r app\build\outputs\apk\debug\app-debug.apk`; no manual UI QA run.
+- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after onboarding reference correction pass.
+- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after onboarding icon/UI reference-match pass; no phone/manual UI QA run.
+- 2026-06-21: Premium onboarding redesign APK installed on phone `4ab0d020` with `adb install -r app\build\outputs\apk\debug\app-debug.apk`; no manual UI QA run.
+- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after premium onboarding redesign.
+- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after launch/splash theme resource fix; APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after onboarding launch flicker fix; APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed for Step 9 Onboarding; no phone/manual UI QA run.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after final widget picker naming/spacing polish; no phone/manual UI QA run.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after replacing 4x4 picker preview table layout with RemoteViews-safe linear rows; no phone/manual UI QA run.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 4x2 widget polish and widget picker preview/name updates; no phone/manual UI QA run.
@@ -355,8 +398,18 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from 4x2 polish and widget picker preview update build is available at `app/build/outputs/apk/debug/app-debug.apk`; not installed in this pass.
+- Latest debug APK from onboarding screen1 asset integration build is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run in the commit pass.
 - Confirm package `com.dotfield.dotcal`, label `DotCal`.
+- First normal app launch: onboarding appears once with 5 pages: DotCal, Calendar Access, Reminders, Birthdays, Ready.
+- First normal app launch: Calendar Month should not flash before onboarding appears.
+- Onboarding visual QA: all 5 pages should use the same premium editorial layout, large semi-3D hero illustration, light/dark palette, red accent, `N / 5` progress, full-width rounded primary CTA, and secondary `Not Now` where applicable.
+- Onboarding icon QA: floating cards/badges should show reference-style mini calendar, bell, check, and lock icons; progress dots should sit near the `N / 5` count.
+- Onboarding progress QA: progress should be left-aligned under the copy group, with current number in red and dots near the count, not centered.
+- Onboarding illustrations: Calendar Access uses generic event/calendar cards only; no Google/Outlook/Yahoo/Apple or other third-party logos.
+- Phone in light theme: launch/splash screen should use light background behind app icon. Phone in dark theme: launch/splash screen should use dark background.
+- Onboarding: allow or skip Calendar/Notifications/Contacts; denied/skipped permissions should not block local app use.
+- Onboarding: after Skip or Start, relaunch should not show onboarding again.
+- Onboarding/deep links: event/task/widget/reminder deep links should open their target directly instead of being covered by onboarding.
 - Launcher widgets: add DotCal small 2x2, medium 4x2, and large 4x4 widgets.
 - Widgets: visible-calendar events render; tasks do not render; hidden calendar events do not render.
 - 2x2 widget: no app icon; red date circle, date label, one-line event title, time/location; empty state opens Add Event.
@@ -398,13 +451,16 @@ Do not change package name, deep link scheme, or DB filename. Do not run phone/m
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
 ```
 
-Latest completed work: widget refinement pass after `340b036 Add home screen widgets`.
-- Shared widget radius is 24dp.
-- 4x4 widget dashboard refinements are complete: no header icon, larger month grid, filled current-day circle, event dots, 2 stacked upcoming events, `+X more`, Add Event empty state, and date-specific month deep links.
-- 4x2 widget balance/readability polish is complete: date circle moved left, event block remains centered, title supports 2 lines, and dark secondary contrast is improved.
-- Widget picker previews are realistic themed `previewLayout` resources for 2x2, 4x2, and 4x4.
-- 4x4 picker preview is RemoteViews-safe nested `LinearLayout`/`TextView` only; no `TableLayout/TableRow`.
-- Widget picker names are `Next Event`, `Event Details`, and `Calendar Dashboard`.
-- Required debug build passed; no phone/manual UI QA run.
+Latest completed work: Continuation Roadmap Step 9, Onboarding.
+- Shows once using existing `KEY_ONBOARDING_DONE`.
+- 5 pages: Welcome (using screen1.png asset scaled by 1.72f, offset by 20.dp, and separated by a 24.dp spacer), Calendar Access, Reminders, Birthdays, Ready.
+- Calendar/notification/contacts permissions are optional; app stays usable when skipped or denied.
+- Routed deep links skip onboarding overlay for direct widget/reminder/event/task launches.
+- First-launch flicker fix waits for onboarding preference load before revealing Calendar Month.
+- Launch/splash theme follows system day/night resources before Compose starts.
+- Premium onboarding redesign uses shared editorial layout, large semi-3D Compose Canvas illustrations, requested light/dark palette, centered progress dots with left-aligned progress text count, rounded full-width CTA, and generic no-brand calendar/event visuals.
+- Latest correction: progress indicator left-aligned, welcome angled side panel, calendar access border details match reference, and floating cards render realistic texts/shapes. Build passed.
+- No package, deep link scheme, DB filename, Room table, or schema changes.
+- Required debug build passed after redesign; latest APK installed on phone `4ab0d020`; no manual UI QA run.
 
-Current next implementation step: Continuation Roadmap Step 9, Onboarding, but keep existing app behavior as source of truth where conflicts exist.
+Current next implementation step: Continuation Roadmap Step 10, Settings Missing Items, but keep existing app behavior as source of truth where conflicts exist.

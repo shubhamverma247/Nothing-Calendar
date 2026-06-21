@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.DotCal" parent="@style/Theme.DotCal.Dark" />
+    <style name="Theme.DotCal" parent="@style/Theme.DotCal.Light" />
 
     <style name="Theme.DotCal.Dark" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowActionBar">false</item>
