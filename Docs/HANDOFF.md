@@ -222,7 +222,7 @@ Latest committed behavior:
   - Inserted a `24.dp` top spacer below the header row to comfortably push the illustration and text labels downward.
   - Successfully compiled the APK and installed it directly on phone `4ab0d020`.
 - 2026-06-21 onboarding screen assets integration and light/dark theme distinction:
-  - Integrated all 5 screen assets (`screen1.png` through `screen5.png`) for Light Mode, and all 5 screen assets (`dark1.png` through `dark5.png`) for Dark Mode.
+  - Integrated screen assets for Light Mode (`screen1.png` to `screen4.png`) and Dark Mode (`dark1.png` to `dark4.png`), and `both5.png` for Screen 5 in both themes.
   - Set layout spacing with `1.72f` image scale, `4.dp` image y-offset, `12.dp` top spacer above image, and `64.dp` spacer below image for better layout balance.
   - Implemented missing settings helpers (`parseStoredTime`, `toHour12`, `toHour24`, `allDayReminderTimeLabel`) in `DotCalApp.kt` to fix unresolved settings compilation errors.
 - 2026-06-21 Step 10 Settings Missing Items implemented:

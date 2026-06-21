@@ -1324,13 +1324,15 @@ private fun OnboardingHero(page: OnboardingPage, colors: OnboardingColors, modif
             .heightIn(min = 270.dp, max = 360.dp),
         contentAlignment = Alignment.Center,
     ) {
-        val imageRes = if (colors.isDark) {
+        val imageRes = if (page == OnboardingPage.Ready) {
+            com.dotfield.dotcal.R.drawable.both5
+        } else if (colors.isDark) {
             when (page) {
                 OnboardingPage.Welcome -> com.dotfield.dotcal.R.drawable.dark1
                 OnboardingPage.CalendarPermission -> com.dotfield.dotcal.R.drawable.dark2
                 OnboardingPage.Notifications -> com.dotfield.dotcal.R.drawable.dark3
                 OnboardingPage.Contacts -> com.dotfield.dotcal.R.drawable.dark4
-                OnboardingPage.Ready -> com.dotfield.dotcal.R.drawable.dark5
+                else -> com.dotfield.dotcal.R.drawable.both5
             }
         } else {
             when (page) {
@@ -1338,7 +1340,7 @@ private fun OnboardingHero(page: OnboardingPage, colors: OnboardingColors, modif
                 OnboardingPage.CalendarPermission -> com.dotfield.dotcal.R.drawable.screen2
                 OnboardingPage.Notifications -> com.dotfield.dotcal.R.drawable.screen3
                 OnboardingPage.Contacts -> com.dotfield.dotcal.R.drawable.screen4
-                OnboardingPage.Ready -> com.dotfield.dotcal.R.drawable.screen5
+                else -> com.dotfield.dotcal.R.drawable.both5
             }
         }
 
