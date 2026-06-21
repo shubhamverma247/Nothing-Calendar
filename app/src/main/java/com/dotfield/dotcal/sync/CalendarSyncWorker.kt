@@ -53,10 +53,11 @@ class CalendarSyncWorker(
 object CalendarSyncWorkScheduler {
     suspend fun syncFromPreferences(context: Context) {
         val preferences = context.calendarPreferencesDataStore.data.first()
-        if (preferences[CalendarPreferences.KEY_SYNC_ENABLED] == true) {
+        val interval = preferences[CalendarPreferences.KEY_SYNC_INTERVAL_MINS] ?: DEFAULT_SYNC_INTERVAL_MINS
+        if (preferences[CalendarPreferences.KEY_SYNC_ENABLED] == true && interval > 0) {
             schedulePeriodic(
                 context = context,
-                intervalMinutes = preferences[CalendarPreferences.KEY_SYNC_INTERVAL_MINS] ?: DEFAULT_SYNC_INTERVAL_MINS,
+                intervalMinutes = interval,
             )
         } else {
             cancelPeriodic(context)
@@ -73,6 +74,10 @@ object CalendarSyncWorkScheduler {
     }
 
     fun schedulePeriodic(context: Context, intervalMinutes: Int) {
+        if (intervalMinutes <= 0) {
+            cancelPeriodic(context)
+            return
+        }
         val interval = intervalMinutes.coerceAtLeast(MIN_SYNC_INTERVAL_MINS)
         val request = PeriodicWorkRequestBuilder<CalendarSyncWorker>(interval.toLong(), TimeUnit.MINUTES).build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(

@@ -220,6 +220,14 @@ Latest committed behavior:
   - Centered the onboarding progress dots at the bottom of the screen while keeping the page indicator text ("N / 5") left-aligned.
   - Inserted a `24.dp` top spacer below the header row to comfortably push the illustration and text labels downward.
   - Successfully compiled the APK and installed it directly on phone `4ab0d020`.
+- 2026-06-21 Step 10 Settings Missing Items implemented:
+  - Settings now has a functional `Default reminder` picker stored in existing `KEY_DEFAULT_REMINDER`; new Add Event uses it as the preselected reminder while existing event edits preserve their stored reminder/none state.
+  - Reminder options are `None`, `5 minutes before`, `10 minutes before`, `30 minutes before`, `1 hour before`, and `1 day before`.
+  - `Birthday calendar` now lives under Additional and still uses existing `KEY_BIRTHDAY_ENABLED` / contacts permission / birthday import behavior.
+  - `Sync interval` now includes `Manual`, `15 min`, `30 min`, and `1 hour`; Manual cancels periodic WorkManager sync while leaving manual Sync Now available.
+  - Added About rows: `Privacy Policy` opens an in-app WebView at `https://dotfieldstudio.com/dotcal/privacy`, `Rate DotCal` opens the Play Store listing, and `Version` reads `BuildConfig.VERSION_NAME`.
+  - Enabled app `BuildConfig` and added `INTERNET` permission only for the in-app privacy WebView.
+  - No package, deep link scheme, DB filename, Room table, column, or schema changes.
 
 ## Completed Roadmap Steps
 
@@ -232,12 +240,13 @@ Latest committed behavior:
 7. Birthday Calendar: complete.
 8. Home Screen Widgets: complete.
 9. Onboarding: complete.
+10. Settings Missing Items: complete.
 
 ## Current Next Step
 
-Continuation Roadmap Step 10: Settings Missing Items.
+Continuation Roadmap Step 11: Release Rules.
 
-Keep existing app behavior source of truth. Settings work must not rebuild Settings from scratch and must not change package, scheme, DB filename, schema columns, or 5-table count.
+Keep existing app behavior source of truth. Release work must not change package, scheme, DB filename, schema columns, or 5-table count.
 
 ## Step 7 Spec: Birthday Calendar
 
@@ -356,6 +365,7 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Step 10 Settings Missing Items; no phone/manual UI QA run.
 - 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed before committing onboarding/splash/theme changes; no phone/manual UI QA run.
 - 2026-06-21: APK installed on phone `4ab0d020` after onboarding reference correction retry with `adb install -r app\build\outputs\apk\debug\app-debug.apk`; no manual UI QA run.
 - 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after onboarding reference correction pass.
@@ -398,7 +408,7 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from onboarding screen1 asset integration build is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run in the commit pass.
+- Latest debug APK from Step 10 Settings Missing Items build is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run in this pass.
 - Confirm package `com.dotfield.dotcal`, label `DotCal`.
 - First normal app launch: onboarding appears once with 5 pages: DotCal, Calendar Access, Reminders, Birthdays, Ready.
 - First normal app launch: Calendar Month should not flash before onboarding appears.
@@ -430,6 +440,9 @@ For current latest app state:
 - Event Detail: event taps open detail; edit pencil opens editor; delete confirms.
 - Tasks: bottom nav opens Tasks; filters work; add/edit/detail/delete/complete behavior matches Task Detail rules above.
 - Settings: theme, sync, calendar accounts, switches, and back behavior match current UI.
+- Settings > Reminders: `Default reminder` picker persists `None`, `5 min`, `10 min`, `30 min`, `1 hour`, and `1 day`; new Add Event opens with the selected default reminder.
+- Settings > Additional: `Birthday calendar` toggle, `Sync enabled`, `Sync interval`, and `Sync Now` preserve existing behavior; `Manual` sync interval cancels periodic background sync but leaves `Sync Now` usable.
+- Settings > About: Privacy Policy opens in-app WebView, Rate DotCal opens Play Store, and Version shows `1.0.0` from `BuildConfig.VERSION_NAME`.
 - Reminders: future event/task reminders fire; View/Snooze actions route correctly.
 
 For Step 7 after implementation:
@@ -463,4 +476,4 @@ Latest completed work: Continuation Roadmap Step 9, Onboarding.
 - No package, deep link scheme, DB filename, Room table, or schema changes.
 - Required debug build passed after redesign; latest APK installed on phone `4ab0d020`; no manual UI QA run.
 
-Current next implementation step: Continuation Roadmap Step 10, Settings Missing Items, but keep existing app behavior as source of truth where conflicts exist.
+Current next implementation step: Continuation Roadmap Step 11, Release Rules, but keep existing app behavior as source of truth where conflicts exist.
