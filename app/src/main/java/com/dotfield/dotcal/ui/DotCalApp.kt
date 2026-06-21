@@ -1165,7 +1165,7 @@ private fun OnboardingScreen(
                     .fillMaxWidth()
                     .weight(1.05f),
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(48.dp))
             Text(
                 text = copy.label,
                 color = colors.accent,
