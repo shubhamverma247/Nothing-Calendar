@@ -16,6 +16,8 @@ import android.provider.Settings
 import android.os.SystemClock
 import android.widget.Toast
 import android.util.Size
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -133,6 +135,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -150,6 +153,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.datastore.preferences.core.edit
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import com.dotfield.dotcal.BuildConfig
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventEditorData
@@ -194,7 +198,7 @@ private val editorTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.U
 private const val WEEK_HOUR_HEIGHT_DP = 64f
 private const val BOOT_PREFS = "dotcal_boot"
 private const val BOOT_THEME_KEY = "theme_mode"
-private val reminderOptions = listOf(null, 5, 10, 30)
+private val reminderOptions = listOf(null, 5, 10, 30, 60, 1440)
 private val taskReminderOptions = listOf(null, 5, 10, 30, 1440)
 private data class RecurrenceOption(val label: String, val rrule: String?)
 private val recurrenceOptions = listOf(
@@ -293,6 +297,12 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] ?: false
         }
     }.collectAsStateWithLifecycle(initialValue = false)
+    val defaultReminderMinutes by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            val stored = preferences[CalendarPreferences.KEY_DEFAULT_REMINDER] ?: 5
+            stored.takeIf { it >= 0 }
+        }
+    }.collectAsStateWithLifecycle(initialValue = 5)
     val onboardingDone by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_ONBOARDING_DONE] ?: false
@@ -786,6 +796,7 @@ fun DotCalApp(
                 syncMetadata = syncMetadata,
                 isSyncing = isSyncing,
                 birthdayEnabled = birthdayEnabled,
+                defaultReminderMinutes = defaultReminderMinutes,
                 accounts = accounts,
                 hasCalendarPermission = hasCalendarPermission,
                 onSyncNow = { runSyncNow(showToast = true) },
@@ -811,9 +822,22 @@ fun DotCalApp(
                         context.calendarPreferencesDataStore.edit { preferences ->
                             preferences[CalendarPreferences.KEY_SYNC_INTERVAL_MINS] = interval
                         }
-                        if (syncEnabled) {
+                        if (syncEnabled && interval > 0) {
                             CalendarSyncWorkScheduler.cancelPeriodic(context)
                             CalendarSyncWorkScheduler.schedulePeriodic(context, interval)
+                        } else {
+                            CalendarSyncWorkScheduler.cancelPeriodic(context)
+                        }
+                    }
+                },
+                onDefaultReminderSelected = { minutes ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            if (minutes == null) {
+                                preferences[CalendarPreferences.KEY_DEFAULT_REMINDER] = -1
+                            } else {
+                                preferences[CalendarPreferences.KEY_DEFAULT_REMINDER] = minutes
+                            }
                         }
                     }
                 },
@@ -838,6 +862,11 @@ fun DotCalApp(
                             Toast.makeText(context, "Birthdays disabled", Toast.LENGTH_SHORT).show()
                         }
                     }
+                },
+                onRateDotCal = {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.dotfield.dotcal")),
+                    )
                 },
                 onRequestCalendarAccess = {
                     if (hasCalendarPermission) {
@@ -949,7 +978,11 @@ fun DotCalApp(
                 editorSessionKey = editorSessionKey,
                 selectedDate = selectedDate,
                 selectedTime = addStartTime,
-                initialReminderMinutes = editingEvent?.let { event -> reminders.firstOrNull { it.eventId == event.baseEventId() }?.minutesBefore },
+                initialReminderMinutes = if (editingEvent == null) {
+                    defaultReminderMinutes
+                } else {
+                    reminders.firstOrNull { it.eventId == editingEvent?.baseEventId() }?.minutesBefore
+                },
                 palette = palette,
                 onDismiss = {
                     editingEvent = null
@@ -1281,6 +1314,17 @@ private fun OnboardingHero(page: OnboardingPage, colors: OnboardingColors, modif
         if (page == OnboardingPage.Welcome) {
             Image(
                 painter = androidx.compose.ui.res.painterResource(id = com.dotfield.dotcal.R.drawable.screen1),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .scale(1.72f)
+                    .offset(y = 20.dp)
+                    .padding(vertical = 12.dp),
+                contentScale = ContentScale.Fit
+            )
+        } else if (page == OnboardingPage.CalendarPermission) {
+            Image(
+                painter = androidx.compose.ui.res.painterResource(id = com.dotfield.dotcal.R.drawable.screen2),
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
@@ -5447,13 +5491,16 @@ private fun SettingsPreview(
     syncMetadata: List<SyncMetadata>,
     isSyncing: Boolean,
     birthdayEnabled: Boolean,
+    defaultReminderMinutes: Int?,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
     onAccountVisibilityChange: (String, Boolean) -> Unit,
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
+    onDefaultReminderSelected: (Int?) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
+    onRateDotCal: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
 ) {
     BackHandler {
@@ -5474,13 +5521,17 @@ private fun SettingsPreview(
             syncMetadata = syncMetadata,
             isSyncing = isSyncing,
             birthdayEnabled = birthdayEnabled,
+            defaultReminderMinutes = defaultReminderMinutes,
             accounts = accounts,
             hasCalendarPermission = hasCalendarPermission,
             onSyncNow = onSyncNow,
             onAccountVisibilityChange = onAccountVisibilityChange,
             onSyncEnabledChange = onSyncEnabledChange,
             onSyncIntervalSelected = onSyncIntervalSelected,
+            onDefaultReminderSelected = onDefaultReminderSelected,
             onBirthdayEnabledChange = onBirthdayEnabledChange,
+            onPrivacyPolicy = { onScreenChange(SettingsScreen.PrivacyPolicy) },
+            onRateDotCal = onRateDotCal,
             onRequestCalendarAccess = onRequestCalendarAccess,
         )
         AnimatedVisibility(
@@ -5514,6 +5565,17 @@ private fun SettingsPreview(
             onAccountVisibilityChange = onAccountVisibilityChange,
             )
         }
+        AnimatedVisibility(
+            visible = screen == SettingsScreen.PrivacyPolicy,
+            enter = slideInHorizontally(initialOffsetX = { it }),
+            exit = slideOutHorizontally(targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+        ) {
+            PrivacyPolicySettings(
+                palette = palette,
+                onBack = { onScreenChange(SettingsScreen.Root) },
+            )
+        }
     }
 }
 
@@ -5528,13 +5590,17 @@ private fun SettingsRoot(
     syncMetadata: List<SyncMetadata>,
     isSyncing: Boolean,
     birthdayEnabled: Boolean,
+    defaultReminderMinutes: Int?,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
     onAccountVisibilityChange: (String, Boolean) -> Unit,
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
+    onDefaultReminderSelected: (Int?) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
+    onPrivacyPolicy: () -> Unit,
+    onRateDotCal: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -5565,19 +5631,23 @@ private fun SettingsRoot(
 
             SettingsSectionTitle("Reminders", palette)
             SettingsMenuRow(title = "Reminders", value = "", palette = palette, onClick = {})
-            SettingsMenuRow(title = "Default reminder time", value = "5 minutes before", palette = palette, showStepper = true, onClick = {})
-            SettingsMenuRow(title = "Default all-day reminder time", value = "8:00 am", palette = palette, onClick = {})
-            SettingsToggleRow(
-                title = "Import contacts' birthdays",
-                subtitle = "Automatically import and display contacts' birthdays",
-                checked = birthdayEnabled,
+            SettingsDefaultReminderRow(
+                selectedMinutes = defaultReminderMinutes,
                 palette = palette,
-                onCheckedChange = onBirthdayEnabledChange,
+                onReminderSelected = onDefaultReminderSelected,
             )
+            SettingsMenuRow(title = "Default all-day reminder time", value = "8:00 am", palette = palette, onClick = {})
             SettingsDivider(palette)
 
             SettingsSectionTitle("Additional", palette)
             SettingsThemeDropdownRow(themeMode = themeMode, palette = palette, onThemeSelected = onThemeSelected)
+            SettingsToggleRow(
+                title = "Birthday calendar",
+                subtitle = "Import contacts' birthdays",
+                checked = birthdayEnabled,
+                palette = palette,
+                onCheckedChange = onBirthdayEnabledChange,
+            )
             SettingsToggleRow(title = "Sync enabled", checked = syncEnabled, palette = palette, onCheckedChange = onSyncEnabledChange)
             SettingsSyncIntervalRow(intervalMins = syncIntervalMins, palette = palette, onIntervalSelected = onSyncIntervalSelected)
             SettingsSyncNowRow(
@@ -5586,7 +5656,12 @@ private fun SettingsRoot(
                 palette = palette,
                 onClick = onSyncNow,
             )
-            SettingsMenuRow(title = "About this app", value = "", palette = palette, onClick = {})
+            SettingsDivider(palette)
+
+            SettingsSectionTitle("About", palette)
+            SettingsMenuRow(title = "Privacy Policy", value = "", palette = palette, onClick = onPrivacyPolicy)
+            SettingsMenuRow(title = "Rate DotCal", value = "", palette = palette, onClick = onRateDotCal)
+            SettingsMenuRow(title = "Version", value = BuildConfig.VERSION_NAME, palette = palette, showChevron = false, onClick = {})
             Spacer(modifier = Modifier.height(32.dp))
             }
         }
@@ -5736,6 +5811,31 @@ private fun CalendarAccountsSettings(
 }
 
 @Composable
+private fun PrivacyPolicySettings(
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
+        SettingsCompactHeader(palette = palette, onBack = onBack, title = "Privacy Policy")
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { context ->
+                WebView(context).apply {
+                    webViewClient = WebViewClient()
+                    settings.javaScriptEnabled = false
+                    loadUrl("https://dotfieldstudio.com/dotcal/privacy")
+                }
+            },
+            update = { webView ->
+                if (webView.url != "https://dotfieldstudio.com/dotcal/privacy") {
+                    webView.loadUrl("https://dotfieldstudio.com/dotcal/privacy")
+                }
+            },
+        )
+    }
+}
+
+@Composable
 private fun CalendarAccountToggleRow(
     account: CalendarAccount,
     palette: DotCalPalette,
@@ -5784,6 +5884,61 @@ private fun CalendarAccountToggleRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsDefaultReminderRow(
+    selectedMinutes: Int?,
+    palette: DotCalPalette,
+    onReminderSelected: (Int?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .noRippleClickable { expanded = true },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Default reminder", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(reminderLabel(selectedMinutes), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                UpDownChevron(tint = palette.secondaryText)
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(palette.dialogSurface),
+        ) {
+            reminderOptions.forEach { option ->
+                DropdownMenuItem(
+                    modifier = Modifier.background(palette.dialogSurface),
+                    text = {
+                        Text(
+                            reminderLabel(option),
+                            color = palette.primaryText,
+                            fontFamily = mono,
+                            fontSize = 16.sp,
+                        )
+                    },
+                    trailingIcon = {
+                        if (option == selectedMinutes) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = palette.primaryText)
+                        }
+                    },
+                    onClick = {
+                        onReminderSelected(option)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun SettingsSectionTitle(title: String, palette: DotCalPalette) {
     Text(
@@ -5801,6 +5956,7 @@ private fun SettingsMenuRow(
     value: String,
     palette: DotCalPalette,
     showStepper: Boolean = false,
+    showChevron: Boolean = true,
     onClick: () -> Unit,
 ) {
     Row(
@@ -5820,7 +5976,7 @@ private fun SettingsMenuRow(
             }
             if (showStepper) {
                 UpDownChevron(tint = palette.secondaryText)
-            } else {
+            } else if (showChevron) {
                 Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
             }
         }
@@ -5942,7 +6098,7 @@ private fun SettingsSyncIntervalRow(
     onIntervalSelected: (Int) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val options = listOf(15, 30, 60, 120)
+    val options = listOf(0, 15, 30, 60)
     Box {
         Row(
             modifier = Modifier
@@ -6241,7 +6397,12 @@ private fun coerceEndAfterStart(start: LocalTime, end: LocalTime): LocalTime {
 }
 
 private fun reminderLabel(minutes: Int?): String {
-    return minutes?.let { "$it minutes before" } ?: "None"
+    return when (minutes) {
+        null -> "None"
+        60 -> "1 hour before"
+        1440 -> "1 day before"
+        else -> "$minutes minutes before"
+    }
 }
 
 private fun RecurringEditScope.label(): String {
@@ -6257,6 +6418,7 @@ private fun dateTimeLabel(date: LocalDate, time: LocalTime): String {
 
 private fun syncIntervalLabel(minutes: Int): String {
     return when (minutes) {
+        0 -> "Manual"
         60 -> "1 hour"
         120 -> "2 hours"
         else -> "$minutes min"
@@ -6484,6 +6646,7 @@ private enum class SettingsScreen {
     Root,
     Theme,
     CalendarAccounts,
+    PrivacyPolicy,
 }
 
 private enum class OnboardingPage {
