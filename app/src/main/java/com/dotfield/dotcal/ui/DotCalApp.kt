@@ -1324,20 +1324,21 @@ private fun OnboardingHero(page: OnboardingPage, colors: OnboardingColors, modif
             .heightIn(min = 270.dp, max = 360.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (!colors.isDark && page == OnboardingPage.Welcome) {
+        val lightImageRes = if (!colors.isDark) {
+            when (page) {
+                OnboardingPage.Welcome -> com.dotfield.dotcal.R.drawable.screen1
+                OnboardingPage.CalendarPermission -> com.dotfield.dotcal.R.drawable.screen2
+                OnboardingPage.Notifications -> com.dotfield.dotcal.R.drawable.screen3
+                OnboardingPage.Contacts -> com.dotfield.dotcal.R.drawable.screen4
+                OnboardingPage.Ready -> com.dotfield.dotcal.R.drawable.screen5
+            }
+        } else {
+            null
+        }
+
+        if (lightImageRes != null) {
             Image(
-                painter = androidx.compose.ui.res.painterResource(id = com.dotfield.dotcal.R.drawable.screen1),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .scale(1.72f)
-                    .offset(y = 20.dp)
-                    .padding(vertical = 12.dp),
-                contentScale = ContentScale.Fit
-            )
-        } else if (!colors.isDark && page == OnboardingPage.CalendarPermission) {
-            Image(
-                painter = androidx.compose.ui.res.painterResource(id = com.dotfield.dotcal.R.drawable.screen2),
+                painter = androidx.compose.ui.res.painterResource(id = lightImageRes),
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()

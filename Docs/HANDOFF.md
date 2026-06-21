@@ -221,9 +221,9 @@ Latest committed behavior:
   - Centered the onboarding progress dots at the bottom of the screen while keeping the page indicator text ("N / 5") left-aligned.
   - Inserted a `24.dp` top spacer below the header row to comfortably push the illustration and text labels downward.
   - Successfully compiled the APK and installed it directly on phone `4ab0d020`.
-- 2026-06-21 onboarding screen 2 asset integration and light/dark theme distinction:
-  - Integrated `screen2.png` asset for Screen 2 (`CalendarPermission`) in Light Mode, scaled by `1.72f` and offset by `20.dp`.
-  - Configured Onboarding screens 1 and 2 to fall back to premium Canvas-drawn illustrations in Dark Mode since only light theme assets are provided.
+- 2026-06-21 onboarding screen assets integration and light/dark theme distinction:
+  - Integrated all 5 screen assets (`screen1.png` through `screen5.png`) for Screens 1-5 in Light Mode, scaled by `1.72f` and offset by `20.dp`.
+  - Configured Onboarding screens to fall back to premium Canvas-drawn illustrations in Dark Mode since only light theme assets are provided.
   - Implemented missing settings helpers (`parseStoredTime`, `toHour12`, `toHour24`, `allDayReminderTimeLabel`) in `DotCalApp.kt` to fix unresolved settings compilation errors.
 - 2026-06-21 Step 10 Settings Missing Items implemented:
   - Settings now has a functional `Default reminder` picker stored in existing `KEY_DEFAULT_REMINDER`; new Add Event uses it as the preselected reminder while existing event edits preserve their stored reminder/none state.
