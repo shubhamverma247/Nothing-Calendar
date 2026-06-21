@@ -327,35 +327,15 @@ Birthday UI behavior:
 
 ## Remaining Roadmap
 
-10. Settings Missing Items:
-- Reminders: `Default reminder` picker stored in `KEY_DEFAULT_REMINDER`.
-- Additional: Birthday calendar, Sync enabled, Sync interval.
-- About: Privacy Policy WebView, Rate DotCal Play Store link, Version from `BuildConfig.VERSION_NAME`.
-- Do not rebuild Settings from scratch.
+No continuation roadmap items remain. Steps 1-11 are implemented.
 
-11. Release Rules:
-- Add R8/ProGuard rules after all roadmap steps complete:
+Completed Step 10 Settings Missing Items:
+- `Default reminder` picker stored in `KEY_DEFAULT_REMINDER`.
+- Additional section includes Birthday calendar, Sync enabled, Sync interval, and Sync Now.
+- About section includes Privacy Policy WebView, Rate DotCal Play Store link, and Version from `BuildConfig.VERSION_NAME`.
 
-```proguard
-# Room
--keep class * extends androidx.room.RoomDatabase
--keep @androidx.room.Entity class *
--keepclassmembers @androidx.room.Entity class * { *; }
-
-# Hilt
--keepnames @dagger.hilt.android.lifecycle.HiltViewModel class *
-
-# Kotlin Serialization
--keepattributes *Annotation*, InnerClasses
--keep @kotlinx.serialization.Serializable class * { *; }
-
-# Glance
--keep class androidx.glance.** { *; }
-
-# Coroutines
--keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
--keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
-```
+Completed Step 11 Release Rules:
+- R8/ProGuard keep rules added for Room, Hilt ViewModels, Kotlin Serialization, Glance, and coroutines.
 
 ## Architecture Rules
 
