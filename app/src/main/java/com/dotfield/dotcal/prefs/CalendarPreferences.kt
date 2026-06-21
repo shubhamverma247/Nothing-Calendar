@@ -13,6 +13,7 @@ object CalendarPreferences {
     val KEY_DEFAULT_VIEW = stringPreferencesKey("default_view")
     val KEY_WEEK_START = stringPreferencesKey("week_start")
     val KEY_DEFAULT_REMINDER = intPreferencesKey("default_reminder")
+    val KEY_DEFAULT_ALL_DAY_REMINDER_TIME = stringPreferencesKey("default_all_day_reminder_time")
     val KEY_SYNC_ENABLED = booleanPreferencesKey("sync_enabled")
     val KEY_SYNC_INTERVAL_MINS = intPreferencesKey("sync_interval_mins")
     val KEY_BIRTHDAY_ENABLED = booleanPreferencesKey("birthday_enabled")

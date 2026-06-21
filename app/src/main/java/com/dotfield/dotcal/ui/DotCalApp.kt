@@ -303,6 +303,11 @@ fun DotCalApp(
             stored.takeIf { it >= 0 }
         }
     }.collectAsStateWithLifecycle(initialValue = 5)
+    val defaultAllDayReminderTime by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            parseStoredTime(preferences[CalendarPreferences.KEY_DEFAULT_ALL_DAY_REMINDER_TIME]) ?: LocalTime.of(8, 0)
+        }
+    }.collectAsStateWithLifecycle(initialValue = LocalTime.of(8, 0))
     val onboardingDone by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_ONBOARDING_DONE] ?: false
@@ -797,6 +802,7 @@ fun DotCalApp(
                 isSyncing = isSyncing,
                 birthdayEnabled = birthdayEnabled,
                 defaultReminderMinutes = defaultReminderMinutes,
+                defaultAllDayReminderTime = defaultAllDayReminderTime,
                 accounts = accounts,
                 hasCalendarPermission = hasCalendarPermission,
                 onSyncNow = { runSyncNow(showToast = true) },
@@ -838,6 +844,13 @@ fun DotCalApp(
                             } else {
                                 preferences[CalendarPreferences.KEY_DEFAULT_REMINDER] = minutes
                             }
+                        }
+                    }
+                },
+                onDefaultAllDayReminderTimeSelected = { time ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_DEFAULT_ALL_DAY_REMINDER_TIME] = time.toString()
                         }
                     }
                 },
@@ -1311,7 +1324,7 @@ private fun OnboardingHero(page: OnboardingPage, colors: OnboardingColors, modif
             .heightIn(min = 270.dp, max = 360.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (page == OnboardingPage.Welcome) {
+        if (!colors.isDark && page == OnboardingPage.Welcome) {
             Image(
                 painter = androidx.compose.ui.res.painterResource(id = com.dotfield.dotcal.R.drawable.screen1),
                 contentDescription = null,
@@ -1322,7 +1335,7 @@ private fun OnboardingHero(page: OnboardingPage, colors: OnboardingColors, modif
                     .padding(vertical = 12.dp),
                 contentScale = ContentScale.Fit
             )
-        } else if (page == OnboardingPage.CalendarPermission) {
+        } else if (!colors.isDark && page == OnboardingPage.CalendarPermission) {
             Image(
                 painter = androidx.compose.ui.res.painterResource(id = com.dotfield.dotcal.R.drawable.screen2),
                 contentDescription = null,
@@ -1337,11 +1350,11 @@ private fun OnboardingHero(page: OnboardingPage, colors: OnboardingColors, modif
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawHeroAtmosphere(colors)
                 when (page) {
+                    OnboardingPage.Welcome -> drawCalendarHero(colors)
                     OnboardingPage.CalendarPermission -> drawCalendarHubHero(colors)
                     OnboardingPage.Notifications -> drawReminderHero(colors)
                     OnboardingPage.Contacts -> drawBirthdayHero(colors)
                     OnboardingPage.Ready -> drawReadyHero(colors)
-                    else -> {}
                 }
             }
         }
@@ -5492,6 +5505,7 @@ private fun SettingsPreview(
     isSyncing: Boolean,
     birthdayEnabled: Boolean,
     defaultReminderMinutes: Int?,
+    defaultAllDayReminderTime: LocalTime,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
@@ -5499,6 +5513,7 @@ private fun SettingsPreview(
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
     onDefaultReminderSelected: (Int?) -> Unit,
+    onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
     onRateDotCal: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
@@ -5522,6 +5537,7 @@ private fun SettingsPreview(
             isSyncing = isSyncing,
             birthdayEnabled = birthdayEnabled,
             defaultReminderMinutes = defaultReminderMinutes,
+            defaultAllDayReminderTime = defaultAllDayReminderTime,
             accounts = accounts,
             hasCalendarPermission = hasCalendarPermission,
             onSyncNow = onSyncNow,
@@ -5529,6 +5545,7 @@ private fun SettingsPreview(
             onSyncEnabledChange = onSyncEnabledChange,
             onSyncIntervalSelected = onSyncIntervalSelected,
             onDefaultReminderSelected = onDefaultReminderSelected,
+            onDefaultAllDayReminderTimeSelected = onDefaultAllDayReminderTimeSelected,
             onBirthdayEnabledChange = onBirthdayEnabledChange,
             onPrivacyPolicy = { onScreenChange(SettingsScreen.PrivacyPolicy) },
             onRateDotCal = onRateDotCal,
@@ -5591,6 +5608,7 @@ private fun SettingsRoot(
     isSyncing: Boolean,
     birthdayEnabled: Boolean,
     defaultReminderMinutes: Int?,
+    defaultAllDayReminderTime: LocalTime,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
@@ -5598,6 +5616,7 @@ private fun SettingsRoot(
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
     onDefaultReminderSelected: (Int?) -> Unit,
+    onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
     onPrivacyPolicy: () -> Unit,
     onRateDotCal: () -> Unit,
@@ -5623,9 +5642,6 @@ private fun SettingsRoot(
 
             SettingsSectionTitle("General", palette)
             SettingsMenuRow(title = "Start of the week", value = "Region default", palette = palette, showStepper = true, onClick = {})
-            SettingsMenuRow(title = "Time zone", value = "", palette = palette, onClick = {})
-            SettingsToggleRow(title = "Show week number", checked = false, palette = palette)
-            SettingsMenuRow(title = "Other calendars", value = "None", palette = palette, onClick = {})
             SettingsMenuRow(title = "Global holidays", value = "", palette = palette, onClick = {})
             SettingsDivider(palette)
 
@@ -5636,7 +5652,11 @@ private fun SettingsRoot(
                 palette = palette,
                 onReminderSelected = onDefaultReminderSelected,
             )
-            SettingsMenuRow(title = "Default all-day reminder time", value = "8:00 am", palette = palette, onClick = {})
+            SettingsAllDayReminderTimeRow(
+                selectedTime = defaultAllDayReminderTime,
+                palette = palette,
+                onTimeSelected = onDefaultAllDayReminderTimeSelected,
+            )
             SettingsDivider(palette)
 
             SettingsSectionTitle("Additional", palette)
@@ -5934,6 +5954,153 @@ private fun SettingsDefaultReminderRow(
                         expanded = false
                     },
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsAllDayReminderTimeRow(
+    selectedTime: LocalTime,
+    palette: DotCalPalette,
+    onTimeSelected: (LocalTime) -> Unit,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .noRippleClickable { showPicker = true },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Default all-day reminder time", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(allDayReminderTimeLabel(selectedTime), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            UpDownChevron(tint = palette.secondaryText)
+        }
+    }
+    if (showPicker) {
+        AllDayReminderTimeSheet(
+            selectedTime = selectedTime,
+            palette = palette,
+            onDismiss = { showPicker = false },
+            onSelected = {
+                onTimeSelected(it)
+                showPicker = false
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AllDayReminderTimeSheet(
+    selectedTime: LocalTime,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (LocalTime) -> Unit,
+) {
+    val hours = remember { (1..12).toList() }
+    val minutes = remember { (0..59).toList() }
+    val periods = remember { listOf("AM", "PM") }
+    val initialHour = selectedTime.toHour12()
+    val initialPeriod = if (selectedTime.hour < 12) "AM" else "PM"
+    var pickedHour by remember(selectedTime) { mutableStateOf(initialHour) }
+    var pickedMinute by remember(selectedTime) { mutableStateOf(selectedTime.minute) }
+    var pickedPeriod by remember(selectedTime) { mutableStateOf(initialPeriod) }
+    val pickedTime = remember(pickedHour, pickedMinute, pickedPeriod) {
+        LocalTime.of(toHour24(pickedHour, pickedPeriod), pickedMinute)
+    }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(palette.dialogSurface)
+                .padding(horizontal = 20.dp)
+                .padding(top = 4.dp, bottom = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Default all-day reminder time", color = palette.primaryText, fontFamily = mono, fontSize = 20.sp)
+            Text(
+                allDayReminderTimeLabel(pickedTime),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 15.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().height(188.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WheelColumn(
+                    items = hours,
+                    selected = pickedHour,
+                    label = { it.toString() },
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    circular = true,
+                    onSelected = { pickedHour = it },
+                )
+                WheelColumn(
+                    items = minutes,
+                    selected = pickedMinute,
+                    label = { it.toString().padStart(2, '0') },
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    circular = true,
+                    onSelected = { pickedMinute = it },
+                )
+                WheelColumn(
+                    items = periods,
+                    selected = pickedPeriod,
+                    label = { it },
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    circular = true,
+                    onSelected = { pickedPeriod = it },
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = palette.cancelSurface,
+                        contentColor = palette.primaryText,
+                    ),
+                    shape = RoundedCornerShape(18.dp),
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .border(1.dp, palette.cancelBorder, RoundedCornerShape(18.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("Cancel", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Button(
+                    onClick = { onSelected(pickedTime) },
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+                    shape = RoundedCornerShape(18.dp),
+                ) {
+                    Text("OK", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }
@@ -6385,6 +6552,28 @@ private fun CalendarEvent.endLocalTime(): LocalTime {
 
 private fun parseEditorTime(value: String): LocalTime? {
     return runCatching { LocalTime.parse(value, timeFormatter) }.getOrNull()
+}
+
+private fun LocalTime.toHour12(): Int {
+    val h = hour % 12
+    return if (h == 0) 12 else h
+}
+
+private fun toHour24(hour12: Int, period: String): Int {
+    return if (period.uppercase(Locale.US) == "PM") {
+        if (hour12 == 12) 12 else hour12 + 12
+    } else {
+        if (hour12 == 12) 0 else hour12
+    }
+}
+
+private fun allDayReminderTimeLabel(time: LocalTime): String {
+    return DateTimeFormatter.ofPattern("h:mm a", Locale.US).format(time).lowercase(Locale.US)
+}
+
+private fun parseStoredTime(value: String?): LocalTime? {
+    if (value.isNullOrBlank()) return null
+    return runCatching { LocalTime.parse(value) }.getOrNull()
 }
 
 private fun coerceEndAfterStart(start: LocalTime, end: LocalTime): LocalTime {
