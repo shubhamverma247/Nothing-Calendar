@@ -1,6 +1,7 @@
 package com.dotfield.dotcal.ui
 
 import android.Manifest
+import android.accounts.AccountManager
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -332,11 +333,30 @@ fun DotCalApp(
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
         )
     }
+    var calendarPermissionRequested by remember { mutableStateOf(false) }
+    var pendingAddAccountAfterPermission by remember { mutableStateOf(false) }
+    val addAccountLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK && !isSyncing) {
+            isSyncing = true
+            viewModel.syncNow { isSyncing = false }
+        }
+    }
     val calendarPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         hasCalendarPermission = grants[Manifest.permission.READ_CALENDAR] == true ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
         if (hasCalendarPermission) {
-            viewModel.syncNow()
+            if (pendingAddAccountAfterPermission) {
+                pendingAddAccountAfterPermission = false
+                runCatching {
+                    addAccountLauncher.launch(googleAccountPickerIntent())
+                }.onFailure {
+                    Toast.makeText(context, "Account picker unavailable", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                viewModel.syncNow()
+            }
+        } else {
+            pendingAddAccountAfterPermission = false
         }
     }
     val contactsPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -365,7 +385,6 @@ fun DotCalApp(
         hasContactsPermission = granted ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
     }
-    var calendarPermissionRequested by remember { mutableStateOf(false) }
     var onboardingPageIndex by remember { mutableStateOf(0) }
     var selectedDateRestored by remember { mutableStateOf(false) }
     var calendarTab by remember { mutableStateOf<CalendarTab?>(null) }
@@ -919,6 +938,24 @@ fun DotCalApp(
                                 ),
                             )
                         }
+                    }
+                },
+                onAddAccount = {
+                    if (hasCalendarPermission) {
+                        runCatching {
+                            addAccountLauncher.launch(googleAccountPickerIntent())
+                        }.onFailure {
+                            Toast.makeText(context, "Account picker unavailable", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        pendingAddAccountAfterPermission = true
+                        calendarPermissionRequested = true
+                        calendarPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.READ_CALENDAR,
+                                Manifest.permission.WRITE_CALENDAR,
+                            ),
+                        )
                     }
                 },
             )
@@ -5539,6 +5576,7 @@ private fun SettingsPreview(
     onBirthdayEnabledChange: (Boolean) -> Unit,
     onRateDotCal: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
+    onAddAccount: () -> Unit,
 ) {
     BackHandler {
         if (screen != SettingsScreen.Root) {
@@ -5574,6 +5612,7 @@ private fun SettingsPreview(
             onPrivacyPolicy = { onScreenChange(SettingsScreen.PrivacyPolicy) },
             onRateDotCal = onRateDotCal,
             onRequestCalendarAccess = onRequestCalendarAccess,
+            onAddAccount = onAddAccount,
         )
         AnimatedVisibility(
             visible = screen == SettingsScreen.Theme,
@@ -5604,6 +5643,7 @@ private fun SettingsPreview(
             onRequestCalendarAccess = onRequestCalendarAccess,
             onSyncNow = onSyncNow,
             onAccountVisibilityChange = onAccountVisibilityChange,
+            onAddAccount = onAddAccount,
             )
         }
         AnimatedVisibility(
@@ -5647,6 +5687,7 @@ private fun SettingsRoot(
     onPrivacyPolicy: () -> Unit,
     onRateDotCal: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
+    onAddAccount: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
@@ -5802,6 +5843,7 @@ private fun CalendarAccountsSettings(
     onRequestCalendarAccess: () -> Unit,
     onSyncNow: () -> Unit,
     onAccountVisibilityChange: (String, Boolean) -> Unit,
+    onAddAccount: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
@@ -5851,6 +5893,10 @@ private fun CalendarAccountsSettings(
                     SettingsContentDivider(palette)
                 }
             }
+            item {
+                CalendarAddAccountRow(palette = palette, onClick = onAddAccount)
+                SettingsContentDivider(palette)
+            }
             item { Spacer(modifier = Modifier.height(28.dp)) }
         }
         if (showCompactHeader) {
@@ -5880,6 +5926,32 @@ private fun PrivacyPolicySettings(
                     webView.loadUrl("https://dotfieldstudio.com/dotcal/privacy")
                 }
             },
+        )
+    }
+}
+
+@Composable
+private fun CalendarAddAccountRow(palette: DotCalPalette, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .noRippleClickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Default.Add,
+            contentDescription = null,
+            tint = palette.primaryText,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            "+ Add Account",
+            color = palette.primaryText,
+            fontFamily = mono,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
         )
     }
 }
@@ -6909,6 +6981,18 @@ private fun parseColor(hex: String): Int {
     } catch (_: IllegalArgumentException) {
         android.graphics.Color.RED
     }
+}
+
+private fun googleAccountPickerIntent(): Intent {
+    return AccountManager.newChooseAccountIntent(
+        null,
+        null,
+        arrayOf("com.google"),
+        null,
+        null,
+        null,
+        null,
+    )
 }
 
 private enum class CalendarTab(val label: String, val shortLabel: String) {

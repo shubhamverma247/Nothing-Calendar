@@ -265,9 +265,23 @@ Latest committed behavior:
 
 ## Current Next Step
 
-Continuation roadmap implementation is complete through Step 11.
+Phase 1 Step 2 pending: Print to PDF.
 
 Keep existing app behavior source of truth. Future work must not change package, scheme, DB filename, schema columns, or 5-table count unless explicitly requested.
+
+## Phase 1 - Easy Features
+
+1. Add Account button: complete.
+2. Print to PDF: pending.
+3. Extra Accent Themes: pending.
+
+Implemented Step 1:
+- Added `+ Add Account` row in Settings > Calendar Accounts below the connected account list.
+- Row uses plus icon and existing Settings row styling.
+- Tap opens Android Google account picker through `AccountManager.newChooseAccountIntent`.
+- If calendar permission is missing, Add Account requests calendar permission first, then opens the picker after grant.
+- Successful account-picker result triggers existing `syncNow`; account list refreshes through existing account Flow.
+- No new sync engine, account table, package, scheme, DB filename, Room table, column, or schema changes.
 
 ## Step 7 Spec: Birthday Calendar
 
@@ -366,6 +380,7 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Phase 1 Step 1 Add Account button; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Settings week-start picker follow-up; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after merging latest `feature/onboarding-screen` into `main`; onboarding branch changes were prioritized in conflicts; no phone/manual UI QA run.
 - 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Settings cleanup/all-day reminder picker follow-up; no phone/manual UI QA run.
@@ -451,6 +466,9 @@ For current latest app state:
 - Settings > General: `Global holidays` remains static/no-op until a holiday implementation is explicitly chosen.
 - Settings > General: `Time zone`, `Show week number`, and `Other calendars` should no longer appear.
 - Settings > Additional: `Birthday calendar` toggle, `Sync enabled`, `Sync interval`, and `Sync Now` preserve existing behavior; `Manual` sync interval cancels periodic background sync but leaves `Sync Now` usable.
+- Settings > Calendar Accounts: `+ Add Account` row appears below connected accounts; tapping it opens Android's Google account picker.
+- Settings > Calendar Accounts: canceling account picker does nothing; successfully adding/selecting an account triggers sync and refreshes the account list.
+- Settings > Calendar Accounts: if calendar permission is missing, tapping `+ Add Account` requests calendar permission first.
 - Settings > About: Privacy Policy opens in-app WebView, Rate DotCal opens Play Store, and Version shows `1.0.0` from `BuildConfig.VERSION_NAME`.
 - Reminders: future event/task reminders fire; View/Snooze actions route correctly.
 
