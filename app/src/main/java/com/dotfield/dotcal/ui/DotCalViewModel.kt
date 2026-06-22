@@ -11,16 +11,25 @@ import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
+import com.dotfield.dotcal.data.holiday.HolidayCountry
+import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.sync.CalendarSyncResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
+
+data class HolidayCountryUiItem(
+    val code: String,
+    val name: String,
+    val isSelected: Boolean,
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
@@ -40,6 +49,25 @@ class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
 
     val syncMetadata: StateFlow<List<SyncMetadata>> = repository.observeSyncMetadata()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val holidayCountries: StateFlow<List<HolidayCountryUiItem>> = repository.observeSelectedHolidayCountries()
+        .map { selectedCodes ->
+            val selected = selectedCodes.toSet()
+            HolidayDataSource.Countries.map { country ->
+                HolidayCountryUiItem(
+                    code = country.code,
+                    name = country.name,
+                    isSelected = country.code in selected,
+                )
+            }
+        }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            HolidayDataSource.Countries.map { country ->
+                HolidayCountryUiItem(country.code, country.name, isSelected = false)
+            },
+        )
 
     val reminders: StateFlow<List<EventReminder>> = repository.observeReminders()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -160,6 +188,22 @@ class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
     fun setBirthdayCalendarEnabled(enabled: Boolean, onComplete: (Result<BirthdayImportResult>) -> Unit = {}) {
         viewModelScope.launch {
             val result = runCatching { repository.setBirthdayCalendarEnabled(enabled) }
+            onComplete(result)
+        }
+    }
+
+    fun addHolidayCountry(item: HolidayCountryUiItem, onComplete: (Result<Unit>) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = runCatching {
+                repository.addHolidayCountry(HolidayCountry(item.code, item.name))
+            }
+            onComplete(result)
+        }
+    }
+
+    fun removeHolidayCountry(item: HolidayCountryUiItem, onComplete: (Result<Unit>) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = runCatching { repository.removeHolidayCountry(item.code) }
             onComplete(result)
         }
     }

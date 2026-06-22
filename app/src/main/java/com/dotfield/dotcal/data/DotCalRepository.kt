@@ -2,6 +2,8 @@ package com.dotfield.dotcal.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import com.dotfield.dotcal.data.holiday.HolidayCountry
+import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
 import com.dotfield.dotcal.reminders.ReminderScheduler
@@ -63,12 +65,16 @@ class DotCalRepository(
 ) {
     private val reminderScheduler = ReminderScheduler(context)
     private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
+    private val holidayDataSource = HolidayDataSource(context.applicationContext)
     private val syncRepository = CalendarSyncRepository(
         dao = dao,
         providerDataSource = CalendarProviderDataSource(context.applicationContext),
     )
 
     fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts()
+
+    fun observeSelectedHolidayCountries(): Flow<List<String>> = dao.observeHolidayAccountIds()
+        .map { ids -> ids.mapNotNull { it.removePrefix(HOLIDAY_ACCOUNT_PREFIX).takeIf(String::isNotBlank) } }
 
     fun observeSyncMetadata(): Flow<List<SyncMetadata>> = dao.observeSyncMetadata()
 
@@ -182,6 +188,30 @@ class DotCalRepository(
             preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] = true
         }
         BirthdayImportResult(importedCount = events.size)
+    }
+
+    suspend fun addHolidayCountry(country: HolidayCountry) = withContext(Dispatchers.IO) {
+        val accountId = holidayAccountId(country.code)
+        val account = CalendarAccount(
+            id = accountId,
+            accountName = country.name,
+            displayName = "Holidays - ${country.name}",
+            accountType = "DEVICE",
+            color = DEFAULT_EVENT_COLOR,
+            isVisible = 1,
+            isPrimary = 0,
+            sortOrder = dao.getAccount(accountId)?.sortOrder ?: ((dao.getMaxAccountSortOrder() ?: 0) + 1),
+        )
+        dao.upsertHolidayCalendar(
+            account = account,
+            events = holidayDataSource.loadBundledHolidays(country.code, accountId),
+        )
+        updateWidgets()
+    }
+
+    suspend fun removeHolidayCountry(countryCode: String) = withContext(Dispatchers.IO) {
+        dao.deleteAccount(holidayAccountId(countryCode))
+        updateWidgets()
     }
 
     suspend fun refreshBirthdayCalendarIfEnabled() = withContext(Dispatchers.IO) {
@@ -636,10 +666,14 @@ class DotCalRepository(
 
     companion object {
         const val LOCAL_ACCOUNT_ID = "local-primary"
+        private const val HOLIDAY_ACCOUNT_PREFIX = "holiday-"
+        private const val DEFAULT_EVENT_COLOR = "#FF0000"
         private const val BIRTHDAY_ACCOUNT_ID = ContactsProviderDataSource.BIRTHDAY_ACCOUNT_ID
         private const val BIRTHDAY_COLOR = ContactsProviderDataSource.BIRTHDAY_COLOR
         private const val BIRTHDAY_REMINDER_MINUTES = 1440
         private const val BIRTHDAY_SORT_ORDER = 10
+
+        fun holidayAccountId(countryCode: String): String = "$HOLIDAY_ACCOUNT_PREFIX$countryCode"
     }
 }
 

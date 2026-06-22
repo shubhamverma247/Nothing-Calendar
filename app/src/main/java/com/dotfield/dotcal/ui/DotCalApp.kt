@@ -242,6 +242,7 @@ fun DotCalApp(
     val events by viewModel.events.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val holidayCountries by viewModel.holidayCountries.collectAsStateWithLifecycle()
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val syncMetadata by viewModel.syncMetadata.collectAsStateWithLifecycle()
     val detailEvent by viewModel.detailEvent.collectAsStateWithLifecycle()
@@ -852,6 +853,7 @@ fun DotCalApp(
                 defaultReminderMinutes = defaultReminderMinutes,
                 defaultAllDayReminderTime = defaultAllDayReminderTime,
                 weekStartOption = weekStartOption,
+                holidayCountries = holidayCountries,
                 accounts = accounts,
                 hasCalendarPermission = hasCalendarPermission,
                 onSyncNow = { runSyncNow(showToast = true) },
@@ -929,6 +931,20 @@ fun DotCalApp(
                     } else {
                         viewModel.setBirthdayCalendarEnabled(false) {
                             Toast.makeText(context, "Birthdays disabled", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                onAddHolidayCountry = { item ->
+                    viewModel.addHolidayCountry(item) { result ->
+                        if (result.isFailure) {
+                            Toast.makeText(context, "Could not add holidays", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                onRemoveHolidayCountry = { item ->
+                    viewModel.removeHolidayCountry(item) { result ->
+                        if (result.isFailure) {
+                            Toast.makeText(context, "Could not remove holidays", Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
@@ -2775,7 +2791,7 @@ private fun EventDetailScreen(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val isReadOnly = event.source == "BIRTHDAY"
+    val isReadOnly = event.source == "BIRTHDAY" || event.source == "HOLIDAY"
     val imageUris = remember(event.imageUris) { parseJsonStringArray(event.imageUris) }
     var previewImageUri by remember { mutableStateOf<String?>(null) }
     Box(modifier = Modifier.fillMaxSize().background(palette.background)) {
@@ -5579,6 +5595,7 @@ private fun SettingsPreview(
     defaultReminderMinutes: Int?,
     defaultAllDayReminderTime: LocalTime,
     weekStartOption: WeekStartOption,
+    holidayCountries: List<HolidayCountryUiItem>,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
@@ -5589,6 +5606,8 @@ private fun SettingsPreview(
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
+    onAddHolidayCountry: (HolidayCountryUiItem) -> Unit,
+    onRemoveHolidayCountry: (HolidayCountryUiItem) -> Unit,
     onRateDotCal: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
     onAddAccount: () -> Unit,
@@ -5614,6 +5633,7 @@ private fun SettingsPreview(
             defaultReminderMinutes = defaultReminderMinutes,
             defaultAllDayReminderTime = defaultAllDayReminderTime,
             weekStartOption = weekStartOption,
+            holidayCountries = holidayCountries,
             accounts = accounts,
             hasCalendarPermission = hasCalendarPermission,
             onSyncNow = onSyncNow,
@@ -5624,6 +5644,7 @@ private fun SettingsPreview(
             onDefaultAllDayReminderTimeSelected = onDefaultAllDayReminderTimeSelected,
             onWeekStartSelected = onWeekStartSelected,
             onBirthdayEnabledChange = onBirthdayEnabledChange,
+            onGlobalHolidays = { onScreenChange(SettingsScreen.GlobalHolidays) },
             onPrivacyPolicy = { onScreenChange(SettingsScreen.PrivacyPolicy) },
             onRateDotCal = onRateDotCal,
             onRequestCalendarAccess = onRequestCalendarAccess,
@@ -5674,6 +5695,20 @@ private fun SettingsPreview(
             )
         }
         AnimatedVisibility(
+            visible = screen == SettingsScreen.GlobalHolidays,
+            enter = slideInHorizontally(initialOffsetX = { it }),
+            exit = slideOutHorizontally(targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+        ) {
+            GlobalHolidaysSettings(
+                countries = holidayCountries,
+                palette = palette,
+                onBack = { onScreenChange(SettingsScreen.Root) },
+                onAddCountry = onAddHolidayCountry,
+                onRemoveCountry = onRemoveHolidayCountry,
+            )
+        }
+        AnimatedVisibility(
             visible = screen == SettingsScreen.PrivacyPolicy,
             enter = slideInHorizontally(initialOffsetX = { it }),
             exit = slideOutHorizontally(targetOffsetX = { it }),
@@ -5701,6 +5736,7 @@ private fun SettingsRoot(
     defaultReminderMinutes: Int?,
     defaultAllDayReminderTime: LocalTime,
     weekStartOption: WeekStartOption,
+    holidayCountries: List<HolidayCountryUiItem>,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
@@ -5711,6 +5747,7 @@ private fun SettingsRoot(
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
+    onGlobalHolidays: () -> Unit,
     onPrivacyPolicy: () -> Unit,
     onRateDotCal: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
@@ -5740,7 +5777,12 @@ private fun SettingsRoot(
                 palette = palette,
                 onWeekStartSelected = onWeekStartSelected,
             )
-            SettingsMenuRow(title = "Global holidays", value = "", palette = palette, onClick = {})
+            SettingsMenuRow(
+                title = "Global Holidays",
+                value = selectedHolidayCountriesLabel(holidayCountries),
+                palette = palette,
+                onClick = onGlobalHolidays,
+            )
             SettingsDivider(palette)
 
             SettingsSectionTitle("Reminders", palette)
@@ -5855,6 +5897,86 @@ private fun ThemeSettings(
                     onClick = { onThemeSelected(mode) },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun GlobalHolidaysSettings(
+    countries: List<HolidayCountryUiItem>,
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onAddCountry: (HolidayCountryUiItem) -> Unit,
+    onRemoveCountry: (HolidayCountryUiItem) -> Unit,
+) {
+    val selected = remember(countries) { countries.filter { it.isSelected } }
+    val available = remember(countries) { countries.filterNot { it.isSelected } }
+    val listState = rememberLazyListState()
+    val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
+    Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
+            item {
+                SettingsLargeHeader(palette = palette, onBack = onBack, title = "Global Holidays")
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+            if (selected.isNotEmpty()) {
+                item { SettingsSectionTitle("SELECTED", palette) }
+                lazyItems(selected, key = { it.code }) { country ->
+                    HolidayCountryRow(
+                        country = country,
+                        palette = palette,
+                        selected = true,
+                        onClick = { onRemoveCountry(country) },
+                    )
+                    HolidayCountryDivider(palette)
+                }
+                item { Spacer(modifier = Modifier.height(16.dp)) }
+            }
+            if (available.isNotEmpty()) {
+                item { SettingsSectionTitle("AVAILABLE", palette) }
+                lazyItems(available, key = { it.code }) { country ->
+                    HolidayCountryRow(
+                        country = country,
+                        palette = palette,
+                        selected = false,
+                        onClick = { onAddCountry(country) },
+                    )
+                    HolidayCountryDivider(palette)
+                }
+            }
+            item { Spacer(modifier = Modifier.height(560.dp)) }
+        }
+        if (showCompactHeader) {
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Global Holidays")
+        }
+    }
+}
+
+@Composable
+private fun HolidayCountryDivider(palette: DotCalPalette) {
+    HorizontalDivider(color = palette.line, thickness = 1.dp)
+}
+
+@Composable
+private fun HolidayCountryRow(
+    country: HolidayCountryUiItem,
+    palette: DotCalPalette,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .noRippleClickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(country.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        if (selected) {
+            Icon(Icons.Default.Close, contentDescription = "Remove", tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+        } else {
+            Icon(Icons.Default.Add, contentDescription = "Add", tint = palette.accent, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -6886,6 +7008,15 @@ private fun calendarAccountsLabel(accounts: List<CalendarAccount>, hasCalendarPe
     return "$selectedCount/$providerCount selected"
 }
 
+private fun selectedHolidayCountriesLabel(countries: List<HolidayCountryUiItem>): String {
+    val count = countries.count { it.isSelected }
+    return when (count) {
+        0 -> "None selected"
+        1 -> "1 country selected"
+        else -> "$count countries selected"
+    }
+}
+
 private fun List<SyncMetadata>.lastSyncedLabel(): String {
     return lastSyncedRelativeLabel().replaceFirstChar { char ->
         if (char.isLowerCase()) char.titlecase(Locale.US) else char.toString()
@@ -7100,6 +7231,7 @@ private enum class SettingsScreen {
     Theme,
     CalendarAccounts,
     AddAccount,
+    GlobalHolidays,
     PrivacyPolicy,
 }
 

@@ -33,6 +33,12 @@ interface CalendarDao {
     @Query("SELECT * FROM calendar_accounts WHERE id = :accountId LIMIT 1")
     suspend fun getAccount(accountId: String): CalendarAccount?
 
+    @Query("SELECT MAX(sortOrder) FROM calendar_accounts")
+    suspend fun getMaxAccountSortOrder(): Int?
+
+    @Query("SELECT id FROM calendar_accounts WHERE id LIKE 'holiday-%' ORDER BY sortOrder ASC")
+    fun observeHolidayAccountIds(): Flow<List<String>>
+
     @Query("SELECT * FROM calendar_events WHERE id = :eventId LIMIT 1")
     suspend fun getEvent(eventId: String): CalendarEvent?
 
@@ -214,6 +220,9 @@ interface CalendarDao {
     @Query("DELETE FROM calendar_events WHERE id = :eventId")
     suspend fun deleteEvent(eventId: String)
 
+    @Query("DELETE FROM calendar_accounts WHERE id = :accountId")
+    suspend fun deleteAccount(accountId: String)
+
     @Query("DELETE FROM calendar_events WHERE source = 'BIRTHDAY'")
     suspend fun deleteBirthdayEvents()
 
@@ -263,5 +272,14 @@ interface CalendarDao {
         deleteBirthdayEvents()
         if (events.isNotEmpty()) upsertEvents(events)
         if (reminders.isNotEmpty()) insertReminders(reminders)
+    }
+
+    @Transaction
+    suspend fun upsertHolidayCalendar(
+        account: CalendarAccount,
+        events: List<CalendarEvent>,
+    ) {
+        upsertAccountPreservingEvents(account)
+        if (events.isNotEmpty()) upsertEvents(events)
     }
 }

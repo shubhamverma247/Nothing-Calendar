@@ -246,8 +246,22 @@ Latest committed behavior:
   - Replaced static `Start of the week` row with a persisted picker stored in existing `KEY_WEEK_START`.
   - Week start options are `Region default`, `Saturday`, `Sunday`, and `Monday`.
   - The selected week start applies to Month, Week, and Year calendar layouts.
-  - `Global holidays` remains static/no-op; not implemented yet.
   - No package, deep link scheme, DB filename, Room table, column, or schema changes.
+- 2026-06-22 Global Holidays implemented after explicit roadmap override:
+  - Bundled offline holiday asset at `app/src/main/assets/dotcal_holidays.json`.
+  - Holiday data covers 2025-2031 for 7 countries: IN, DE, GB, JP, IT, SA, US.
+  - Settings now opens a full-screen `Global Holidays` picker with reactive `SELECTED` and `AVAILABLE` sections.
+  - Selected countries create deterministic `calendar_accounts` rows (`holiday-{code}`) and deterministic `calendar_events` rows (`holiday-{code}-{date}`).
+  - Deselected countries delete only the account row; existing FK cascade removes holiday events.
+  - Event Detail hides edit for `source == "HOLIDAY"` same as birthdays.
+  - No package, deep link scheme, DB filename, Room table, column, network permission, Pro, billing, or ads changes.
+- 2026-06-23 Global Holidays Settings UI correction:
+  - Global Holidays sub-screen now uses the same Settings-style large scroll header and compact pinned header behavior as Calendar Accounts/Add Account.
+  - Global Holidays now includes the same extra bottom scroll space as Add Account so the short 7-country list can actually scroll and trigger the compact top-center title.
+  - Available country rows use a red plus icon instead of a chevron for add/select.
+  - Selected country rows keep a close icon for removal.
+  - Country row dividers are full-width instead of inset/half-width.
+  - No package, deep link scheme, DB filename, Room table, column, or holiday data changes.
 
 ## Completed Roadmap Steps
 
@@ -471,6 +485,28 @@ Completed Step 10 Settings Missing Items:
 Completed Step 11 Release Rules:
 - R8/ProGuard keep rules added for Room, Hilt ViewModels, Kotlin Serialization, Glance, and coroutines.
 
+## Global Holidays Feature
+
+Status: COMPLETE after explicit roadmap override.
+
+Generated bundled holiday counts:
+- IN: 41
+- DE: 63
+- GB: 53
+- JP: 127
+- IT: 90
+- SA: 28
+- US: 82
+
+Known gaps:
+- Holiday data covers 2025-2031 only; regenerate `dotcal_holidays.json` for later years in a future update.
+- Only 7 countries are supported in this pass.
+- Same-date holidays are merged into one title because holiday event ids are deterministic by country/date.
+- Python was unavailable in the local environment, so the asset was generated with transient workspace-local NPM tooling and the `date-holidays` package; no generator dependency or script ships with the app.
+
+Next step:
+- Return to Phase 1 roadmap: Step 2 Print to PDF pending. Do not start Step 3 until Step 2 builds and is marked complete.
+
 ## Architecture Rules
 
 - UI -> ViewModel -> repository/data source; preserve existing local structure.
@@ -493,6 +529,10 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after enabling Global Holidays scrolling on short lists; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
+- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Global Holidays compact-header/divider correction; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
+- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Global Holidays Settings UI correction; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
+- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Global Holidays implementation; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after changing Google row from account picker to direct add-account/sign-in flow; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after restoring Google row to open the Android account picker/sign-in flow; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after restoring Settings-style scroll/compact-header behavior on Add Account screen; no phone/manual UI QA run.
@@ -583,7 +623,19 @@ For current latest app state:
 - Settings > Reminders: `Default reminder` picker persists `None`, `5 min`, `10 min`, `30 min`, `1 hour`, and `1 day`; new Add Event opens with the selected default reminder.
 - Settings > Reminders: `Default all-day reminder time` opens a three-wheel picker for hour, minute, and AM/PM; selected time persists after reopening Settings.
 - Settings > General: `Start of the week` picker persists `Region default`, `Saturday`, `Sunday`, and `Monday`; Month, Week, and Year layouts reorder week starts accordingly.
-- Settings > General: `Global holidays` remains static/no-op until a holiday implementation is explicitly chosen.
+- Settings > General: `Global Holidays` row shows `None selected` initially.
+- Open Global Holidays screen: it uses the Settings-style large header/compact scroll header; all 7 countries appear under `AVAILABLE`, with no `SELECTED` section.
+- Available country rows show a red plus icon, not a chevron.
+- Tap India: it moves to `SELECTED` immediately and India holidays appear in Calendar views.
+- Tap Germany: it also moves to `SELECTED`; India holidays remain untouched.
+- Remove India from `SELECTED`: India holidays disappear; Germany holidays remain.
+- Select all 7 countries: `AVAILABLE` section disappears and `SELECTED` shows all 7.
+- Remove all countries: `SELECTED` disappears and `AVAILABLE` shows all 7 again.
+- Settings subtitle updates as countries are added/removed: `1 country selected`, `3 countries selected`, `None selected`.
+- Turn on airplane mode on a fresh install and select a country; holidays should still load from bundled assets.
+- Tap a holiday event in any view: Event Detail opens with no edit icon.
+- Close/reopen app with 2+ countries selected: both remain visible with no duplicate rows.
+- Reopen Global Holidays after selecting India: India should already be under `SELECTED`, not selectable twice.
 - Settings > General: `Time zone`, `Show week number`, and `Other calendars` should no longer appear.
 - Settings > Additional: `Birthday calendar` toggle, `Sync enabled`, `Sync interval`, and `Sync Now` preserve existing behavior; `Manual` sync interval cancels periodic background sync but leaves `Sync Now` usable.
 - Settings > Calendar Accounts: centered accent `Add Account` button appears below connected accounts without top/bottom list dividers; tapping it opens a nested `Add an account` screen.
@@ -611,9 +663,9 @@ Continue DotCal (`com.dotfield.dotcal`). Preserve existing app behavior/UI when 
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
 ```
 
-Roadmap Steps 1-11 are implemented. Recent completed work: Settings week-start picker and Phase 1 Step 1 Add Account button. `Start of the week` now uses existing `KEY_WEEK_START` with `Region default`, `Saturday`, `Sunday`, `Monday`, and applies to Month/Week/Year. Static `Reminders` Settings row was removed. `Global holidays` remains static/no-op and must not be implemented unless explicitly requested. Add Account row exists in Settings > Calendar Accounts, opens Android Google account picker, requests calendar permission first if needed, and syncs through existing `syncNow` after successful picker result. Latest builds passed; no phone/manual UI QA run.
+Roadmap Steps 1-11 are implemented. Recent completed work: Settings week-start picker, Phase 1 Step 1 Add Account button, and Global Holidays after explicit roadmap override. `Start of the week` now uses existing `KEY_WEEK_START` with `Region default`, `Saturday`, `Sunday`, `Monday`, and applies to Month/Week/Year. Static `Reminders` Settings row was removed. Global Holidays is now implemented as bundled offline data for IN, DE, GB, JP, IT, SA, and US for 2025-2031. Add Account row exists in Settings > Calendar Accounts, opens Android Google account picker, requests calendar permission first if needed, and syncs through existing `syncNow` after successful picker result. Latest builds passed; latest APK was installed on phone `4ab0d020`; no phone/manual UI QA run.
 
-Current Phase 1 status: Step 1 Add Account button complete. Step 2 Print to PDF pending. Step 3 Extra Accent Themes pending. Build one step at a time in order. Do not start Step 3 until Step 2 builds and is marked complete. Do not add Pro/billing/ads/cancel/reschedule/global holidays in this phase.
+Current Phase 1 status: Step 1 Add Account button complete. Global Holidays complete by user override. Step 2 Print to PDF pending. Step 3 Extra Accent Themes pending. Build one step at a time in order. Do not start Step 3 until Step 2 builds and is marked complete. Do not add Pro/billing/ads/cancel/reschedule in this phase.
 
 Before each feature: read relevant code, tell the user exactly what files/functions will change, what behavior will change, what schema/package/scheme/DB impact exists, and what to test after build. Ask questions when needed; do not assume. Wait for user approval before code edits unless the user already explicitly approved that feature.
 
