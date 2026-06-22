@@ -1157,7 +1157,7 @@ private fun OnboardingScreen(
                     Text("Skip", color = colors.secondaryText, fontFamily = mono, fontSize = 14.sp)
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             OnboardingHero(
                 page = page,
                 colors = colors,
@@ -1165,7 +1165,7 @@ private fun OnboardingScreen(
                     .fillMaxWidth()
                     .weight(1.05f),
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(64.dp))
             Text(
                 text = copy.label,
                 color = colors.accent,
@@ -1324,40 +1324,36 @@ private fun OnboardingHero(page: OnboardingPage, colors: OnboardingColors, modif
             .heightIn(min = 270.dp, max = 360.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (!colors.isDark && page == OnboardingPage.Welcome) {
-            Image(
-                painter = androidx.compose.ui.res.painterResource(id = com.dotfield.dotcal.R.drawable.screen1),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .scale(1.72f)
-                    .offset(y = 20.dp)
-                    .padding(vertical = 12.dp),
-                contentScale = ContentScale.Fit
-            )
-        } else if (!colors.isDark && page == OnboardingPage.CalendarPermission) {
-            Image(
-                painter = androidx.compose.ui.res.painterResource(id = com.dotfield.dotcal.R.drawable.screen2),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .scale(1.72f)
-                    .offset(y = 20.dp)
-                    .padding(vertical = 12.dp),
-                contentScale = ContentScale.Fit
-            )
+        val imageRes = if (page == OnboardingPage.Ready) {
+            com.dotfield.dotcal.R.drawable.both5
+        } else if (colors.isDark) {
+            when (page) {
+                OnboardingPage.Welcome -> com.dotfield.dotcal.R.drawable.dark1
+                OnboardingPage.CalendarPermission -> com.dotfield.dotcal.R.drawable.dark2
+                OnboardingPage.Notifications -> com.dotfield.dotcal.R.drawable.dark3
+                OnboardingPage.Contacts -> com.dotfield.dotcal.R.drawable.dark4
+                else -> com.dotfield.dotcal.R.drawable.both5
+            }
         } else {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawHeroAtmosphere(colors)
-                when (page) {
-                    OnboardingPage.Welcome -> drawCalendarHero(colors)
-                    OnboardingPage.CalendarPermission -> drawCalendarHubHero(colors)
-                    OnboardingPage.Notifications -> drawReminderHero(colors)
-                    OnboardingPage.Contacts -> drawBirthdayHero(colors)
-                    OnboardingPage.Ready -> drawReadyHero(colors)
-                }
+            when (page) {
+                OnboardingPage.Welcome -> com.dotfield.dotcal.R.drawable.screen1
+                OnboardingPage.CalendarPermission -> com.dotfield.dotcal.R.drawable.screen2
+                OnboardingPage.Notifications -> com.dotfield.dotcal.R.drawable.screen3
+                OnboardingPage.Contacts -> com.dotfield.dotcal.R.drawable.screen4
+                else -> com.dotfield.dotcal.R.drawable.both5
             }
         }
+
+        Image(
+            painter = androidx.compose.ui.res.painterResource(id = imageRes),
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .scale(1.72f)
+                .offset(y = 4.dp)
+                .padding(vertical = 12.dp),
+            contentScale = ContentScale.Fit
+        )
     }
 }
 

@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-06-21
+Updated: 2026-06-22
 
 ## Purpose
 
@@ -221,9 +221,9 @@ Latest committed behavior:
   - Centered the onboarding progress dots at the bottom of the screen while keeping the page indicator text ("N / 5") left-aligned.
   - Inserted a `24.dp` top spacer below the header row to comfortably push the illustration and text labels downward.
   - Successfully compiled the APK and installed it directly on phone `4ab0d020`.
-- 2026-06-21 onboarding screen 2 asset integration and light/dark theme distinction:
-  - Integrated `screen2.png` asset for Screen 2 (`CalendarPermission`) in Light Mode, scaled by `1.72f` and offset by `20.dp`.
-  - Configured Onboarding screens 1 and 2 to fall back to premium Canvas-drawn illustrations in Dark Mode since only light theme assets are provided.
+- 2026-06-21 onboarding screen assets integration and light/dark theme distinction:
+  - Integrated screen assets for Light Mode (`screen1.png` to `screen4.png`) and Dark Mode (`dark1.png` to `dark4.png`), and `both5.png` for Screen 5 in both themes.
+  - Set layout spacing with `1.72f` image scale, `4.dp` image y-offset, `12.dp` top spacer above image, and `64.dp` spacer below image for better layout balance.
   - Implemented missing settings helpers (`parseStoredTime`, `toHour12`, `toHour24`, `allDayReminderTimeLabel`) in `DotCalApp.kt` to fix unresolved settings compilation errors.
 - 2026-06-21 Step 10 Settings Missing Items implemented:
   - Settings now has a functional `Default reminder` picker stored in existing `KEY_DEFAULT_REMINDER`; new Add Event uses it as the preselected reminder while existing event edits preserve their stored reminder/none state.
@@ -359,6 +359,7 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after merging latest `feature/onboarding-screen` into `main`; onboarding branch changes were prioritized in conflicts; no phone/manual UI QA run.
 - 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Settings cleanup/all-day reminder picker follow-up; no phone/manual UI QA run.
 - 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Step 11 Release Rules; no phone/manual UI QA run.
 - 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Step 10 Settings Missing Items; no phone/manual UI QA run.
