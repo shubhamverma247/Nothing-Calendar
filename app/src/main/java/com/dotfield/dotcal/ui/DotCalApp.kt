@@ -177,6 +177,7 @@ import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.WeekFields
 import java.io.File
 import java.util.Locale
 import java.util.UUID
@@ -308,6 +309,12 @@ fun DotCalApp(
             parseStoredTime(preferences[CalendarPreferences.KEY_DEFAULT_ALL_DAY_REMINDER_TIME]) ?: LocalTime.of(8, 0)
         }
     }.collectAsStateWithLifecycle(initialValue = LocalTime.of(8, 0))
+    val weekStartOption by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            parseWeekStartOption(preferences[CalendarPreferences.KEY_WEEK_START])
+        }
+    }.collectAsStateWithLifecycle(initialValue = WeekStartOption.RegionDefault)
+    val weekStartDay = remember(weekStartOption) { resolveWeekStartDay(weekStartOption) }
     val onboardingDone by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_ONBOARDING_DONE] ?: false
@@ -663,6 +670,7 @@ fun DotCalApp(
                             selectedDate = selectedDate,
                             events = events,
                             palette = palette,
+                            weekStart = weekStartDay,
                             onPrevious = viewModel::previousMonth,
                             onNext = viewModel::nextMonth,
                             onJumpToday = { viewModel.selectDate(LocalDate.now()) },
@@ -675,6 +683,7 @@ fun DotCalApp(
                             selectedDate = selectedDate,
                             events = events,
                             palette = palette,
+                            weekStart = weekStartDay,
                             onPreviousWeek = { viewModel.selectDate(selectedDate.minusWeeks(1)) },
                             onNextWeek = { viewModel.selectDate(selectedDate.plusWeeks(1)) },
                             onJumpToday = { viewModel.selectDate(LocalDate.now()) },
@@ -723,6 +732,7 @@ fun DotCalApp(
                             selectedDate = selectedDate,
                             events = events,
                             palette = palette,
+                            weekStart = weekStartDay,
                             onPreviousYear = { viewModel.selectDate(selectedDate.minusYears(1)) },
                             onNextYear = { viewModel.selectDate(selectedDate.plusYears(1)) },
                             onJumpToday = { viewModel.selectDate(LocalDate.now()) },
@@ -803,6 +813,7 @@ fun DotCalApp(
                 birthdayEnabled = birthdayEnabled,
                 defaultReminderMinutes = defaultReminderMinutes,
                 defaultAllDayReminderTime = defaultAllDayReminderTime,
+                weekStartOption = weekStartOption,
                 accounts = accounts,
                 hasCalendarPermission = hasCalendarPermission,
                 onSyncNow = { runSyncNow(showToast = true) },
@@ -851,6 +862,13 @@ fun DotCalApp(
                     scope.launch {
                         context.calendarPreferencesDataStore.edit { preferences ->
                             preferences[CalendarPreferences.KEY_DEFAULT_ALL_DAY_REMINDER_TIME] = time.toString()
+                        }
+                    }
+                },
+                onWeekStartSelected = { option ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_WEEK_START] = option.storageKey
                         }
                     }
                 },
@@ -2137,13 +2155,15 @@ private fun MonthView(
     selectedDate: LocalDate,
     events: List<CalendarEvent>,
     palette: DotCalPalette,
+    weekStart: DayOfWeek,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onJumpToday: () -> Unit,
     onDateSelected: (LocalDate) -> Unit,
 ) {
-    val days = remember(month) { monthGrid(month, DayOfWeek.SUNDAY) }
+    val days = remember(month, weekStart) { monthGrid(month, weekStart) }
     val eventsByDate = remember(events) { events.groupBy { it.localDate() } }
+    val weekDayLabels = remember(weekStart) { weekDayLabels(weekStart) }
     var dragTotal by remember { mutableFloatStateOf(0f) }
 
     Column(
@@ -2163,7 +2183,7 @@ private fun MonthView(
             },
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(32.dp).background(palette.calendarSurface)) {
-            listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT").forEach {
+            weekDayLabels.forEach {
                 Text(
                     it,
                     modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
@@ -2260,6 +2280,7 @@ private fun WeekView(
     selectedDate: LocalDate,
     events: List<CalendarEvent>,
     palette: DotCalPalette,
+    weekStart: DayOfWeek,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     onJumpToday: () -> Unit,
@@ -2267,14 +2288,14 @@ private fun WeekView(
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
 ) {
-    val days = remember(selectedDate) { weekDays(selectedDate) }
-    val weekStart = days.first()
-    val weekEnd = days.last()
-    val timedEvents = remember(events, weekStart, weekEnd) {
-        events.filter { it.isAllDay == 0 && it.localDate() in weekStart..weekEnd }
+    val days = remember(selectedDate, weekStart) { weekDays(selectedDate, weekStart) }
+    val weekRangeStart = days.first()
+    val weekRangeEnd = days.last()
+    val timedEvents = remember(events, weekRangeStart, weekRangeEnd) {
+        events.filter { it.isAllDay == 0 && it.localDate() in weekRangeStart..weekRangeEnd }
     }
-    val allDayEvents = remember(events, weekStart, weekEnd) {
-        events.filter { it.isAllDay == 1 && it.localDate() in weekStart..weekEnd }
+    val allDayEvents = remember(events, weekRangeStart, weekRangeEnd) {
+        events.filter { it.isAllDay == 1 && it.localDate() in weekRangeStart..weekRangeEnd }
     }
     val eventLayouts = remember(timedEvents) { layoutTimedEvents(timedEvents) }
     val timedEventsByDayHour = remember(timedEvents) {
@@ -5345,6 +5366,7 @@ private fun YearView(
     selectedDate: LocalDate,
     events: List<CalendarEvent>,
     palette: DotCalPalette,
+    weekStart: DayOfWeek,
     onPreviousYear: () -> Unit,
     onNextYear: () -> Unit,
     onJumpToday: () -> Unit,
@@ -5382,6 +5404,7 @@ private fun YearView(
                     selected = month.year == selectedDate.year && month.monthValue == selectedDate.monthValue,
                     eventDates = eventDates,
                     palette = palette,
+                    weekStart = weekStart,
                     onClick = { onMonthSelected(month) },
                 )
             }
@@ -5395,9 +5418,10 @@ private fun YearMonthCell(
     selected: Boolean,
     eventDates: Set<LocalDate>,
     palette: DotCalPalette,
+    weekStart: DayOfWeek,
     onClick: () -> Unit,
 ) {
-    val days = remember(month) { monthGrid(month, DayOfWeek.SUNDAY) }
+    val days = remember(month, weekStart) { monthGrid(month, weekStart) }
     val today = LocalDate.now()
     val isCurrentMonth = month.year == today.year && month.monthValue == today.monthValue
     Column(
@@ -5502,6 +5526,7 @@ private fun SettingsPreview(
     birthdayEnabled: Boolean,
     defaultReminderMinutes: Int?,
     defaultAllDayReminderTime: LocalTime,
+    weekStartOption: WeekStartOption,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
@@ -5510,6 +5535,7 @@ private fun SettingsPreview(
     onSyncIntervalSelected: (Int) -> Unit,
     onDefaultReminderSelected: (Int?) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
+    onWeekStartSelected: (WeekStartOption) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
     onRateDotCal: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
@@ -5534,6 +5560,7 @@ private fun SettingsPreview(
             birthdayEnabled = birthdayEnabled,
             defaultReminderMinutes = defaultReminderMinutes,
             defaultAllDayReminderTime = defaultAllDayReminderTime,
+            weekStartOption = weekStartOption,
             accounts = accounts,
             hasCalendarPermission = hasCalendarPermission,
             onSyncNow = onSyncNow,
@@ -5542,6 +5569,7 @@ private fun SettingsPreview(
             onSyncIntervalSelected = onSyncIntervalSelected,
             onDefaultReminderSelected = onDefaultReminderSelected,
             onDefaultAllDayReminderTimeSelected = onDefaultAllDayReminderTimeSelected,
+            onWeekStartSelected = onWeekStartSelected,
             onBirthdayEnabledChange = onBirthdayEnabledChange,
             onPrivacyPolicy = { onScreenChange(SettingsScreen.PrivacyPolicy) },
             onRateDotCal = onRateDotCal,
@@ -5605,6 +5633,7 @@ private fun SettingsRoot(
     birthdayEnabled: Boolean,
     defaultReminderMinutes: Int?,
     defaultAllDayReminderTime: LocalTime,
+    weekStartOption: WeekStartOption,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
@@ -5613,6 +5642,7 @@ private fun SettingsRoot(
     onSyncIntervalSelected: (Int) -> Unit,
     onDefaultReminderSelected: (Int?) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
+    onWeekStartSelected: (WeekStartOption) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
     onPrivacyPolicy: () -> Unit,
     onRateDotCal: () -> Unit,
@@ -5637,12 +5667,15 @@ private fun SettingsRoot(
             SettingsDivider(palette)
 
             SettingsSectionTitle("General", palette)
-            SettingsMenuRow(title = "Start of the week", value = "Region default", palette = palette, showStepper = true, onClick = {})
+            SettingsWeekStartRow(
+                selectedOption = weekStartOption,
+                palette = palette,
+                onWeekStartSelected = onWeekStartSelected,
+            )
             SettingsMenuRow(title = "Global holidays", value = "", palette = palette, onClick = {})
             SettingsDivider(palette)
 
             SettingsSectionTitle("Reminders", palette)
-            SettingsMenuRow(title = "Reminders", value = "", palette = palette, onClick = {})
             SettingsDefaultReminderRow(
                 selectedMinutes = defaultReminderMinutes,
                 palette = palette,
@@ -5897,6 +5930,61 @@ private fun CalendarAccountToggleRow(
             palette = palette,
             onCheckedChange = { checked -> onAccountVisibilityChange(account.id, checked) },
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsWeekStartRow(
+    selectedOption: WeekStartOption,
+    palette: DotCalPalette,
+    onWeekStartSelected: (WeekStartOption) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .noRippleClickable { expanded = true },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Start of the week", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(selectedOption.label, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                UpDownChevron(tint = palette.secondaryText)
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(palette.dialogSurface),
+        ) {
+            WeekStartOption.entries.forEach { option ->
+                DropdownMenuItem(
+                    modifier = Modifier.background(palette.dialogSurface),
+                    text = {
+                        Text(
+                            option.label,
+                            color = palette.primaryText,
+                            fontFamily = mono,
+                            fontSize = 16.sp,
+                        )
+                    },
+                    trailingIcon = {
+                        if (option == selectedOption) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = palette.primaryText)
+                        }
+                    },
+                    onClick = {
+                        onWeekStartSelected(option)
+                        expanded = false
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -6500,10 +6588,24 @@ private fun monthGrid(month: LocalDate, weekStart: DayOfWeek): List<LocalDate> {
     return List(42) { start.plusDays(it.toLong()) }
 }
 
-private fun weekDays(date: LocalDate): List<LocalDate> {
-    val delta = (7 + date.dayOfWeek.value - DayOfWeek.SUNDAY.value) % 7
+private fun weekDays(date: LocalDate, weekStart: DayOfWeek): List<LocalDate> {
+    val delta = (7 + date.dayOfWeek.value - weekStart.value) % 7
     val start = date.minusDays(delta.toLong())
     return List(7) { start.plusDays(it.toLong()) }
+}
+
+private fun weekDayLabels(weekStart: DayOfWeek): List<String> {
+    return List(7) { index ->
+        weekStart.plus(index.toLong()).name.take(3)
+    }
+}
+
+private fun parseWeekStartOption(value: String?): WeekStartOption {
+    return WeekStartOption.entries.firstOrNull { it.storageKey == value || it.name == value } ?: WeekStartOption.RegionDefault
+}
+
+private fun resolveWeekStartDay(option: WeekStartOption): DayOfWeek {
+    return option.fixedDay ?: WeekFields.of(Locale.getDefault()).firstDayOfWeek
 }
 
 private fun CalendarEvent.localDate(): LocalDate {
@@ -6832,6 +6934,13 @@ private enum class SettingsScreen {
     Theme,
     CalendarAccounts,
     PrivacyPolicy,
+}
+
+private enum class WeekStartOption(val storageKey: String, val label: String, val fixedDay: DayOfWeek?) {
+    RegionDefault("REGION_DEFAULT", "Region default", null),
+    Saturday("SATURDAY", "Saturday", DayOfWeek.SATURDAY),
+    Sunday("SUNDAY", "Sunday", DayOfWeek.SUNDAY),
+    Monday("MONDAY", "Monday", DayOfWeek.MONDAY),
 }
 
 private enum class OnboardingPage {

@@ -241,6 +241,13 @@ Latest committed behavior:
   - Replaced static `Default all-day reminder time` row with a persisted picker stored in `KEY_DEFAULT_ALL_DAY_REMINDER_TIME`.
   - Picker uses three wheel rollers: hour, minute, and AM/PM. AM/PM is not a toggle.
   - No package, deep link scheme, DB filename, Room table, column, or schema changes.
+- 2026-06-22 Settings week-start picker follow-up:
+  - Removed the static `Reminders` Settings row while keeping functional reminder rows.
+  - Replaced static `Start of the week` row with a persisted picker stored in existing `KEY_WEEK_START`.
+  - Week start options are `Region default`, `Saturday`, `Sunday`, and `Monday`.
+  - The selected week start applies to Month, Week, and Year calendar layouts.
+  - `Global holidays` remains static/no-op; not implemented yet.
+  - No package, deep link scheme, DB filename, Room table, column, or schema changes.
 
 ## Completed Roadmap Steps
 
@@ -359,6 +366,7 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Settings week-start picker follow-up; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after merging latest `feature/onboarding-screen` into `main`; onboarding branch changes were prioritized in conflicts; no phone/manual UI QA run.
 - 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Settings cleanup/all-day reminder picker follow-up; no phone/manual UI QA run.
 - 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Step 11 Release Rules; no phone/manual UI QA run.
@@ -439,6 +447,8 @@ For current latest app state:
 - Settings: theme, sync, calendar accounts, switches, and back behavior match current UI.
 - Settings > Reminders: `Default reminder` picker persists `None`, `5 min`, `10 min`, `30 min`, `1 hour`, and `1 day`; new Add Event opens with the selected default reminder.
 - Settings > Reminders: `Default all-day reminder time` opens a three-wheel picker for hour, minute, and AM/PM; selected time persists after reopening Settings.
+- Settings > General: `Start of the week` picker persists `Region default`, `Saturday`, `Sunday`, and `Monday`; Month, Week, and Year layouts reorder week starts accordingly.
+- Settings > General: `Global holidays` remains static/no-op until a holiday implementation is explicitly chosen.
 - Settings > General: `Time zone`, `Show week number`, and `Other calendars` should no longer appear.
 - Settings > Additional: `Birthday calendar` toggle, `Sync enabled`, `Sync interval`, and `Sync Now` preserve existing behavior; `Manual` sync interval cancels periodic background sync but leaves `Sync Now` usable.
 - Settings > About: Privacy Policy opens in-app WebView, Rate DotCal opens Play Store, and Version shows `1.0.0` from `BuildConfig.VERSION_NAME`.
