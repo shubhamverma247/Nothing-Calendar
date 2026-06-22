@@ -282,11 +282,14 @@ Rules:
 3. Extra Accent Themes: pending.
 
 Implemented Step 1:
-- Added `+ Add Account` row in Settings > Calendar Accounts below the connected account list.
-- Row uses plus icon and existing Settings row styling.
-- Tap opens Android Google account picker through `AccountManager.newChooseAccountIntent`.
-- If calendar permission is missing, Add Account requests calendar permission first, then opens the picker after grant.
-- Successful account-picker result triggers existing `syncNow`; account list refreshes through existing account Flow.
+- Added `Add Account` button in Settings > Calendar Accounts below the connected account list.
+- Button is centered, uses the app accent theme, and does not have its own top/bottom divider.
+- Tap opens a nested `Add an account` Settings-style slide screen.
+- The nested screen matches Settings scroll behavior: large `Add an account` title first, then centered compact header appears after a small scroll. It shows a `Google` row with Google logo icon and right chevron.
+- Back from `Add an account` returns to Calendar Accounts.
+- Tapping `Google` opens Android's direct Google add-account/sign-in flow through `AccountManager.addAccount("com.google")`; it does not show the intermediate account-picker dialog.
+- If calendar permission is missing, tapping `Google` requests calendar permission first, then opens the direct Google add-account/sign-in flow after grant.
+- Successful add-account result triggers existing `syncNow`; account list refreshes through existing account Flow.
 - No new sync engine, account table, package, scheme, DB filename, Room table, column, or schema changes.
 
 Pending Step 2: Print to PDF.
@@ -490,6 +493,13 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after changing Google row from account picker to direct add-account/sign-in flow; no phone/manual UI QA run.
+- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after restoring Google row to open the Android account picker/sign-in flow; no phone/manual UI QA run.
+- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after restoring Settings-style scroll/compact-header behavior on Add Account screen; no phone/manual UI QA run.
+- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after adding Google logo icon to Add Account provider row; no phone/manual UI QA run.
+- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Add Account header/direct-Google-sync update; no phone/manual UI QA run.
+- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Add Account nested provider screen and back navigation correction; no phone/manual UI QA run.
+- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Calendar Accounts Add Account button UI polish; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Phase 1 Step 1 Add Account button; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Settings week-start picker follow-up; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after merging latest `feature/onboarding-screen` into `main`; onboarding branch changes were prioritized in conflicts; no phone/manual UI QA run.
@@ -538,7 +548,7 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from Settings cleanup/all-day reminder picker build is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run in this pass.
+- Latest debug APK from Add Account Settings-style header behavior build is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run in this pass.
 - Confirm package `com.dotfield.dotcal`, label `DotCal`.
 - First normal app launch: onboarding appears once with 5 pages: DotCal, Calendar Access, Reminders, Birthdays, Ready.
 - First normal app launch: Calendar Month should not flash before onboarding appears.
@@ -576,9 +586,11 @@ For current latest app state:
 - Settings > General: `Global holidays` remains static/no-op until a holiday implementation is explicitly chosen.
 - Settings > General: `Time zone`, `Show week number`, and `Other calendars` should no longer appear.
 - Settings > Additional: `Birthday calendar` toggle, `Sync enabled`, `Sync interval`, and `Sync Now` preserve existing behavior; `Manual` sync interval cancels periodic background sync but leaves `Sync Now` usable.
-- Settings > Calendar Accounts: `+ Add Account` row appears below connected accounts; tapping it opens Android's Google account picker.
-- Settings > Calendar Accounts: canceling account picker does nothing; successfully adding/selecting an account triggers sync and refreshes the account list.
-- Settings > Calendar Accounts: if calendar permission is missing, tapping `+ Add Account` requests calendar permission first.
+- Settings > Calendar Accounts: centered accent `Add Account` button appears below connected accounts without top/bottom list dividers; tapping it opens a nested `Add an account` screen.
+- Settings > Calendar Accounts > Add an account: initially shows large `Add an account` title, then after a small scroll shows centered compact title; `Google` row has Google logo icon plus chevron; tapping `Google` opens Android's direct Google add-account/sign-in flow without the intermediate account-picker dialog.
+- Settings > Calendar Accounts > Add an account: header/system back returns to Calendar Accounts.
+- Settings > Calendar Accounts: completing Google add-account/sign-in triggers existing sync and refreshes the account list.
+- Settings > Calendar Accounts > Add an account: if calendar permission is missing, tapping `Google` requests calendar permission first, then opens direct add-account/sign-in after grant.
 - Settings > About: Privacy Policy opens in-app WebView, Rate DotCal opens Play Store, and Version shows `1.0.0` from `BuildConfig.VERSION_NAME`.
 - Reminders: future event/task reminders fire; View/Snooze actions route correctly.
 
