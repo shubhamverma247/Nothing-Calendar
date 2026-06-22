@@ -271,6 +271,12 @@ Keep existing app behavior source of truth. Future work must not change package,
 
 ## Phase 1 - Easy Features
 
+Rules:
+- Build one step at a time in order.
+- Do not start Step 3 until Step 2 builds and is marked complete.
+- Do not add Pro/billing/ads/cancel/reschedule/global holidays here.
+- Do not run phone/manual UI QA unless user explicitly asks.
+
 1. Add Account button: complete.
 2. Print to PDF: pending.
 3. Extra Accent Themes: pending.
@@ -282,6 +288,110 @@ Implemented Step 1:
 - If calendar permission is missing, Add Account requests calendar permission first, then opens the picker after grant.
 - Successful account-picker result triggers existing `syncNow`; account list refreshes through existing account Flow.
 - No new sync engine, account table, package, scheme, DB filename, Room table, column, or schema changes.
+
+Pending Step 2: Print to PDF.
+Goal:
+- Export current calendar view as a simple readable PDF.
+- Entry point is Calendar top action bar only; do not add print to Settings or event detail.
+
+Implementation plan:
+- Add `app/src/main/java/com/dotfield/dotcal/util/PdfExportUtil.kt`.
+- Function:
+
+```kotlin
+suspend fun exportToPdf(
+    context: Context,
+    viewType: String,
+    rangeStart: Long,
+    rangeEnd: Long,
+    events: List<CalendarEvent>,
+): File
+```
+
+- Use `android.graphics.pdf.PdfDocument`.
+- Use A4 size `595 x 842`.
+- Run PDF drawing on `Dispatchers.Default`.
+- Save to `context.getExternalFilesDir(null)/dotcal_export_{timestamp}.pdf`.
+- Return generated `File`.
+- Render black text on white page regardless of app theme.
+- Month PDF: 7-column grid with day numbers and truncated event titles.
+- Week/Day PDF: date-grouped vertical event list with time, title, optional location.
+- Agenda PDF: date headers and event rows.
+- Add multi-page support when content exceeds page height.
+- Add Calendar top bar printer icon next to existing icon-only actions.
+- Tap print icon opens a simple bottom sheet/dialog with `Print current view`.
+- On print: use current selected calendar view/range and already-loaded events; do not duplicate data-loading or query DB from UI.
+- Show loading while export runs.
+- On success, share generated PDF using Android share sheet and FileProvider.
+- On failure, show generic failure feedback using existing toast/snackbar pattern.
+- Add FileProvider manifest entry and `res/xml/file_paths.xml` only if not already present.
+- FileProvider scope must cover the external files directory used above.
+
+Step 2 verification to add after build:
+- Calendar top bar shows print icon.
+- Tapping it shows `Print current view`.
+- Generated PDF share sheet opens.
+- PDF is readable and matches current Month/Week/Day/Agenda range data.
+- No schema/package/scheme/DB/table/column changes.
+- Known gap if still true: no custom date range selection; current view only.
+
+Pending Step 3: Extra Accent Themes.
+Goal:
+- Add selectable accent color while preserving existing Light/Dark/System base themes.
+- Existing users default to red and see no visual change until choosing another accent.
+
+Data implementation plan:
+- Add DataStore key `KEY_ACCENT_COLOR` in `CalendarPreferences`.
+- Default value: `RED`.
+- Add `AccentColor` enum in theme-related code:
+
+```kotlin
+enum class AccentColor(val hex: String, val label: String) {
+    RED("#FF3B30", "Red"),
+    BLUE("#0A84FF", "Blue"),
+    GREEN("#30D158", "Green"),
+    PURPLE("#BF5AF2", "Purple"),
+    AMBER("#FF9F0A", "Amber"),
+}
+```
+
+- Keep `KEY_THEME_MODE` unchanged.
+- Accent preference is independent from Light/Dark/System mode.
+
+Accent replacement plan:
+- Search codebase for `#FF3B30`, `FF3B30`, and `Color(0xFFFF3B30)`.
+- Replace brand/selection accent usage with current accent value.
+- Do not change destructive/danger red if it is specifically used for delete/destructive actions.
+- Must review at least:
+  - today circle
+  - selected date indicator
+  - FAB/Add button
+  - segmented selected state where accent-colored
+  - bottom nav active state
+  - all-day switch checked state
+  - date/time picker OK/save accents
+  - event default fallback color when `colorHex` is null
+  - widget/app-theme accents only if tied to current app accent and safe to update
+- Preserve Light/Dark backgrounds, surfaces, dialog colors, cancel color, text colors.
+
+Settings UI plan:
+- In Settings > Theme detail screen, add section `Accent Color` below Light/Dark/System picker.
+- Show 5 circular 40dp swatches.
+- Selected swatch shows checkmark or selected ring matching existing style.
+- Tapping swatch saves DataStore immediately and applies accent instantly.
+
+Startup plan:
+- Mirror selected accent through existing boot/startup theme-preference path if needed.
+- Avoid flash of red before selected accent appears on first Compose frame.
+- Only extend existing boot theme mechanism; do not rewrite it.
+
+Step 3 verification to add after build:
+- Settings > Theme shows 5 accent swatches.
+- Selecting accent immediately updates today circle, add button, active bottom nav, and all found brand accent usage.
+- Light/Dark/System base themes otherwise unchanged.
+- App relaunch preserves selected accent with no red startup flash.
+- Existing default with no preference remains red.
+- No package/scheme/DB/table/schema changes; DataStore key only.
 
 ## Step 7 Spec: Birthday Calendar
 
