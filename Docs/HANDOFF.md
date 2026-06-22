@@ -593,21 +593,16 @@ For Step 7 after implementation:
 
 Use caveman-ultra and `$android-development`. Work in `D:\Caveman\caveman\Nothing-Calendar`. Read `Docs/HANDOFF.md` first.
 
-Continue DotCal (`com.dotfield.dotcal`). Preserve existing app behavior/UI when it conflicts with newer roadmap text. Preserve schema columns/current UI rules and exactly 5 Room tables: `calendar_accounts`, `calendar_events`, `event_reminders`, `sync_metadata`, `deleted_event_log`.
-
-Do not change package name, deep link scheme, or DB filename. Do not run phone/manual UI QA unless explicitly asked. Keep `Docs/HANDOFF.md` updated after each completed step. Build after implementation steps with:
+Continue DotCal (`com.dotfield.dotcal`). Preserve existing app behavior/UI when roadmap text conflicts. Preserve exactly 5 Room tables: `calendar_accounts`, `calendar_events`, `event_reminders`, `sync_metadata`, `deleted_event_log`. Do not change schema columns, package/application id `com.dotfield.dotcal`, deep link scheme `dotcal://`, or DB filename `dotcal.db`. Do not run phone/manual UI QA unless explicitly asked. Keep `Docs/HANDOFF.md` updated after each completed step. Build after implementation steps with:
 
 ```powershell
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
 ```
 
-Latest completed work: Settings cleanup/all-day reminder picker follow-up after Continuation Roadmap Step 11.
-- Roadmap Steps 1-11 are implemented.
-- Added R8/ProGuard keep rules for Room, Hilt ViewModels, Kotlin Serialization, Glance, and coroutines.
-- Removed static Settings rows: `Time zone`, `Show week number`, and `Other calendars`.
-- `Default all-day reminder time` now opens a three-wheel picker for hour, minute, and AM/PM; AM/PM is a roller, not a toggle.
-- The selected all-day reminder time is stored in existing DataStore file `calendar_preferences` using `KEY_DEFAULT_ALL_DAY_REMINDER_TIME`.
-- No package, deep link scheme, DB filename, Room table, column, or schema changes.
-- Required debug build passed after this settings follow-up; no phone/manual UI QA run.
+Roadmap Steps 1-11 are implemented. Recent completed work: Settings week-start picker and Phase 1 Step 1 Add Account button. `Start of the week` now uses existing `KEY_WEEK_START` with `Region default`, `Saturday`, `Sunday`, `Monday`, and applies to Month/Week/Year. Static `Reminders` Settings row was removed. `Global holidays` remains static/no-op and must not be implemented unless explicitly requested. Add Account row exists in Settings > Calendar Accounts, opens Android Google account picker, requests calendar permission first if needed, and syncs through existing `syncNow` after successful picker result. Latest builds passed; no phone/manual UI QA run.
 
-Current continuation roadmap status: Steps 1-11 implemented. Keep existing app behavior as source of truth where future roadmap text conflicts.
+Current Phase 1 status: Step 1 Add Account button complete. Step 2 Print to PDF pending. Step 3 Extra Accent Themes pending. Build one step at a time in order. Do not start Step 3 until Step 2 builds and is marked complete. Do not add Pro/billing/ads/cancel/reschedule/global holidays in this phase.
+
+Before each feature: read relevant code, tell the user exactly what files/functions will change, what behavior will change, what schema/package/scheme/DB impact exists, and what to test after build. Ask questions when needed; do not assume. Wait for user approval before code edits unless the user already explicitly approved that feature.
+
+Next feature if user approves: Phase 1 Step 2 Print to PDF. Implement per `Phase 1 - Easy Features` section: add `util/PdfExportUtil.kt`, use `PdfDocument`, A4 `595 x 842`, run drawing on `Dispatchers.Default`, save to `context.getExternalFilesDir(null)/dotcal_export_{timestamp}.pdf`, add Calendar top bar printer icon only, show `Print current view`, export current Month/Week/Day/Agenda data from already-loaded events, share with FileProvider, show loading and generic failure feedback, update `HANDOFF.md`, build, and add What To Test.
