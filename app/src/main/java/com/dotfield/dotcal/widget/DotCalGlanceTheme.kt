@@ -25,7 +25,9 @@ fun DotCalGlanceTheme(content: @Composable () -> Unit) {
 }
 
 suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
-    val mode = context.calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_THEME_MODE] ?: "System"
+    val preferences = context.calendarPreferencesDataStore.data.first()
+    val mode = preferences[CalendarPreferences.KEY_THEME_MODE] ?: "System"
+    val accent = widgetAccentColor(preferences[CalendarPreferences.KEY_ACCENT_COLOR])
     if (mode == "System") {
         return DotCalWidgetPalette(
             background = ColorProvider(R.color.widget_background),
@@ -33,6 +35,7 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
             secondary = ColorProvider(R.color.widget_secondary),
             border = ColorProvider(R.color.widget_border),
             inactive = ColorProvider(R.color.widget_inactive),
+            accent = ColorProvider(accent),
         )
     }
     val isDark = when (mode) {
@@ -47,6 +50,7 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
             secondary = ColorProvider(Color(0xFFC2C2C2)),
             border = ColorProvider(Color(0xFF2A2A2A)),
             inactive = ColorProvider(Color(0xFF666666)),
+            accent = ColorProvider(accent),
         )
     } else {
         DotCalWidgetPalette(
@@ -55,6 +59,17 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
             secondary = ColorProvider(Color(0xFF6B6B6B)),
             border = ColorProvider(Color(0xFFE8E8E8)),
             inactive = ColorProvider(Color(0xFFB0B0B0)),
+            accent = ColorProvider(accent),
         )
+    }
+}
+
+private fun widgetAccentColor(value: String?): Color {
+    return when (value) {
+        "BLUE" -> Color(0xFF0A84FF)
+        "GREEN" -> Color(0xFF30D158)
+        "PURPLE" -> Color(0xFFBF5AF2)
+        "AMBER" -> Color(0xFFFF9F0A)
+        else -> Color(0xFFFF3B30)
     }
 }

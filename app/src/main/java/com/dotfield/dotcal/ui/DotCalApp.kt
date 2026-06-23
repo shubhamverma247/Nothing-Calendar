@@ -71,7 +71,6 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
@@ -171,7 +170,6 @@ import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import com.dotfield.dotcal.ui.theme.NBlack
-import com.dotfield.dotcal.ui.theme.NRed
 import com.dotfield.dotcal.ui.theme.NWhite
 import java.time.DayOfWeek
 import java.time.Instant
@@ -202,6 +200,7 @@ private val editorTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.U
 private const val WEEK_HOUR_HEIGHT_DP = 64f
 private const val BOOT_PREFS = "dotcal_boot"
 private const val BOOT_THEME_KEY = "theme_mode"
+private const val BOOT_ACCENT_KEY = "accent_color"
 private val reminderOptions = listOf(null, 5, 10, 30, 60, 1440)
 private val taskReminderOptions = listOf(null, 5, 10, 30, 1440)
 private data class RecurrenceOption(val label: String, val rrule: String?)
@@ -272,11 +271,19 @@ fun DotCalApp(
     val bootThemeMode = remember(bootPreferences) {
         DotCalThemeMode.fromStorage(bootPreferences.getString(BOOT_THEME_KEY, null))
     }
+    val bootAccentColor = remember(bootPreferences) {
+        AccentColor.fromStorage(bootPreferences.getString(BOOT_ACCENT_KEY, null))
+    }
     val themeMode by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             DotCalThemeMode.fromStorage(preferences[CalendarPreferences.KEY_THEME_MODE])
         }
     }.collectAsStateWithLifecycle(initialValue = bootThemeMode)
+    val accentColor by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            AccentColor.fromStorage(preferences[CalendarPreferences.KEY_ACCENT_COLOR])
+        }
+    }.collectAsStateWithLifecycle(initialValue = bootAccentColor)
     val storedCalendarTab by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             CalendarTab.fromStorage(preferences[CalendarPreferences.KEY_DEFAULT_VIEW])
@@ -414,12 +421,16 @@ fun DotCalApp(
     val activeCalendarTab = calendarTab ?: storedCalendarTab
     val systemDark = isSystemInDarkTheme()
     val resolvedThemeMode = themeMode
-    val palette = remember(resolvedThemeMode, systemDark) { resolvedThemeMode?.let { dotCalPalette(it, systemDark) } ?: dotCalBootPalette() }
+    val resolvedAccentColor = accentColor
+    val palette = remember(resolvedThemeMode, resolvedAccentColor, systemDark) {
+        dotCalPalette(resolvedThemeMode, resolvedAccentColor, systemDark)
+    }
     SystemBarColorSync(palette)
-    LaunchedEffect(resolvedThemeMode) {
-        resolvedThemeMode?.let { mode ->
-            bootPreferences.edit().putString(BOOT_THEME_KEY, mode.name).apply()
-        }
+    LaunchedEffect(resolvedThemeMode, resolvedAccentColor) {
+        bootPreferences.edit()
+            .putString(BOOT_THEME_KEY, resolvedThemeMode.name)
+            .putString(BOOT_ACCENT_KEY, resolvedAccentColor.name)
+            .apply()
     }
     LaunchedEffect(storedSelectedDateValue, initialEventId, initialTaskId, initialCalendarDate) {
         val storedValue = storedSelectedDateValue ?: return@LaunchedEffect
@@ -831,7 +842,8 @@ fun DotCalApp(
             modifier = Modifier.fillMaxSize().background(palette.calendarSurface).statusBarsPadding(),
         ) {
             SettingsPreview(
-                themeMode = resolvedThemeMode ?: DotCalThemeMode.System,
+                themeMode = resolvedThemeMode,
+                accentColor = resolvedAccentColor,
                 palette = palette,
                 screen = settingsScreen,
                 onBack = { closeTopSurface() },
@@ -841,6 +853,15 @@ fun DotCalApp(
                     scope.launch {
                         context.calendarPreferencesDataStore.edit { preferences ->
                             preferences[CalendarPreferences.KEY_THEME_MODE] = selectedTheme.name
+                        }
+                        WidgetUpdateWorker.enqueue(context)
+                    }
+                },
+                onAccentSelected = { selectedAccent ->
+                    bootPreferences.edit().putString(BOOT_ACCENT_KEY, selectedAccent.name).apply()
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_ACCENT_COLOR] = selectedAccent.name
                         }
                         WidgetUpdateWorker.enqueue(context)
                     }
@@ -2329,7 +2350,7 @@ private fun DayCell(
                             modifier = Modifier
                                 .size(4.dp)
                                 .clip(CircleShape)
-                                .background(Color(parseColor(event.colorHex ?: "#FF0000"))),
+                                .background(event.displayColor(palette)),
                         )
                     }
                 }
@@ -2406,7 +2427,7 @@ private fun WeekView(
                 days.forEach { day ->
                     val event = allDayEvents.firstOrNull { it.localDate() == day }
                     Box(
-                        modifier = Modifier.weight(1f).height(32.dp).padding(2.dp).background(if (event == null) Color.Transparent else Color(parseColor(event.colorHex ?: "#FF0000")).copy(alpha = 0.75f)),
+                        modifier = Modifier.weight(1f).height(32.dp).padding(2.dp).background(if (event == null) Color.Transparent else event.displayColor(palette).copy(alpha = 0.75f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (event != null) {
@@ -2580,7 +2601,7 @@ private fun WeekEventBlock(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(parseColor(event.colorHex ?: "#FF0000")).copy(alpha = 0.80f))
+            .background(event.displayColor(palette).copy(alpha = 0.80f))
             .noRippleClickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -2622,7 +2643,7 @@ private fun DayView(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp)
-                            .background(Color(parseColor(allDayEvents[index].colorHex ?: "#FF0000")).copy(alpha = 0.75f))
+                            .background(allDayEvents[index].displayColor(palette).copy(alpha = 0.75f))
                             .clickable { onEventClick(allDayEvents[index]) }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     )
@@ -5582,11 +5603,13 @@ private fun MiniMonthGridCanvas(
 @Composable
 private fun SettingsPreview(
     themeMode: DotCalThemeMode,
+    accentColor: AccentColor,
     palette: DotCalPalette,
     screen: SettingsScreen,
     onBack: () -> Unit,
     onScreenChange: (SettingsScreen) -> Unit,
     onThemeSelected: (DotCalThemeMode) -> Unit,
+    onAccentSelected: (AccentColor) -> Unit,
     syncEnabled: Boolean,
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
@@ -5622,9 +5645,12 @@ private fun SettingsPreview(
     Box(modifier = Modifier.fillMaxSize()) {
         SettingsRoot(
             themeMode = themeMode,
+            accentColor = accentColor,
             palette = palette,
             onBack = onBack,
             onThemeSelected = onThemeSelected,
+            onAccentSelected = onAccentSelected,
+            onThemeSettings = { onScreenChange(SettingsScreen.Theme) },
             syncEnabled = syncEnabled,
             syncIntervalMins = syncIntervalMins,
             syncMetadata = syncMetadata,
@@ -5658,9 +5684,11 @@ private fun SettingsPreview(
         ) {
             ThemeSettings(
             themeMode = themeMode,
+            accentColor = accentColor,
             palette = palette,
             onBack = { onScreenChange(SettingsScreen.Root) },
             onThemeSelected = onThemeSelected,
+            onAccentSelected = onAccentSelected,
             )
         }
         AnimatedVisibility(
@@ -5725,9 +5753,12 @@ private fun SettingsPreview(
 @Composable
 private fun SettingsRoot(
     themeMode: DotCalThemeMode,
+    accentColor: AccentColor,
     palette: DotCalPalette,
     onBack: () -> Unit,
     onThemeSelected: (DotCalThemeMode) -> Unit,
+    onAccentSelected: (AccentColor) -> Unit,
+    onThemeSettings: () -> Unit,
     syncEnabled: Boolean,
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
@@ -5799,7 +5830,12 @@ private fun SettingsRoot(
             SettingsDivider(palette)
 
             SettingsSectionTitle("Additional", palette)
-            SettingsThemeDropdownRow(themeMode = themeMode, palette = palette, onThemeSelected = onThemeSelected)
+            SettingsMenuRow(
+                title = "Theme",
+                value = "${themeMode.label} • ${accentColor.label}",
+                palette = palette,
+                onClick = onThemeSettings,
+            )
             SettingsToggleRow(
                 title = "Birthday calendar",
                 subtitle = "Import contacts' birthdays",
@@ -5873,30 +5909,50 @@ private fun SettingsCompactHeader(palette: DotCalPalette, onBack: () -> Unit, ti
 @Composable
 private fun ThemeSettings(
     themeMode: DotCalThemeMode,
+    accentColor: AccentColor,
     palette: DotCalPalette,
     onBack: () -> Unit,
     onThemeSelected: (DotCalThemeMode) -> Unit,
+    onAccentSelected: (AccentColor) -> Unit,
 ) {
-    LazyColumn(modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(16.dp)) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ChevronLeft, contentDescription = "Back", tint = palette.primaryText)
-                }
-                Text("Theme", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+    val listState = rememberLazyListState()
+    val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
+    Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
+            item {
+                SettingsLargeHeader(palette = palette, onBack = onBack, title = "Theme")
+                Spacer(modifier = Modifier.height(10.dp))
+                Text("Choose app appearance", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(bottom = 16.dp))
             }
-            Text("Choose app appearance", color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, modifier = Modifier.padding(start = 4.dp, bottom = 16.dp))
+            item {
             DotCalThemeMode.entries.forEach { mode ->
                 ThemeOptionRow(
                     mode = mode,
+                    accentColor = accentColor,
                     palette = palette,
                     selected = themeMode == mode,
                     onClick = { onThemeSelected(mode) },
                 )
             }
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                "Accent Color",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                modifier = Modifier.padding(start = 4.dp, bottom = 14.dp),
+            )
+            AccentColorSwatches(
+                selectedAccent = accentColor,
+                palette = palette,
+                onAccentSelected = onAccentSelected,
+            )
+            Spacer(modifier = Modifier.height(960.dp))
+            }
+        }
+        if (showCompactHeader) {
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Theme")
         }
     }
 }
@@ -5944,7 +6000,7 @@ private fun GlobalHolidaysSettings(
                     HolidayCountryDivider(palette)
                 }
             }
-            item { Spacer(modifier = Modifier.height(560.dp)) }
+            item { Spacer(modifier = Modifier.height(960.dp)) }
         }
         if (showCompactHeader) {
             SettingsCompactHeader(palette = palette, onBack = onBack, title = "Global Holidays")
@@ -6067,9 +6123,9 @@ private fun AddAccountSettings(
                 SettingsLargeHeader(palette = palette, onBack = onBack, title = "Add an account")
                 Spacer(modifier = Modifier.height(10.dp))
                 GoogleAccountProviderRow(palette = palette, onClick = onGoogleAccount)
-                SettingsContentDivider(palette)
+                HorizontalDivider(color = palette.line, thickness = 1.dp)
             }
-            item { Spacer(modifier = Modifier.height(560.dp)) }
+            item { Spacer(modifier = Modifier.height(960.dp)) }
         }
         if (showCompactHeader) {
             SettingsCompactHeader(palette = palette, onBack = onBack, title = "Add an account")
@@ -6686,62 +6742,6 @@ private fun SettingsSyncIntervalRow(
 }
 
 @Composable
-private fun SettingsThemeDropdownRow(
-    themeMode: DotCalThemeMode,
-    palette: DotCalPalette,
-    onThemeSelected: (DotCalThemeMode) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val menuSurface = palette.dialogSurface
-    val menuText = palette.primaryText
-    Box {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .noRippleClickable { expanded = true },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Theme", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(themeMode.label, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                UpDownChevron(tint = palette.secondaryText)
-            }
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(menuSurface),
-        ) {
-            DotCalThemeMode.entries.forEach { mode ->
-                DropdownMenuItem(
-                    modifier = Modifier.background(menuSurface),
-                    text = {
-                        Text(
-                            mode.label,
-                            color = menuText,
-                            fontFamily = mono,
-                            fontSize = 16.sp,
-                        )
-                    },
-                    trailingIcon = {
-                        if (mode == themeMode) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = menuText)
-                        }
-                    },
-                    onClick = {
-                        onThemeSelected(mode)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun UpDownChevron(tint: Color, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(width = 12.dp, height = 16.dp)) {
         val stroke = 1.4.dp.toPx()
@@ -6765,6 +6765,7 @@ private fun SettingsContentDivider(palette: DotCalPalette) {
 @Composable
 private fun ThemeOptionRow(
     mode: DotCalThemeMode,
+    accentColor: AccentColor,
     palette: DotCalPalette,
     selected: Boolean,
     onClick: () -> Unit,
@@ -6781,7 +6782,7 @@ private fun ThemeOptionRow(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ThemePreview(mode = mode)
+            ThemePreview(mode = mode, accentColor = accentColor)
             Column {
                 Text(mode.label, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Text(if (selected) "Active" else "Tap to apply", color = if (selected) palette.accent else palette.secondaryText, fontFamily = mono, fontSize = 10.sp)
@@ -6797,8 +6798,8 @@ private fun ThemeOptionRow(
 }
 
 @Composable
-private fun ThemePreview(mode: DotCalThemeMode) {
-    val preview = dotCalPalette(mode)
+private fun ThemePreview(mode: DotCalThemeMode, accentColor: AccentColor) {
+    val preview = dotCalPalette(mode, accentColor)
     Row(
         modifier = Modifier
             .size(width = 46.dp, height = 32.dp)
@@ -6810,6 +6811,38 @@ private fun ThemePreview(mode: DotCalThemeMode) {
     ) {
         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(preview.accent))
         Box(modifier = Modifier.size(width = 20.dp, height = 2.dp).background(preview.primaryText))
+    }
+}
+
+@Composable
+private fun AccentColorSwatches(
+    selectedAccent: AccentColor,
+    palette: DotCalPalette,
+    onAccentSelected: (AccentColor) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AccentColor.entries.forEach { accent ->
+            val selected = accent == selectedAccent
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, if (selected) palette.primaryText else palette.line, CircleShape)
+                    .padding(3.dp)
+                    .clip(CircleShape)
+                    .background(accent.color)
+                    .noRippleClickable { onAccentSelected(accent) },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(Icons.Default.Check, contentDescription = accent.label, tint = accent.onColor, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
     }
 }
 
@@ -7208,6 +7241,10 @@ private fun parseColor(hex: String): Int {
     }
 }
 
+private fun CalendarEvent.displayColor(palette: DotCalPalette): Color {
+    return colorHex?.let { Color(parseColor(it)) } ?: palette.accent
+}
+
 private enum class CalendarTab(val label: String, val shortLabel: String) {
     Year("Year view", "Year"),
     Month("Month view", "Month"),
@@ -7291,12 +7328,37 @@ private enum class DotCalThemeMode(val label: String) {
     }
 }
 
-private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): DotCalPalette {
+private enum class AccentColor(val hex: String, val label: String) {
+    RED("#FF3B30", "Red"),
+    BLUE("#0A84FF", "Blue"),
+    GREEN("#30D158", "Green"),
+    PURPLE("#BF5AF2", "Purple"),
+    AMBER("#FF9F0A", "Amber");
+
+    val color: Color
+        get() = Color(android.graphics.Color.parseColor(hex))
+
+    val onColor: Color
+        get() = when (this) {
+            GREEN, AMBER -> Color(0xFF101010)
+            RED, BLUE, PURPLE -> Color(0xFFFFFFFF)
+        }
+
+    companion object {
+        fun fromStorage(value: String?): AccentColor {
+            return entries.firstOrNull { it.name == value } ?: RED
+        }
+    }
+}
+
+private fun dotCalPalette(mode: DotCalThemeMode, accentColor: AccentColor = AccentColor.RED, systemDark: Boolean = false): DotCalPalette {
     val resolved = if (mode == DotCalThemeMode.System) {
         if (systemDark) DotCalThemeMode.Dark else DotCalThemeMode.Light
     } else {
         mode
     }
+    val accent = accentColor.color
+    val onAccent = accentColor.onColor
     return when (resolved) {
         DotCalThemeMode.Dark -> DotCalPalette(
             background = Color(0xFF000000),
@@ -7322,8 +7384,8 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
             dot = Color(0xFFFFFFFF),
             yearWeekday = Color(0xFFFFFFFF),
             yearMonthLabel = Color(0xFFFFFFFF),
-            accent = NRed,
-            onAccent = Color(0xFFFFFFFF),
+            accent = accent,
+            onAccent = onAccent,
             isDark = true,
         )
         DotCalThemeMode.Light -> DotCalPalette(
@@ -7350,15 +7412,15 @@ private fun dotCalPalette(mode: DotCalThemeMode, systemDark: Boolean = false): D
             dot = Color(0xFF101010),
             yearWeekday = Color(0xFF101010),
             yearMonthLabel = Color(0xFF101010),
-            accent = NRed,
-            onAccent = NWhite,
+            accent = accent,
+            onAccent = onAccent,
             isDark = false,
         )
         DotCalThemeMode.System -> error("System must be resolved before palette creation")
     }
 }
 
-private fun dotCalBootPalette(): DotCalPalette {
+private fun dotCalBootPalette(accentColor: AccentColor = AccentColor.RED): DotCalPalette {
     return DotCalPalette(
         background = Color(0xFF000000),
         primaryText = Color(0xFFFFFFFF),
@@ -7383,8 +7445,8 @@ private fun dotCalBootPalette(): DotCalPalette {
         dot = Color(0xFFFFFFFF),
         yearWeekday = Color(0xFFFFFFFF),
         yearMonthLabel = Color(0xFFFFFFFF),
-        accent = NRed,
-        onAccent = Color(0xFFFFFFFF),
+        accent = accentColor.color,
+        onAccent = accentColor.onColor,
         isDark = true,
     )
 }
