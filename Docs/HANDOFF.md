@@ -544,6 +544,7 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-23: Reverted uncommitted widget-related changes from this session (`DotCalRepository`, `DotCalWidgets`, `WidgetDataRepository`, `WidgetUpdateWorker`, `widget_preview_large.xml`, and untracked widget helper/assets). Kept non-widget `DotCalApp.kt` change and user reference PNGs. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed on rerun after first timeout; APK install skipped because no ADB device was connected.
 - 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after increasing Theme detail and Add Account scroll area for tall devices; no phone/manual UI QA run; APK not installed in this pass.
 - 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after increasing Add Account screen scroll area; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Theme detail Settings-style header and Add Account Google divider refinement; no phone/manual UI QA run.

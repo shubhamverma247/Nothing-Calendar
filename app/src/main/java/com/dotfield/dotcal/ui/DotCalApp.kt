@@ -479,13 +479,14 @@ fun DotCalApp(
         }
     }
     LaunchedEffect(initialRouteToken, initialCalendarTab, initialCalendarDate) {
-        if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialCalendarTab.equals("month", ignoreCase = true)) {
+        val routedCalendarTab = CalendarTab.entries.firstOrNull { it.name.equals(initialCalendarTab, ignoreCase = true) }
+        if (initialRouteToken != null && handledRouteToken != initialRouteToken && routedCalendarTab != null) {
             viewModel.closeEventDetail()
             taskDetail = null
             settingsScreen = SettingsScreen.Root
             previousScreenTab = ScreenTab.Calendar
             screenTab = ScreenTab.Calendar
-            calendarTab = CalendarTab.Month
+            calendarTab = if (routedCalendarTab == CalendarTab.ThreeDay) CalendarTab.Month else routedCalendarTab
             initialCalendarDate?.let { date ->
                 runCatching { LocalDate.parse(date) }.getOrNull()?.let(viewModel::selectDate)
             }
@@ -3584,12 +3585,20 @@ private fun EventEditorScreen(
     var showReminderPicker by remember { mutableStateOf(false) }
     var showRepeatPicker by remember { mutableStateOf(false) }
     var showApplyScopePicker by remember { mutableStateOf(false) }
+    var pendingPermissionSave by remember { mutableStateOf<Pair<EventEditorData, RecurringEditScope>?>(null) }
     var submitted by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusSinkRequester = remember { FocusRequester() }
     val context = LocalContext.current
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        pendingPermissionSave?.let { pending ->
+            val data = if (granted) pending.first else pending.first.copy(reminderMinutes = null)
+            onSave(data, pending.second)
+            pendingPermissionSave = null
+            if (!granted) Toast.makeText(context, "Event saved without reminder", Toast.LENGTH_SHORT).show()
+        }
+    }
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5),
     ) { uris ->
@@ -3621,30 +3630,40 @@ private fun EventEditorScreen(
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
+    fun needsNotificationPermissionForReminder(): Boolean {
+        return reminderMinutes != null &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+    }
+    fun currentEditorData(): EventEditorData {
+        return EventEditorData(
+            eventId = draftEventId,
+            title = title,
+            description = description,
+            location = location,
+            date = startDate,
+            endDate = endDate,
+            startTime = startTime,
+            endTime = endTime,
+            isAllDay = allDay,
+            reminderMinutes = reminderMinutes,
+            rrule = recurrenceRule,
+            imageUris = imageUris.toJsonStringArray(),
+            voiceNotePath = voiceNotePath,
+        )
+    }
     fun trySave() {
         submitted = true
         val startDateTime = startDate.atTime(startTime)
         val endDateTime = endDate.atTime(endTime)
         if (title.isNotBlank() && (if (allDay) endDate >= startDate else endDateTime.isAfter(startDateTime))) {
-            if (reminderMinutes != null) requestNotificationPermissionForReminder()
-            onSave(
-                EventEditorData(
-                    eventId = draftEventId,
-                    title = title,
-                    description = description,
-                    location = location,
-                    date = startDate,
-                    endDate = endDate,
-                    startTime = startTime,
-                    endTime = endTime,
-                    isAllDay = allDay,
-                    reminderMinutes = reminderMinutes,
-                    rrule = recurrenceRule,
-                    imageUris = imageUris.toJsonStringArray(),
-                    voiceNotePath = voiceNotePath,
-                ),
-                recurringEditScope,
-            )
+            val data = currentEditorData()
+            if (needsNotificationPermissionForReminder()) {
+                pendingPermissionSave = data to recurringEditScope
+                requestNotificationPermissionForReminder()
+            } else {
+                onSave(data, recurringEditScope)
+            }
         }
     }
     Column(
@@ -4991,11 +5010,18 @@ private fun TaskEditorSheet(
     var showTimePicker by remember { mutableStateOf(false) }
     var showReminderPicker by remember { mutableStateOf(false) }
     var showRepeatPicker by remember { mutableStateOf(false) }
+    var pendingTaskPermissionSave by remember { mutableStateOf<TaskEditorData?>(null) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusSinkRequester = remember { FocusRequester() }
     val context = LocalContext.current
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        pendingTaskPermissionSave?.let { pending ->
+            onSave(if (granted) pending else pending.copy(reminderMinutes = null))
+            pendingTaskPermissionSave = null
+            if (!granted) Toast.makeText(context, "Task saved without reminder", Toast.LENGTH_SHORT).show()
+        }
+    }
     val taskSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     fun clearTaskFocus() {
@@ -5010,6 +5036,11 @@ private fun TaskEditorSheet(
         ) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+    fun needsNotificationPermissionForTaskReminder(): Boolean {
+        return reminderMinutes != null &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
     }
 
     ModalBottomSheet(
@@ -5138,16 +5169,19 @@ private fun TaskEditorSheet(
                     if (title.isBlank()) {
                         titleError = true
                     } else {
-                        onSave(
-                            TaskEditorData(
-                                title = title,
-                                date = dueDate,
-                                time = dueTime,
-                                reminderMinutes = reminderMinutes,
-                                rrule = if (dueDate == null) null else recurrenceRule,
-                            ),
+                        val data = TaskEditorData(
+                            title = title,
+                            date = dueDate,
+                            time = dueTime,
+                            reminderMinutes = reminderMinutes,
+                            rrule = if (dueDate == null) null else recurrenceRule,
                         )
-                        if (reminderMinutes != null) requestNotificationPermissionForTaskReminder()
+                        if (needsNotificationPermissionForTaskReminder()) {
+                            pendingTaskPermissionSave = data
+                            requestNotificationPermissionForTaskReminder()
+                        } else {
+                            onSave(data)
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
