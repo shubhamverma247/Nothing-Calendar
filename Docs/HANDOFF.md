@@ -544,6 +544,8 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-23: Root Settings header cleanup: removed the back arrow from the root Settings large header and compact header now that bottom-nav tab switching stays visible; nested Settings screens still keep back arrows. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
+- 2026-06-23: Settings overlay bottom-nav visibility fix: Settings now reserves the bottom-nav area plus system navigation inset, so opening Settings keeps the bottom nav visible instead of covering it. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - 2026-06-23: Onboarding/button/navigation polish: primary onboarding buttons now use squarer 8dp corners, onboarding content uses navigation-bar padding and compact-height spacing so `Not Now` remains visible with 3-button navigation, bottom nav uses navigation-bar padding so it sits above system buttons, and Settings bottom-tab icon changed to a filled gear-style icon. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - 2026-06-23: Reverted uncommitted widget-related changes from this session (`DotCalRepository`, `DotCalWidgets`, `WidgetDataRepository`, `WidgetUpdateWorker`, `widget_preview_large.xml`, and untracked widget helper/assets). Kept non-widget `DotCalApp.kt` change and user reference PNGs. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed on rerun after first timeout; APK install skipped because no ADB device was connected.
 - 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after increasing Theme detail and Add Account scroll area for tall devices; no phone/manual UI QA run; APK not installed in this pass.
@@ -627,6 +629,9 @@ For current latest app state:
 - Onboarding buttons: primary CTA should have squarer reference-style corners, not pill corners.
 - Onboarding on phones with 3-button navigation: `Not Now` should stay visible above system buttons.
 - Bottom nav on phones with 3-button navigation: Calendar/Tasks/Settings labels should sit above system buttons and remain fully visible.
+- Open Settings: bottom nav should remain visible below the Settings overlay, and tapping `Calendar` or `Tasks` from there should still switch tabs normally.
+- Root Settings screen: no top-left back arrow in either the large header or compact scrolled header.
+- Nested Settings screens like `Theme`, `Calendar Accounts`, `Add an account`, `Global Holidays`, and `Privacy Policy` should still show back arrows.
 - Bottom nav Settings icon should render as a filled gear-style icon.
 - Onboarding icon QA: floating cards/badges should show reference-style mini calendar, bell, check, and lock icons; progress dots should sit near the `N / 5` count.
 - Onboarding progress QA: progress should be left-aligned under the copy group, with current number in red and dots near the count, not centered.

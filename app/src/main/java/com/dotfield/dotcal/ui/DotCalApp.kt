@@ -843,7 +843,12 @@ fun DotCalApp(
             visible = screenTab == ScreenTab.Settings,
             enter = slideInHorizontally(initialOffsetX = { it }),
             exit = slideOutHorizontally(targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.calendarSurface).statusBarsPadding(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 78.dp)
+                .navigationBarsPadding()
+                .background(palette.calendarSurface)
+                .statusBarsPadding(),
         ) {
             SettingsPreview(
                 themeMode = resolvedThemeMode,
@@ -5814,7 +5819,7 @@ private fun SettingsRoot(
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
             item {
-                SettingsLargeHeader(palette = palette, onBack = onBack)
+                SettingsLargeHeader(palette = palette, onBack = onBack, showBack = false)
                 Spacer(modifier = Modifier.height(10.dp))
             }
             item {
@@ -5886,16 +5891,23 @@ private fun SettingsRoot(
             }
         }
         if (showCompactHeader) {
-            SettingsCompactHeader(palette = palette, onBack = onBack)
+            SettingsCompactHeader(palette = palette, onBack = onBack, showBack = false)
         }
     }
 }
 
 @Composable
-private fun SettingsLargeHeader(palette: DotCalPalette, onBack: () -> Unit, title: String = "Calendar") {
+private fun SettingsLargeHeader(
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    title: String = "Calendar",
+    showBack: Boolean = true,
+) {
     Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp)) {
-        IconButton(onClick = onBack, modifier = Modifier.offset(x = (-16).dp).size(44.dp)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+        if (showBack) {
+            IconButton(onClick = onBack, modifier = Modifier.offset(x = (-16).dp).size(44.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+            }
         }
         Text(
             title,
@@ -5903,21 +5915,28 @@ private fun SettingsLargeHeader(palette: DotCalPalette, onBack: () -> Unit, titl
             fontFamily = mono,
             fontWeight = FontWeight.Normal,
             fontSize = 28.sp,
-            modifier = Modifier.padding(start = 0.dp, top = 2.dp),
+            modifier = Modifier.padding(start = 0.dp, top = if (showBack) 2.dp else 10.dp),
         )
     }
 }
 
 @Composable
-private fun SettingsCompactHeader(palette: DotCalPalette, onBack: () -> Unit, title: String = "Calendar") {
+private fun SettingsCompactHeader(
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    title: String = "Calendar",
+    showBack: Boolean = true,
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
             .background(palette.calendarSurface),
     ) {
-        IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+        if (showBack) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+            }
         }
         Text(
             title,
