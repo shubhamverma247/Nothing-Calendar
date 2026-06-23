@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-06-22
+Updated: 2026-06-23
 
 ## Purpose
 
@@ -293,7 +293,7 @@ Rules:
 
 1. Add Account button: complete.
 2. Print to PDF: pending.
-3. Extra Accent Themes: pending.
+3. Extra Accent Themes: complete by explicit user request on separate branch before Step 2.
 
 Implemented Step 1:
 - Added `Add Account` button in Settings > Calendar Accounts below the connected account list.
@@ -352,7 +352,7 @@ Step 2 verification to add after build:
 - No schema/package/scheme/DB/table/column changes.
 - Known gap if still true: no custom date range selection; current view only.
 
-Pending Step 3: Extra Accent Themes.
+Completed Step 3: Extra Accent Themes.
 Goal:
 - Add selectable accent color while preserving existing Light/Dark/System base themes.
 - Existing users default to red and see no visual change until choosing another accent.
@@ -408,6 +408,21 @@ Step 3 verification to add after build:
 - Light/Dark/System base themes otherwise unchanged.
 - App relaunch preserves selected accent with no red startup flash.
 - Existing default with no preference remains red.
+
+Implemented Step 3:
+- Branch: `feature/phase1-step3-accent-themes`.
+- Added existing DataStore-backed `KEY_ACCENT_COLOR` with default `RED`.
+- Added accent choices: Red `#FF3B30`, Blue `#0A84FF`, Green `#30D158`, Purple `#BF5AF2`, Amber `#FF9F0A`.
+- Accent is independent from Light/Dark/System theme mode.
+- Settings > Additional shows current theme plus accent label and 5 circular accent swatches. Existing Theme dropdown remains available.
+- Theme detail screen also contains an `Accent Color` section for the same 5 swatches.
+- 2026-06-23 follow-up refinement: Settings > Additional no longer shows accent swatches directly under Theme. It now shows one `Theme` row with `Light/Dark/System • Accent` value and chevron; tapping opens the Theme detail screen, where Light/Dark/System choices and `Accent Color` swatches live.
+- 2026-06-23 follow-up refinement: Theme detail now uses the same Settings-style large header plus compact centered scroll header as Calendar Accounts/Add Account/Global Holidays. Add Account's Google row divider is full-width so it covers the icon area too.
+- 2026-06-23 follow-up refinement: Theme detail and Add Account screen bottom spacers increased so both scroll on tall devices and can trigger compact centered headers.
+- Selecting an accent writes DataStore immediately, mirrors the value to boot preferences to avoid a red startup flash, updates Compose palette, and enqueues widget refresh.
+- Null event color fallback now uses the current accent in Month dots, Week all-day/timed blocks, and Day all-day/timed blocks while explicit event/provider/birthday colors remain untouched.
+- Widgets read `KEY_ACCENT_COLOR` for their accent when refreshed.
+- Light/Dark/System backgrounds, surfaces, dialog colors, text colors, package id, deep link scheme, DB filename, Room tables, columns, and schema are unchanged.
 - No package/scheme/DB/table/schema changes; DataStore key only.
 
 ## Step 7 Spec: Birthday Calendar
@@ -529,6 +544,11 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after increasing Theme detail and Add Account scroll area for tall devices; no phone/manual UI QA run; APK not installed in this pass.
+- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after increasing Add Account screen scroll area; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
+- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Theme detail Settings-style header and Add Account Google divider refinement; no phone/manual UI QA run.
+- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after moving Accent Color swatches from Settings root into Theme detail screen; no phone/manual UI QA run.
+- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Phase 1 Step 3 Extra Accent Themes on branch `feature/phase1-step3-accent-themes`; no phone/manual UI QA run.
 - 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after enabling Global Holidays scrolling on short lists; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Global Holidays compact-header/divider correction; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Global Holidays Settings UI correction; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
@@ -588,8 +608,17 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from Add Account Settings-style header behavior build is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run in this pass.
+- Latest debug APK from Phase 1 Step 3 Extra Accent Themes build is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run in this pass.
 - Confirm package `com.dotfield.dotcal`, label `DotCal`.
+- Settings > Additional: Theme row should show base theme and selected accent label, with no swatches directly under it.
+- Tap Settings > Additional > Theme: Theme detail screen should open with large `Theme` header; after scrolling, compact centered `Theme` header should appear at the top.
+- Theme detail screen: `Accent Color` should show Red, Blue, Green, Purple, and Amber circular swatches.
+- Settings > Calendar Accounts > Add an account: Google row divider should span full row width, including under the Google icon area.
+- Settings > Calendar Accounts > Add an account: screen should scroll even on tall devices and show the compact centered `Add an account` header after scrolling.
+- Tap each swatch: today circle, selected indicators, add button, active bottom nav, switches, picker save/OK accents, and default event color fallback should update immediately.
+- Relaunch app after selecting Blue/Green/Purple/Amber: selected accent should persist with no red startup flash.
+- Light/Dark/System base theme backgrounds, surfaces, and text colors should remain unchanged.
+- Widgets should use selected accent after a widget refresh trigger.
 - First normal app launch: onboarding appears once with 5 pages: DotCal, Calendar Access, Reminders, Birthdays, Ready.
 - First normal app launch: Calendar Month should not flash before onboarding appears.
 - Onboarding visual QA: all 5 pages should use the same premium editorial layout, large semi-3D hero illustration, light/dark palette, red accent, `N / 5` progress, full-width rounded primary CTA, and secondary `Not Now` where applicable.
@@ -665,7 +694,7 @@ Continue DotCal (`com.dotfield.dotcal`). Preserve existing app behavior/UI when 
 
 Roadmap Steps 1-11 are implemented. Recent completed work: Settings week-start picker, Phase 1 Step 1 Add Account button, and Global Holidays after explicit roadmap override. `Start of the week` now uses existing `KEY_WEEK_START` with `Region default`, `Saturday`, `Sunday`, `Monday`, and applies to Month/Week/Year. Static `Reminders` Settings row was removed. Global Holidays is now implemented as bundled offline data for IN, DE, GB, JP, IT, SA, and US for 2025-2031. Add Account row exists in Settings > Calendar Accounts, opens Android Google account picker, requests calendar permission first if needed, and syncs through existing `syncNow` after successful picker result. Latest builds passed; latest APK was installed on phone `4ab0d020`; no phone/manual UI QA run.
 
-Current Phase 1 status: Step 1 Add Account button complete. Global Holidays complete by user override. Step 2 Print to PDF pending. Step 3 Extra Accent Themes pending. Build one step at a time in order. Do not start Step 3 until Step 2 builds and is marked complete. Do not add Pro/billing/ads/cancel/reschedule in this phase.
+Current Phase 1 status: Step 1 Add Account button complete. Global Holidays complete by user override. Step 3 Extra Accent Themes complete on branch `feature/phase1-step3-accent-themes` by explicit user request before Step 2. Step 2 Print to PDF remains pending. Do not add Pro/billing/ads/cancel/reschedule in this phase.
 
 Before each feature: read relevant code, tell the user exactly what files/functions will change, what behavior will change, what schema/package/scheme/DB impact exists, and what to test after build. Ask questions when needed; do not assume. Wait for user approval before code edits unless the user already explicitly approved that feature.
 

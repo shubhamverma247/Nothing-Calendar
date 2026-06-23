@@ -22,5 +22,6 @@ object CalendarPreferences {
     val KEY_SHOW_DECLINED = booleanPreferencesKey("show_declined")
     val KEY_24_HOUR_FORMAT = booleanPreferencesKey("twenty_four_hour_format")
     val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
+    val KEY_ACCENT_COLOR = stringPreferencesKey("accent_color")
     val KEY_LAST_SELECTED_DATE = stringPreferencesKey("last_selected_date")
 }
