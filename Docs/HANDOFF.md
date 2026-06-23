@@ -544,6 +544,7 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-23: Onboarding/button/navigation polish: primary onboarding buttons now use squarer 8dp corners, onboarding content uses navigation-bar padding and compact-height spacing so `Not Now` remains visible with 3-button navigation, bottom nav uses navigation-bar padding so it sits above system buttons, and Settings bottom-tab icon changed to a filled gear-style icon. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - 2026-06-23: Reverted uncommitted widget-related changes from this session (`DotCalRepository`, `DotCalWidgets`, `WidgetDataRepository`, `WidgetUpdateWorker`, `widget_preview_large.xml`, and untracked widget helper/assets). Kept non-widget `DotCalApp.kt` change and user reference PNGs. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed on rerun after first timeout; APK install skipped because no ADB device was connected.
 - 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after increasing Theme detail and Add Account scroll area for tall devices; no phone/manual UI QA run; APK not installed in this pass.
 - 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after increasing Add Account screen scroll area; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
@@ -609,7 +610,7 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from Phase 1 Step 3 Extra Accent Themes build is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run in this pass.
+- Latest debug APK from onboarding/button/navigation polish build is available at `app/build/outputs/apk/debug/app-debug.apk`; installed on phone `4ab0d020`; no phone/manual UI QA run in this pass.
 - Confirm package `com.dotfield.dotcal`, label `DotCal`.
 - Settings > Additional: Theme row should show base theme and selected accent label, with no swatches directly under it.
 - Tap Settings > Additional > Theme: Theme detail screen should open with large `Theme` header; after scrolling, compact centered `Theme` header should appear at the top.
@@ -623,6 +624,10 @@ For current latest app state:
 - First normal app launch: onboarding appears once with 5 pages: DotCal, Calendar Access, Reminders, Birthdays, Ready.
 - First normal app launch: Calendar Month should not flash before onboarding appears.
 - Onboarding visual QA: all 5 pages should use the same premium editorial layout, large semi-3D hero illustration, light/dark palette, red accent, `N / 5` progress, full-width rounded primary CTA, and secondary `Not Now` where applicable.
+- Onboarding buttons: primary CTA should have squarer reference-style corners, not pill corners.
+- Onboarding on phones with 3-button navigation: `Not Now` should stay visible above system buttons.
+- Bottom nav on phones with 3-button navigation: Calendar/Tasks/Settings labels should sit above system buttons and remain fully visible.
+- Bottom nav Settings icon should render as a filled gear-style icon.
 - Onboarding icon QA: floating cards/badges should show reference-style mini calendar, bell, check, and lock icons; progress dots should sit near the `N / 5` count.
 - Onboarding progress QA: progress should be left-aligned under the copy group, with current number in red and dots near the count, not centered.
 - Onboarding illustrations: Calendar Access uses generic event/calendar cards only; no Google/Outlook/Yahoo/Apple or other third-party logos.

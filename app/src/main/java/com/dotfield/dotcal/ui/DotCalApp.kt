@@ -40,6 +40,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -50,6 +51,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -78,6 +80,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Settings as SettingsGearIcon
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
@@ -1246,12 +1249,14 @@ private fun OnboardingScreen(
         hasContactsPermission = hasContactsPermission,
     )
     val colors = remember(palette.isDark) { onboardingColors(palette.isDark) }
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.background)
+            .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 14.dp),
     ) {
+        val compactHeight = maxHeight < 720.dp
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier.fillMaxWidth().height(46.dp),
@@ -1265,15 +1270,15 @@ private fun OnboardingScreen(
                     Text("Skip", color = colors.secondaryText, fontFamily = mono, fontSize = 14.sp)
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(if (compactHeight) 8.dp else 12.dp))
             OnboardingHero(
                 page = page,
                 colors = colors,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1.05f),
+                    .weight(if (compactHeight) 0.9f else 1.05f),
             )
-            Spacer(modifier = Modifier.height(64.dp))
+            Spacer(modifier = Modifier.height(if (compactHeight) 28.dp else 64.dp))
             Text(
                 text = copy.label,
                 color = colors.accent,
@@ -1286,33 +1291,33 @@ private fun OnboardingScreen(
                 text = copy.title,
                 color = colors.primaryText,
                 fontFamily = mono,
-                fontSize = 36.sp,
+                fontSize = if (compactHeight) 32.sp else 36.sp,
                 fontWeight = FontWeight.Bold,
-                lineHeight = 40.sp,
+                lineHeight = if (compactHeight) 36.sp else 40.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(if (compactHeight) 8.dp else 12.dp))
             Text(
                 text = copy.description,
                 color = colors.secondaryText,
                 fontFamily = mono,
                 fontSize = 16.sp,
                 lineHeight = 24.sp,
-                maxLines = 3,
+                maxLines = if (compactHeight) 2 else 3,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.weight(1f))
             OnboardingProgress(pageIndex = pageIndex, pageCount = pageCount, colors = colors)
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(if (compactHeight) 14.dp else 20.dp))
             Button(
                 onClick = onPrimary,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = colors.accent,
                     contentColor = Color.White,
                 ),
-                shape = RoundedCornerShape(22.dp),
-                modifier = Modifier.fillMaxWidth().height(60.dp),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth().height(if (compactHeight) 54.dp else 60.dp),
                 contentPadding = PaddingValues(horizontal = 18.dp),
             ) {
                 Text(copy.primaryLabel, fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -1320,12 +1325,12 @@ private fun OnboardingScreen(
             if (page != OnboardingPage.Welcome && page != OnboardingPage.Ready) {
                 TextButton(
                     onClick = onSecondary,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    modifier = Modifier.fillMaxWidth().height(if (compactHeight) 44.dp else 48.dp),
                 ) {
                     Text("Not Now", color = colors.secondaryText, fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
             } else {
-                Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(if (compactHeight) 44.dp else 48.dp))
             }
         }
     }
@@ -2029,8 +2034,9 @@ private fun DotCalBottomNav(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(78.dp)
             .background(surface)
+            .navigationBarsPadding()
+            .height(78.dp)
             .drawBehind {
                 drawLine(
                     border,
@@ -2207,22 +2213,7 @@ private fun BottomTaskIcon(tint: Color) {
 
 @Composable
 private fun BottomSettingsIcon(tint: Color) {
-    Canvas(modifier = Modifier.size(30.dp)) {
-        val strokeWidth = 1.9.dp.toPx()
-        val stroke = Stroke(width = strokeWidth)
-        val center = Offset(size.width / 2f, size.height / 2f)
-        drawCircle(tint, radius = 11.5.dp.toPx(), center = center, style = stroke)
-        drawCircle(tint, radius = 3.dp.toPx(), center = center, style = stroke)
-        val dotRadius = 1.35.dp.toPx()
-        repeat(12) { index ->
-            val angle = Math.toRadians((index * 30).toDouble())
-            val dotCenter = Offset(
-                center.x + kotlin.math.cos(angle).toFloat() * 8.dp.toPx(),
-                center.y + kotlin.math.sin(angle).toFloat() * 8.dp.toPx(),
-            )
-            drawCircle(tint, radius = dotRadius, center = dotCenter)
-        }
-    }
+    Icon(Icons.Filled.SettingsGearIcon, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
 }
 
 @Composable
