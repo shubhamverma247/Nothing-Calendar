@@ -612,7 +612,7 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from onboarding/button/navigation polish build is available at `app/build/outputs/apk/debug/app-debug.apk`; installed on phone `4ab0d020`; no phone/manual UI QA run in this pass.
+- Latest debug APK from root Settings/nav visibility polish build is available at `app/build/outputs/apk/debug/app-debug.apk`; installed on phone `4ab0d020`; no phone/manual UI QA run in this pass.
 - Confirm package `com.dotfield.dotcal`, label `DotCal`.
 - Settings > Additional: Theme row should show base theme and selected accent label, with no swatches directly under it.
 - Tap Settings > Additional > Theme: Theme detail screen should open with large `Theme` header; after scrolling, compact centered `Theme` header should appear at the top.
@@ -703,7 +703,7 @@ Continue DotCal (`com.dotfield.dotcal`). Preserve existing app behavior/UI when 
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
 ```
 
-Roadmap Steps 1-11 are implemented. Recent completed work: Settings week-start picker, Phase 1 Step 1 Add Account button, and Global Holidays after explicit roadmap override. `Start of the week` now uses existing `KEY_WEEK_START` with `Region default`, `Saturday`, `Sunday`, `Monday`, and applies to Month/Week/Year. Static `Reminders` Settings row was removed. Global Holidays is now implemented as bundled offline data for IN, DE, GB, JP, IT, SA, and US for 2025-2031. Add Account row exists in Settings > Calendar Accounts, opens Android Google account picker, requests calendar permission first if needed, and syncs through existing `syncNow` after successful picker result. Latest builds passed; latest APK was installed on phone `4ab0d020`; no phone/manual UI QA run.
+Roadmap Steps 1-11 are implemented. Recent completed work: Settings week-start picker, Phase 1 Step 1 Add Account button, Global Holidays after explicit roadmap override, extra accent themes, onboarding/button/navigation polish, and recent Settings root-nav cleanup. `Start of the week` now uses existing `KEY_WEEK_START` with `Region default`, `Saturday`, `Sunday`, `Monday`, and applies to Month/Week/Year. Static `Reminders` Settings row was removed. Global Holidays is now implemented as bundled offline data for IN, DE, GB, JP, IT, SA, and US for 2025-2031. Add Account row exists in Settings > Calendar Accounts, opens Android Google account picker, requests calendar permission first if needed, and syncs through existing `syncNow` after successful picker result. Root Settings keeps the bottom nav visible, root Settings large/compact headers no longer show a back arrow, nested Settings screens still keep back arrows, onboarding buttons use squarer corners, and the Settings bottom-nav icon is the filled gear-style icon. Latest builds passed; latest APK was installed on phone `4ab0d020`; no phone/manual UI QA run.
 
 Current Phase 1 status: Step 1 Add Account button complete. Global Holidays complete by user override. Step 3 Extra Accent Themes complete on branch `feature/phase1-step3-accent-themes` by explicit user request before Step 2. Step 2 Print to PDF remains pending. Do not add Pro/billing/ads/cancel/reschedule in this phase.
 
