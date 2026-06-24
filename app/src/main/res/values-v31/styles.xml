@@ -25,7 +25,7 @@
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:navigationBarColor">#FFFFFF</item>
         <item name="android:statusBarColor">#FFFFFF</item>
-        <item name="android:windowSplashScreenBackground">#F7F7F7</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">#F7F7F7</item>
+        <item name="android:windowSplashScreenBackground">#000000</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#000000</item>
     </style>
 </resources>

@@ -1,3 +1,6 @@
 <resources>
-    <style name="Theme.DotCal" parent="@style/Theme.DotCal.Dark" />
+    <style name="Theme.DotCal" parent="@style/Theme.DotCal.Dark">
+        <item name="android:windowSplashScreenBackground">#000000</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#000000</item>
+    </style>
 </resources>

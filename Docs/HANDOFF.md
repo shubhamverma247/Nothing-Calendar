@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-06-23
+Updated: 2026-06-24
 
 ## Purpose
 
@@ -73,6 +73,21 @@ Keys:
 ## Current App State
 
 Product: premium black/white/red calendar app. App label: `DotCal`.
+
+Current Phase 1:
+- Step 1 Add Account button complete.
+- Global Holidays complete by user override.
+- Step 3 Extra Accent Themes complete on branch `feature/phase1-step3-accent-themes` by explicit user request before Step 2.
+- Step 2 Print to PDF remains pending.
+- Do not add Pro, billing, ads, cancel, or reschedule in this phase.
+
+Work protocol:
+- Before each feature, read relevant code and state exact files/functions to change, behavior impact, schema/package/scheme/DB impact, and what to test after build.
+- Ask when needed; do not assume product decisions.
+- Wait for user approval before code edits unless the user already explicitly approved that feature.
+- Build after implementation with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+- If a phone is connected after build, always install `app/build/outputs/apk/debug/app-debug.apk`.
+- Do not run manual UI QA unless user explicitly asks.
 
 Main navigation:
 - Bottom nav: `Calendar`, `Tasks`, `Settings`.
@@ -177,6 +192,8 @@ Latest committed behavior:
 - 2026-06-20 shared widget corner radius reduced from 34dp to 28dp across 2x2, 4x2, and 4x4 to better match the native launcher widget reference.
 - 2026-06-20 shared dark widget background lightened from `#181818` to `#1E1E1E` across resource-backed System mode and forced Dark mode.
 - 2026-06-20 launcher icon replaced old `N` mark with DotCal calendar mark using black/white/red palette.
+- 2026-06-24 App icon replacement complete using the provided `DotCal-FixedIcon-Final-v2.zip` Android adaptive icon resources as-is. Resources were placed under `app/src/main/res/mipmap-*` and `app/src/main/res/mipmap-anydpi-v26`; manifest icon refs now use `@mipmap/ic_launcher` and `@mipmap/ic_launcher_round`. Old `res/drawable/ic_launcher.xml` was removed. Play Store 512 image is at `Docs/play_store_512.png` for future Play Console upload. No Kotlin, Compose, ViewModel, DB, schema, package id, deep link scheme, or DB filename changes.
+- 2026-06-24 Splash screen background fix complete. Android 12+ splash background and icon background are explicitly black in both `values-v31/styles.xml` and `values-night-v31/styles.xml`; splash icon unchanged. No Kotlin, Compose, ViewModel, DB, schema, package id, deep link scheme, or DB filename changes.
 - 2026-06-20 4x4 widget final refinement keeps existing structure but removes the header icon, moves/centers month title with the grid, increases calendar cells slightly, uses a filled red current-day circle, shows subtle event dots, limits upcoming events to 3 with `+X more`, routes empty state to Add Event, and reduces shared widget radius to 24dp.
 - 2026-06-20 4x4 widget follow-up refinement keeps header/month/current-day structure, increases calendar cell footprint again, keeps event dots under event dates, changes upcoming rows to stacked time/title/location, limits 4x4 upcoming events to 2 with `+X more`, and tightens bottom whitespace.
 - 2026-06-20 4x2 widget final polish moves the date circle closer to the left edge, keeps the event block aligned/centered, allows the event title to wrap to 2 lines, keeps single-event focus, and slightly increases dark secondary-text contrast.
@@ -558,6 +575,8 @@ Latest verification:
 - 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Global Holidays Settings UI correction; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Global Holidays implementation; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after changing Google row from account picker to direct add-account/sign-in flow; no phone/manual UI QA run.
+- 2026-06-24: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after splash screen background fix; APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-24: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after final launcher icon resource replacement; APK installed on phone `4ab0d020`; no manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after restoring Google row to open the Android account picker/sign-in flow; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after restoring Settings-style scroll/compact-header behavior on Add Account screen; no phone/manual UI QA run.
 - 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after adding Google logo icon to Add Account provider row; no phone/manual UI QA run.
@@ -612,7 +631,13 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from root Settings/nav visibility polish build is available at `app/build/outputs/apk/debug/app-debug.apk`; installed on phone `4ab0d020`; no phone/manual UI QA run in this pass.
+- Latest debug APK from splash screen background fix build is available at `app/build/outputs/apk/debug/app-debug.apk`; installed on phone `4ab0d020`; no manual UI QA run.
+- System theme Light: fully close app, relaunch from launcher, confirm splash background is black, not white, with no harsh box around icon.
+- System theme Dark: fully close app, relaunch from launcher, confirm splash background is still black and unchanged from prior dark behavior.
+- Splash icon: confirm icon still displays correctly, colored or monochrome depending on Android `Themed icons`; only background behind it changed.
+- Launcher icon: with Android `Themed icons` OFF, confirm colored DC calendar design appears: red header bar, red center dot, white D + red C.
+- Launcher icon: with Android `Themed icons` ON, confirm white silhouette tinted with system accent color appears.
+- Launch app and confirm no crash or missing resource error.
 - Confirm package `com.dotfield.dotcal`, label `DotCal`.
 - Settings > Additional: Theme row should show base theme and selected accent label, with no swatches directly under it.
 - Tap Settings > Additional > Theme: Theme detail screen should open with large `Theme` header; after scrolling, compact centered `Theme` header should appear at the top.
@@ -636,7 +661,7 @@ For current latest app state:
 - Onboarding icon QA: floating cards/badges should show reference-style mini calendar, bell, check, and lock icons; progress dots should sit near the `N / 5` count.
 - Onboarding progress QA: progress should be left-aligned under the copy group, with current number in red and dots near the count, not centered.
 - Onboarding illustrations: Calendar Access uses generic event/calendar cards only; no Google/Outlook/Yahoo/Apple or other third-party logos.
-- Phone in light theme: launch/splash screen should use light background behind app icon. Phone in dark theme: launch/splash screen should use dark background.
+- Phone in light or dark theme: launch/splash screen should use black background behind app icon.
 - Onboarding: allow or skip Calendar/Notifications/Contacts; denied/skipped permissions should not block local app use.
 - Onboarding: after Skip or Start, relaunch should not show onboarding again.
 - Onboarding/deep links: event/task/widget/reminder deep links should open their target directly instead of being covered by onboarding.
@@ -695,18 +720,8 @@ For Step 7 after implementation:
 
 ## Resume Prompt
 
-Use caveman-ultra and `$android-development`. Work in `D:\Caveman\caveman\Nothing-Calendar`. Read `Docs/HANDOFF.md` first.
+Use caveman-ultra and `$android-development`. Work in `D:\Caveman\caveman\Nothing-Calendar`. Read `Docs/HANDOFF.md` first and follow it as source of truth.
 
-Continue DotCal (`com.dotfield.dotcal`). Preserve existing app behavior/UI when roadmap text conflicts. Preserve exactly 5 Room tables: `calendar_accounts`, `calendar_events`, `event_reminders`, `sync_metadata`, `deleted_event_log`. Do not change schema columns, package/application id `com.dotfield.dotcal`, deep link scheme `dotcal://`, or DB filename `dotcal.db`. Do not run phone/manual UI QA unless explicitly asked. Keep `Docs/HANDOFF.md` updated after each completed step. Build after implementation steps with:
+Continue DotCal (`com.dotfield.dotcal`). Do not change Room schema/tables, package id, deep link scheme, or DB filename. Keep handoff updated, build after implementation, and install APK if phone is connected.
 
-```powershell
-.\gradlew.bat --no-daemon --console=plain :app:assembleDebug
-```
-
-Roadmap Steps 1-11 are implemented. Recent completed work: Settings week-start picker, Phase 1 Step 1 Add Account button, Global Holidays after explicit roadmap override, extra accent themes, onboarding/button/navigation polish, and recent Settings root-nav cleanup. `Start of the week` now uses existing `KEY_WEEK_START` with `Region default`, `Saturday`, `Sunday`, `Monday`, and applies to Month/Week/Year. Static `Reminders` Settings row was removed. Global Holidays is now implemented as bundled offline data for IN, DE, GB, JP, IT, SA, and US for 2025-2031. Add Account row exists in Settings > Calendar Accounts, opens Android Google account picker, requests calendar permission first if needed, and syncs through existing `syncNow` after successful picker result. Root Settings keeps the bottom nav visible, root Settings large/compact headers no longer show a back arrow, nested Settings screens still keep back arrows, onboarding buttons use squarer corners, and the Settings bottom-nav icon is the filled gear-style icon. Latest builds passed; latest APK was installed on phone `4ab0d020`; no phone/manual UI QA run.
-
-Current Phase 1 status: Step 1 Add Account button complete. Global Holidays complete by user override. Step 3 Extra Accent Themes complete on branch `feature/phase1-step3-accent-themes` by explicit user request before Step 2. Step 2 Print to PDF remains pending. Do not add Pro/billing/ads/cancel/reschedule in this phase.
-
-Before each feature: read relevant code, tell the user exactly what files/functions will change, what behavior will change, what schema/package/scheme/DB impact exists, and what to test after build. Ask questions when needed; do not assume. Wait for user approval before code edits unless the user already explicitly approved that feature.
-
-Next feature if user approves: Phase 1 Step 2 Print to PDF. Implement per `Phase 1 - Easy Features` section: add `util/PdfExportUtil.kt`, use `PdfDocument`, A4 `595 x 842`, run drawing on `Dispatchers.Default`, save to `context.getExternalFilesDir(null)/dotcal_export_{timestamp}.pdf`, add Calendar top bar printer icon only, show `Print current view`, export current Month/Week/Day/Agenda data from already-loaded events, share with FileProvider, show loading and generic failure feedback, update `HANDOFF.md`, build, and add What To Test.
+Next pending feature, only if user approves: Phase 1 Step 2 Print to PDF.
