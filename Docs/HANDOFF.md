@@ -725,3 +725,4 @@ Use caveman-ultra and `$android-development`. Work in `D:\Caveman\caveman\Nothin
 Continue DotCal (`com.dotfield.dotcal`). Do not change Room schema/tables, package id, deep link scheme, or DB filename. Keep handoff updated, build after implementation, and install APK if phone is connected.
 
 Next pending feature, only if user approves: Phase 1 Step 2 Print to PDF.
+dont start work lmk when ready.
