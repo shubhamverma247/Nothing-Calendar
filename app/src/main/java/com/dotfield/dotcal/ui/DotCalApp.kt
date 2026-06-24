@@ -1253,7 +1253,7 @@ private fun OnboardingScreen(
         hasNotificationPermission = hasNotificationPermission,
         hasContactsPermission = hasContactsPermission,
     )
-    val colors = remember(palette.isDark) { onboardingColors(palette.isDark) }
+    val colors = remember(palette) { onboardingColors(palette) }
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -1275,30 +1275,30 @@ private fun OnboardingScreen(
                     Text("Skip", color = colors.secondaryText, fontFamily = mono, fontSize = 14.sp)
                 }
             }
-            Spacer(modifier = Modifier.height(if (compactHeight) 8.dp else 12.dp))
+            Spacer(modifier = Modifier.height(if (compactHeight) 20.dp else 28.dp))
             OnboardingHero(
                 page = page,
                 colors = colors,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(if (compactHeight) 0.9f else 1.05f),
+                    .height(if (compactHeight) 120.dp else 132.dp),
             )
-            Spacer(modifier = Modifier.height(if (compactHeight) 28.dp else 64.dp))
+            Spacer(modifier = Modifier.height(if (compactHeight) 24.dp else 34.dp))
             Text(
                 text = copy.label,
                 color = colors.accent,
                 fontFamily = mono,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = copy.title,
                 color = colors.primaryText,
                 fontFamily = mono,
-                fontSize = if (compactHeight) 32.sp else 36.sp,
+                fontSize = if (compactHeight) 22.sp else 24.sp,
                 fontWeight = FontWeight.Bold,
-                lineHeight = if (compactHeight) 36.sp else 40.sp,
+                lineHeight = if (compactHeight) 26.sp else 28.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1307,9 +1307,9 @@ private fun OnboardingScreen(
                 text = copy.description,
                 color = colors.secondaryText,
                 fontFamily = mono,
-                fontSize = 16.sp,
-                lineHeight = 24.sp,
-                maxLines = if (compactHeight) 2 else 3,
+                fontSize = 13.sp,
+                lineHeight = 20.sp,
+                maxLines = if (compactHeight) 3 else 4,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.weight(1f))
@@ -1319,20 +1319,21 @@ private fun OnboardingScreen(
                 onClick = onPrimary,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = colors.accent,
-                    contentColor = Color.White,
+                    contentColor = colors.onAccent,
                 ),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth().height(if (compactHeight) 54.dp else 60.dp),
+                shape = RoundedCornerShape(16.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
+                modifier = Modifier.fillMaxWidth().height(if (compactHeight) 48.dp else 52.dp),
                 contentPadding = PaddingValues(horizontal = 18.dp),
             ) {
-                Text(copy.primaryLabel, fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(copy.primaryLabel, fontFamily = mono, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
             if (page != OnboardingPage.Welcome && page != OnboardingPage.Ready) {
                 TextButton(
                     onClick = onSecondary,
                     modifier = Modifier.fillMaxWidth().height(if (compactHeight) 44.dp else 48.dp),
                 ) {
-                    Text("Not Now", color = colors.secondaryText, fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Not Now", color = colors.secondaryText, fontFamily = mono, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 }
             } else {
                 Spacer(modifier = Modifier.height(if (compactHeight) 44.dp else 48.dp))
@@ -1356,6 +1357,7 @@ private data class OnboardingColors(
     val secondaryText: Color,
     val mutedText: Color,
     val accent: Color,
+    val onAccent: Color,
     val glow: Color,
     val shadow: Color,
     val line: Color,
@@ -1402,33 +1404,35 @@ private fun onboardingCopy(
     }
 }
 
-private fun onboardingColors(isDark: Boolean): OnboardingColors {
-    return if (isDark) {
+private fun onboardingColors(palette: DotCalPalette): OnboardingColors {
+    return if (palette.isDark) {
         OnboardingColors(
-            background = Color(0xFF0B0B0D),
-            surface = Color(0xFF121216),
-            elevatedSurface = Color(0xFF1A1A20),
-            primaryText = Color.White,
-            secondaryText = Color(0xFF9CA3AF),
-            mutedText = Color(0xFF5B626E),
-            accent = Color(0xFFFF3B30),
-            glow = Color(0xFFFF3B30).copy(alpha = 0.22f),
+            background = palette.background,
+            surface = palette.dialogSurface,
+            elevatedSurface = palette.eventCardSurface,
+            primaryText = palette.primaryText,
+            secondaryText = palette.secondaryText,
+            mutedText = palette.dimText,
+            accent = palette.accent,
+            onAccent = palette.onAccent,
+            glow = palette.accent.copy(alpha = 0.22f),
             shadow = Color.Black.copy(alpha = 0.55f),
-            line = Color(0xFF2A2A32),
+            line = palette.line,
             isDark = true,
         )
     } else {
         OnboardingColors(
-            background = Color(0xFFFAFAFA),
-            surface = Color.White,
-            elevatedSurface = Color(0xFFF7F7F8),
-            primaryText = Color(0xFF111111),
-            secondaryText = Color(0xFF6B7280),
-            mutedText = Color(0xFFD1D5DB),
-            accent = Color(0xFFFF3B30),
-            glow = Color(0xFFFF3B30).copy(alpha = 0.13f),
+            background = palette.background,
+            surface = palette.dialogSurface,
+            elevatedSurface = palette.eventCardSurface,
+            primaryText = palette.primaryText,
+            secondaryText = palette.secondaryText,
+            mutedText = palette.dimText,
+            accent = palette.accent,
+            onAccent = palette.onAccent,
+            glow = palette.accent.copy(alpha = 0.13f),
             shadow = Color(0xFF111827).copy(alpha = 0.13f),
-            line = Color(0xFFE5E7EB),
+            line = palette.line,
             isDark = false,
         )
     }
@@ -1439,39 +1443,18 @@ private fun OnboardingHero(page: OnboardingPage, colors: OnboardingColors, modif
     Box(
         modifier = Modifier
             .then(modifier)
-            .heightIn(min = 270.dp, max = 360.dp),
+            .heightIn(min = 110.dp, max = 150.dp),
         contentAlignment = Alignment.Center,
     ) {
-        val imageRes = if (page == OnboardingPage.Ready) {
-            com.dotfield.dotcal.R.drawable.both5
-        } else if (colors.isDark) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
             when (page) {
-                OnboardingPage.Welcome -> com.dotfield.dotcal.R.drawable.dark1
-                OnboardingPage.CalendarPermission -> com.dotfield.dotcal.R.drawable.dark2
-                OnboardingPage.Notifications -> com.dotfield.dotcal.R.drawable.dark3
-                OnboardingPage.Contacts -> com.dotfield.dotcal.R.drawable.dark4
-                else -> com.dotfield.dotcal.R.drawable.both5
-            }
-        } else {
-            when (page) {
-                OnboardingPage.Welcome -> com.dotfield.dotcal.R.drawable.screen1
-                OnboardingPage.CalendarPermission -> com.dotfield.dotcal.R.drawable.screen2
-                OnboardingPage.Notifications -> com.dotfield.dotcal.R.drawable.screen3
-                OnboardingPage.Contacts -> com.dotfield.dotcal.R.drawable.screen4
-                else -> com.dotfield.dotcal.R.drawable.both5
+                OnboardingPage.Welcome -> drawFlatWelcomeHero(colors)
+                OnboardingPage.CalendarPermission -> drawFlatCalendarAccessHero(colors)
+                OnboardingPage.Notifications -> drawFlatReminderHero(colors)
+                OnboardingPage.Contacts -> drawFlatBirthdayHero(colors)
+                OnboardingPage.Ready -> drawFlatReadyHero(colors)
             }
         }
-
-        Image(
-            painter = androidx.compose.ui.res.painterResource(id = imageRes),
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxSize()
-                .scale(1.72f)
-                .offset(y = 4.dp)
-                .padding(vertical = 12.dp),
-            contentScale = ContentScale.Fit
-        )
     }
 }
 
@@ -1501,17 +1484,120 @@ private fun OnboardingProgress(pageIndex: Int, pageCount: Int, colors: Onboardin
             )
         }
         
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             repeat(pageCount) { index ->
+                val active = index == pageIndex
                 Box(
                     modifier = Modifier
-                        .padding(horizontal = 5.dp)
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(if (index == pageIndex) colors.accent else colors.mutedText.copy(alpha = if (colors.isDark) 0.55f else 0.75f)),
+                        .padding(horizontal = 3.dp)
+                        .width(if (active) 16.dp else 5.dp)
+                        .height(5.dp)
+                        .background(if (active) colors.accent else colors.mutedText.copy(alpha = if (colors.isDark) 0.55f else 0.75f)),
+                )
+            }
+        }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFlatWelcomeHero(colors: OnboardingColors) {
+    val calendarWidth = size.minDimension * 0.441f
+    val calendarHeight = calendarWidth * 0.86f
+    val left = (size.width - calendarWidth) / 2f
+    val top = size.height * 0.22f
+    drawFlatCalendarPage(colors, Offset(left, top), calendarWidth, calendarHeight, dotGrid = true)
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFlatCalendarAccessHero(colors: OnboardingColors) {
+    val side = size.minDimension * 0.441f
+    val calendarHeight = side * 0.86f
+    val left = (size.width - side) / 2f
+    val top = size.height * 0.22f
+    drawRect(
+        color = colors.background,
+        topLeft = Offset(left, top),
+        size = androidx.compose.ui.geometry.Size(side, calendarHeight),
+    )
+    drawRect(colors.primaryText, Offset(left, top), androidx.compose.ui.geometry.Size(side, calendarHeight), style = Stroke(2.dp.toPx()))
+    drawRect(colors.accent, Offset(left, top), androidx.compose.ui.geometry.Size(side, calendarHeight * 0.3f))
+    drawCircle(colors.accent, 4.dp.toPx(), Offset(left + side * 0.5f, top + calendarHeight * 0.58f))
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFlatReminderHero(colors: OnboardingColors) {
+    val c = Offset(size.width * 0.5f, size.height * 0.42f)
+    drawCircle(colors.primaryText, size.minDimension * 0.168f, c, style = Stroke(2.dp.toPx()))
+    drawRect(
+        colors.accent,
+        Offset(c.x - 5.dp.toPx(), c.y + size.minDimension * 0.15f),
+        androidx.compose.ui.geometry.Size(10.dp.toPx(), 10.dp.toPx()),
+    )
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFlatBirthdayHero(colors: OnboardingColors) {
+    val c = Offset(size.width * 0.5f, size.height * 0.3f)
+    val radius = size.minDimension * 0.105f
+    drawCircle(colors.primaryText, radius, c, style = Stroke(2.dp.toPx()))
+    drawCircle(colors.accent, 4.5.dp.toPx(), Offset(c.x + radius * 1.45f, c.y - radius * 0.95f))
+    drawArc(
+        color = colors.primaryText,
+        startAngle = 205f,
+        sweepAngle = 120f,
+        useCenter = false,
+        topLeft = Offset(c.x - radius * 1.62f, c.y + radius * 1.72f),
+        size = androidx.compose.ui.geometry.Size(radius * 3.24f, radius * 1.72f),
+        style = Stroke(2.dp.toPx(), cap = StrokeCap.Round),
+    )
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFlatReadyHero(colors: OnboardingColors) {
+    val side = size.minDimension * 0.441f
+    val left = (size.width - side) / 2f
+    val top = size.height * 0.22f
+    drawRect(colors.accent, Offset(left, top), androidx.compose.ui.geometry.Size(side, side), style = Stroke(2.dp.toPx()))
+    val path = androidx.compose.ui.graphics.Path().apply {
+        moveTo(left + side * 0.24f, top + side * 0.52f)
+        lineTo(left + side * 0.43f, top + side * 0.71f)
+        lineTo(left + side * 0.78f, top + side * 0.31f)
+    }
+    drawPath(path, colors.accent, style = Stroke(3.dp.toPx(), cap = StrokeCap.Square, join = StrokeJoin.Miter))
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFlatCalendarPage(
+    colors: OnboardingColors,
+    topLeft: Offset,
+    width: Float,
+    height: Float,
+    dotGrid: Boolean,
+) {
+    drawRect(colors.background, topLeft, androidx.compose.ui.geometry.Size(width, height))
+    val borderColor = if (colors.isDark) Color(0xFF171717) else Color(0xFF101010)
+    drawRect(borderColor, topLeft, androidx.compose.ui.geometry.Size(width, height), style = Stroke(1.5.dp.toPx()))
+    drawRect(colors.accent, topLeft, androidx.compose.ui.geometry.Size(width, height * 0.3f))
+    val pinWidth = 4.dp.toPx()
+    val pinHeight = 14.dp.toPx()
+    listOf(0.28f, 0.72f).forEach { xFactor ->
+        drawRect(
+            colors.primaryText,
+            Offset(topLeft.x + width * xFactor - pinWidth / 2f, topLeft.y - pinHeight * 0.65f),
+            androidx.compose.ui.geometry.Size(pinWidth, pinHeight),
+        )
+    }
+    if (dotGrid) {
+        val gapX = width * 0.26f
+        val startX = topLeft.x + (width - gapX * 2f) / 2f
+        val startY = topLeft.y + height * 0.52f
+        val gapY = height * 0.24f
+        repeat(2) { row ->
+            repeat(3) { col ->
+                val active = row == 1 && col == 1
+                val inactiveColor = if (colors.isDark) {
+                    Color(0xFF303030)
+                } else {
+                    Color(0xFF4A4A4A)
+                }
+                drawCircle(
+                    if (active) colors.accent else inactiveColor,
+                    if (active) 4.dp.toPx() else 3.dp.toPx(),
+                    Offset(startX + col * gapX, startY + row * gapY),
                 )
             }
         }

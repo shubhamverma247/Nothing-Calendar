@@ -622,6 +622,7 @@ Latest verification:
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after bottom nav ripple removal; APK installed on phone `4ab0d020`.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after tab/view switch smoothing; APK installed on phone `4ab0d020`.
 - 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after task filter segmented-control ripple removal; no phone connected at install check.
+- 2026-06-24: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug --rerun-tasks` passed after flat-minimal onboarding experiment on branch `testbranch`; first normal build attempt timed out after 124s with no result, later build passed; no phone/manual UI QA run per request.
 - No phone/manual UI QA run, per instruction.
 
 Phone/manual UI QA:
@@ -631,7 +632,8 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from splash screen background fix build is available at `app/build/outputs/apk/debug/app-debug.apk`; installed on phone `4ab0d020`; no manual UI QA run.
+- Latest debug APK from flat-minimal onboarding experiment is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run.
+- Onboarding experiment: built on separate `testbranch` for visual comparison against existing illustrative onboarding.
 - System theme Light: fully close app, relaunch from launcher, confirm splash background is black, not white, with no harsh box around icon.
 - System theme Dark: fully close app, relaunch from launcher, confirm splash background is still black and unchanged from prior dark behavior.
 - Splash icon: confirm icon still displays correctly, colored or monochrome depending on Android `Themed icons`; only background behind it changed.
@@ -650,17 +652,19 @@ For current latest app state:
 - Widgets should use selected accent after a widget refresh trigger.
 - First normal app launch: onboarding appears once with 5 pages: DotCal, Calendar Access, Reminders, Birthdays, Ready.
 - First normal app launch: Calendar Month should not flash before onboarding appears.
-- Onboarding visual QA: all 5 pages should use the same premium editorial layout, large semi-3D hero illustration, light/dark palette, red accent, `N / 5` progress, full-width rounded primary CTA, and secondary `Not Now` where applicable.
-- Onboarding buttons: primary CTA should have squarer reference-style corners, not pill corners.
+- Onboarding visual QA: run through all 5 onboarding screens in both Light and Dark system theme.
+- Onboarding copy/behavior QA: confirm all existing copy text, button labels, and permission-request behavior are unchanged from before.
+- Onboarding button QA: confirm primary buttons use the same rounded style as in-app Add Event dialog buttons.
+- Onboarding Screen 1 QA: confirm the calendar illustration uses a 2x3 dot grid with one red active dot, visually echoing the app launcher icon style.
+- Onboarding progress QA: confirm progress indicator shows rectangular bars, not circles.
+- Onboarding style QA: all 5 pages should use flat-minimal Canvas/vector geometry, app background/text/accent tokens, no bitmaps, no gradients, no shadows, and no decorative foliage/sparkles.
 - Onboarding on phones with 3-button navigation: `Not Now` should stay visible above system buttons.
 - Bottom nav on phones with 3-button navigation: Calendar/Tasks/Settings labels should sit above system buttons and remain fully visible.
 - Open Settings: bottom nav should remain visible below the Settings overlay, and tapping `Calendar` or `Tasks` from there should still switch tabs normally.
 - Root Settings screen: no top-left back arrow in either the large header or compact scrolled header.
 - Nested Settings screens like `Theme`, `Calendar Accounts`, `Add an account`, `Global Holidays`, and `Privacy Policy` should still show back arrows.
 - Bottom nav Settings icon should render as a filled gear-style icon.
-- Onboarding icon QA: floating cards/badges should show reference-style mini calendar, bell, check, and lock icons; progress dots should sit near the `N / 5` count.
-- Onboarding progress QA: progress should be left-aligned under the copy group, with current number in red and dots near the count, not centered.
-- Onboarding illustrations: Calendar Access uses generic event/calendar cards only; no Google/Outlook/Yahoo/Apple or other third-party logos.
+- Onboarding illustrations: Calendar Access, Reminders, Birthdays, and Ready should use only the requested simple flat calendar/reminder/person/checkmark drawings.
 - Phone in light or dark theme: launch/splash screen should use black background behind app icon.
 - Onboarding: allow or skip Calendar/Notifications/Contacts; denied/skipped permissions should not block local app use.
 - Onboarding: after Skip or Start, relaunch should not show onboarding again.
