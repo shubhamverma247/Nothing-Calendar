@@ -49,7 +49,7 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
     }
     return if (isDark) {
         DotCalWidgetPalette(
-            background = ColorProvider(Color(0xFF080808)),
+            background = ColorProvider(Color(0xFF1A1A1A)),
             primary = ColorProvider(Color(0xFFFFFFFF)),
             secondary = ColorProvider(Color(0xFF7A7A7A)),
             dim = ColorProvider(Color(0xFF4A4A4A)),

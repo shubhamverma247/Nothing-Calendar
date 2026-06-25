@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="widget_background">#080808</color>
+    <color name="widget_background">#1A1A1A</color>
     <color name="widget_primary">#FFFFFF</color>
     <color name="widget_secondary">#7A7A7A</color>
     <color name="widget_dim">#4A4A4A</color>
     <color name="widget_border">#2A2A2A</color>
     <color name="widget_inactive">#4A4A4A</color>
     <color name="widget_dot">#242424</color>
-    <color name="widget_preview_background">#080808</color>
+    <color name="widget_preview_background">#1A1A1A</color>
     <color name="widget_preview_primary">#FFFFFF</color>
     <color name="widget_preview_secondary">#7A7A7A</color>
     <color name="widget_preview_dim">#4A4A4A</color>

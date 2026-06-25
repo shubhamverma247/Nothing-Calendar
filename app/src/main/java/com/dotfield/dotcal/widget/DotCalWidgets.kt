@@ -154,7 +154,7 @@ private fun MediumWidget(context: Context, data: WidgetCalendarData, palette: Do
             if (item == null) {
                 Box(
                     modifier = GlanceModifier.fillMaxWidth().clickable(actionStartActivity(openAddEventIntent(context))),
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = Alignment.CenterStart,
                 ) {
                     Text("NO EVENTS - TAP TO ADD", maxLines = 1, style = monoStyle(palette.secondary, 12, FontWeight.Bold))
                 }
@@ -441,7 +441,7 @@ private fun WidgetSurfaceBox(palette: DotCalWidgetPalette, content: @Composable 
         modifier = GlanceModifier
             .fillMaxSize()
             .background(palette.background)
-            .cornerRadius(24.dp),
+            .cornerRadius(18.dp),
     ) {
         content()
     }

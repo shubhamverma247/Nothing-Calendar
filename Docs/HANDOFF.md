@@ -645,6 +645,8 @@ After app-code change:
 ```
 
 Latest verification:
+- 2026-06-25: 4x2 empty-state alignment pass: live 4x2 `NO EVENTS - TAP TO ADD` label now aligns to the same content start after the vertical divider as the event title/details lane, instead of centering in the remaining widget area. No widget picker preview XML, data repository, update trigger, package id, deep link scheme, Room schema/table/column, or DB filename changes. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
+- 2026-06-25: Dark-theme widget background/corner match pass: live Glance dark widget background and dark widget picker preview background changed from `#080808` to `#1A1A1A`, and shared widget surface/picker preview radius changed from `24dp` to `18dp` to better match the provided left-widget reference. No content layout, data repository, update trigger, package id, deep link scheme, Room schema/table/column, or DB filename changes. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; no ADB device connected, so APK was not installed; no phone/manual UI QA run.
 - 2026-06-23: Root Settings header cleanup: removed the back arrow from the root Settings large header and compact header now that bottom-nav tab switching stays visible; nested Settings screens still keep back arrows. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - 2026-06-23: Settings overlay bottom-nav visibility fix: Settings now reserves the bottom-nav area plus system navigation inset, so opening Settings keeps the bottom nav visible instead of covering it. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - 2026-06-23: Onboarding/button/navigation polish: primary onboarding buttons now use squarer 8dp corners, onboarding content uses navigation-bar padding and compact-height spacing so `Not Now` remains visible with 3-button navigation, bottom nav uses navigation-bar padding so it sits above system buttons, and Settings bottom-tab icon changed to a filled gear-style icon. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
@@ -716,6 +718,8 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
+- 4x2 widget empty state: `NO EVENTS - TAP TO ADD` should start at the same horizontal position as event text does when an event is present, keeping the divider-to-label gap equal to the divider-to-event gap.
+- Dark-theme widgets: 2x2, 4x2, and 4x4 widget surfaces should use the softer charcoal `#1A1A1A` background and `18dp` rounded corners, matching the provided left-widget reference more closely than the previous pure-black/rounder surface.
 - Widget redesign: add/check all three DotCal widgets (`Next Event`, `Event Details`, `Calendar Dashboard`) in light and dark theme.
 - Widget background: all three widgets should show the dark dotted Nothing-style background; 4x4 should match the provided reference spacing more closely.
 - 4x4 widget: dotted background should cover the full rounded widget, not only the upper-left area; `JUNE`, `2026`, and event count should sit slightly farther right than the previous build.
