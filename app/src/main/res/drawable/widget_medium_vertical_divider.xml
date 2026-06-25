@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="2dp"
+    android:height="132dp"
+    android:viewportWidth="2"
+    android:viewportHeight="132">
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,1h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,8h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,15h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,22h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,29h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,36h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,43h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,50h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,57h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,64h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,71h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,78h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,85h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,92h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,99h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,106h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,113h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,120h2v3h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,127h2v3h-2z" />
+</vector>

@@ -14,8 +14,10 @@ data class DotCalWidgetPalette(
     val background: ColorProvider,
     val primary: ColorProvider,
     val secondary: ColorProvider,
+    val dim: ColorProvider,
     val border: ColorProvider,
     val inactive: ColorProvider,
+    val dot: ColorProvider,
     val accent: ColorProvider = ColorProvider(Color(0xFFFF3B30)),
 )
 
@@ -33,8 +35,10 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
             background = ColorProvider(R.color.widget_background),
             primary = ColorProvider(R.color.widget_primary),
             secondary = ColorProvider(R.color.widget_secondary),
+            dim = ColorProvider(R.color.widget_dim),
             border = ColorProvider(R.color.widget_border),
             inactive = ColorProvider(R.color.widget_inactive),
+            dot = ColorProvider(R.color.widget_dot),
             accent = ColorProvider(accent),
         )
     }
@@ -45,20 +49,24 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
     }
     return if (isDark) {
         DotCalWidgetPalette(
-            background = ColorProvider(Color(0xFF1E1E1E)),
+            background = ColorProvider(Color(0xFF080808)),
             primary = ColorProvider(Color(0xFFFFFFFF)),
-            secondary = ColorProvider(Color(0xFFC2C2C2)),
+            secondary = ColorProvider(Color(0xFF7A7A7A)),
+            dim = ColorProvider(Color(0xFF4A4A4A)),
             border = ColorProvider(Color(0xFF2A2A2A)),
-            inactive = ColorProvider(Color(0xFF666666)),
+            inactive = ColorProvider(Color(0xFF4A4A4A)),
+            dot = ColorProvider(Color(0xFF242424)),
             accent = ColorProvider(accent),
         )
     } else {
         DotCalWidgetPalette(
-            background = ColorProvider(Color(0xFFF5F5F5)),
+            background = ColorProvider(Color(0xFFFFFFFF)),
             primary = ColorProvider(Color(0xFF101010)),
             secondary = ColorProvider(Color(0xFF6B6B6B)),
-            border = ColorProvider(Color(0xFFE8E8E8)),
-            inactive = ColorProvider(Color(0xFFB0B0B0)),
+            dim = ColorProvider(Color(0xFFB5B5B5)),
+            border = ColorProvider(Color(0xFFECECEC)),
+            inactive = ColorProvider(Color(0xFFB5B5B5)),
+            dot = ColorProvider(Color(0xFFEDEDED)),
             accent = ColorProvider(accent),
         )
     }

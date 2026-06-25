@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-06-24
+Updated: 2026-06-25
 
 ## Purpose
 
@@ -10,7 +10,7 @@ Keep this file short. Add only current decisions, completed steps, next-step fac
 
 ## Hard Rules
 
-- Use `$android-development` for future Android work.
+Use `$android-development` for future Android work. 
 - Work in `D:\Caveman\caveman\Nothing-Calendar`.
 - Preserve existing app behavior/UI when newer roadmap text conflicts.
 - Do not change package/application id: `com.dotfield.dotcal`.
@@ -159,6 +159,90 @@ Tasks:
 Latest commit: widget refinement commit after `340b036 Add home screen widgets`.
 
 Latest committed behavior:
+- 2026-06-24 widget branch visual redesign implemented for Glance 2x2/4x2/4x4 widgets:
+  - Visual-only change in `DotCalWidgets.kt`, `DotCalGlanceTheme.kt`, widget colors, and widget picker preview resources.
+  - No data repository, update trigger, deep-link route, package id, Room schema/table/column, or DB filename changes.
+  - Widgets use selected app accent color from `KEY_ACCENT_COLOR`; accent is used visually as outline/dot/text, not filled date circles/buttons.
+  - Glance 1.1.1 has no usable `defaultWeight`/border modifier in this project; ring and pill outlines are composited from nested Glance boxes, and dashed dividers use repeated tiny Box segments.
+  - No bundled font added; widget numerals use built-in Glance monospace because no licensed font asset was supplied.
+  - Picker previews stay RemoteViews-safe with `LinearLayout`/`TextView` only; no `TableLayout`/`TableRow`.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed and APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-24 widget branch image-match follow-up:
+  - All Glance widgets now use a darker dotted Nothing-style background layer.
+  - 4x4 widget outer padding increased, calendar grid moved lower, `JUNE` and `2026` split into different text colors, and weekday labels made brighter.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed and APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-24 widget branch 4x4 reference spacing follow-up:
+  - 4x4 header shifted slightly right, event count nudged right, and dotted background density expanded so dots cover the full widget surface.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; no phone connected at install check; no manual UI QA run.
+- 2026-06-24 widget branch strict 4x4 reference alignment follow-up:
+  - 4x4 `JUNE 2026` header moved slightly right, event count spacing moved farther right, and dotted background now starts at the rounded widget edge with denser full-surface coverage instead of a padded upper-left field.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-24 widget branch 4x4 simple-background correction:
+  - Removed the dotted background from live Glance widgets after launcher verification showed Glance/RemoteViews dot layers were unreliable.
+  - 4x4 header now uses balanced left/right padding for `JUNE 2026` and event count, agenda event titles are larger, and the gap between event time and title is wider.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; live home-screen screenshot verified; no manual UI QA run.
+- 2026-06-24 widget branch 4x4 spacing follow-up:
+  - 4x4 content moved down by 8dp, dashed divider above agenda removed, event count target inset set to match the `JUNE 2026` 34dp edge inset, agenda title font increased, time/title gap widened, and `+N MORE` moved under the title column.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-24 widget branch 4x4 event-count correction:
+  - Corrected previous `N EVENTS` adjustment that moved the count too close to `JUNE 2026`; header spacer widened so count moves right again.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-24 widget branch 4x2/4x4 spacing polish:
+  - 4x4 `N EVENTS` moved slightly left from the previous build without changing font size, 4x2 date ring increased, ring numeral uses theme primary text (white in dark, black in light), vertical dashed divider height increased, and 4x2 date/divider/body gaps widened.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-24 widget branch 4x2 live polish follow-up:
+  - 4x2 live Glance widget only: `+N` pill moved above the title lane, vertical dashed divider length increased to 102dp, 4x2 vertical padding tightened to 4dp, and vertical dash count fixed so the divider does not overdraw and clip inside its own height.
+  - Widget picker preview XML was not changed in this follow-up.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; app launched once to trigger widget refresh; direct `APPWIDGET_UPDATE` shell broadcast was blocked by Android permission; `screencap`/`screenrecord` hung on the device, so no screenshot artifact was captured.
+- 2026-06-24 widget branch 4x2 divider visibility correction:
+  - Confirmed live home widget id `209` uses `MediumDotCalWidgetReceiver`; picker XML not touched.
+  - Root cause: increasing length alone did not read visually because the 4x2 divider used 2dp low-contrast `border` dashes, short 4dp dash segments, and a trailing spacer per dash in a constrained MIUI widget cell.
+  - 4x2 live divider now uses 108dp length, no top/bottom row padding, brighter `secondary` dashes, 7dp dash segments with 4dp gaps, and no trailing spacer after the last dash.
+  - `+N` pill moved further upward by expanding the event lane to 102dp and pushing the title column down to 16dp.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; app launched once and returned home to trigger widget refresh.
+- 2026-06-25 widget branch 4x2 divider-height root-cause fix:
+  - Root cause: the 4x2 divider stopped responding to length increases because the Glance content canvas, not the divider, was the limit. `MediumDotCalWidget` declared `SizeMode.Responsive(setOf(DpSize(250.dp, 110.dp)))`, so Glance always composed the 4x2 inside a 110dp-tall box and the launcher upscaled that bitmap. The divider at 108dp already filled the 110dp canvas, so 102/108/anything-taller all clamped to the same rendered height.
+  - Fix is visual-only: raised the Medium content canvas to `DpSize(250.dp, 140.dp)`, bumped `dotcal_widget_medium.xml` `minHeight` 110dp -> 140dp, and set the 4x2 vertical divider length to 124dp so it now has room to read taller.
+  - No data repository, update trigger, deep-link route, package id, Room schema/table/column, or DB filename changes.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-25 widget branch 4x2 divider stale-parameter correction:
+  - Root cause follow-up: the canvas/resource height fix existed, but `MediumWidget(...)` still passed `length = 56` to the live vertical `DashedDivider`, so prior height changes could not appear in the installed widget.
+  - Corrected the live 4x2 divider call to `length = 124`; no preview XML or schema/package/deep-link/DB changes.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-25 widget branch 4x2 divider centering/dash correction:
+  - Root cause follow-up: `length = 124` controlled the divider lane, but the painted dash pattern still used long `7dp` dashes and produced only ~117dp of visible marks starting at the top, so the height change read weakly on the launcher.
+  - Changed live 4x2 divider to a 132dp centered lane with shorter 3dp dash marks and 4dp gaps; `DashedDivider(...)` now centers the painted vertical pattern inside its requested lane.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no manual UI QA run.
+- 2026-06-25 widget branch 4x2 divider real-device fix:
+  - Self-run ADB screenshot showed only ~5 short dash marks rendering, despite 132dp requested height; actual root cause was Glance/RemoteViews/MIUI compressing the divider made from repeated `Box`/`Spacer` children.
+  - Replaced the live 4x2 vertical divider with a single fixed vector drawable (`widget_medium_vertical_divider.xml`) rendered through Glance `Image`, 132dp tall with 19 short 3dp dashes. This makes height/centering deterministic on launcher.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; app launched and home screenshot verified divider is visibly taller and centered. Direct `APPWIDGET_UPDATE` broadcast remains blocked by Android permission.
+- 2026-06-25 widget branch 4x2 `+N` position correction:
+  - Moved the live 4x2 `+N` pill upward by giving its Glance column an 86dp lane with bottom spacer, so it sits above the title instead of horizontally aligning with the title or dropping toward the detail/bottom area.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; app launched, returned home, and screenshot verified `+N` is above the title.
+- 2026-06-25 widget branch 4x2 final live spacing polish:
+  - Raised the `+N` pill to align with the divider top, widened the event title lane so the current title wraps instead of clipping early, and reduced/thinned the live divider to a centered 108dp by 1dp image.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; app launched, returned home, and ADB screenshot verified the divider is shorter/thinner/centered and the current title no longer ellipsizes.
+- 2026-06-25 widget branch 2x2 live spacing polish:
+  - Live 2x2 widget only: moved the red event dot to the far right of the header, moved the event section lower, reduced the title-to-time gap, and decreased the time/location font size.
+  - No preview XML, data repository, update trigger, deep-link route, package id, Room schema/table/column, or DB filename changes.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; app launched, returned home, and ADB screenshot verified the 2x2 widget rendered with the updated spacing.
+- 2026-06-25 widget branch 2x2 dot/gap follow-up:
+  - Live 2x2 widget only: moved the red dot slightly left from the far-right edge, increased the gap between the `JUN 25` date row and event section, and moved the dotted divider/event section lower together.
+  - No preview XML, data repository, update trigger, deep-link route, package id, Room schema/table/column, or DB filename changes.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; app launched, returned home, and ADB screenshot verified the updated 2x2 spacing.
+- 2026-06-25 widget branch 2x2 live divider/detail follow-up:
+  - Live 2x2 widget only: aligned the red dot within the `THURSDAY` header row, increased the `JUN 25` to divider gap, replaced the Glance box-based horizontal divider with a fixed vector image divider modeled after the 4x2 divider fix, reduced the divider-to-title gap, reduced the time/location label font to 9sp, and changed the time/location separator from hyphen to middle dot.
+  - No widget picker preview XML, data repository, update trigger, deep-link route, package id, Room schema/table/column, or DB filename changes.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; app launched and returned home, but ADB device disconnected during screenshot capture, so no screenshot verification was completed for this final pass.
+- 2026-06-25 widget branch 2x2 divider dash-density follow-up:
+  - Live 2x2 horizontal divider vector only: kept individual dash width at 2dp and reduced the gap between dashes to 3dp for a denser divider. Widget picker preview XML was not changed.
+  - No data repository, update trigger, deep-link route, package id, Room schema/table/column, or DB filename changes.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; no phone connected in ADB, so APK was not installed and no screenshot verification was run.
+- 2026-06-25 widget branch 2x2 divider tight-gap correction:
+  - Live 2x2 horizontal divider vector only: corrected the dash spacing direction by keeping 2dp dash width and reducing the gap to 1dp, placing dash starts every 3dp so dashes are closer together. Widget picker preview XML was not changed.
+  - No data repository, update trigger, deep-link route, package id, Room schema/table/column, or DB filename changes.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; app launched and returned home, but ADB disconnected during screenshot capture, so screenshot verification was not completed.
 - Birthday calendar import is implemented.
 - Contacts birthdays import as read-only yearly all-day events using existing rows/tables.
 - Birthday account/reminders use existing `calendar_accounts`, `calendar_events`, and `event_reminders`.
@@ -632,7 +716,16 @@ Phone/manual UI QA:
 ## What To Test Now
 
 For current latest app state:
-- Latest debug APK from flat-minimal onboarding experiment is available at `app/build/outputs/apk/debug/app-debug.apk`; no phone/manual UI QA run.
+- Widget redesign: add/check all three DotCal widgets (`Next Event`, `Event Details`, `Calendar Dashboard`) in light and dark theme.
+- Widget background: all three widgets should show the dark dotted Nothing-style background; 4x4 should match the provided reference spacing more closely.
+- 4x4 widget: dotted background should cover the full rounded widget, not only the upper-left area; `JUNE`, `2026`, and event count should sit slightly farther right than the previous build.
+- 2x2 widget: day name + date line render; no date number; status dot appears only when at least one event is shown; empty state shows ring plus `ADD EVENT`.
+- 4x2 widget: ring date, day abbreviation, dashed vertical divider, optional outlined `+N` pill, and empty `NO EVENTS - TAP TO ADD` state render correctly.
+- 4x4 widget: month grid remains visible in empty state; today is outline ring, not filled circle; event days show small dots; count tag hides when empty.
+- Widget accent: change Settings > Additional > Theme accent, trigger widget refresh, confirm widget outlines/dots/text use selected accent with no filled accent date circles/buttons.
+- Widget picker: previews for all three sizes load without `Can't load widget`; they use redesigned structure and no icon-only preview.
+- Widget routes: event rows open Event Detail, date/month targets open Month, empty states open Add Event.
+- Latest debug APK from widget visual redesign is available at `app/build/outputs/apk/debug/app-debug.apk`; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 - Onboarding experiment: built on separate `testbranch` for visual comparison against existing illustrative onboarding.
 - System theme Light: fully close app, relaunch from launcher, confirm splash background is black, not white, with no harsh box around icon.
 - System theme Dark: fully close app, relaunch from launcher, confirm splash background is still black and unchanged from prior dark behavior.
@@ -724,9 +817,4 @@ For Step 7 after implementation:
 
 ## Resume Prompt
 
-Use caveman-ultra and `$android-development`. Work in `D:\Caveman\caveman\Nothing-Calendar`. Read `Docs/HANDOFF.md` first and follow it as source of truth.
 
-Continue DotCal (`com.dotfield.dotcal`). Do not change Room schema/tables, package id, deep link scheme, or DB filename. Keep handoff updated, build after implementation, and install APK if phone is connected.
-
-Next pending feature, only if user approves: Phase 1 Step 2 Print to PDF.
-dont start work lmk when ready.

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="1dp"
+    android:viewportWidth="96"
+    android:viewportHeight="1">
+    <path android:fillColor="@color/widget_secondary" android:pathData="M0,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M3,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M6,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M9,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M12,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M15,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M18,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M21,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M24,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M27,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M30,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M33,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M36,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M39,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M42,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M45,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M48,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M51,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M54,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M57,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M60,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M63,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M66,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M69,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M72,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M75,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M78,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M81,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M84,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M87,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M90,0h2v1h-2z" />
+    <path android:fillColor="@color/widget_secondary" android:pathData="M93,0h2v1h-2z" />
+</vector>
