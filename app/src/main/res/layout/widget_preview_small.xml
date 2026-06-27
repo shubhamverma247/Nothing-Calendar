@@ -52,19 +52,17 @@
         android:layout_alignParentBottom="true"
         android:orientation="vertical">
 
-        <TextView
+        <ImageView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:includeFontPadding="false"
-            android:text="- - - - - - - - - - -"
-            android:textColor="@color/widget_preview_dim"
-            android:textSize="8sp" />
+            android:layout_height="1dp"
+            android:contentDescription="@null"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_small_horizontal_divider" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
+            android:layout_marginTop="7dp"
             android:ellipsize="end"
             android:fontFamily="sans-serif"
             android:includeFontPadding="false"

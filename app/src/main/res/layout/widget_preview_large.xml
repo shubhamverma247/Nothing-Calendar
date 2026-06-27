@@ -85,7 +85,10 @@
         <LinearLayout style="@style/WidgetPreviewCalendarRow">
             <TextView style="@style/WidgetPreviewDay" android:text="7" />
             <TextView style="@style/WidgetPreviewDay" android:text="8" />
-            <TextView style="@style/WidgetPreviewEventDay" android:text="9·" />
+            <LinearLayout style="@style/WidgetPreviewEventCell">
+                <TextView style="@style/WidgetPreviewEventDayNum" android:text="9" />
+                <ImageView style="@style/WidgetPreviewEventDot" />
+            </LinearLayout>
             <TextView style="@style/WidgetPreviewDay" android:text="10" />
             <TextView style="@style/WidgetPreviewDay" android:text="11" />
             <TextView style="@style/WidgetPreviewDay" android:text="12" />
@@ -98,7 +101,10 @@
             <TextView style="@style/WidgetPreviewDay" android:text="15" />
             <TextView style="@style/WidgetPreviewDay" android:text="16" />
             <TextView style="@style/WidgetPreviewDay" android:text="17" />
-            <TextView style="@style/WidgetPreviewEventDay" android:text="18·" />
+            <LinearLayout style="@style/WidgetPreviewEventCell">
+                <TextView style="@style/WidgetPreviewEventDayNum" android:text="18" />
+                <ImageView style="@style/WidgetPreviewEventDot" />
+            </LinearLayout>
             <TextView style="@style/WidgetPreviewDay" android:text="19" />
             <TextView style="@style/WidgetPreviewDay" android:text="20" />
         </LinearLayout>
@@ -109,15 +115,34 @@
             <TextView style="@style/WidgetPreviewDay" android:text="22" />
             <TextView style="@style/WidgetPreviewDay" android:text="23" />
             <TextView style="@style/WidgetPreviewDay" android:text="24" />
-            <TextView style="@style/WidgetPreviewEventDay" android:text="25·" />
+            <LinearLayout style="@style/WidgetPreviewEventCell">
+                <TextView style="@style/WidgetPreviewEventDayNum" android:text="25" />
+                <ImageView style="@style/WidgetPreviewEventDot" />
+            </LinearLayout>
             <TextView style="@style/WidgetPreviewDay" android:text="26" />
-            <TextView style="@style/WidgetPreviewCurrentDay" android:text="27" />
+            <FrameLayout style="@style/WidgetPreviewTodayCell">
+                <TextView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/widget_preview_ring_accent"
+                    android:fontFamily="monospace"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="27"
+                    android:textColor="@color/widget_accent"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
         </LinearLayout>
 
         <!-- Week 5: 28–30 -->
         <LinearLayout style="@style/WidgetPreviewCalendarRow">
             <TextView style="@style/WidgetPreviewDay" android:text="28" />
-            <TextView style="@style/WidgetPreviewEventDay" android:text="29·" />
+            <LinearLayout style="@style/WidgetPreviewEventCell">
+                <TextView style="@style/WidgetPreviewEventDayNum" android:text="29" />
+                <ImageView style="@style/WidgetPreviewEventDot" />
+            </LinearLayout>
             <TextView style="@style/WidgetPreviewDay" android:text="30" />
             <TextView style="@style/WidgetPreviewDay" android:text="" />
             <TextView style="@style/WidgetPreviewDay" android:text="" />
@@ -127,16 +152,14 @@
     </LinearLayout>
 
     <!-- Dashed divider -->
-    <TextView
+    <ImageView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:layout_marginBottom="6dp"
-        android:fontFamily="monospace"
-        android:includeFontPadding="false"
-        android:text="- - - - - - - - - - - - - -"
-        android:textColor="@color/widget_preview_dim"
-        android:textSize="8sp" />
+        android:layout_height="1dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="8dp"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_small_horizontal_divider" />
 
     <!-- Agenda row 1 -->
     <LinearLayout

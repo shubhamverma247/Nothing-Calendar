@@ -63,4 +63,38 @@
         <item name="android:gravity">center</item>
         <item name="android:orientation">horizontal</item>
     </style>
+
+    <!-- Event day: number with a small accent dot centered below it -->
+    <style name="WidgetPreviewEventCell">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">25dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="WidgetPreviewEventDayNum">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textColor">@color/widget_preview_primary</item>
+        <item name="android:textSize">9sp</item>
+    </style>
+
+    <style name="WidgetPreviewEventDot">
+        <item name="android:layout_width">3dp</item>
+        <item name="android:layout_height">3dp</item>
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:src">@drawable/widget_preview_event_dot</item>
+        <item name="android:contentDescription">@null</item>
+    </style>
+
+    <!-- Today: circular ring outline that stays round inside the wide grid cell -->
+    <style name="WidgetPreviewTodayCell">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">25dp</item>
+        <item name="android:layout_weight">1</item>
+    </style>
 </resources>
