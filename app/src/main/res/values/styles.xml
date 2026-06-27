@@ -27,24 +27,24 @@
 
     <style name="WidgetPreviewWeekday">
         <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">16dp</item>
+        <item name="android:layout_height">13dp</item>
         <item name="android:layout_weight">1</item>
         <item name="android:fontFamily">monospace</item>
         <item name="android:gravity">center</item>
         <item name="android:includeFontPadding">false</item>
-        <item name="android:textColor">@color/widget_preview_secondary</item>
-        <item name="android:textSize">10sp</item>
+        <item name="android:textColor">@color/widget_preview_dim</item>
+        <item name="android:textSize">7sp</item>
     </style>
 
     <style name="WidgetPreviewDay">
         <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">25dp</item>
+        <item name="android:layout_height">20dp</item>
         <item name="android:layout_weight">1</item>
         <item name="android:fontFamily">monospace</item>
         <item name="android:gravity">center</item>
         <item name="android:includeFontPadding">false</item>
         <item name="android:textColor">@color/widget_preview_primary</item>
-        <item name="android:textSize">13sp</item>
+        <item name="android:textSize">9sp</item>
     </style>
 
     <style name="WidgetPreviewEventDay" parent="@style/WidgetPreviewDay">

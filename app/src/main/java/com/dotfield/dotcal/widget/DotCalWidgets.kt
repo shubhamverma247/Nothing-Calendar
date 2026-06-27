@@ -242,7 +242,7 @@ private fun LargeWidget(context: Context, data: WidgetCalendarData, palette: Dot
                     Text(
                         "+${data.moreItemCount} MORE",
                         modifier = GlanceModifier
-                            .padding(start = 78.dp)
+                            .padding(start = 68.dp)
                             .clickable(actionStartActivity(openCalendarMonthIntent(context))),
                         style = monoStyle(palette.secondary, 12, FontWeight.Bold),
                     )
@@ -310,7 +310,7 @@ private fun AgendaRow(context: Context, item: WidgetEventItem, palette: DotCalWi
             .fillMaxWidth()
             .padding(start = 12.dp, bottom = 5.dp)
             .clickable(actionStartActivity(itemIntent(context, item))),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
         Text(item.timeLabel, maxLines = 1, modifier = GlanceModifier.width(50.dp), style = monoStyle(palette.accent, 10, FontWeight.Bold))
         Spacer(GlanceModifier.width(6.dp))
