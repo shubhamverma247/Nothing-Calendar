@@ -312,7 +312,7 @@ private fun AgendaRow(context: Context, item: WidgetEventItem, palette: DotCalWi
             .clickable(actionStartActivity(itemIntent(context, item))),
         verticalAlignment = Alignment.Top,
     ) {
-        Text(item.timeLabel, maxLines = 1, modifier = GlanceModifier.width(50.dp), style = monoStyle(palette.accent, 10, FontWeight.Bold))
+        Text(item.timeLabel, maxLines = 1, modifier = GlanceModifier.width(50.dp).padding(top = 3.dp), style = monoStyle(palette.accent, 10, FontWeight.Bold))
         Spacer(GlanceModifier.width(6.dp))
         Column(modifier = GlanceModifier.width(168.dp)) {
             Text(item.title, maxLines = 1, style = primaryStyle(palette, 16, FontWeight.Bold))

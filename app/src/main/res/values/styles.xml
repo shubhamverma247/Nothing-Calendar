@@ -27,7 +27,7 @@
 
     <style name="WidgetPreviewWeekday">
         <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">13dp</item>
+        <item name="android:layout_height">16dp</item>
         <item name="android:layout_weight">1</item>
         <item name="android:fontFamily">monospace</item>
         <item name="android:gravity">center</item>
@@ -38,7 +38,7 @@
 
     <style name="WidgetPreviewDay">
         <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">20dp</item>
+        <item name="android:layout_height">25dp</item>
         <item name="android:layout_weight">1</item>
         <item name="android:fontFamily">monospace</item>
         <item name="android:gravity">center</item>
