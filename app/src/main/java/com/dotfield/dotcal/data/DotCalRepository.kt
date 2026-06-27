@@ -87,6 +87,19 @@ class DotCalRepository(
             }
     }
 
+    fun observeUpcomingAgendaEvents(startDate: LocalDate): Flow<List<CalendarEvent>> {
+        val start = startDate
+        val end = start.plusMonths(6)
+        val startMs = start.atStartMs()
+        return dao.observeEvents(startMs, end.atStartMs())
+            .map { events ->
+                withContext(Dispatchers.Default) {
+                    expandRecurringEvents(events, start, end)
+                        .filter { event -> event.endTimeMs >= startMs }
+                }
+            }
+    }
+
     fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks()
         .map { tasks ->
             withContext(Dispatchers.Default) { expandRecurringTasks(tasks) }

@@ -15,6 +15,7 @@ import com.dotfield.dotcal.ui.DotCalViewModel
 import com.dotfield.dotcal.ui.theme.DotCalTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
     private val deepLinkTarget = mutableStateOf<DotCalDeepLinkTarget?>(null)
@@ -32,7 +33,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val bootPrefs = getSharedPreferences(BOOT_PREFS, MODE_PRIVATE)
         val bootTheme = bootPrefs.getString(BOOT_THEME_KEY, null)
-        setTheme(if (bootTheme == "Light") R.style.Theme_DotCal_Light else R.style.Theme_DotCal_Dark)
+        val systemDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        setTheme(
+            if (bootTheme == "Light" || ((bootTheme == null || bootTheme == "System") && !systemDark)) {
+                R.style.Theme_DotCal_Light
+            } else {
+                R.style.Theme_DotCal_Dark
+            },
+        )
         super.onCreate(savedInstanceState)
         deepLinkTarget.value = intent.dotCalDeepLinkTarget()
         lifecycleScope.launch {
@@ -51,6 +60,7 @@ class MainActivity : ComponentActivity() {
                     initialCalendarTab = target?.calendarTab,
                     initialCalendarDate = target?.calendarDate,
                     initialAddEvent = target?.addEvent == true,
+                    initialAddEventDate = target?.addEventDate,
                     initialRouteToken = target?.routeToken,
                 )
             }
@@ -72,8 +82,16 @@ class MainActivity : ComponentActivity() {
         val uri = data ?: return null
         val token = ++deepLinkSequence
         return when {
-            uri.scheme == "dotcal" && uri.host == "event" && uri.lastPathSegment == "new" -> DotCalDeepLinkTarget(addEvent = true, routeToken = token)
-            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" && uri.pathSegments.getOrNull(1) == "new" -> DotCalDeepLinkTarget(addEvent = true, routeToken = token)
+            uri.scheme == "dotcal" && uri.host == "event" && uri.lastPathSegment == "new" -> DotCalDeepLinkTarget(
+                addEvent = true,
+                addEventDate = uri.getQueryParameter("date") ?: LocalDate.now().toString(),
+                routeToken = token,
+            )
+            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" && uri.pathSegments.getOrNull(1) == "new" -> DotCalDeepLinkTarget(
+                addEvent = true,
+                addEventDate = uri.getQueryParameter("date") ?: LocalDate.now().toString(),
+                routeToken = token,
+            )
             uri.scheme == "dotcal" && uri.host == "event" -> DotCalDeepLinkTarget(eventId = uri.lastPathSegment, routeToken = token)
             uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" -> DotCalDeepLinkTarget(eventId = uri.pathSegments.getOrNull(1), routeToken = token)
             uri.scheme == "dotcal" && uri.host == "task" -> DotCalDeepLinkTarget(taskId = uri.lastPathSegment, routeToken = token)
@@ -91,5 +109,6 @@ private data class DotCalDeepLinkTarget(
     val calendarTab: String? = null,
     val calendarDate: String? = null,
     val addEvent: Boolean = false,
+    val addEventDate: String? = null,
     val routeToken: Long,
 )

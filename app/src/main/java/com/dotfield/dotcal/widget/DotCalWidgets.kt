@@ -75,14 +75,35 @@ abstract class DotCalWidget(
 
 class SmallDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = SmallDotCalWidget()
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+            WidgetUpdateWorker.enqueue(context)
+        }
+    }
 }
 
 class MediumDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = MediumDotCalWidget()
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+            WidgetUpdateWorker.enqueue(context)
+        }
+    }
 }
 
 class LargeDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = LargeDotCalWidget()
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+            WidgetUpdateWorker.enqueue(context)
+        }
+    }
 }
 
 @Composable
@@ -480,7 +501,8 @@ private fun todayDayAbbrev(): String {
 }
 
 private fun openAddEventIntent(context: Context): Intent {
-    return Intent(Intent.ACTION_VIEW, Uri.parse("dotcal://event/new")).setPackage(context.packageName)
+    val today = LocalDate.now().toString()
+    return Intent(Intent.ACTION_VIEW, Uri.parse("dotcal://event/new?date=$today")).setPackage(context.packageName)
 }
 
 private fun WidgetEventItem.detailLine(): String {

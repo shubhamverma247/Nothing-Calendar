@@ -237,11 +237,13 @@ fun DotCalApp(
     initialCalendarTab: String? = null,
     initialCalendarDate: String? = null,
     initialAddEvent: Boolean = false,
+    initialAddEventDate: String? = null,
     initialRouteToken: Long? = null,
 ) {
     val month by viewModel.month.collectAsStateWithLifecycle()
     val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
     val events by viewModel.events.collectAsStateWithLifecycle()
+    val agendaEvents by viewModel.agendaEvents.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val holidayCountries by viewModel.holidayCountries.collectAsStateWithLifecycle()
@@ -253,6 +255,7 @@ fun DotCalApp(
     var showSheet by remember { mutableStateOf(false) }
     var addSheet by remember { mutableStateOf(false) }
     var addStartTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
+    var addEditorDateOverride by remember { mutableStateOf<LocalDate?>(null) }
     var editingEvent by remember { mutableStateOf<CalendarEvent?>(null) }
     var taskDetail by remember { mutableStateOf<CalendarEvent?>(null) }
     var lastTaskDetail by remember { mutableStateOf<CalendarEvent?>(null) }
@@ -429,11 +432,12 @@ fun DotCalApp(
         dotCalPalette(resolvedThemeMode, resolvedAccentColor, systemDark)
     }
     SystemBarColorSync(palette)
-    LaunchedEffect(resolvedThemeMode, resolvedAccentColor) {
+    LaunchedEffect(resolvedThemeMode, resolvedAccentColor, systemDark) {
         bootPreferences.edit()
             .putString(BOOT_THEME_KEY, resolvedThemeMode.name)
             .putString(BOOT_ACCENT_KEY, resolvedAccentColor.name)
             .apply()
+        WidgetUpdateWorker.enqueue(context)
     }
     LaunchedEffect(storedSelectedDateValue, initialEventId, initialTaskId, initialCalendarDate) {
         val storedValue = storedSelectedDateValue ?: return@LaunchedEffect
@@ -519,26 +523,32 @@ fun DotCalApp(
             }
         }
     }
-    fun openAddEditor(startTime: LocalTime = LocalTime.of(9, 0)) {
+    fun openAddEditor(startTime: LocalTime = LocalTime.of(9, 0), date: LocalDate? = null) {
         editorSessionKey = UUID.randomUUID().toString()
         addStartTime = startTime
+        addEditorDateOverride = date
         editingEvent = null
         addSheet = true
     }
-    LaunchedEffect(initialRouteToken, initialAddEvent) {
+    LaunchedEffect(initialRouteToken, initialAddEvent, initialAddEventDate) {
         if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialAddEvent) {
             viewModel.closeEventDetail()
             taskDetail = null
             settingsScreen = SettingsScreen.Root
             previousScreenTab = ScreenTab.Calendar
             screenTab = ScreenTab.Calendar
-            openAddEditor()
+            val addDate = initialAddEventDate
+                ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                ?: LocalDate.now()
+            viewModel.selectDate(addDate)
+            openAddEditor(date = addDate)
             handledRouteToken = initialRouteToken
             routePending = false
         }
     }
     fun openEditEditor(event: CalendarEvent) {
         editorSessionKey = UUID.randomUUID().toString()
+        addEditorDateOverride = null
         editingEvent = event
         addSheet = true
     }
@@ -546,6 +556,7 @@ fun DotCalApp(
         when {
             addSheet -> {
                 editingEvent = null
+                addEditorDateOverride = null
                 addSheet = false
             }
             showTaskEditor -> {
@@ -777,7 +788,7 @@ fun DotCalApp(
                         )
                         CalendarTab.Agenda -> AgendaPreview(
                             selectedDate = selectedDate,
-                            events = events,
+                            events = agendaEvents,
                             palette = palette,
                             onAdd = { openAddEditor() },
                             onEventClick = viewModel::openEventDetail,
@@ -1105,7 +1116,7 @@ fun DotCalApp(
             EventEditorScreen(
                 event = editingEvent,
                 editorSessionKey = editorSessionKey,
-                selectedDate = selectedDate,
+                selectedDate = addEditorDateOverride ?: selectedDate,
                 selectedTime = addStartTime,
                 initialReminderMinutes = if (editingEvent == null) {
                     defaultReminderMinutes
@@ -1115,12 +1126,14 @@ fun DotCalApp(
                 palette = palette,
                 onDismiss = {
                     editingEvent = null
+                    addEditorDateOverride = null
                     addSheet = false
                 },
                 onSave = { data, scope ->
                     viewModel.saveEvent(editingEvent, data, scope) {
                         viewModel.selectDate(data.date)
                         editingEvent = null
+                        addEditorDateOverride = null
                         addSheet = false
                     }
                 },
@@ -1141,6 +1154,7 @@ fun DotCalApp(
                     when (request.source) {
                         DeleteSource.Editor -> {
                             editingEvent = null
+                            addEditorDateOverride = null
                             addSheet = false
                         }
                         DeleteSource.Detail -> viewModel.closeEventDetail()
@@ -1166,6 +1180,7 @@ fun DotCalApp(
         }
         BackHandler(enabled = addSheet) {
             editingEvent = null
+            addEditorDateOverride = null
             addSheet = false
         }
     }
@@ -4191,7 +4206,7 @@ private fun <T> WheelColumn(
     } else {
         selectedIndex
     }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (initialIndex - 1).coerceAtLeast(0))
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
     val scope = rememberCoroutineScope()
     val centeredIndex by remember {
         derivedStateOf {
@@ -4204,19 +4219,20 @@ private fun <T> WheelColumn(
     }
     LaunchedEffect(selectedIndex, circular) {
         if (circular) return@LaunchedEffect
-        listState.scrollToItem((selectedIndex - 1).coerceAtLeast(0))
+        listState.scrollToItem(selectedIndex)
     }
     LaunchedEffect(listState.isScrollInProgress, centeredIndex) {
         if (!listState.isScrollInProgress && items.isNotEmpty()) {
             val targetIndex = centeredIndex.coerceIn(0, (virtualCount - 1).coerceAtLeast(0))
             val targetItemIndex = if (circular) targetIndex % items.size else targetIndex
-            listState.animateScrollToItem((targetIndex - 1).coerceAtLeast(0))
+            listState.animateScrollToItem(targetIndex)
             if (items[targetItemIndex] != selected) onSelected(items[targetItemIndex])
         }
     }
     LazyColumn(
         state = listState,
         modifier = modifier.height(rowHeight * 3),
+        contentPadding = PaddingValues(vertical = rowHeight),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         items(virtualCount) { index ->
@@ -4239,7 +4255,7 @@ private fun <T> WheelColumn(
                             } else {
                                 index
                             }
-                            listState.animateScrollToItem((targetIndex - 1).coerceAtLeast(0))
+                            listState.animateScrollToItem(targetIndex)
                             onSelected(item)
                         }
                     }
@@ -4478,11 +4494,13 @@ private fun AgendaPreview(
     onAdd: () -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
 ) {
-    val dayEvents = remember(events, selectedDate) {
+    val agendaStartDate = LocalDate.now()
+    val upcomingEvents = remember(events, agendaStartDate) {
         events
-            .filter { it.isTask == 0 && it.localDate() == selectedDate }
+            .filter { it.isTask == 0 && !it.localDate().isBefore(agendaStartDate) }
             .sortedBy { it.startTimeMs }
     }
+    val eventsByDate = remember(upcomingEvents) { upcomingEvents.groupBy { it.localDate() } }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -4490,29 +4508,45 @@ private fun AgendaPreview(
         contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 22.dp, bottom = 36.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            Text(
-                selectedDate.format(agendaDateHeaderFormatter),
-                color = palette.secondaryText,
-                fontFamily = mono,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                letterSpacing = 0.4.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            )
-        }
-        lazyItems(dayEvents, key = { it.id }) { event ->
-            AgendaEventCard(event = event, palette = palette, onClick = { onEventClick(event) })
-        }
-        item {
-            if (dayEvents.isEmpty()) {
+        if (upcomingEvents.isEmpty()) {
+            item {
+                Text(
+                    agendaStartDate.format(agendaDateHeaderFormatter),
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 13.sp,
+                    letterSpacing = 0.4.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                )
+            }
+            item {
                 AgendaEndOfDayState(
                     palette = palette,
                     modifier = Modifier.fillParentMaxHeight(0.72f),
                     onAdd = onAdd,
                 )
-            } else {
+            }
+        } else {
+            eventsByDate.forEach { (date, dateEvents) ->
+                item(key = "agenda-header-$date") {
+                    Text(
+                        date.format(agendaDateHeaderFormatter),
+                        color = palette.secondaryText,
+                        fontFamily = mono,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 13.sp,
+                        letterSpacing = 0.4.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(top = if (date == agendaStartDate) 0.dp else 18.dp, bottom = 8.dp),
+                    )
+                }
+                lazyItems(dateEvents, key = { it.id }) { event ->
+                    AgendaEventCard(event = event, palette = palette, onClick = { onEventClick(event) })
+                }
+            }
+            item {
                 AgendaEndOfDayState(
                     palette = palette,
                     modifier = Modifier

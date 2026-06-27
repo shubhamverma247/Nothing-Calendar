@@ -645,71 +645,9 @@ After app-code change:
 ```
 
 Latest verification:
-- 2026-06-25: 4x2 empty-state alignment pass: live 4x2 `NO EVENTS - TAP TO ADD` label now aligns to the same content start after the vertical divider as the event title/details lane, instead of centering in the remaining widget area. No widget picker preview XML, data repository, update trigger, package id, deep link scheme, Room schema/table/column, or DB filename changes. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
-- 2026-06-25: Dark-theme widget background/corner match pass: live Glance dark widget background and dark widget picker preview background changed from `#080808` to `#1A1A1A`, and shared widget surface/picker preview radius changed from `24dp` to `18dp` to better match the provided left-widget reference. No content layout, data repository, update trigger, package id, deep link scheme, Room schema/table/column, or DB filename changes. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; no ADB device connected, so APK was not installed; no phone/manual UI QA run.
-- 2026-06-23: Root Settings header cleanup: removed the back arrow from the root Settings large header and compact header now that bottom-nav tab switching stays visible; nested Settings screens still keep back arrows. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
-- 2026-06-23: Settings overlay bottom-nav visibility fix: Settings now reserves the bottom-nav area plus system navigation inset, so opening Settings keeps the bottom nav visible instead of covering it. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
-- 2026-06-23: Onboarding/button/navigation polish: primary onboarding buttons now use squarer 8dp corners, onboarding content uses navigation-bar padding and compact-height spacing so `Not Now` remains visible with 3-button navigation, bottom nav uses navigation-bar padding so it sits above system buttons, and Settings bottom-tab icon changed to a filled gear-style icon. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
-- 2026-06-23: Reverted uncommitted widget-related changes from this session (`DotCalRepository`, `DotCalWidgets`, `WidgetDataRepository`, `WidgetUpdateWorker`, `widget_preview_large.xml`, and untracked widget helper/assets). Kept non-widget `DotCalApp.kt` change and user reference PNGs. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed on rerun after first timeout; APK install skipped because no ADB device was connected.
-- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after increasing Theme detail and Add Account scroll area for tall devices; no phone/manual UI QA run; APK not installed in this pass.
-- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after increasing Add Account screen scroll area; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
-- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Theme detail Settings-style header and Add Account Google divider refinement; no phone/manual UI QA run.
-- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after moving Accent Color swatches from Settings root into Theme detail screen; no phone/manual UI QA run.
-- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Phase 1 Step 3 Extra Accent Themes on branch `feature/phase1-step3-accent-themes`; no phone/manual UI QA run.
-- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after enabling Global Holidays scrolling on short lists; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
-- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Global Holidays compact-header/divider correction; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
-- 2026-06-23: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Global Holidays Settings UI correction; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
-- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Global Holidays implementation; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
-- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after changing Google row from account picker to direct add-account/sign-in flow; no phone/manual UI QA run.
-- 2026-06-24: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after splash screen background fix; APK installed on phone `4ab0d020`; no manual UI QA run.
-- 2026-06-24: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after final launcher icon resource replacement; APK installed on phone `4ab0d020`; no manual UI QA run.
-- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after restoring Google row to open the Android account picker/sign-in flow; no phone/manual UI QA run.
-- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after restoring Settings-style scroll/compact-header behavior on Add Account screen; no phone/manual UI QA run.
-- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after adding Google logo icon to Add Account provider row; no phone/manual UI QA run.
-- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Add Account header/direct-Google-sync update; no phone/manual UI QA run.
-- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Add Account nested provider screen and back navigation correction; no phone/manual UI QA run.
-- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Calendar Accounts Add Account button UI polish; no phone/manual UI QA run.
-- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Phase 1 Step 1 Add Account button; no phone/manual UI QA run.
-- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Settings week-start picker follow-up; no phone/manual UI QA run.
-- 2026-06-22: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after merging latest `feature/onboarding-screen` into `main`; onboarding branch changes were prioritized in conflicts; no phone/manual UI QA run.
-- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Settings cleanup/all-day reminder picker follow-up; no phone/manual UI QA run.
-- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Step 11 Release Rules; no phone/manual UI QA run.
-- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after Step 10 Settings Missing Items; no phone/manual UI QA run.
-- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed before committing onboarding/splash/theme changes; no phone/manual UI QA run.
-- 2026-06-21: APK installed on phone `4ab0d020` after onboarding reference correction retry with `adb install -r app\build\outputs\apk\debug\app-debug.apk`; no manual UI QA run.
-- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after onboarding reference correction pass.
-- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after onboarding icon/UI reference-match pass; no phone/manual UI QA run.
-- 2026-06-21: Premium onboarding redesign APK installed on phone `4ab0d020` with `adb install -r app\build\outputs\apk\debug\app-debug.apk`; no manual UI QA run.
-- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after premium onboarding redesign.
-- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after launch/splash theme resource fix; APK installed on phone `4ab0d020`; no manual UI QA run.
-- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after onboarding launch flicker fix; APK installed on phone `4ab0d020`; no manual UI QA run.
-- 2026-06-21: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed for Step 9 Onboarding; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after final widget picker naming/spacing polish; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after replacing 4x4 picker preview table layout with RemoteViews-safe linear rows; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 4x2 widget polish and widget picker preview/name updates; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 4x4 calendar-size and stacked upcoming-events refinement; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 4x4 widget final refinement and shared radius reduction to 24dp; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after shared widget dark background lightening; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after shared widget corner-radius reduction; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 2x2 widget balance/readability refinement; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 4x2 widget gap/date-circle correction; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 4x2 widget readability/spacing refinement; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after widget dark background/corner-radius match pass; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after resource-backed widget day/night colors; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 2x2/4x2 layout and system-theme refresh pass; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after widget deep-link routing fix; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after 2x2 widget icon removal and empty-state Add Event route; no phone/manual UI QA run.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after widget visual/theme/data revision; no phone connected at install check.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed for Step 8 Home Screen Widgets.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after behavior-preserving optimization pass; APK installed on phone `4ab0d020`.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed for Step 7 Birthday Calendar.
-- First build attempt timed out after 124s with no result; rerun with longer timeout passed.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after month selected-date/ripple polish; APK installed on phone `4ab0d020`.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after bottom nav ripple removal; APK installed on phone `4ab0d020`.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after tab/view switch smoothing; APK installed on phone `4ab0d020`.
-- 2026-06-20: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after task filter segmented-control ripple removal; no phone connected at install check.
-- 2026-06-24: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug --rerun-tasks` passed after flat-minimal onboarding experiment on branch `testbranch`; first normal build attempt timed out after 124s with no result, later build passed; no phone/manual UI QA run per request.
-- No phone/manual UI QA run, per instruction.
+- 2026-06-27: Follow-up root-cause fixes after device report. Agenda now loads upcoming agenda from today instead of the mutable selected calendar date, and `AgendaPreview` filters/group headers from today so selecting a future/past date in Calendar cannot hide other upcoming days. Fresh-install Light Mode on a dark phone was caused by restorable preferences/boot theme state, so app backup is disabled and no saved theme still resolves to System/splash system mode. Widget theme refresh now also enqueues widget updates when app observes system dark/light changes, while widget receivers still listen for configuration changes. No package id, deep link scheme, Room schema/table/column, or DB filename changes. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed. APK install skipped because `adb` is not available in this shell; no phone/manual UI QA run.
+- 2026-06-27: Fixed first-launch/default theme and widget Add Event date/theme refresh issues. Fresh install now defaults to `System` theme and splash follows system when no boot theme exists; widget Add Event deep link includes today's date and Add Event route opens editor on that date instead of stale selected date; widget receivers enqueue refresh on `CONFIGURATION_CHANGED` so light/dark changes update Glance widgets. Preserved package id, deep link scheme, Room schema/table/column, and DB filename. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed. APK install skipped because `adb` was not available in this shell; no phone/manual UI QA run.
+- 2026-06-27: Add/Edit Event start/end date wheel edge fix: shared `WheelColumn` now uses one-row vertical content padding and scrolls selected items directly, so the first allowed end date can center correctly. This fixes the case where Start `28 Jun 10:00` updates Ends display to `28 Jun 11:00`, but opening the Ends picker highlighted `29 Jun 11:00` because `minDate = startDate` made `28 Jun` the first wheel item. Applies to all shared date/time wheels using `WheelColumn`; no package id, deep link scheme, Room schema/table/column, or DB filename changes. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
 
 Phone/manual UI QA:
 - Do not run unless user explicitly asks.
@@ -717,107 +655,11 @@ Phone/manual UI QA:
 
 ## What To Test Now
 
-For current latest app state:
-- 4x2 widget empty state: `NO EVENTS - TAP TO ADD` should start at the same horizontal position as event text does when an event is present, keeping the divider-to-label gap equal to the divider-to-event gap.
-- Dark-theme widgets: 2x2, 4x2, and 4x4 widget surfaces should use the softer charcoal `#1A1A1A` background and `18dp` rounded corners, matching the provided left-widget reference more closely than the previous pure-black/rounder surface.
-- Widget redesign: add/check all three DotCal widgets (`Next Event`, `Event Details`, `Calendar Dashboard`) in light and dark theme.
-- Widget background: all three widgets should show the dark dotted Nothing-style background; 4x4 should match the provided reference spacing more closely.
-- 4x4 widget: dotted background should cover the full rounded widget, not only the upper-left area; `JUNE`, `2026`, and event count should sit slightly farther right than the previous build.
-- 2x2 widget: day name + date line render; no date number; status dot appears only when at least one event is shown; empty state shows ring plus `ADD EVENT`.
-- 4x2 widget: ring date, day abbreviation, dashed vertical divider, optional outlined `+N` pill, and empty `NO EVENTS - TAP TO ADD` state render correctly.
-- 4x4 widget: month grid remains visible in empty state; today is outline ring, not filled circle; event days show small dots; count tag hides when empty.
-- Widget accent: change Settings > Additional > Theme accent, trigger widget refresh, confirm widget outlines/dots/text use selected accent with no filled accent date circles/buttons.
-- Widget picker: previews for all three sizes load without `Can't load widget`; they use redesigned structure and no icon-only preview.
-- Widget routes: event rows open Event Detail, date/month targets open Month, empty states open Add Event.
-- Latest debug APK from widget visual redesign is available at `app/build/outputs/apk/debug/app-debug.apk`; APK installed on phone `4ab0d020`; no phone/manual UI QA run.
-- Onboarding experiment: built on separate `testbranch` for visual comparison against existing illustrative onboarding.
-- System theme Light: fully close app, relaunch from launcher, confirm splash background is black, not white, with no harsh box around icon.
-- System theme Dark: fully close app, relaunch from launcher, confirm splash background is still black and unchanged from prior dark behavior.
-- Splash icon: confirm icon still displays correctly, colored or monochrome depending on Android `Themed icons`; only background behind it changed.
-- Launcher icon: with Android `Themed icons` OFF, confirm colored DC calendar design appears: red header bar, red center dot, white D + red C.
-- Launcher icon: with Android `Themed icons` ON, confirm white silhouette tinted with system accent color appears.
-- Launch app and confirm no crash or missing resource error.
-- Confirm package `com.dotfield.dotcal`, label `DotCal`.
-- Settings > Additional: Theme row should show base theme and selected accent label, with no swatches directly under it.
-- Tap Settings > Additional > Theme: Theme detail screen should open with large `Theme` header; after scrolling, compact centered `Theme` header should appear at the top.
-- Theme detail screen: `Accent Color` should show Red, Blue, Green, Purple, and Amber circular swatches.
-- Settings > Calendar Accounts > Add an account: Google row divider should span full row width, including under the Google icon area.
-- Settings > Calendar Accounts > Add an account: screen should scroll even on tall devices and show the compact centered `Add an account` header after scrolling.
-- Tap each swatch: today circle, selected indicators, add button, active bottom nav, switches, picker save/OK accents, and default event color fallback should update immediately.
-- Relaunch app after selecting Blue/Green/Purple/Amber: selected accent should persist with no red startup flash.
-- Light/Dark/System base theme backgrounds, surfaces, and text colors should remain unchanged.
-- Widgets should use selected accent after a widget refresh trigger.
-- First normal app launch: onboarding appears once with 5 pages: DotCal, Calendar Access, Reminders, Birthdays, Ready.
-- First normal app launch: Calendar Month should not flash before onboarding appears.
-- Onboarding visual QA: run through all 5 onboarding screens in both Light and Dark system theme.
-- Onboarding copy/behavior QA: confirm all existing copy text, button labels, and permission-request behavior are unchanged from before.
-- Onboarding button QA: confirm primary buttons use the same rounded style as in-app Add Event dialog buttons.
-- Onboarding Screen 1 QA: confirm the calendar illustration uses a 2x3 dot grid with one red active dot, visually echoing the app launcher icon style.
-- Onboarding progress QA: confirm progress indicator shows rectangular bars, not circles.
-- Onboarding style QA: all 5 pages should use flat-minimal Canvas/vector geometry, app background/text/accent tokens, no bitmaps, no gradients, no shadows, and no decorative foliage/sparkles.
-- Onboarding on phones with 3-button navigation: `Not Now` should stay visible above system buttons.
-- Bottom nav on phones with 3-button navigation: Calendar/Tasks/Settings labels should sit above system buttons and remain fully visible.
-- Open Settings: bottom nav should remain visible below the Settings overlay, and tapping `Calendar` or `Tasks` from there should still switch tabs normally.
-- Root Settings screen: no top-left back arrow in either the large header or compact scrolled header.
-- Nested Settings screens like `Theme`, `Calendar Accounts`, `Add an account`, `Global Holidays`, and `Privacy Policy` should still show back arrows.
-- Bottom nav Settings icon should render as a filled gear-style icon.
-- Onboarding illustrations: Calendar Access, Reminders, Birthdays, and Ready should use only the requested simple flat calendar/reminder/person/checkmark drawings.
-- Phone in light or dark theme: launch/splash screen should use black background behind app icon.
-- Onboarding: allow or skip Calendar/Notifications/Contacts; denied/skipped permissions should not block local app use.
-- Onboarding: after Skip or Start, relaunch should not show onboarding again.
-- Onboarding/deep links: event/task/widget/reminder deep links should open their target directly instead of being covered by onboarding.
-- Launcher widgets: add DotCal small 2x2, medium 4x2, and large 4x4 widgets.
-- Widgets: visible-calendar events render; tasks do not render; hidden calendar events do not render.
-- 2x2 widget: no app icon; red date circle, date label, one-line event title, time/location; empty state opens Add Event.
-- 4x2 widget: no app icon; red date circle and date/title/time-location group; date circle opens Month.
-- 4x2 widget: date circle sits closer to the left edge; title remains strongest and can wrap to 2 lines; empty state keeps the same left circle/content structure.
-- Widget picker: 2x2, 4x2, and 4x4 previews show realistic themed content, not icon-only previews; picker names are `Next Event`, `Event Details`, and `Calendar Dashboard`.
-- Widget picker: 4x4 preview uses RemoteViews-safe linear rows to avoid launcher `Can't load widget` preview failure.
-- Widgets: change phone light/dark theme while app theme is System; widget colors should refresh.
-- Widgets: 2x2, 4x2, and 4x4 share 24dp corners and match current reference structure: red date circle, event-only agenda/month dashboard, no app/calendar icon clutter.
-- 4x4 widget: month title sits above centered weekday/grid layout; today uses filled red circle with white text; event days show subtle red dots; no-event state opens Add Event.
-- 4x4 widget: upcoming section shows up to 2 stacked event rows as time, title, optional location; `+X more` opens Calendar.
-- 4x4 widget: tapping month date opens Month with that date selected; tapping `+X more` opens Calendar.
-- Widgets: tapping event rows opens Event Detail.
-- Widgets: save/delete an event, toggle calendar account visibility, change app theme, and run Sync Now; widgets refresh.
-- Calendar: `Year`, `Month`, `Week`, `Day`, `Agenda` switch immediately and persist.
-- Calendar: Week/Day event placement and Day task rows look identical to previous build.
-- Add/Edit Event: full-screen slide, X/check top bar, start/end picker sheets, reminder/repeat neutral sheets.
-- Event Detail: event taps open detail; edit pencil opens editor; delete confirms.
-- Tasks: bottom nav opens Tasks; filters work; add/edit/detail/delete/complete behavior matches Task Detail rules above.
-- Settings: theme, sync, calendar accounts, switches, and back behavior match current UI.
-- Settings > Reminders: `Default reminder` picker persists `None`, `5 min`, `10 min`, `30 min`, `1 hour`, and `1 day`; new Add Event opens with the selected default reminder.
-- Settings > Reminders: `Default all-day reminder time` opens a three-wheel picker for hour, minute, and AM/PM; selected time persists after reopening Settings.
-- Settings > General: `Start of the week` picker persists `Region default`, `Saturday`, `Sunday`, and `Monday`; Month, Week, and Year layouts reorder week starts accordingly.
-- Settings > General: `Global Holidays` row shows `None selected` initially.
-- Open Global Holidays screen: it uses the Settings-style large header/compact scroll header; all 7 countries appear under `AVAILABLE`, with no `SELECTED` section.
-- Available country rows show a red plus icon, not a chevron.
-- Tap India: it moves to `SELECTED` immediately and India holidays appear in Calendar views.
-- Tap Germany: it also moves to `SELECTED`; India holidays remain untouched.
-- Remove India from `SELECTED`: India holidays disappear; Germany holidays remain.
-- Select all 7 countries: `AVAILABLE` section disappears and `SELECTED` shows all 7.
-- Remove all countries: `SELECTED` disappears and `AVAILABLE` shows all 7 again.
-- Settings subtitle updates as countries are added/removed: `1 country selected`, `3 countries selected`, `None selected`.
-- Turn on airplane mode on a fresh install and select a country; holidays should still load from bundled assets.
-- Tap a holiday event in any view: Event Detail opens with no edit icon.
-- Close/reopen app with 2+ countries selected: both remain visible with no duplicate rows.
-- Reopen Global Holidays after selecting India: India should already be under `SELECTED`, not selectable twice.
-- Settings > General: `Time zone`, `Show week number`, and `Other calendars` should no longer appear.
-- Settings > Additional: `Birthday calendar` toggle, `Sync enabled`, `Sync interval`, and `Sync Now` preserve existing behavior; `Manual` sync interval cancels periodic background sync but leaves `Sync Now` usable.
-- Settings > Calendar Accounts: centered accent `Add Account` button appears below connected accounts without top/bottom list dividers; tapping it opens a nested `Add an account` screen.
-- Settings > Calendar Accounts > Add an account: initially shows large `Add an account` title, then after a small scroll shows centered compact title; `Google` row has Google logo icon plus chevron; tapping `Google` opens Android's direct Google add-account/sign-in flow without the intermediate account-picker dialog.
-- Settings > Calendar Accounts > Add an account: header/system back returns to Calendar Accounts.
-- Settings > Calendar Accounts: completing Google add-account/sign-in triggers existing sync and refreshes the account list.
-- Settings > Calendar Accounts > Add an account: if calendar permission is missing, tapping `Google` requests calendar permission first, then opens direct add-account/sign-in after grant.
-- Settings > About: Privacy Policy opens in-app WebView, Rate DotCal opens Play Store, and Version shows `1.0.0` from `BuildConfig.VERSION_NAME`.
-- Reminders: future event/task reminders fire; View/Snooze actions route correctly.
-
-For Step 7 after implementation:
-- Toggle Birthday Calendar on with contacts permission granted; birthdays import as read-only yearly all-day events.
-- Toggle off; birthday events disappear.
-- Deny contacts permission; toggle remains off and app stays usable.
-- Tap birthday event; Event Detail opens without edit/delete actions.
-- Verify no Room table/column/package/scheme/DB filename changes.
+- Fresh install while phone is in Dark Mode: app should open in dark theme by default.
+- In Calendar, select any other date, then open Agenda: upcoming events from today onward should still show, grouped by event date.
+- Widget Add Event after fresh install: editor date should be today, not June 19 or any prior saved date.
+- Select a different date in Calendar, back out without saving, then tap widget Add Event: editor date should still be today.
+- Switch phone light/dark mode while app theme is System: widgets should refresh to matching light/dark appearance.
 
 ## Resume Prompt
 
