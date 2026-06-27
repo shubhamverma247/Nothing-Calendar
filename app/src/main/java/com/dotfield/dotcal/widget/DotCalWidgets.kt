@@ -464,6 +464,15 @@ private fun WidgetSurfaceBox(palette: DotCalWidgetPalette, content: @Composable 
             .background(palette.background)
             .cornerRadius(18.dp),
     ) {
+        // Dot texture: a tiled BitmapDrawable applied as a view background.
+        // Glance routes background(ImageProvider(resId)) to setViewBackgroundResource,
+        // so the drawable's tileMode="repeat" is honored (no stretching).
+        Box(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .background(ImageProvider(palette.dotTile))
+                .cornerRadius(18.dp),
+        ) {}
         content()
     }
 }

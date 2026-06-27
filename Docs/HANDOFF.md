@@ -156,7 +156,17 @@ Tasks:
 
 ## Latest Committed Work
 
-Latest commit: widget refinement commit after `340b036 Add home screen widgets`.
+Latest commit: widget-improvement branch — picker fix + dotted background.
+
+- 2026-06-27 widget-improvement branch: picker "Can't load widget" fix + dotted background:
+  - Root cause of picker failure: `widget_preview_small.xml` used `<Space>`, which is not a RemoteViews-allowed view class and caused picker inflation to fail with "Can't load widget". Fixed by replacing `<Space>` with `<FrameLayout>`.
+  - Added repeating dot texture to all three live Glance widgets. Texture is a 28×28 RGBA PNG tile (`drawable-nodpi/widget_dot_tile_dark.png` and `widget_dot_tile_light.png`) wrapped in a tiling `<bitmap tileMode="repeat">` drawable. Applied via `GlanceModifier.background(ImageProvider(resId))` — Glance routes this to `setViewBackgroundResource` which honors the drawable's tileMode (no stretching). Dark: white dots ~9-24/255 alpha. Light: black dots ~9-24/255 alpha.
+  - Palette carries `dotTile: Int` (res id) so tile is theme-aware. System mode resolves tile based on current `UI_MODE_NIGHT` at widget-update time.
+  - Picker preview backgrounds (`widget_preview_background.xml`) updated to layer-list with dot tile for both day (`drawable/`) and night (`drawable-night/`) variants so picker previews also show dot texture.
+  - No data repository, update trigger, deep-link route, package id, Room schema/table/column, or DB filename changes.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed; APK install skipped because `adb` not available in this shell; no manual UI QA run.
+
+Latest commit before this branch: widget refinement commit after `340b036 Add home screen widgets`.
 
 Latest committed behavior:
 - 2026-06-24 widget branch visual redesign implemented for Glance 2x2/4x2/4x4 widgets:
@@ -655,10 +665,12 @@ Phone/manual UI QA:
 
 ## What To Test Now
 
+- Widget picker (long-press home → Widgets → DotCal): all three sizes should show real previews, not "Can't load widget".
+- Live 2x2, 4x2, 4x4 widgets on home screen: subtle repeating dot texture visible over dark/light background — fine white/black dots, not giant blobs.
+- Switch phone light/dark mode while widgets are on screen: dot texture should match theme (white dots in dark, black dots in light).
 - Fresh install while phone is in Dark Mode: app should open in dark theme by default.
 - In Calendar, select any other date, then open Agenda: upcoming events from today onward should still show, grouped by event date.
 - Widget Add Event after fresh install: editor date should be today, not June 19 or any prior saved date.
-- Select a different date in Calendar, back out without saving, then tap widget Add Event: editor date should still be today.
 - Switch phone light/dark mode while app theme is System: widgets should refresh to matching light/dark appearance.
 
 ## Resume Prompt

@@ -18,6 +18,7 @@ data class DotCalWidgetPalette(
     val border: ColorProvider,
     val inactive: ColorProvider,
     val dot: ColorProvider,
+    val dotTile: Int,
     val accent: ColorProvider = ColorProvider(Color(0xFFFF3B30)),
 )
 
@@ -30,6 +31,7 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
     val preferences = context.calendarPreferencesDataStore.data.first()
     val mode = preferences[CalendarPreferences.KEY_THEME_MODE] ?: "System"
     val accent = widgetAccentColor(preferences[CalendarPreferences.KEY_ACCENT_COLOR])
+    val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
     if (mode == "System") {
         return DotCalWidgetPalette(
             background = ColorProvider(R.color.widget_background),
@@ -39,13 +41,14 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
             border = ColorProvider(R.color.widget_border),
             inactive = ColorProvider(R.color.widget_inactive),
             dot = ColorProvider(R.color.widget_dot),
+            dotTile = if (systemDark) R.drawable.widget_dot_pattern_dark else R.drawable.widget_dot_pattern_light,
             accent = ColorProvider(accent),
         )
     }
     val isDark = when (mode) {
         "Light" -> false
         "Dark" -> true
-        else -> (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        else -> systemDark
     }
     return if (isDark) {
         DotCalWidgetPalette(
@@ -56,6 +59,7 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
             border = ColorProvider(Color(0xFF2A2A2A)),
             inactive = ColorProvider(Color(0xFF4A4A4A)),
             dot = ColorProvider(Color(0xFF242424)),
+            dotTile = R.drawable.widget_dot_pattern_dark,
             accent = ColorProvider(accent),
         )
     } else {
@@ -67,6 +71,7 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
             border = ColorProvider(Color(0xFFECECEC)),
             inactive = ColorProvider(Color(0xFFB5B5B5)),
             dot = ColorProvider(Color(0xFFEDEDED)),
+            dotTile = R.drawable.widget_dot_pattern_light,
             accent = ColorProvider(accent),
         )
     }
