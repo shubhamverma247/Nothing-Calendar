@@ -452,6 +452,9 @@ fun DotCalApp(
     }
     LaunchedEffect(selectedDate, selectedDateRestored) {
         if (selectedDateRestored) {
+            // Debounce: rapid Week/Day paging cancels this effect on each change, so
+            // only the final date after a short idle is committed to disk.
+            delay(400)
             context.calendarPreferencesDataStore.edit { preferences ->
                 preferences[CalendarPreferences.KEY_LAST_SELECTED_DATE] = selectedDate.toString()
             }
@@ -650,6 +653,9 @@ fun DotCalApp(
         closeTopSurface()
     }
 
+    // Group events by day once at the top level so the buckets survive Calendar <-> Tasks
+    // <-> Settings switches and every calendar view reuses them instead of re-deriving.
+    val eventsByDate = remember(events) { events.groupBy { it.localDate() } }
     Box(modifier = Modifier.fillMaxSize().background(palette.topBarSurface)) {
         val visibleMainTab = if (screenTab == ScreenTab.Settings) previousScreenTab else screenTab
         val calendarHeaderLabel = when (activeCalendarTab) {
@@ -731,9 +737,6 @@ fun DotCalApp(
                 }
                 when (visibleMainTab) {
                 ScreenTab.Calendar -> {
-                    // Group events by day once and keep it across view switches so each
-                    // view reuses the buckets instead of re-deriving them on every switch.
-                    val eventsByDate = remember(events) { events.groupBy { it.localDate() } }
                     Crossfade(
                         targetState = activeCalendarTab,
                         animationSpec = tween(durationMillis = 150),
