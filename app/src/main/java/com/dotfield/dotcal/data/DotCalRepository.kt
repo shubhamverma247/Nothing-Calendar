@@ -79,8 +79,13 @@ class DotCalRepository(
     fun observeSyncMetadata(): Flow<List<SyncMetadata>> = dao.observeSyncMetadata()
 
     fun observeEventsForMonth(month: LocalDate): Flow<List<CalendarEvent>> {
-        val start = month.withDayOfMonth(1)
-        val end = start.plusMonths(1)
+        val monthStart = month.withDayOfMonth(1)
+        // Load a rolling window of the previous, current, and next month so that
+        // Week/Day/3-day views straddling a month boundary always have their
+        // neighbouring-month events, and paging across months reuses already-loaded
+        // data instead of showing a gap while a narrower query reloads.
+        val start = monthStart.minusMonths(1)
+        val end = monthStart.plusMonths(2)
         return dao.observeEvents(start.atStartMs(), end.atStartMs())
             .map { events ->
                 withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }

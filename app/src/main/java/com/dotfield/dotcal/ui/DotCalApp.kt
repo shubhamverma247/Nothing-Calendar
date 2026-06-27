@@ -25,6 +25,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
@@ -729,11 +731,19 @@ fun DotCalApp(
                 }
                 when (visibleMainTab) {
                 ScreenTab.Calendar -> {
-                    when (activeCalendarTab) {
+                    // Group events by day once and keep it across view switches so each
+                    // view reuses the buckets instead of re-deriving them on every switch.
+                    val eventsByDate = remember(events) { events.groupBy { it.localDate() } }
+                    Crossfade(
+                        targetState = activeCalendarTab,
+                        animationSpec = tween(durationMillis = 150),
+                        label = "calendarViewSwitch",
+                    ) { tab ->
+                    when (tab) {
                         CalendarTab.Month -> MonthView(
                             month = month,
                             selectedDate = selectedDate,
-                            events = events,
+                            eventsByDate = eventsByDate,
                             palette = palette,
                             weekStart = weekStartDay,
                             onPrevious = viewModel::previousMonth,
@@ -746,7 +756,7 @@ fun DotCalApp(
                         )
                         CalendarTab.Week -> WeekView(
                             selectedDate = selectedDate,
-                            events = events,
+                            eventsByDate = eventsByDate,
                             palette = palette,
                             weekStart = weekStartDay,
                             onPreviousWeek = { viewModel.selectDate(selectedDate.minusWeeks(1)) },
@@ -761,7 +771,7 @@ fun DotCalApp(
                         )
                         CalendarTab.Day -> DayView(
                             selectedDate = selectedDate,
-                            events = events,
+                            eventsByDate = eventsByDate,
                             palette = palette,
                             onPreviousDay = { viewModel.selectDate(selectedDate.minusDays(1)) },
                             onNextDay = { viewModel.selectDate(selectedDate.plusDays(1)) },
@@ -774,7 +784,7 @@ fun DotCalApp(
                         )
                         CalendarTab.ThreeDay -> ThreeDayView(
                             selectedDate = selectedDate,
-                            events = events,
+                            eventsByDate = eventsByDate,
                             palette = palette,
                             onPreviousRange = { viewModel.selectDate(selectedDate.minusDays(3)) },
                             onNextRange = { viewModel.selectDate(selectedDate.plusDays(3)) },
@@ -795,7 +805,7 @@ fun DotCalApp(
                         )
                         CalendarTab.Year -> YearView(
                             selectedDate = selectedDate,
-                            events = events,
+                            eventsByDate = eventsByDate,
                             palette = palette,
                             weekStart = weekStartDay,
                             onPreviousYear = { viewModel.selectDate(selectedDate.minusYears(1)) },
@@ -806,6 +816,7 @@ fun DotCalApp(
                                 selectCalendarTab(CalendarTab.Month)
                             },
                         )
+                    }
                     }
                 }
                     ScreenTab.Tasks -> TasksScreen(
@@ -2340,7 +2351,7 @@ private fun Modifier.noRippleClickable(
 private fun MonthView(
     month: LocalDate,
     selectedDate: LocalDate,
-    events: List<CalendarEvent>,
+    eventsByDate: Map<LocalDate, List<CalendarEvent>>,
     palette: DotCalPalette,
     weekStart: DayOfWeek,
     onPrevious: () -> Unit,
@@ -2349,7 +2360,6 @@ private fun MonthView(
     onDateSelected: (LocalDate) -> Unit,
 ) {
     val days = remember(month, weekStart) { monthGrid(month, weekStart) }
-    val eventsByDate = remember(events) { events.groupBy { it.localDate() } }
     val weekDayLabels = remember(weekStart) { weekDayLabels(weekStart) }
     var dragTotal by remember { mutableFloatStateOf(0f) }
 
@@ -2465,7 +2475,7 @@ private fun DayCell(
 @Composable
 private fun WeekView(
     selectedDate: LocalDate,
-    events: List<CalendarEvent>,
+    eventsByDate: Map<LocalDate, List<CalendarEvent>>,
     palette: DotCalPalette,
     weekStart: DayOfWeek,
     onPreviousWeek: () -> Unit,
@@ -2476,14 +2486,9 @@ private fun WeekView(
     onEventClick: (CalendarEvent) -> Unit,
 ) {
     val days = remember(selectedDate, weekStart) { weekDays(selectedDate, weekStart) }
-    val weekRangeStart = days.first()
-    val weekRangeEnd = days.last()
-    val timedEvents = remember(events, weekRangeStart, weekRangeEnd) {
-        events.filter { it.isAllDay == 0 && it.localDate() in weekRangeStart..weekRangeEnd }
-    }
-    val allDayEvents = remember(events, weekRangeStart, weekRangeEnd) {
-        events.filter { it.isAllDay == 1 && it.localDate() in weekRangeStart..weekRangeEnd }
-    }
+    val weekEvents = remember(eventsByDate, days) { days.flatMap { eventsByDate[it].orEmpty() } }
+    val timedEvents = remember(weekEvents) { weekEvents.filter { it.isAllDay == 0 } }
+    val allDayEvents = remember(weekEvents) { weekEvents.filter { it.isAllDay == 1 } }
     val eventLayouts = remember(timedEvents) { layoutTimedEvents(timedEvents) }
     val timedEventsByDayHour = remember(timedEvents) {
         timedEvents.groupBy { event -> event.localDate() to event.startLocalTime().hour }
@@ -2711,7 +2716,7 @@ private fun WeekEventBlock(
 @Composable
 private fun DayView(
     selectedDate: LocalDate,
-    events: List<CalendarEvent>,
+    eventsByDate: Map<LocalDate, List<CalendarEvent>>,
     palette: DotCalPalette,
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
@@ -2719,15 +2724,12 @@ private fun DayView(
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
 ) {
-    val dayEvents = remember(events, selectedDate) {
-        events.filter { it.isTask == 0 && it.localDate() == selectedDate }
-    }
+    val dayAll = remember(eventsByDate, selectedDate) { eventsByDate[selectedDate].orEmpty() }
+    val dayEvents = remember(dayAll) { dayAll.filter { it.isTask == 0 } }
     val allDayEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 1 } }
     val timedEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 0 } }
     val timedEventsByHour = remember(timedEvents) { timedEvents.groupBy { it.startLocalTime().hour } }
-    val tasks = remember(events, selectedDate) {
-        events.filter { it.isTask == 1 && it.localDate() == selectedDate }
-    }
+    val tasks = remember(dayAll) { dayAll.filter { it.isTask == 1 } }
 
     Column(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         if (allDayEvents.isNotEmpty()) {
@@ -5484,7 +5486,7 @@ private fun TaskTimeChoiceSheet(
 @Composable
 private fun ThreeDayView(
     selectedDate: LocalDate,
-    events: List<CalendarEvent>,
+    eventsByDate: Map<LocalDate, List<CalendarEvent>>,
     palette: DotCalPalette,
     onPreviousRange: () -> Unit,
     onNextRange: () -> Unit,
@@ -5494,7 +5496,9 @@ private fun ThreeDayView(
     onEventClick: (CalendarEvent) -> Unit,
 ) {
     val days = remember(selectedDate) { List(3) { selectedDate.plusDays(it.toLong()) } }
-    val rangeEvents = events.filter { it.isAllDay == 0 && it.localDate() in days.first()..days.last() }
+    val rangeEvents = remember(eventsByDate, days) {
+        days.flatMap { eventsByDate[it].orEmpty() }.filter { it.isAllDay == 0 }
+    }
     val rangeEventsByDayHour = remember(rangeEvents) {
         rangeEvents.groupBy { event -> event.localDate() to event.startLocalTime().hour }
     }
@@ -5603,7 +5607,7 @@ private fun ThreeDayHourRow(
 @Composable
 private fun YearView(
     selectedDate: LocalDate,
-    events: List<CalendarEvent>,
+    eventsByDate: Map<LocalDate, List<CalendarEvent>>,
     palette: DotCalPalette,
     weekStart: DayOfWeek,
     onPreviousYear: () -> Unit,
@@ -5613,10 +5617,10 @@ private fun YearView(
 ) {
     var dragTotal by remember { mutableFloatStateOf(0f) }
     val months = remember(selectedDate.year) { List(12) { selectedDate.withMonth(it + 1).withDayOfMonth(1) } }
-    val eventDates = remember(events, selectedDate.year) {
-        events.filter { it.isTask == 0 }
-            .map { it.localDate() }
-            .filter { it.year == selectedDate.year }
+    val eventDates = remember(eventsByDate, selectedDate.year) {
+        eventsByDate.entries
+            .filter { (date, dayEvents) -> date.year == selectedDate.year && dayEvents.any { it.isTask == 0 } }
+            .map { it.key }
             .toSet()
     }
 
