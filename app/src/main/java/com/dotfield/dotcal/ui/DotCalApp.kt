@@ -24,11 +24,17 @@ import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
@@ -735,7 +741,15 @@ fun DotCalApp(
                             .background(palette.topBarSurface),
                     )
                 }
-                when (visibleMainTab) {
+                AnimatedContent(
+                    targetState = visibleMainTab,
+                    transitionSpec = {
+                        fadeIn(tween(140)) togetherWith fadeOut(tween(100))
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    label = "tabContent",
+                ) { tab ->
+                when (tab) {
                 ScreenTab.Calendar -> {
                     Crossfade(
                         targetState = activeCalendarTab,
@@ -836,6 +850,7 @@ fun DotCalApp(
                     )
                     ScreenTab.Settings -> Unit
                 }
+                }
             }
         }
         if (routePending) {
@@ -846,8 +861,8 @@ fun DotCalApp(
         }
         AnimatedVisibility(
             visible = showOnboarding,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
             modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
         ) {
             OnboardingScreen(
@@ -866,8 +881,8 @@ fun DotCalApp(
         }
         AnimatedVisibility(
             visible = screenTab == ScreenTab.Settings,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = 78.dp)
@@ -1048,8 +1063,8 @@ fun DotCalApp(
         }
         AnimatedVisibility(
             visible = detailEvent != null,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
             modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
         ) {
             detailEvent?.let { event ->
@@ -1071,8 +1086,8 @@ fun DotCalApp(
         }
         AnimatedVisibility(
             visible = taskDetail != null,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
             modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
         ) {
             lastTaskDetail?.let { task ->
@@ -1123,8 +1138,8 @@ fun DotCalApp(
         }
         AnimatedVisibility(
             visible = addSheet,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
             modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
         ) {
             EventEditorScreen(
@@ -2205,7 +2220,11 @@ private fun BottomNavItem(
     icon: @Composable (Color) -> Unit,
     onClick: () -> Unit,
 ) {
-    val tint = if (selected) activeColor else inactiveColor
+    val tint by animateColorAsState(
+        targetValue = if (selected) activeColor else inactiveColor,
+        animationSpec = tween(200),
+        label = "navTint",
+    )
     Column(
         modifier = Modifier
             .width(72.dp)
@@ -2891,7 +2910,7 @@ private fun EventListSheet(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     lazyItems(events, key = { it.id }) { event ->
-                        EventRow(event = event, palette = palette, onClick = { onEdit(event) })
+                        EventRow(event = event, palette = palette, onClick = { onEdit(event) }, modifier = Modifier.animateItem())
                     }
                 }
             }
@@ -4434,9 +4453,9 @@ private fun BottomSheetDragHandle(palette: DotCalPalette) {
 }
 
 @Composable
-private fun EventRow(event: CalendarEvent, palette: DotCalPalette, onClick: (() -> Unit)? = null) {
+private fun EventRow(event: CalendarEvent, palette: DotCalPalette, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(palette.eventCardSurface)
@@ -4548,7 +4567,7 @@ private fun AgendaPreview(
                     )
                 }
                 lazyItems(dateEvents, key = { it.id }) { event ->
-                    AgendaEventCard(event = event, palette = palette, onClick = { onEventClick(event) })
+                    AgendaEventCard(event = event, palette = palette, onClick = { onEventClick(event) }, modifier = Modifier.animateItem())
                 }
             }
             item {
@@ -4569,9 +4588,10 @@ private fun AgendaEventCard(
     event: CalendarEvent,
     palette: DotCalPalette,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(if (palette.isDark) palette.dialogSurface else palette.eventCardSurface)
@@ -4879,6 +4899,7 @@ private fun TasksScreen(
                                     onClick = { onTaskClick(task) },
                                     onComplete = { onCompleteTask(task) },
                                     onDelete = { onDeleteTask(task) },
+                                    modifier = Modifier.animateItem(),
                                 )
                             }
                         }
@@ -4933,11 +4954,16 @@ private fun TaskFilterSegmentedControl(
     ) {
         TaskFilter.entries.forEach { option ->
             val isSelected = selected == option
+            val segBg by animateColorAsState(
+                targetValue = if (isSelected) segmentSelected else Color.Transparent,
+                animationSpec = tween(180),
+                label = "segBg",
+            )
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSelected) segmentSelected else Color.Transparent)
+                    .background(segBg)
                     .noRippleClickable { onSelected(option) },
                 contentAlignment = Alignment.Center,
             ) {
@@ -4969,11 +4995,12 @@ private fun TaskRow(
     onClick: () -> Unit,
     onComplete: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var dragOffset by remember(task.id) { mutableFloatStateOf(0f) }
     val thresholdPx = with(LocalDensity.current) { 96.dp.toPx() }
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(
@@ -5835,8 +5862,8 @@ private fun SettingsPreview(
         )
         AnimatedVisibility(
             visible = screen == SettingsScreen.Theme,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
             modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
         ) {
             ThemeSettings(
@@ -5850,8 +5877,8 @@ private fun SettingsPreview(
         }
         AnimatedVisibility(
             visible = screen == SettingsScreen.CalendarAccounts,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
             modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
         ) {
             CalendarAccountsSettings(
@@ -5869,8 +5896,8 @@ private fun SettingsPreview(
         }
         AnimatedVisibility(
             visible = screen == SettingsScreen.AddAccount,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
             modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
         ) {
             AddAccountSettings(
@@ -5881,8 +5908,8 @@ private fun SettingsPreview(
         }
         AnimatedVisibility(
             visible = screen == SettingsScreen.GlobalHolidays,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
             modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
         ) {
             GlobalHolidaysSettings(
@@ -5895,8 +5922,8 @@ private fun SettingsPreview(
         }
         AnimatedVisibility(
             visible = screen == SettingsScreen.PrivacyPolicy,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it }),
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
             modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
         ) {
             PrivacyPolicySettings(
@@ -6351,12 +6378,12 @@ private fun PrivacyPolicySettings(
                 WebView(context).apply {
                     webViewClient = WebViewClient()
                     settings.javaScriptEnabled = false
-                    loadUrl("https://dotfieldstudio.com/dotcal/privacy")
+                    loadUrl("https://dotcal-website.netlify.app/privacy")
                 }
             },
             update = { webView ->
-                if (webView.url != "https://dotfieldstudio.com/dotcal/privacy") {
-                    webView.loadUrl("https://dotfieldstudio.com/dotcal/privacy")
+                if (webView.url != "https://dotcal-website.netlify.app/privacy") {
+                    webView.loadUrl("https://dotcal-website.netlify.app/privacy")
                 }
             },
         )
