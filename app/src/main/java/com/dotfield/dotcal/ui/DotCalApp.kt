@@ -24,6 +24,15 @@ import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.appupdate.AppUpdateOptions
+import com.google.android.play.core.install.InstallStateUpdatedListener
+import com.google.android.play.core.install.model.AppUpdateType
+import com.google.android.play.core.install.model.InstallStatus
+import com.google.android.play.core.install.model.UpdateAvailability
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -285,6 +294,72 @@ fun DotCalApp(
     var isSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // In-app update (Play Flexible). Silent-fails when not installed from Play Store.
+    val appUpdateManager = remember(context) { AppUpdateManagerFactory.create(context) }
+    var updateAvailable by remember { mutableStateOf(false) }
+    var updateDownloaded by remember { mutableStateOf(false) }
+    var updateCheckedThisSession by remember { mutableStateOf(false) }
+    val updateFlowLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { /* download progress handled by InstallStateUpdatedListener */ }
+    val checkForUpdates: (Boolean) -> Unit = { manual ->
+        appUpdateManager.appUpdateInfo
+            .addOnSuccessListener { info ->
+                val flexibleAllowed = info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
+                when {
+                    info.installStatus() == InstallStatus.DOWNLOADED -> updateDownloaded = true
+                    info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE && flexibleAllowed -> updateAvailable = true
+                    manual -> Toast.makeText(context, "DotCal is up to date", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .addOnFailureListener {
+                if (manual) Toast.makeText(context, "Couldn't check for updates", Toast.LENGTH_SHORT).show()
+            }
+    }
+    val startFlexibleUpdate: () -> Unit = {
+        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
+            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
+                info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
+            ) {
+                runCatching {
+                    appUpdateManager.startUpdateFlowForResult(
+                        info,
+                        updateFlowLauncher,
+                        AppUpdateOptions.defaultOptions(AppUpdateType.FLEXIBLE),
+                    )
+                }
+            }
+        }
+    }
+    DisposableEffect(appUpdateManager) {
+        val listener = InstallStateUpdatedListener { state ->
+            if (state.installStatus() == InstallStatus.DOWNLOADED) {
+                updateDownloaded = true
+            }
+        }
+        appUpdateManager.registerListener(listener)
+        onDispose { appUpdateManager.unregisterListener(listener) }
+    }
+    val updateLifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(updateLifecycleOwner, appUpdateManager) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
+                    if (info.installStatus() == InstallStatus.DOWNLOADED) updateDownloaded = true
+                }
+            }
+        }
+        updateLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { updateLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(Unit) {
+        if (!updateCheckedThisSession) {
+            updateCheckedThisSession = true
+            checkForUpdates(false)
+        }
+    }
+
     val bootPreferences = remember(context) { context.getSharedPreferences(BOOT_PREFS, android.content.Context.MODE_PRIVATE) }
     val bootThemeMode = remember(bootPreferences) {
         DotCalThemeMode.fromStorage(bootPreferences.getString(BOOT_THEME_KEY, null))
@@ -984,6 +1059,7 @@ fun DotCalApp(
                         Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.dotfield.dotcal")),
                     )
                 },
+                onCheckForUpdates = { checkForUpdates(true) },
                 onRequestCalendarAccess = {
                     if (hasCalendarPermission) {
                         runSyncNow(showToast = false)
@@ -1205,6 +1281,26 @@ fun DotCalApp(
                 },
             )
         }
+        if (updateAvailable) {
+            UpdateAvailableDialog(
+                palette = palette,
+                onUpdate = {
+                    updateAvailable = false
+                    startFlexibleUpdate()
+                },
+                onDismiss = { updateAvailable = false },
+            )
+        }
+        if (updateDownloaded) {
+            UpdateReadyDialog(
+                palette = palette,
+                onRestart = {
+                    updateDownloaded = false
+                    appUpdateManager.completeUpdate()
+                },
+                onDismiss = { updateDownloaded = false },
+            )
+        }
         BackHandler(enabled = addSheet) {
             editingEvent = null
             addEditorDateOverride = null
@@ -1270,6 +1366,58 @@ private fun ConfirmDeleteDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancel", color = palette.primaryText)
+            }
+        },
+    )
+}
+
+@Composable
+private fun UpdateAvailableDialog(
+    palette: DotCalPalette,
+    onUpdate: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        titleContentColor = palette.primaryText,
+        textContentColor = palette.secondaryText,
+        title = { Text("Update available") },
+        text = { Text("A new version of DotCal is available. Update to get the latest improvements.") },
+        confirmButton = {
+            TextButton(onClick = onUpdate) {
+                Text("Update", color = palette.accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Not now", color = palette.primaryText)
+            }
+        },
+    )
+}
+
+@Composable
+private fun UpdateReadyDialog(
+    palette: DotCalPalette,
+    onRestart: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        titleContentColor = palette.primaryText,
+        textContentColor = palette.secondaryText,
+        title = { Text("Update ready") },
+        text = { Text("The update has been downloaded. Restart DotCal to apply it.") },
+        confirmButton = {
+            TextButton(onClick = onRestart) {
+                Text("Restart", color = palette.accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Later", color = palette.primaryText)
             }
         },
     )
@@ -5954,6 +6102,7 @@ private fun SettingsPreview(
     onAddHolidayCountry: (HolidayCountryUiItem) -> Unit,
     onRemoveHolidayCountry: (HolidayCountryUiItem) -> Unit,
     onRateDotCal: () -> Unit,
+    onCheckForUpdates: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
     onAddAccount: () -> Unit,
 ) {
@@ -5995,6 +6144,7 @@ private fun SettingsPreview(
             onGlobalHolidays = { onScreenChange(SettingsScreen.GlobalHolidays) },
             onPrivacyPolicy = { onScreenChange(SettingsScreen.PrivacyPolicy) },
             onRateDotCal = onRateDotCal,
+            onCheckForUpdates = onCheckForUpdates,
             onRequestCalendarAccess = onRequestCalendarAccess,
             onAddAccount = { onScreenChange(SettingsScreen.AddAccount) },
         )
@@ -6103,6 +6253,7 @@ private fun SettingsRoot(
     onGlobalHolidays: () -> Unit,
     onPrivacyPolicy: () -> Unit,
     onRateDotCal: () -> Unit,
+    onCheckForUpdates: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
     onAddAccount: () -> Unit,
 ) {
@@ -6176,6 +6327,7 @@ private fun SettingsRoot(
             SettingsDivider(palette)
 
             SettingsSectionTitle("About", palette)
+            SettingsMenuRow(title = "Check for updates", value = "", palette = palette, onClick = onCheckForUpdates)
             SettingsMenuRow(title = "Privacy Policy", value = "", palette = palette, onClick = onPrivacyPolicy)
             SettingsMenuRow(title = "Rate DotCal", value = "", palette = palette, onClick = onRateDotCal)
             SettingsMenuRow(title = "Version", value = BuildConfig.VERSION_NAME, palette = palette, showChevron = false, onClick = {})
