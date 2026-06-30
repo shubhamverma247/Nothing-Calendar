@@ -156,8 +156,9 @@ Tasks:
 
 ## Latest Committed Work
 
-Latest commit: version code bump for Play Store close testing.
+Latest commit: Task tab metadata icons styled (red, reduced gap, centered).
 
+- 2026-06-30 (second pass): Task tab metadata icons improved. `TaskMetadata` icon color changed from `secondaryText` to `palette.accent` (red), icon-text gap reduced `3.dp → 2.dp`, icon size bumped `13.dp → 14.dp` for visual centering. versionCode bumped `3 → 4` in `app/build.gradle.kts`. Visual-only changes in `app/src/main/java/com/dotfield/dotcal/ui/DotCalApp.kt` (lines 5375-5395) and build config; no package id, deep link scheme, Room schema/table/column, or DB filename changes. `gradlew --no-daemon --console=plain :app:assembleDebug` passed (2m 15s). APK install skipped because `adb` is not available in this shell; no phone/manual UI QA run.
 - 2026-06-29 version code bump: `versionCode = 2 → 3` in `app/build.gradle.kts` for Play Store internal testing builds. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed. APK ready for internal testing track.
 - 2026-06-27 widget-improvement branch: picker "Can't load widget" fix + dotted background:
   - Root cause of picker failure: `widget_preview_small.xml` used `<Space>`, which is not a RemoteViews-allowed view class and caused picker inflation to fail with "Can't load widget". Fixed by replacing `<Space>` with `<FrameLayout>`.

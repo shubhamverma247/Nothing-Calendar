@@ -5374,10 +5374,10 @@ private fun TaskRow(
                     Spacer(modifier = Modifier.height(5.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (task.hasTaskDate() && task.isAllDay == 0) {
-                            TaskMetadata(label = task.startLocalTime().format(timeFormatter), icon = Icons.Default.AccessTime, color = metadataColor)
+                            TaskMetadata(label = task.startLocalTime().format(timeFormatter), icon = Icons.Default.AccessTime, color = metadataColor, palette = palette)
                         }
                         reminder?.let {
-                            TaskMetadata(label = taskReminderMetadataLabel(it.minutesBefore), icon = Icons.Default.Notifications, color = metadataColor)
+                            TaskMetadata(label = taskReminderMetadataLabel(it.minutesBefore), icon = Icons.Default.Notifications, color = metadataColor, palette = palette)
                         }
                     }
                 }
@@ -5387,11 +5387,11 @@ private fun TaskRow(
 }
 
 @Composable
-private fun TaskMetadata(label: String, icon: ImageVector, color: Color) {
+private fun TaskMetadata(label: String, icon: ImageVector, color: Color, palette: DotCalPalette) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(label, color = color, fontFamily = mono, fontSize = 14.sp, maxLines = 1)
+        Icon(icon, contentDescription = null, tint = palette.accent, modifier = Modifier.size(14.dp))
+        Spacer(modifier = Modifier.width(2.dp))
+        Text(label, color = color, fontFamily = mono, fontSize = 12.sp, maxLines = 1)
     }
 }
 
@@ -5427,7 +5427,7 @@ private fun TaskEmptyState(filter: TaskFilter, palette: DotCalPalette, onAddClic
         TaskFilter.Completed -> "Completed tasks show up here"
     }
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().padding(bottom = 80.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -5442,11 +5442,11 @@ private fun TaskEmptyState(filter: TaskFilter, palette: DotCalPalette, onAddClic
             Icon(
                 if (showAddAffordance) Icons.Default.Add else Icons.Default.Check,
                 contentDescription = if (showAddAffordance) "Add task" else null,
-                tint = if (showAddAffordance) palette.accent else palette.secondaryText,
+                tint = palette.accent,
                 modifier = Modifier.size(44.dp),
             )
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(14.dp))
         Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Medium, fontSize = 18.sp, textAlign = TextAlign.Center)
         Spacer(modifier = Modifier.height(8.dp))
         Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp, textAlign = TextAlign.Center)
