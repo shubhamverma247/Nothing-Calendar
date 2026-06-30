@@ -1100,7 +1100,9 @@ fun DotCalApp(
         }
         // Floating bottom nav — rendered AFTER Settings overlay so it appears on top of Settings,
         // but BEFORE full-screen overlays (EventDetail, AddEvent, etc.) so those cover it correctly.
+        // Hidden on onboarding and on Settings sub-screens (non-Root).
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            if (!showOnboarding && (screenTab != ScreenTab.Settings || settingsScreen == SettingsScreen.Root))
             DotCalBottomNav(
                 selected = screenTab,
                 palette = palette,
@@ -3720,10 +3722,17 @@ private fun VoiceNoteEditorSection(
                     onVoiceNoteChanged(null)
                 },
             )
-            !permissionDenied -> EmptyVoiceNoteRow(
+            else -> EmptyVoiceNoteRow(
                 palette = palette,
+                permissionDenied = permissionDenied,
                 onRecord = {
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    if (permissionDenied) {
+                        context.startActivity(
+                            Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            },
+                        )
+                    } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                         startVoiceRecording(context, eventId)?.let { started ->
                             recorder = started
                             recordingStartedAt = SystemClock.elapsedRealtime()
@@ -3739,7 +3748,7 @@ private fun VoiceNoteEditorSection(
 }
 
 @Composable
-private fun EmptyVoiceNoteRow(palette: DotCalPalette, onRecord: () -> Unit) {
+private fun EmptyVoiceNoteRow(palette: DotCalPalette, onRecord: () -> Unit, permissionDenied: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -3749,8 +3758,14 @@ private fun EmptyVoiceNoteRow(palette: DotCalPalette, onRecord: () -> Unit) {
             .padding(horizontal = 14.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MicGlyph(tint = palette.primaryText)
-        Text("TAP TO RECORD", color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp, modifier = Modifier.padding(start = 12.dp))
+        MicGlyph(tint = if (permissionDenied) palette.secondaryText else palette.primaryText)
+        Text(
+            if (permissionDenied) "MIC PERMISSION DENIED — TAP TO ENABLE" else "TAP TO RECORD",
+            color = palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(start = 12.dp),
+        )
     }
 }
 
@@ -4735,12 +4750,9 @@ private fun AgendaPreview(
     ) {
         if (upcomingEvents.isEmpty()) {
             item {
-                AgendaDateHeader(date = agendaStartDate, isFirst = true, palette = palette)
-            }
-            item {
                 AgendaEndOfDayState(
                     palette = palette,
-                    modifier = Modifier.fillParentMaxHeight(0.72f),
+                    modifier = Modifier.fillParentMaxHeight(0.82f),
                     onAdd = onAdd,
                 )
             }
@@ -5132,7 +5144,7 @@ private fun TasksScreen(
                         .padding(horizontal = 16.dp, vertical = 16.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    TaskEmptyState(filter = filter, palette = palette)
+                    TaskEmptyState(filter = filter, palette = palette, onAddClick = onAddClick)
                 }
             } else {
                 LazyColumn(
@@ -5398,24 +5410,46 @@ private fun taskReminderMetadataLabel(minutes: Int): String {
 }
 
 @Composable
-private fun TaskEmptyState(filter: TaskFilter, palette: DotCalPalette) {
+private fun TaskEmptyState(filter: TaskFilter, palette: DotCalPalette, onAddClick: () -> Unit) {
     val title = when (filter) {
         TaskFilter.All -> "No tasks yet"
         TaskFilter.Today -> "Nothing due today"
         TaskFilter.Upcoming -> "All clear"
         TaskFilter.Completed -> "No completed tasks"
     }
-    val subtitle = if (filter == TaskFilter.All) "Tap + to create your first task" else null
+    // Only the "All" filter shows the tappable add affordance — other filters are
+    // just empty results, not an invitation to create.
+    val showAddAffordance = filter == TaskFilter.All
+    val subtitle = when (filter) {
+        TaskFilter.All -> "Tap to create your first task"
+        TaskFilter.Today -> "Enjoy your free time"
+        TaskFilter.Upcoming -> "No upcoming tasks scheduled"
+        TaskFilter.Completed -> "Completed tasks show up here"
+    }
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Medium, fontSize = 18.sp, textAlign = TextAlign.Center)
-        subtitle?.let {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(it, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp, textAlign = TextAlign.Center)
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .clip(CircleShape)
+                .background(palette.cell)
+                .then(if (showAddAffordance) Modifier.noRippleClickable(onClick = onAddClick) else Modifier),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (showAddAffordance) Icons.Default.Add else Icons.Default.Check,
+                contentDescription = if (showAddAffordance) "Add task" else null,
+                tint = if (showAddAffordance) palette.accent else palette.secondaryText,
+                modifier = Modifier.size(44.dp),
+            )
         }
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Medium, fontSize = 18.sp, textAlign = TextAlign.Center)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -6257,6 +6291,7 @@ private fun SettingsRoot(
     onRequestCalendarAccess: () -> Unit,
     onAddAccount: () -> Unit,
 ) {
+    val context = LocalContext.current
     val listState = rememberLazyListState()
     val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
@@ -6330,6 +6365,13 @@ private fun SettingsRoot(
             SettingsMenuRow(title = "Check for updates", value = "", palette = palette, onClick = onCheckForUpdates)
             SettingsMenuRow(title = "Privacy Policy", value = "", palette = palette, onClick = onPrivacyPolicy)
             SettingsMenuRow(title = "Rate DotCal", value = "", palette = palette, onClick = onRateDotCal)
+            SettingsMenuRow(title = "Send Feedback", value = "", palette = palette, onClick = {
+                context.startActivity(
+                    Intent(Intent.ACTION_SENDTO).apply {
+                        data = Uri.parse("mailto:dotfieldstudio@gmail.com?subject=DotCal%20Feedback")
+                    }
+                )
+            })
             SettingsMenuRow(title = "Version", value = BuildConfig.VERSION_NAME, palette = palette, showChevron = false, onClick = {})
             Spacer(modifier = Modifier.height(32.dp))
             }
@@ -6511,16 +6553,16 @@ private fun HolidayCountryRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .height(64.dp)
             .noRippleClickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(country.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        Text(country.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
         if (selected) {
-            Icon(Icons.Default.Close, contentDescription = "Remove", tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.Close, contentDescription = "Remove", tint = palette.secondaryText, modifier = Modifier.size(22.dp))
         } else {
-            Icon(Icons.Default.Add, contentDescription = "Add", tint = palette.accent, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.Add, contentDescription = "Add", tint = palette.accent, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -6626,7 +6668,7 @@ private fun GoogleAccountProviderRow(palette: DotCalPalette, onClick: () -> Unit
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .height(64.dp)
             .noRippleClickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -6635,7 +6677,7 @@ private fun GoogleAccountProviderRow(palette: DotCalPalette, onClick: () -> Unit
             Image(
                 painter = androidx.compose.ui.res.painterResource(id = com.dotfield.dotcal.R.drawable.ic_google_logo),
                 contentDescription = null,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(24.dp),
             )
             Spacer(modifier = Modifier.width(14.dp))
             Text(
@@ -6643,7 +6685,7 @@ private fun GoogleAccountProviderRow(palette: DotCalPalette, onClick: () -> Unit
                 color = palette.primaryText,
                 fontFamily = mono,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
+                fontSize = 16.sp,
             )
         }
         Icon(
@@ -6660,22 +6702,185 @@ private fun PrivacyPolicySettings(
     palette: DotCalPalette,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     Column(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         SettingsCompactHeader(palette = palette, onBack = onBack, title = "Privacy Policy")
-        AndroidView(
+        LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            factory = { context ->
-                WebView(context).apply {
-                    webViewClient = WebViewClient()
-                    settings.javaScriptEnabled = false
-                    loadUrl("https://dotcal-website.netlify.app/privacy")
+            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp),
+        ) {
+            // Hero intro
+            item {
+                Column {
+                    Text(
+                        "LEGAL",
+                        color = palette.accent,
+                        fontFamily = mono,
+                        fontSize = 11.sp,
+                        letterSpacing = 2.sp,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Your data stays on your device.",
+                        color = palette.primaryText,
+                        fontFamily = mono,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 22.sp,
+                        lineHeight = 28.sp,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "DotCal stores your calendar data locally on your device. Nothing goes to any server. No account, no sync service, no telemetry — ever.",
+                        color = palette.secondaryText,
+                        fontFamily = mono,
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp,
+                    )
                 }
-            },
-            update = { webView ->
-                if (webView.url != "https://dotcal-website.netlify.app/privacy") {
-                    webView.loadUrl("https://dotcal-website.netlify.app/privacy")
+            }
+
+            item {
+                PrivacySection(
+                    "01  Overview",
+                    "DotCal collects no personal data and transmits no information to any server. All calendar events, tasks, reminders, attachments, and settings exist only on your Android device.\n\nThis policy covers the DotCal Android app (com.dotfield.dotcal), published by Dotfield Studio, and applies from the date of your first install.\n\nWe built DotCal with a simple rule: data about your life belongs to you. The app works entirely offline. There is no backend, no account system, and no analytics SDK embedded anywhere in the code.",
+                    palette,
+                )
+            }
+            item {
+                PrivacySection(
+                    "02  Data We Collect",
+                    "DotCal does not collect, store, or transmit any personal data to Dotfield Studio or any third party.\n\nCalendar events, tasks, reminder alarms, voice notes, image attachments, theme and app settings, and any imported contact birthdays or Google Calendar events all live only on your device. None of it is ever sent anywhere, and we cannot access any of it.\n\nNo crash analytics. No usage analytics. Nothing is collected.",
+                    palette,
+                )
+            }
+            item {
+                PrivacySection(
+                    "03  App Permissions",
+                    "DotCal requests only what it needs to function:\n\n· Calendar (read/write) — only if you enable Google Calendar sync, to read/create events via Android's CalendarProvider. No data leaves the device.\n· Contacts — optional, to read contact birthdays as yearly events. Only reads dates, not full contact data.\n· Exact Alarm & Boot — schedule reminder alarms and re-register them after a reboot.\n· Notifications — display event and task reminders (Android 13+).\n· Microphone — optional, to record voice notes. Saved to app-private storage, only when you tap record.\n· Photos — selected via Android Photo Picker only. DotCal never accesses your full gallery.",
+                    palette,
+                )
+            }
+            item {
+                PrivacySection(
+                    "04  Google Calendar Sync",
+                    "DotCal does not connect to Google's servers. It reads from Android's built-in CalendarProvider — the same local database the default Calendar app uses. No Google credentials are ever seen or stored.\n\nThis is different from apps that use the Google Calendar REST API or OAuth. DotCal never makes HTTP requests and never sees your Google credentials.\n\nIf you disable sync, DotCal stops querying CalendarProvider. Previously imported events stay in DotCal's local database until you delete them.",
+                    palette,
+                )
+            }
+            item {
+                PrivacySection(
+                    "05  Local Storage",
+                    "All DotCal data is stored in Android's app-private storage, inaccessible to other apps without root access, and deleted automatically when you uninstall.\n\nStored data includes the SQLite database (events, tasks, recurrence rules), local preferences (theme, view, sync toggles), voice note files, and image attachments.\n\nDotCal does not write to shared external storage. If your device's Google Backup is enabled at the system level, Android may back up app data — this is outside DotCal's control.",
+                    palette,
+                )
+            }
+            item {
+                PrivacySection(
+                    "06  Third Parties",
+                    "DotCal integrates no third-party SDKs for analytics, advertising, crash reporting, or remote configuration. No Firebase, no Crashlytics, no advertising networks, no A/B testing — nothing that makes outbound network requests.\n\nThe only external dependency is the Android operating system itself.",
+                    palette,
+                )
+            }
+            item {
+                PrivacySection(
+                    "07  Security",
+                    "Because DotCal stores all data locally and makes no network calls, the attack surface is limited to physical device access. Keep your device PIN or biometric lock active.\n\nAndroid's app sandbox provides the primary protection. On modern devices with hardware-backed encryption, the OS-level encryption protects DotCal data at rest.",
+                    palette,
+                )
+            }
+            item {
+                PrivacySection(
+                    "08  Children's Privacy",
+                    "DotCal does not knowingly collect information from anyone, including children under 13. Because DotCal collects no data at all, there is no children's data to protect beyond standard Android privacy protections.",
+                    palette,
+                )
+            }
+            item {
+                PrivacySection(
+                    "09  Your Rights",
+                    "Because DotCal does not collect or store personal data on any server, all of your data is under your direct control:\n\n· Access — your data is in the app on your device.\n· Delete — uninstall to remove everything, or delete individual events in-app.\n· Export — PDF export of calendar views is a planned feature.\n· Portability — events synced via CalendarProvider remain in Android's calendar database.\n\nIf you are in the EU, UK, or California, GDPR and CCPA rights apply — exercised entirely on-device, since we hold no data.",
+                    palette,
+                )
+            }
+            item {
+                PrivacySection(
+                    "10  Policy Changes",
+                    "If this policy changes materially — for example, if DotCal adds any network feature — we will update this page and the effective date below, and flag the change in a release note. We commit to never adding advertising, analytics, or cloud storage without updating this policy and prominently notifying users.",
+                    palette,
+                )
+            }
+
+            // Contact card
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(palette.cell)
+                        .noRippleClickable {
+                            context.startActivity(
+                                Intent(Intent.ACTION_SENDTO).apply {
+                                    data = Uri.parse("mailto:dotfieldstudio@gmail.com?subject=DotCal%20Privacy")
+                                }
+                            )
+                        }
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Questions? Contact us",
+                            color = palette.primaryText,
+                            fontFamily = mono,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                        )
+                        Text(
+                            "dotfieldstudio@gmail.com",
+                            color = palette.accent,
+                            fontFamily = mono,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = palette.secondaryText,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
-            },
+            }
+            item {
+                Text(
+                    "Effective June 27, 2026 · Dotfield Studio",
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 11.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrivacySection(title: String, content: String, palette: DotCalPalette) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            title,
+            color = palette.primaryText,
+            fontFamily = mono,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            content,
+            color = palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
         )
     }
 }
@@ -6724,25 +6929,25 @@ private fun CalendarAccountToggleRow(
 ) {
     val isLocal = account.id == "local-primary"
     Row(
-        modifier = Modifier.fillMaxWidth().height(68.dp),
+        modifier = Modifier.fillMaxWidth().height(72.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
             Box(
                 modifier = Modifier
-                    .size(12.dp)
+                    .size(14.dp)
                     .clip(CircleShape)
                     .background(Color(parseColor(account.color))),
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     account.displayName.readableCalendarLabel(),
                     color = palette.primaryText,
                     fontFamily = mono,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
+                    fontSize = 16.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -6750,7 +6955,7 @@ private fun CalendarAccountToggleRow(
                     account.secondaryCalendarLabel(),
                     color = palette.secondaryText,
                     fontFamily = mono,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -7028,8 +7233,8 @@ private fun SettingsSectionTitle(title: String, palette: DotCalPalette) {
         title,
         color = palette.secondaryText,
         fontFamily = mono,
-        fontSize = 13.sp,
-        modifier = Modifier.padding(top = 20.dp, bottom = 12.dp),
+        fontSize = 14.sp,
+        modifier = Modifier.padding(top = 24.dp, bottom = 14.dp),
     )
 }
 
@@ -7261,7 +7466,7 @@ private fun ThemeOptionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
+            .height(76.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(if (selected) palette.cell else Color.Transparent)
             .noRippleClickable(onClick = onClick)
@@ -7269,16 +7474,16 @@ private fun ThemeOptionRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             ThemePreview(mode = mode, accentColor = accentColor)
             Column {
-                Text(mode.label, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(if (selected) "Active" else "Tap to apply", color = if (selected) palette.accent else palette.secondaryText, fontFamily = mono, fontSize = 10.sp)
+                Text(mode.label, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(if (selected) "Active" else "Tap to apply", color = if (selected) palette.accent else palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
             }
         }
         Box(
             modifier = Modifier
-                .size(18.dp)
+                .size(20.dp)
                 .clip(CircleShape)
                 .background(if (selected) palette.accent else palette.cell),
         )
