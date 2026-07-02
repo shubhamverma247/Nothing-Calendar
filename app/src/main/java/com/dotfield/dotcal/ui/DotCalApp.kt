@@ -53,6 +53,11 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -537,7 +542,7 @@ fun DotCalApp(
     LaunchedEffect(resolvedThemeMode, resolvedAccentColor, systemDark) {
         bootPreferences.edit()
             .putString(BOOT_THEME_KEY, resolvedThemeMode.name)
-            .putString(BOOT_ACCENT_KEY, resolvedAccentColor.name)
+            .putString(BOOT_ACCENT_KEY, resolvedAccentColor.storageValue)
             .apply()
         WidgetUpdateWorker.enqueue(context)
     }
@@ -970,10 +975,10 @@ fun DotCalApp(
                     }
                 },
                 onAccentSelected = { selectedAccent ->
-                    bootPreferences.edit().putString(BOOT_ACCENT_KEY, selectedAccent.name).apply()
+                    bootPreferences.edit().putString(BOOT_ACCENT_KEY, selectedAccent.storageValue).apply()
                     scope.launch {
                         context.calendarPreferencesDataStore.edit { preferences ->
-                            preferences[CalendarPreferences.KEY_ACCENT_COLOR] = selectedAccent.name
+                            preferences[CalendarPreferences.KEY_ACCENT_COLOR] = selectedAccent.storageValue
                         }
                         WidgetUpdateWorker.enqueue(context)
                     }
@@ -6298,9 +6303,11 @@ private fun SettingsPreview(
             themeMode = themeMode,
             accentColor = accentColor,
             palette = palette,
+            isPro = isPro,
             onBack = { onScreenChange(SettingsScreen.Root) },
             onThemeSelected = onThemeSelected,
             onAccentSelected = onAccentSelected,
+            onRequestPro = onDotCalPro,
             )
         }
         AnimatedVisibility(
@@ -6564,10 +6571,13 @@ private fun ThemeSettings(
     themeMode: DotCalThemeMode,
     accentColor: AccentColor,
     palette: DotCalPalette,
+    isPro: Boolean,
     onBack: () -> Unit,
     onThemeSelected: (DotCalThemeMode) -> Unit,
     onAccentSelected: (AccentColor) -> Unit,
+    onRequestPro: () -> Unit,
 ) {
+    var showCustomPicker by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
@@ -6597,9 +6607,43 @@ private fun ThemeSettings(
                 modifier = Modifier.padding(start = 4.dp, bottom = 14.dp),
             )
             AccentColorSwatches(
+                accents = AccentColor.freePresets,
                 selectedAccent = accentColor,
                 palette = palette,
+                locked = false,
                 onAccentSelected = onAccentSelected,
+                onLockedClick = onRequestPro,
+            )
+            Spacer(modifier = Modifier.height(28.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "More Colors",
+                    color = palette.primaryText,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                if (!isPro) {
+                    Text("Pro", color = palette.accent, fontFamily = mono, fontSize = 11.sp)
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            AccentColorSwatches(
+                accents = AccentColor.proPresets,
+                selectedAccent = accentColor,
+                palette = palette,
+                locked = !isPro,
+                onAccentSelected = onAccentSelected,
+                onLockedClick = onRequestPro,
+            )
+            Spacer(modifier = Modifier.height(28.dp))
+            CustomAccentRow(
+                accentColor = accentColor,
+                palette = palette,
+                isPro = isPro,
+                onClick = { if (isPro) showCustomPicker = true else onRequestPro() },
             )
             Spacer(modifier = Modifier.height(960.dp))
             }
@@ -6607,6 +6651,17 @@ private fun ThemeSettings(
         if (showCompactHeader) {
             SettingsCompactHeader(palette = palette, onBack = onBack, title = "Theme")
         }
+    }
+    if (showCustomPicker) {
+        CustomAccentPickerDialog(
+            initial = accentColor.color,
+            palette = palette,
+            onDismiss = { showCustomPicker = false },
+            onConfirm = { hex ->
+                showCustomPicker = false
+                onAccentSelected(AccentColor.Custom(hex))
+            },
+        )
     }
 }
 
@@ -7693,19 +7748,23 @@ private fun ThemePreview(mode: DotCalThemeMode, accentColor: AccentColor) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AccentColorSwatches(
+    accents: List<AccentColor.Preset>,
     selectedAccent: AccentColor,
     palette: DotCalPalette,
+    locked: Boolean,
     onAccentSelected: (AccentColor) -> Unit,
+    onLockedClick: () -> Unit,
 ) {
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth().padding(start = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        AccentColor.entries.forEach { accent ->
-            val selected = accent == selectedAccent
+        accents.forEach { accent ->
+            val selected = accent.storageValue == selectedAccent.storageValue
             Box(
                 modifier = Modifier
                     .size(44.dp)
@@ -7714,15 +7773,282 @@ private fun AccentColorSwatches(
                     .padding(3.dp)
                     .clip(CircleShape)
                     .background(accent.color)
-                    .noRippleClickable { onAccentSelected(accent) },
+                    .noRippleClickable { if (locked) onLockedClick() else onAccentSelected(accent) },
                 contentAlignment = Alignment.Center,
             ) {
-                if (selected) {
-                    Icon(Icons.Default.Check, contentDescription = accent.label, tint = accent.onColor, modifier = Modifier.size(20.dp))
+                when {
+                    locked -> Icon(
+                        Icons.Default.Lock,
+                        contentDescription = "Pro",
+                        tint = accent.onColor.copy(alpha = 0.9f),
+                        modifier = Modifier.size(16.dp),
+                    )
+                    selected -> Icon(
+                        Icons.Default.Check,
+                        contentDescription = accent.label,
+                        tint = accent.onColor,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun CustomAccentRow(
+    accentColor: AccentColor,
+    palette: DotCalPalette,
+    isPro: Boolean,
+    onClick: () -> Unit,
+) {
+    val isCustom = accentColor is AccentColor.Custom
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .border(2.dp, if (isCustom) palette.primaryText else palette.line, CircleShape)
+                .padding(3.dp)
+                .clip(CircleShape)
+                .background(if (isCustom) accentColor.color else palette.cell),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (!isPro) {
+                Icon(Icons.Default.Lock, contentDescription = "Pro", tint = palette.secondaryText, modifier = Modifier.size(16.dp))
+            } else {
+                Icon(Icons.Default.Add, contentDescription = "Custom color", tint = if (isCustom) accentColor.onColor else palette.secondaryText, modifier = Modifier.size(20.dp))
+            }
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Custom Color", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                if (!isPro) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Pro", color = palette.accent, fontFamily = mono, fontSize = 11.sp)
+                }
+            }
+            Text(
+                if (isCustom) accentColor.label else "Pick any hex color",
+                color = if (isCustom) palette.accent else palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+            )
+        }
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun CustomAccentPickerDialog(
+    initial: Color,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    val initialHsv = remember(initial) {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(initial.toArgb(), hsv)
+        hsv
+    }
+    var hue by remember { mutableStateOf(initialHsv[0]) }
+    var sat by remember { mutableStateOf(initialHsv[1]) }
+    var value by remember { mutableStateOf(initialHsv[2]) }
+    val current = remember(hue, sat, value) {
+        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value)))
+    }
+    val currentHex = remember(current) { AccentColor.normalizeHex("#%06X".format(0xFFFFFF and current.toArgb())) ?: "#FF3B30" }
+    var hexField by remember { mutableStateOf(currentHex) }
+    // Keep the hex text field in sync when the user drags the picker.
+    LaunchedEffect(currentHex) { hexField = currentHex }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        title = {
+            Text("Custom Accent", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Live preview.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(current),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        currentHex,
+                        color = if (current.luminanceApprox() > 0.5f) Color(0xFF101010) else Color(0xFFFFFFFF),
+                        fontFamily = mono,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                    )
+                }
+                Spacer(modifier = Modifier.height(18.dp))
+                CalcSectionLabelSafe("HUE", palette)
+                Spacer(modifier = Modifier.height(8.dp))
+                HueSlider(hue = hue, palette = palette, onHueChange = { hue = it })
+                Spacer(modifier = Modifier.height(18.dp))
+                CalcSectionLabelSafe("SATURATION", palette)
+                Spacer(modifier = Modifier.height(8.dp))
+                ValueSlider(
+                    fraction = sat,
+                    track = Brush.horizontalGradient(
+                        listOf(
+                            Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0f, value))),
+                            Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, value))),
+                        ),
+                    ),
+                    palette = palette,
+                    onChange = { sat = it },
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+                CalcSectionLabelSafe("BRIGHTNESS", palette)
+                Spacer(modifier = Modifier.height(8.dp))
+                ValueSlider(
+                    fraction = value,
+                    track = Brush.horizontalGradient(
+                        listOf(
+                            Color.Black,
+                            Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, 1f))),
+                        ),
+                    ),
+                    palette = palette,
+                    onChange = { value = it },
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+                CalcSectionLabelSafe("HEX", palette)
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, palette.textFieldBorder, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                ) {
+                    BasicTextField(
+                        value = hexField,
+                        onValueChange = { raw ->
+                            hexField = raw
+                            AccentColor.normalizeHex(raw)?.let { normalized ->
+                                val hsv = FloatArray(3)
+                                android.graphics.Color.colorToHSV(android.graphics.Color.parseColor(normalized), hsv)
+                                hue = hsv[0]; sat = hsv[1]; value = hsv[2]
+                            }
+                        },
+                        singleLine = true,
+                        textStyle = TextStyle(color = palette.primaryText, fontFamily = mono, fontSize = 15.sp),
+                        cursorBrush = SolidColor(palette.accent),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Text(
+                "Apply",
+                color = palette.accent,
+                fontFamily = mono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                modifier = Modifier.noRippleClickable { onConfirm(currentHex) }.padding(8.dp),
+            )
+        },
+        dismissButton = {
+            Text(
+                "Cancel",
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 15.sp,
+                modifier = Modifier.noRippleClickable(onClick = onDismiss).padding(8.dp),
+            )
+        },
+    )
+}
+
+@Composable
+private fun CalcSectionLabelSafe(text: String, palette: DotCalPalette) {
+    Text(text, color = palette.secondaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
+}
+
+/** Rainbow hue slider (0..360). */
+@Composable
+private fun HueSlider(hue: Float, palette: DotCalPalette, onHueChange: (Float) -> Unit) {
+    var widthPx by remember { mutableStateOf(1) }
+    val hueBrush = remember {
+        Brush.horizontalGradient(
+            (0..360 step 60).map { Color(android.graphics.Color.HSVToColor(floatArrayOf(it.toFloat(), 1f, 1f))) },
+        )
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(28.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(hueBrush)
+            .onSizeChanged { widthPx = it.width.coerceAtLeast(1) }
+            .pointerInput(Unit) {
+                detectTapGestures { offset -> onHueChange((offset.x / widthPx).coerceIn(0f, 1f) * 360f) }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures { change, _ ->
+                    onHueChange((change.position.x / widthPx).coerceIn(0f, 1f) * 360f)
+                }
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        SliderThumb(fraction = hue / 360f, widthPx = widthPx)
+    }
+}
+
+/** Generic 0..1 slider with a custom gradient [track]. */
+@Composable
+private fun ValueSlider(fraction: Float, track: Brush, palette: DotCalPalette, onChange: (Float) -> Unit) {
+    var widthPx by remember { mutableStateOf(1) }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(28.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(track)
+            .onSizeChanged { widthPx = it.width.coerceAtLeast(1) }
+            .pointerInput(Unit) {
+                detectTapGestures { offset -> onChange((offset.x / widthPx).coerceIn(0f, 1f)) }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures { change, _ ->
+                    onChange((change.position.x / widthPx).coerceIn(0f, 1f))
+                }
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        SliderThumb(fraction = fraction, widthPx = widthPx)
+    }
+}
+
+@Composable
+private fun SliderThumb(fraction: Float, widthPx: Int) {
+    val thumb = 22.dp
+    val density = LocalDensity.current
+    val trackWidthDp = with(density) { widthPx.toDp() }
+    val x = (trackWidthDp - thumb) * fraction.coerceIn(0f, 1f)
+    Box(
+        modifier = Modifier
+            .offset(x = x)
+            .size(thumb)
+            .clip(CircleShape)
+            .background(Color.White)
+            .border(2.dp, Color(0x33000000), CircleShape),
+    )
 }
 
 @Composable
@@ -8207,30 +8533,94 @@ private enum class DotCalThemeMode(val label: String) {
     }
 }
 
-private enum class AccentColor(val hex: String, val label: String) {
-    RED("#FF3B30", "Red"),
-    BLUE("#0A84FF", "Blue"),
-    GREEN("#30D158", "Green"),
-    PURPLE("#BF5AF2", "Purple"),
-    AMBER("#FF9F0A", "Amber");
-
+/**
+ * Accent color model. Free tier uses the 5 [Preset] swatches; Pro unlocks the extra curated
+ * [proPresets] and a full [Custom] hex color picker.
+ *
+ * Storage format in [CalendarPreferences.KEY_ACCENT_COLOR] (and the boot SharedPreferences mirror):
+ *  - a preset enum name, e.g. "BLUE" (backward compatible with existing installs), or
+ *  - a "#RRGGBB" hex string for a Pro custom color.
+ */
+private sealed interface AccentColor {
     val color: Color
-        get() = Color(android.graphics.Color.parseColor(hex))
+    val label: String
 
+    /** Text/icon color that stays legible on top of [color]. */
     val onColor: Color
-        get() = when (this) {
-            GREEN, AMBER -> Color(0xFF101010)
-            RED, BLUE, PURPLE -> Color(0xFFFFFFFF)
-        }
+        get() = if (color.luminanceApprox() > 0.5f) Color(0xFF101010) else Color(0xFFFFFFFF)
+
+    /** Value persisted to DataStore + boot prefs. */
+    val storageValue: String
+
+    enum class Preset(val hex: String, override val label: String) : AccentColor {
+        // Free presets. Order/names are storage-stable; do not rename.
+        RED("#FF3B30", "Red"),
+        BLUE("#0A84FF", "Blue"),
+        GREEN("#30D158", "Green"),
+        PURPLE("#BF5AF2", "Purple"),
+        AMBER("#FF9F0A", "Amber"),
+        // Pro presets (extra curated palette).
+        TEAL("#2AB8B0", "Teal"),
+        PINK("#FF375F", "Pink"),
+        ORANGE("#FF6B00", "Orange"),
+        CYAN("#32ADE6", "Cyan"),
+        INDIGO("#5E5CE6", "Indigo"),
+        MINT("#66D4A0", "Mint"),
+        ROSE("#F06292", "Rose"),
+        LIME("#B0C948", "Lime");
+
+        override val color: Color get() = Color(android.graphics.Color.parseColor(hex))
+        override val storageValue: String get() = name
+        val isPro: Boolean get() = this in proPresets
+    }
+
+    /** Pro-only arbitrary hex color chosen from the color picker. */
+    data class Custom(val hex: String) : AccentColor {
+        override val color: Color get() = Color(android.graphics.Color.parseColor(hex))
+        override val label: String get() = hex.uppercase()
+        override val storageValue: String get() = hex.uppercase()
+    }
 
     companion object {
+        val Default: Preset = Preset.RED
+
+        /** Free presets shown to everyone. */
+        val freePresets: List<Preset> = listOf(
+            Preset.RED, Preset.BLUE, Preset.GREEN, Preset.PURPLE, Preset.AMBER,
+        )
+
+        /** Extra presets unlocked by Pro. */
+        val proPresets: List<Preset> = listOf(
+            Preset.TEAL, Preset.PINK, Preset.ORANGE, Preset.CYAN,
+            Preset.INDIGO, Preset.MINT, Preset.ROSE, Preset.LIME,
+        )
+
         fun fromStorage(value: String?): AccentColor {
-            return entries.firstOrNull { it.name == value } ?: RED
+            if (value == null) return Default
+            Preset.entries.firstOrNull { it.name == value }?.let { return it }
+            return normalizeHex(value)?.let { Custom(it) } ?: Default
+        }
+
+        /** Returns a canonical "#RRGGBB" string if [raw] is a valid hex color, else null. */
+        fun normalizeHex(raw: String?): String? {
+            if (raw.isNullOrBlank()) return null
+            val trimmed = raw.trim().removePrefix("#")
+            val hex = when (trimmed.length) {
+                3 -> trimmed.map { "$it$it" }.joinToString("")
+                6 -> trimmed
+                8 -> trimmed.substring(2) // drop alpha, force opaque
+                else -> return null
+            }
+            if (!hex.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }) return null
+            return "#${hex.uppercase()}"
         }
     }
 }
 
-private fun dotCalPalette(mode: DotCalThemeMode, accentColor: AccentColor = AccentColor.RED, systemDark: Boolean = false): DotCalPalette {
+/** Cheap perceptual-ish luminance used to pick a legible on-accent text color. */
+private fun Color.luminanceApprox(): Float = 0.299f * red + 0.587f * green + 0.114f * blue
+
+private fun dotCalPalette(mode: DotCalThemeMode, accentColor: AccentColor = AccentColor.Default, systemDark: Boolean = false): DotCalPalette {
     val resolved = if (mode == DotCalThemeMode.System) {
         if (systemDark) DotCalThemeMode.Dark else DotCalThemeMode.Light
     } else {
@@ -8299,7 +8689,7 @@ private fun dotCalPalette(mode: DotCalThemeMode, accentColor: AccentColor = Acce
     }
 }
 
-private fun dotCalBootPalette(accentColor: AccentColor = AccentColor.RED): DotCalPalette {
+private fun dotCalBootPalette(accentColor: AccentColor = AccentColor.Default): DotCalPalette {
     return DotCalPalette(
         background = Color(0xFF000000),
         primaryText = Color(0xFFFFFFFF),
@@ -8352,6 +8742,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Voice Notes", "Record audio notes on your events"),
     ProFeature("Large Widget", "Full month grid widget for your home screen"),
     ProFeature("Date Calculator", "Calculate days between dates instantly"),
+    ProFeature("Custom Accent Colors", "Extra palettes plus any custom hex color"),
 )
 
 @Composable

@@ -110,6 +110,7 @@ Pro gates:
 - Voice Notes.
 - Large Widget.
 - Date Calculator.
+- Custom Accent Colors (extra preset palette + custom hex picker; 5 base accents stay free).
 
 Paywall:
 - Route: `dotcal://paywall`.
@@ -122,6 +123,15 @@ Known Pro fixes:
 - 2026-07-02: Paywall crash fix changed app icon painter from adaptive `R.mipmap.ic_launcher` to bitmap `R.mipmap.ic_launcher_foreground`. Large locked widget Unlock radius changed `0dp -> 20dp`. Version bumped to `versionCode 7`, `versionName 1.1.2` so Play Internal Testing can accept fix over broken `1.1.1`.
 
 ## Latest Work
+
+Branch `profeature` (WIP, not on main):
+- Custom accent + theme pack Pro feature. `AccentColor` in `ui/DotCalApp.kt` refactored from plain enum to a `sealed interface`: `Preset` enum (5 free + 8 Pro presets) and `Custom(hex)`. Storage in `KEY_ACCENT_COLOR` is backward compatible: preset enum name OR `#RRGGBB`. `fromStorage`/`normalizeHex` handle both; `storageValue` used everywhere `.name` was. `onColor` now auto-picks legible text via `luminanceApprox`.
+- Theme settings screen: free swatches (unchanged), new "More Colors" Pro preset row (locked -> Paywall for non-Pro), new "Custom Color" row opening `CustomAccentPickerDialog` (hue/sat/brightness sliders via `detectTapGestures` + `detectHorizontalDragGestures`, live preview, hex text field). Non-Pro taps route to Paywall through existing `onDotCalPro`.
+- Widget parser `widgetAccentColor` in `widget/DotCalGlanceTheme.kt` extended for new presets + `#hex`, red fallback.
+- Paywall `PRO_FEATURES` gained "Custom Accent Colors".
+- No Room/schema/DataStore-key changes. No version bump yet.
+- New composables: `AccentColorSwatches` (now takes accent list + locked flag), `CustomAccentRow`, `CustomAccentPickerDialog`, `HueSlider`, `ValueSlider`, `SliderThumb`, `CalcSectionLabelSafe`. New imports: `detectTapGestures`, `ExperimentalLayoutApi`, `FlowRow`, `Lock` icon, `onSizeChanged`.
+- Verified: `--rerun-tasks :app:compileDebugKotlin` passed (2m 28s), `:app:assembleDebug` passed (1m 15s). No phone/manual QA.
 
 Latest local work:
 - `versionCode = 8`, `versionName = "1.1.3"`.
