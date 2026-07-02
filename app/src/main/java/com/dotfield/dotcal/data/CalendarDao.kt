@@ -42,6 +42,19 @@ interface CalendarDao {
     @Query("SELECT * FROM calendar_events WHERE id = :eventId LIMIT 1")
     suspend fun getEvent(eventId: String): CalendarEvent?
 
+    /**
+     * All user-owned master rows (events + tasks) for ICS export. Excludes read-only generated
+     * calendars (birthdays, holidays) and Google-synced rows which are re-created by their sources.
+     */
+    @Query(
+        """
+        SELECT * FROM calendar_events
+        WHERE source NOT IN ('BIRTHDAY', 'HOLIDAY', 'GOOGLE')
+        ORDER BY isTask ASC, startTimeMs ASC
+        """,
+    )
+    suspend fun getAllUserEventsForExport(): List<CalendarEvent>
+
     @Query("SELECT * FROM event_reminders WHERE eventId = :eventId ORDER BY triggerAtMs ASC")
     suspend fun getRemindersForEvent(eventId: String): List<EventReminder>
 

@@ -88,6 +88,102 @@ class DotCalRepository(
 
     fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts()
 
+    /** Result summary of an ICS import. */
+    data class IcsImportResult(
+        val inserted: Int,
+        val updated: Int,
+        val skipped: Int,
+    )
+
+    /** Serializes all user-owned events + tasks to an RFC 5545 iCalendar document. */
+    suspend fun exportIcs(): String = withContext(Dispatchers.IO) {
+        val events = dao.getAllUserEventsForExport()
+        val remindersByEventId = events.associate { event ->
+            event.id to dao.getRemindersForEvent(event.id)
+        }
+        com.dotfield.dotcal.data.ics.IcsExporter.export(events, remindersByEventId)
+    }
+
+    /** Number of rows that would be exported; used to disable export when there is nothing to save. */
+    suspend fun countExportableEvents(): Int = withContext(Dispatchers.IO) {
+        dao.getAllUserEventsForExport().size
+    }
+
+    /**
+     * Parses [icsText] and upserts events/tasks into the local calendar. Existing rows are matched
+     * by UID (stored as the event id) and updated in place; unknown UIDs are inserted with a fresh
+     * id. VALARM reminders are imported when present; missing alarms preserve existing reminders.
+     * Recurrence exceptions are preserved.
+     */
+    suspend fun importIcs(icsText: String): IcsImportResult = withContext(Dispatchers.IO) {
+        ensureLocalAccount()
+        val items = com.dotfield.dotcal.data.ics.IcsParser.parse(icsText)
+        var inserted = 0
+        var updated = 0
+        var skipped = 0
+        val now = System.currentTimeMillis()
+        items.forEach { item ->
+            if (item.title.isBlank()) { skipped++; return@forEach }
+            // Only trust a UID as an existing local id when the row actually exists locally.
+            val existing = item.uid?.let { dao.getEvent(it) }
+            val targetId = existing?.id ?: item.uid?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
+            val exceptionDates = if (item.exceptionMs.isEmpty()) {
+                existing?.exceptionDates ?: "[]"
+            } else {
+                item.exceptionMs.sorted().joinToString(prefix = "[", postfix = "]")
+            }
+            val row = CalendarEvent(
+                id = targetId,
+                accountId = existing?.accountId ?: LOCAL_ACCOUNT_ID,
+                title = item.title.trim(),
+                description = item.description.trim(),
+                location = item.location.trim(),
+                startTimeMs = item.startTimeMs,
+                endTimeMs = item.endTimeMs,
+                timeZone = item.timeZone,
+                isAllDay = if (item.isAllDay) 1 else 0,
+                colorHex = existing?.colorHex,
+                rrule = item.rrule,
+                exceptionDates = exceptionDates,
+                source = existing?.source ?: "LOCAL",
+                googleEventId = existing?.googleEventId,
+                googleCalendarId = existing?.googleCalendarId,
+                syncVersion = existing?.syncVersion ?: 0,
+                isTask = if (item.isTask) 1 else 0,
+                isCompleted = if (item.isCompleted) 1 else 0,
+                completedAtMs = item.completedAtMs ?: existing?.completedAtMs,
+                imageUris = existing?.imageUris ?: "[]",
+                voiceNotePath = existing?.voiceNotePath,
+                createdAtMs = existing?.createdAtMs ?: now,
+                updatedAtMs = now,
+            )
+            // Guard against invalid spans for timed events (tasks may legitimately be 0/0).
+            if (!item.isTask && row.endTimeMs <= row.startTimeMs) { skipped++; return@forEach }
+            dao.upsertEvent(row)
+            if (item.reminderMinutes.isNotEmpty() && row.startTimeMs > 0L) {
+                replaceImportedReminders(row, item.reminderMinutes)
+            }
+            if (existing != null) updated++ else inserted++
+        }
+        if (inserted > 0 || updated > 0) updateWidgets()
+        IcsImportResult(inserted = inserted, updated = updated, skipped = skipped)
+    }
+
+    private suspend fun replaceImportedReminders(event: CalendarEvent, minutesBefore: List<Int>) {
+        dao.getRemindersForEvent(event.id).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        dao.deleteRemindersForEvent(event.id)
+        val reminders = minutesBefore.distinct().sorted().map { minutes ->
+            EventReminder(
+                eventId = event.id,
+                minutesBefore = minutes,
+                triggerAtMs = event.startTimeMs - minutes * 60_000L,
+                alarmRequestCode = "${event.id}-$minutes".hashCode().absoluteValue,
+            )
+        }
+        dao.insertReminders(reminders)
+        reminders.forEach { reminder -> reminderScheduler.scheduleReminder(reminder, event) }
+    }
+
     fun observeSelectedHolidayCountries(): Flow<List<String>> = dao.observeHolidayAccountIds()
         .map { ids -> ids.mapNotNull { it.removePrefix(HOLIDAY_ACCOUNT_PREFIX).takeIf(String::isNotBlank) } }
 

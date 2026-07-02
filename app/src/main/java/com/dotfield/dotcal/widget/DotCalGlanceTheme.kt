@@ -77,12 +77,31 @@ suspend fun dotCalWidgetPalette(context: Context): DotCalWidgetPalette {
     }
 }
 
+private val DEFAULT_ACCENT = Color(0xFFFF3B30)
+
+/**
+ * Resolves the stored accent value into a color. Accepts legacy preset enum names, the Pro extra
+ * presets, and Pro custom "#RRGGBB" hex strings. Falls back to red on any unknown/invalid value.
+ */
 private fun widgetAccentColor(value: String?): Color {
-    return when (value) {
-        "BLUE" -> Color(0xFF0A84FF)
-        "GREEN" -> Color(0xFF30D158)
-        "PURPLE" -> Color(0xFFBF5AF2)
-        "AMBER" -> Color(0xFFFF9F0A)
-        else -> Color(0xFFFF3B30)
+    if (value == null) return DEFAULT_ACCENT
+    when (value) {
+        "RED" -> return DEFAULT_ACCENT
+        "BLUE" -> return Color(0xFF0A84FF)
+        "GREEN" -> return Color(0xFF30D158)
+        "PURPLE" -> return Color(0xFFBF5AF2)
+        "AMBER" -> return Color(0xFFFF9F0A)
+        "TEAL" -> return Color(0xFF2AB8B0)
+        "PINK" -> return Color(0xFFFF375F)
+        "ORANGE" -> return Color(0xFFFF6B00)
+        "CYAN" -> return Color(0xFF32ADE6)
+        "INDIGO" -> return Color(0xFF5E5CE6)
+        "MINT" -> return Color(0xFF66D4A0)
+        "ROSE" -> return Color(0xFFF06292)
+        "LIME" -> return Color(0xFFB0C948)
     }
+    if (value.startsWith("#")) {
+        runCatching { return Color(android.graphics.Color.parseColor(value)) }
+    }
+    return DEFAULT_ACCENT
 }

@@ -245,6 +245,22 @@ class DotCalViewModel(
         }
     }
 
+    // ----- ICS import / export (Pro) -----
+
+    /** Produces the iCalendar text off the main thread, then hands it to [onReady] for file IO. */
+    fun exportIcs(onReady: (Result<String>) -> Unit) {
+        viewModelScope.launch {
+            onReady(runCatching { repository.exportIcs() })
+        }
+    }
+
+    /** Parses and upserts the supplied iCalendar text, reporting a summary via [onResult]. */
+    fun importIcs(icsText: String, onResult: (Result<DotCalRepository.IcsImportResult>) -> Unit) {
+        viewModelScope.launch {
+            onResult(runCatching { repository.importIcs(icsText) })
+        }
+    }
+
     private fun CalendarEvent.startDate(): LocalDate {
         return java.time.Instant.ofEpochMilli(startTimeMs)
             .atZone(java.time.ZoneId.of(timeZone))
