@@ -129,10 +129,12 @@ Latest local work:
 - Paywall adaptive-icon crash fixed.
 - Large widget locked Unlock button rounded.
 - `Docs/HANDOFF.md` flattened/shortened.
+- Date Calculator UI polish (`DateCalculatorScreen` in `ui/DotCalApp.kt`, no VM/logic change): both tabs now use uppercase section labels + bordered field groups. Days Between result now big accent hero number. Add/Subtract: cryptic square `+/−` toggle replaced by an Add/Subtract segmented control; day count is a `[−] [n] [+]` stepper (still typeable); result shows direction caption + big date. New private composables: `CalcSectionLabel`, `CalcFieldGroup`, `CalcResultHero`, `CalcDaysStepper`, `CalcStepperButton`. Added imports: `BasicTextField`, `SolidColor`.
 
 Latest verification:
 - 2026-07-02: Paywall purchase success auto-dismiss fix: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (2m 40s).
 - 2026-07-02: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after version bump (2m 35s).
+- 2026-07-02: Date Calculator UI polish: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (2m 14s).
 - No phone/manual UI QA run.
 
 Current dirty files may include earlier Pro/UI polish and release assets. Do not revert unrelated user/local changes.

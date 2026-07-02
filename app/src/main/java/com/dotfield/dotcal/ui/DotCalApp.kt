@@ -167,6 +167,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -8598,53 +8600,71 @@ private fun DateCalculatorScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             if (mode == DateCalculatorViewModel.Mode.DAYS_BETWEEN) {
-                CalcDateRow("From", fromDate, palette) { picker = CalcDateField.From }
-                HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
-                CalcDateRow("To", toDate, palette) { picker = CalcDateField.To }
-                Spacer(modifier = Modifier.height(20.dp))
+                CalcSectionLabel("Date range", palette)
+                Spacer(modifier = Modifier.height(10.dp))
+                CalcFieldGroup(palette) {
+                    CalcDateRow("From", fromDate, palette) { picker = CalcDateField.From }
+                    HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
+                    CalcDateRow("To", toDate, palette) { picker = CalcDateField.To }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
                 (result as? DateCalculatorViewModel.CalculatorResult.DaysBetween)?.let { r ->
+                    CalcSectionLabel("Result", palette)
+                    Spacer(modifier = Modifier.height(10.dp))
                     CalcResultCard(palette) {
-                        CalcResultLine("Total days", "${r.totalDays} days", palette)
-                        CalcResultLine("Working days (Mon-Fri)", "${r.workingDays} days", palette)
-                        CalcResultLine("Weekends", "${r.weekends} days", palette)
+                        CalcResultHero("${r.totalDays}", if (r.totalDays == 1) "day total" else "days total", palette)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider(color = palette.eventCardBorder, thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        CalcResultLine("Working days (Mon-Fri)", "${r.workingDays}", palette)
+                        CalcResultLine("Weekends", "${r.weekends}", palette)
                     }
                 }
             } else {
-                CalcDateRow("Start date", startDate, palette) { picker = CalcDateField.Start }
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = if (daysCount == 0) "" else daysCount.toString(),
-                        onValueChange = { text ->
-                            calcViewModel.setDaysCount(text.filter { it.isDigit() }.take(6).toIntOrNull() ?: 0)
-                        },
-                        label = { Text("Days", fontFamily = mono, color = palette.secondaryText) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = palette.primaryText,
-                            unfocusedTextColor = palette.primaryText,
-                            focusedBorderColor = palette.accent,
-                            unfocusedBorderColor = palette.textFieldBorder,
-                            cursorColor = palette.accent,
-                        ),
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(54.dp)
-                            .background(palette.accent)
-                            .noRippleClickable { calcViewModel.setSubtract(!isSubtract) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(if (isSubtract) "−" else "+", color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-                    }
+                CalcSectionLabel("Start date", palette)
+                Spacer(modifier = Modifier.height(10.dp))
+                CalcFieldGroup(palette) {
+                    CalcDateRow("Start date", startDate, palette) { picker = CalcDateField.Start }
                 }
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(24.dp))
+
+                CalcSectionLabel("Operation", palette)
+                Spacer(modifier = Modifier.height(10.dp))
+                TwoOptionSegmentedControl(
+                    options = listOf("Add", "Subtract"),
+                    selectedIndex = if (isSubtract) 1 else 0,
+                    palette = palette,
+                    onSelected = { calcViewModel.setSubtract(it == 1) },
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+
+                CalcSectionLabel("Number of days", palette)
+                Spacer(modifier = Modifier.height(10.dp))
+                CalcDaysStepper(
+                    days = daysCount,
+                    palette = palette,
+                    onChange = { calcViewModel.setDaysCount(it) },
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+
                 (result as? DateCalculatorViewModel.CalculatorResult.AddSubtractResult)?.let { r ->
+                    CalcSectionLabel("Result", palette)
+                    Spacer(modifier = Modifier.height(10.dp))
                     CalcResultCard(palette) {
-                        CalcResultLine("Result date", r.formattedDate, palette)
+                        Text(
+                            "$daysCount ${if (daysCount == 1) "day" else "days"} ${if (isSubtract) "before" else "after"} start date",
+                            color = palette.secondaryText,
+                            fontFamily = mono,
+                            fontSize = 13.sp,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            r.formattedDate,
+                            color = palette.primaryText,
+                            fontFamily = mono,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp,
+                        )
                     }
                 }
             }
@@ -8726,6 +8746,120 @@ private fun CalcResultLine(label: String, value: String, palette: DotCalPalette)
     ) {
         Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
         Text(value, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    }
+}
+
+@Composable
+private fun CalcSectionLabel(text: String, palette: DotCalPalette) {
+    Text(
+        text.uppercase(java.util.Locale.getDefault()),
+        color = palette.secondaryText,
+        fontFamily = mono,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp,
+        letterSpacing = 1.5.sp,
+    )
+}
+
+@Composable
+private fun CalcFieldGroup(palette: DotCalPalette, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.eventCardSurface)
+            .drawBehind {
+                drawRoundRect(
+                    color = palette.eventCardBorder,
+                    size = size,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(14.dp.toPx(), 14.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            }
+            .padding(horizontal = 18.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun CalcResultHero(number: String, caption: String, palette: DotCalPalette) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text(number, color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 40.sp)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            caption,
+            color = palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(bottom = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun CalcDaysStepper(days: Int, palette: DotCalPalette, onChange: (Int) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CalcStepperButton("−", palette) { onChange((days - 1).coerceAtLeast(0)) }
+        Spacer(modifier = Modifier.width(12.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(12.dp))
+                .drawBehind {
+                    drawRoundRect(
+                        color = palette.textFieldBorder,
+                        size = size,
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                        style = Stroke(width = 1.dp.toPx()),
+                    )
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            BasicTextField(
+                value = if (days == 0) "" else days.toString(),
+                onValueChange = { text ->
+                    onChange(text.filter { it.isDigit() }.take(6).toIntOrNull() ?: 0)
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                textStyle = TextStyle(
+                    color = palette.primaryText,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    textAlign = TextAlign.Center,
+                ),
+                cursorBrush = SolidColor(palette.accent),
+                decorationBox = { inner ->
+                    Box(contentAlignment = Alignment.Center) {
+                        if (days == 0) {
+                            Text("0", color = palette.disabledText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        }
+                        inner()
+                    }
+                },
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        CalcStepperButton("+", palette) { onChange(days + 1) }
+    }
+}
+
+@Composable
+private fun CalcStepperButton(symbol: String, palette: DotCalPalette, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.accent)
+            .noRippleClickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(symbol, color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 26.sp)
     }
 }
 
