@@ -281,7 +281,7 @@ private fun LargeWidgetLocked(context: Context, palette: DotCalWidgetPalette) {
             Box(
                 modifier = GlanceModifier
                     .background(palette.accent)
-                    .cornerRadius(0.dp)
+                    .cornerRadius(20.dp)
                     .padding(horizontal = 22.dp, vertical = 10.dp)
                     .clickable(actionStartActivity(openPaywallIntent(context))),
                 contentAlignment = Alignment.Center,

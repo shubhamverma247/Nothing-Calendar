@@ -3578,6 +3578,7 @@ private fun dotCalTextFieldColors(palette: DotCalPalette) = OutlinedTextFieldDef
 private fun ImageAttachmentSection(
     imageUris: List<String>,
     palette: DotCalPalette,
+    isPro: Boolean,
     onAddImage: () -> Unit,
     onRemoveImage: (String) -> Unit,
 ) {
@@ -3585,9 +3586,15 @@ private fun ImageAttachmentSection(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
-            Text("Images", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Column {
+                Text("Images", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                if (!isPro) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("Pro feature", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
+                }
+            }
             if (imageUris.isNotEmpty()) {
                 Text("${imageUris.size}/5", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
             }
@@ -3779,6 +3786,10 @@ private fun VoiceNoteEditorSection(
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Voice note", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        if (!isPro) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text("Pro feature", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
+        }
         Spacer(modifier = Modifier.height(10.dp))
         when {
             recorder != null -> RecordingVoiceNoteRow(
@@ -4165,6 +4176,7 @@ private fun EventEditorScreen(
             ImageAttachmentSection(
                 imageUris = imageUris,
                 palette = palette,
+                isPro = isPro,
                 onAddImage = {
                     clearEditorFocus()
                     if (!isPro) {
@@ -6397,23 +6409,6 @@ private fun SettingsRoot(
                 Spacer(modifier = Modifier.height(10.dp))
             }
             item {
-            SettingsSectionTitle("DotCal Pro", palette)
-            SettingsProRow(
-                isPro = isPro,
-                palette = palette,
-                onClick = onDotCalPro,
-            )
-            if (!isPro) {
-                SettingsMenuRow(
-                    title = "Restore Purchase",
-                    value = "",
-                    palette = palette,
-                    showChevron = false,
-                    onClick = onRestorePurchase,
-                )
-            }
-            SettingsDivider(palette)
-
             SettingsSectionTitle("Accounts", palette)
             SettingsMenuRow(
                 title = "Calendar Accounts",
@@ -6491,6 +6486,14 @@ private fun SettingsRoot(
                 )
             })
             SettingsMenuRow(title = "Version", value = BuildConfig.VERSION_NAME, palette = palette, showChevron = false, onClick = {})
+            SettingsDivider(palette)
+
+            SettingsSectionTitle("DotCal Pro", palette)
+            SettingsProRow(
+                isPro = isPro,
+                palette = palette,
+                onClick = onDotCalPro,
+            )
             Spacer(modifier = Modifier.height(32.dp))
             }
         }
@@ -7401,6 +7404,17 @@ private fun ProBadge(palette: DotCalPalette) {
 }
 
 @Composable
+private fun ProFeatureTag(palette: DotCalPalette) {
+    Text(
+        "Pro feature",
+        color = palette.accent,
+        fontFamily = mono,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp,
+    )
+}
+
+@Composable
 private fun SettingsProRow(isPro: Boolean, palette: DotCalPalette, onClick: () -> Unit) {
     Row(
         modifier = Modifier
@@ -7432,14 +7446,12 @@ private fun SettingsProBadgeRow(title: String, palette: DotCalPalette, onClick: 
             .height(64.dp)
             .noRippleClickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ProBadge(palette)
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
-        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("Pro feature", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
+        Spacer(modifier = Modifier.weight(1f))
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -8357,10 +8369,7 @@ private fun PaywallScreen(
         when (val result = purchaseResult) {
             is ProManager.PurchaseResult.Success -> {
                 purchasing = false
-                viewModel.clearPurchaseResult()
                 showSuccess = true
-                delay(1500)
-                onDismiss()
             }
             is ProManager.PurchaseResult.Cancelled -> {
                 purchasing = false
@@ -8372,6 +8381,13 @@ private fun PaywallScreen(
                 viewModel.clearPurchaseResult()
             }
             null -> Unit
+        }
+    }
+    LaunchedEffect(showSuccess) {
+        if (showSuccess) {
+            delay(1500)
+            onDismiss()
+            viewModel.clearPurchaseResult()
         }
     }
 
@@ -8411,12 +8427,15 @@ private fun PaywallScreen(
             }
         }
 
-        // ② Flat calendar illustration.
-        PaywallCalendarIllustration(
-            palette = palette,
+        // ② App icon.
+        Image(
+            painter = androidx.compose.ui.res.painterResource(id = R.mipmap.ic_launcher_foreground),
+            contentDescription = null,
             modifier = Modifier
                 .padding(top = 8.dp, bottom = 24.dp)
-                .align(Alignment.CenterHorizontally),
+                .align(Alignment.CenterHorizontally)
+                .size(96.dp)
+                .clip(RoundedCornerShape(24.dp)),
         )
 
         // ③ Title.
@@ -8458,13 +8477,14 @@ private fun PaywallScreen(
         }
         Spacer(modifier = Modifier.height(28.dp))
 
-        // ⑥ Buy button — accent bg, 0dp corner, full width.
+        // ⑥ Buy button — accent bg, rounded, full width.
         val buyEnabled = connected && !purchasing
         Box(
             modifier = Modifier
                 .padding(horizontal = 28.dp)
                 .fillMaxWidth()
                 .height(54.dp)
+                .clip(RoundedCornerShape(20.dp))
                 .background(if (buyEnabled) palette.accent else palette.disabledText)
                 .noRippleClickable(enabled = buyEnabled) {
                     val activity = context.findActivity()
@@ -8507,43 +8527,6 @@ private fun PaywallScreen(
     }
 }
 
-@Composable
-private fun PaywallCalendarIllustration(palette: DotCalPalette, modifier: Modifier = Modifier) {
-    // Flat calendar in the app-icon style: red header bar, dot grid, square corners.
-    Canvas(modifier = modifier.size(120.dp)) {
-        val bodyTop = size.height * 0.18f
-        drawRect(
-            color = palette.accent,
-            topLeft = Offset(0f, 0f),
-            size = androidx.compose.ui.geometry.Size(size.width, bodyTop),
-        )
-        drawRect(
-            color = palette.eventCardSurface,
-            topLeft = Offset(0f, bodyTop),
-            size = androidx.compose.ui.geometry.Size(size.width, size.height - bodyTop),
-        )
-        drawRect(
-            color = palette.line,
-            topLeft = Offset(0f, 0f),
-            size = androidx.compose.ui.geometry.Size(size.width, size.height),
-            style = Stroke(width = 2.dp.toPx()),
-        )
-        val cols = 5
-        val rows = 4
-        val gridTop = bodyTop + (size.height - bodyTop) * 0.18f
-        val gridBottom = size.height * 0.88f
-        val gridLeft = size.width * 0.14f
-        val gridRight = size.width * 0.86f
-        val dotRadius = 2.6.dp.toPx()
-        for (r in 0 until rows) {
-            for (c in 0 until cols) {
-                val x = gridLeft + (gridRight - gridLeft) * (c / (cols - 1f))
-                val y = gridTop + (gridBottom - gridTop) * (r / (rows - 1f))
-                drawCircle(color = palette.primaryText.copy(alpha = 0.75f), radius = dotRadius, center = Offset(x, y))
-            }
-        }
-    }
-}
 
 @Composable
 private fun PaywallFeatureRow(feature: ProFeature, palette: DotCalPalette) {
