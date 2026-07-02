@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-06-25
+Updated: 2026-07-02
 
 ## Purpose
 
@@ -156,7 +156,10 @@ Tasks:
 
 ## Latest Committed Work
 
-Latest commit: Task tab metadata icons styled (red, reduced gap, centered).
+Latest commit: Version bump 1.1.0 (code 5) for Play Store release.
+Previous commit: Pro/Billing infrastructure complete (Steps 1-10).
+
+- 2026-07-02 version bump: `versionCode = 4 → 5`, `versionName = 1.0.0 → 1.1.0` in `app/build.gradle.kts` for Play Store internal testing track. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed. No schema/package/deep-link/DB changes.
 
 - 2026-06-30 (second pass): Task tab metadata icons improved. `TaskMetadata` icon color changed from `secondaryText` to `palette.accent` (red), icon-text gap reduced `3.dp → 2.dp`, icon size bumped `13.dp → 14.dp` for visual centering. versionCode bumped `3 → 4` in `app/build.gradle.kts`. Visual-only changes in `app/src/main/java/com/dotfield/dotcal/ui/DotCalApp.kt` (lines 5375-5395) and build config; no package id, deep link scheme, Room schema/table/column, or DB filename changes. `gradlew --no-daemon --console=plain :app:assembleDebug` passed (2m 15s). APK install skipped because `adb` is not available in this shell; no phone/manual UI QA run.
 - 2026-06-29 version code bump: `versionCode = 2 → 3` in `app/build.gradle.kts` for Play Store internal testing builds. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed. APK ready for internal testing track.
@@ -392,9 +395,14 @@ Latest committed behavior:
 
 ## Current Next Step
 
-Pro / Billing phase (Steps 1-10) COMPLETE in code and building. Next work is Play Console account setup by the developer:
+**Pro / Billing phase (Steps 1-10) COMPLETE in code. Version bumped to 1.1.0 (versionCode=5) for Play Store release.**
 
-- Play Console: fix Payments profile issue, create `dotcal_pro` product, add License Testing emails, set up Merchant Account. Then test full purchase flow end-to-end using License Tester credentials.
+Next work is Play Console account setup by the developer (NOT code):
+- Fix Payments profile issue
+- Create one-time product ID: `dotcal_pro`
+- Add License Testing emails
+- Set up Merchant Account
+- Test full purchase flow end-to-end using License Tester credentials
 
 Phase 1 Step 2 (Print to PDF) was SKIPPED by explicit user decision — not pending, not planned. Do not resurrect it unless the user asks.
 
