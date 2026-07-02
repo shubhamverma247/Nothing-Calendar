@@ -527,6 +527,46 @@ fun DotCalApp(
     }
     var onboardingPageIndex by remember { mutableStateOf(0) }
     var selectedDateRestored by remember { mutableStateOf(false) }
+
+    // ----- ICS export / import (Pro) -----
+    val exportIcsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/calendar"),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        viewModel.exportIcs { result ->
+            result.onSuccess { text ->
+                val ok = runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+                }.isSuccess
+                Toast.makeText(context, if (ok) "Calendar exported" else "Export failed", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, "Export failed", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    val importIcsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        }.getOrNull()
+        if (text.isNullOrBlank()) {
+            Toast.makeText(context, "Couldn't read file", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+        viewModel.importIcs(text) { result ->
+            result.onSuccess { summary ->
+                Toast.makeText(
+                    context,
+                    "Imported: ${summary.inserted} new, ${summary.updated} updated",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }.onFailure {
+                Toast.makeText(context, "Import failed — not a valid .ics file", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     var calendarTab by remember { mutableStateOf<CalendarTab?>(null) }
     LaunchedEffect(storedCalendarTab) {
         if (calendarTab == null) calendarTab = storedCalendarTab
@@ -1147,6 +1187,21 @@ fun DotCalApp(
                 },
                 onDateCalculator = {
                     if (isPro) showDateCalculator = true else showPaywall = true
+                },
+                onExportIcs = {
+                    if (!isPro) {
+                        showPaywall = true
+                    } else {
+                        val stamp = java.time.LocalDate.now().toString()
+                        exportIcsLauncher.launch("dotcal-$stamp.ics")
+                    }
+                },
+                onImportIcs = {
+                    if (!isPro) {
+                        showPaywall = true
+                    } else {
+                        importIcsLauncher.launch(arrayOf("text/calendar", "application/octet-stream", "*/*"))
+                    }
                 },
             )
         }
@@ -6246,6 +6301,8 @@ private fun SettingsPreview(
     onDotCalPro: () -> Unit,
     onRestorePurchase: () -> Unit,
     onDateCalculator: () -> Unit,
+    onExportIcs: () -> Unit,
+    onImportIcs: () -> Unit,
 ) {
     BackHandler {
         when (screen) {
@@ -6292,6 +6349,8 @@ private fun SettingsPreview(
             onDotCalPro = onDotCalPro,
             onRestorePurchase = onRestorePurchase,
             onDateCalculator = onDateCalculator,
+            onExportIcs = onExportIcs,
+            onImportIcs = onImportIcs,
         )
         AnimatedVisibility(
             visible = screen == SettingsScreen.Theme,
@@ -6407,6 +6466,8 @@ private fun SettingsRoot(
     onDotCalPro: () -> Unit,
     onRestorePurchase: () -> Unit,
     onDateCalculator: () -> Unit,
+    onExportIcs: () -> Unit,
+    onImportIcs: () -> Unit,
 ) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
@@ -6480,6 +6541,23 @@ private fun SettingsRoot(
                 isSyncing = isSyncing,
                 palette = palette,
                 onClick = onSyncNow,
+            )
+            SettingsDivider(palette)
+
+            SettingsSectionTitle("Data", palette)
+            SettingsImportExportRow(
+                title = "Export Calendar",
+                subtitle = "Save all events & tasks to an .ics file",
+                isPro = isPro,
+                palette = palette,
+                onClick = onExportIcs,
+            )
+            SettingsImportExportRow(
+                title = "Import Calendar",
+                subtitle = "Load events & tasks from an .ics file",
+                isPro = isPro,
+                palette = palette,
+                onClick = onImportIcs,
             )
             SettingsDivider(palette)
 
@@ -7492,6 +7570,40 @@ private fun SettingsProRow(isPro: Boolean, palette: DotCalPalette, onClick: () -
             )
         }
         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun SettingsImportExportRow(
+    title: String,
+    subtitle: String,
+    isPro: Boolean,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+                if (!isPro) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Pro feature", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
+                }
+            }
+            Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+        }
+        Icon(
+            if (isPro) Icons.Default.ChevronRight else Icons.Default.Lock,
+            contentDescription = null,
+            tint = palette.secondaryText,
+            modifier = Modifier.size(if (isPro) 20.dp else 16.dp),
+        )
     }
 }
 
@@ -8743,6 +8855,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Large Widget", "Full month grid widget for your home screen"),
     ProFeature("Date Calculator", "Calculate days between dates instantly"),
     ProFeature("Custom Accent Colors", "Extra palettes plus any custom hex color"),
+    ProFeature("Import / Export", "Back up and restore events & tasks as .ics"),
 )
 
 @Composable

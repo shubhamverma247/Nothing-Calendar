@@ -111,6 +111,7 @@ Pro gates:
 - Large Widget.
 - Date Calculator.
 - Custom Accent Colors (extra preset palette + custom hex picker; 5 base accents stay free).
+- Calendar Import / Export (local `.ics` via SAF; no cloud/network).
 
 Paywall:
 - Route: `dotcal://paywall`.
@@ -125,6 +126,12 @@ Known Pro fixes:
 ## Latest Work
 
 Branch `profeature` (WIP, not on main):
+- ICS import/export Pro feature (local files only, no network — honors sync rule). New package `data/ics`: `IcsExporter.kt` (VEVENT + VTODO, RFC5545, line-folding, UID = event id, RRULE/EXDATE round-trip) and `IcsParser.kt` (unfold, VEVENT/VTODO subset, DTSTART/DTEND/DUE, TZID + all-day, EXDATE, STATUS; RRULE normalized to app's FREQ subset; unknown props ignored, no-crash). Pure Kotlin, no new dependency.
+- `CalendarDao.getAllUserEventsForExport()` selects master rows excluding BIRTHDAY/HOLIDAY/GOOGLE. `DotCalRepository.exportIcs()/importIcs()/countExportableEvents()` + `IcsImportResult`. Import upserts by UID (match existing local id -> update, else insert), preserves images/voice/color/reminders on existing rows, validates timed span, reuses `LOCAL` source. No schema/column change.
+- `DotCalViewModel.exportIcs{}` / `importIcs{}`. UI: SAF `CreateDocument("text/calendar")` + `OpenDocument()` launchers in `DotCalApp.kt`; new Settings "Data" section rows `Export Calendar` / `Import Calendar` via `SettingsImportExportRow` (Pro-gated -> Paywall for non-Pro, lock icon). Toast summaries.
+- Paywall `PRO_FEATURES` gained "Import / Export".
+- Verified: `:app:assembleDebug` passed (2m 27s), real `compileDebugKotlin`. No phone/manual QA.
+
 - Custom accent + theme pack Pro feature. `AccentColor` in `ui/DotCalApp.kt` refactored from plain enum to a `sealed interface`: `Preset` enum (5 free + 8 Pro presets) and `Custom(hex)`. Storage in `KEY_ACCENT_COLOR` is backward compatible: preset enum name OR `#RRGGBB`. `fromStorage`/`normalizeHex` handle both; `storageValue` used everywhere `.name` was. `onColor` now auto-picks legible text via `luminanceApprox`.
 - Theme settings screen: free swatches (unchanged), new "More Colors" Pro preset row (locked -> Paywall for non-Pro), new "Custom Color" row opening `CustomAccentPickerDialog` (hue/sat/brightness sliders via `detectTapGestures` + `detectHorizontalDragGestures`, live preview, hex text field). Non-Pro taps route to Paywall through existing `onDotCalPro`.
 - Widget parser `widgetAccentColor` in `widget/DotCalGlanceTheme.kt` extended for new presets + `#hex`, red fallback.
