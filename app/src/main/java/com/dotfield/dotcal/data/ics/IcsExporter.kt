@@ -1,6 +1,7 @@
 package com.dotfield.dotcal.data.ics
 
 import com.dotfield.dotcal.data.CalendarEvent
+import com.dotfield.dotcal.data.EventReminder
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -29,20 +30,21 @@ object IcsExporter {
     private const val PRODID = "-//Dotfield Studio//DotCal//EN"
 
     /** Builds the full VCALENDAR text for [events]. Master rows only. */
-    fun export(events: List<CalendarEvent>): String {
+    fun export(events: List<CalendarEvent>, remindersByEventId: Map<String, List<EventReminder>> = emptyMap()): String {
         val sb = StringBuilder()
         sb.appendCrlf("BEGIN:VCALENDAR")
         sb.appendCrlf("VERSION:2.0")
         sb.appendCrlf("PRODID:$PRODID")
         sb.appendCrlf("CALSCALE:GREGORIAN")
         events.forEach { event ->
-            if (event.isTask == 1) appendTodo(sb, event) else appendEvent(sb, event)
+            val reminders = remindersByEventId[event.id].orEmpty()
+            if (event.isTask == 1) appendTodo(sb, event, reminders) else appendEvent(sb, event, reminders)
         }
         sb.appendCrlf("END:VCALENDAR")
         return sb.toString()
     }
 
-    private fun appendEvent(sb: StringBuilder, event: CalendarEvent) {
+    private fun appendEvent(sb: StringBuilder, event: CalendarEvent, reminders: List<EventReminder>) {
         val zone = safeZone(event.timeZone)
         val nowStamp = UTC_STAMP.format(Instant.now())
         sb.appendCrlf("BEGIN:VEVENT")
@@ -54,10 +56,11 @@ object IcsExporter {
         if (event.location.isNotBlank()) appendProp(sb, "LOCATION", event.location)
         event.rrule?.trim()?.takeIf { it.isNotEmpty() }?.let { sb.appendCrlf("RRULE:$it") }
         appendExdates(sb, event, zone)
+        appendReminders(sb, reminders)
         sb.appendCrlf("END:VEVENT")
     }
 
-    private fun appendTodo(sb: StringBuilder, event: CalendarEvent) {
+    private fun appendTodo(sb: StringBuilder, event: CalendarEvent, reminders: List<EventReminder>) {
         val zone = safeZone(event.timeZone)
         val nowStamp = UTC_STAMP.format(Instant.now())
         sb.appendCrlf("BEGIN:VTODO")
@@ -78,6 +81,7 @@ object IcsExporter {
             event.completedAtMs?.let { sb.appendCrlf("COMPLETED:${UTC_STAMP.format(Instant.ofEpochMilli(it))}") }
         }
         event.rrule?.trim()?.takeIf { it.isNotEmpty() }?.let { sb.appendCrlf("RRULE:$it") }
+        appendReminders(sb, reminders)
         sb.appendCrlf("END:VTODO")
     }
 
@@ -120,6 +124,19 @@ object IcsExporter {
     private fun appendProp(sb: StringBuilder, name: String, value: String) {
         sb.appendCrlf(foldLine("$name:${escapeText(value)}"))
     }
+
+    private fun appendReminders(sb: StringBuilder, reminders: List<EventReminder>) {
+        reminders.distinctBy { it.minutesBefore }.sortedBy { it.minutesBefore }.forEach { reminder ->
+            sb.appendCrlf("BEGIN:VALARM")
+            sb.appendCrlf("ACTION:DISPLAY")
+            sb.appendCrlf("TRIGGER:${relativeTrigger(reminder.minutesBefore)}")
+            appendProp(sb, "DESCRIPTION", "Reminder")
+            sb.appendCrlf("END:VALARM")
+        }
+    }
+
+    private fun relativeTrigger(minutesBefore: Int): String =
+        if (minutesBefore <= 0) "PT0M" else "-PT${minutesBefore}M"
 
     /** Escapes text per RFC 5545 (backslash, comma, semicolon, newlines). */
     private fun escapeText(value: String): String = value

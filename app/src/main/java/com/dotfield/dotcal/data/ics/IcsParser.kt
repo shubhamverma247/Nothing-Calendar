@@ -25,11 +25,12 @@ data class ParsedIcsItem(
     val exceptionMs: List<Long>,
     val isCompleted: Boolean,
     val completedAtMs: Long?,
+    val reminderMinutes: List<Int>,
 )
 
 /**
  * Minimal RFC 5545 reader for the subset DotCal produces/consumes: VEVENT + VTODO with
- * DTSTART/DTEND/DUE, SUMMARY/DESCRIPTION/LOCATION, RRULE, EXDATE, STATUS.
+ * DTSTART/DTEND/DUE, SUMMARY/DESCRIPTION/LOCATION, RRULE, EXDATE, STATUS, VALARM.
  *
  * Unsupported properties are ignored rather than failing, so importing a foreign `.ics` degrades
  * gracefully instead of crashing. Unfoldable/garbage components are skipped.
@@ -45,22 +46,45 @@ object IcsParser {
         val items = mutableListOf<ParsedIcsItem>()
         var inComponent: String? = null
         var props = mutableListOf<Pair<String, String>>()
+        var inAlarm = false
+        var alarmProps = mutableListOf<Pair<String, String>>()
+        var alarms = mutableListOf<List<Pair<String, String>>>()
         for (line in lines) {
             val upper = line.trimEnd()
             when {
-                upper == "BEGIN:VEVENT" -> { inComponent = "VEVENT"; props = mutableListOf() }
-                upper == "BEGIN:VTODO" -> { inComponent = "VTODO"; props = mutableListOf() }
+                upper == "BEGIN:VEVENT" -> {
+                    inComponent = "VEVENT"
+                    props = mutableListOf()
+                    alarms = mutableListOf()
+                    inAlarm = false
+                }
+                upper == "BEGIN:VTODO" -> {
+                    inComponent = "VTODO"
+                    props = mutableListOf()
+                    alarms = mutableListOf()
+                    inAlarm = false
+                }
+                upper == "BEGIN:VALARM" && inComponent != null -> {
+                    inAlarm = true
+                    alarmProps = mutableListOf()
+                }
+                upper == "END:VALARM" && inComponent != null && inAlarm -> {
+                    alarms += alarmProps
+                    inAlarm = false
+                }
                 upper == "END:VEVENT" || upper == "END:VTODO" -> {
                     val component = inComponent
                     if (component != null) {
-                        buildItem(component, props)?.let { items += it }
+                        buildItem(component, props, alarms)?.let { items += it }
                     }
                     inComponent = null
+                    inAlarm = false
                 }
                 inComponent != null -> {
                     val colon = line.indexOf(':')
                     if (colon > 0) {
-                        props += line.substring(0, colon) to line.substring(colon + 1)
+                        val prop = line.substring(0, colon) to line.substring(colon + 1)
+                        if (inAlarm) alarmProps += prop else props += prop
                     }
                 }
             }
@@ -68,7 +92,11 @@ object IcsParser {
         return items
     }
 
-    private fun buildItem(component: String, props: List<Pair<String, String>>): ParsedIcsItem? {
+    private fun buildItem(
+        component: String,
+        props: List<Pair<String, String>>,
+        alarms: List<List<Pair<String, String>>>,
+    ): ParsedIcsItem? {
         var uid: String? = null
         var summary = ""
         var description = ""
@@ -153,7 +181,34 @@ object IcsParser {
             exceptionMs = exceptions,
             isCompleted = status == "COMPLETED",
             completedAtMs = if (status == "COMPLETED") (completedAtMs ?: System.currentTimeMillis()) else null,
+            reminderMinutes = alarms.mapNotNull(::parseAlarmMinutes).distinct().sorted(),
         )
+    }
+
+    private fun parseAlarmMinutes(props: List<Pair<String, String>>): Int? {
+        val action = props.firstOrNull { it.first.substringBefore(';').equals("ACTION", ignoreCase = true) }?.second?.trim()
+        if (action != null && !action.equals("DISPLAY", ignoreCase = true)) return null
+        val trigger = props.firstOrNull { it.first.substringBefore(';').equals("TRIGGER", ignoreCase = true) }?.second?.trim()
+            ?: return null
+        return parseRelativeTriggerMinutes(trigger)
+    }
+
+    private fun parseRelativeTriggerMinutes(value: String): Int? {
+        val upper = value.uppercase()
+        val negative = upper.startsWith("-")
+        val duration = upper.removePrefix("-").removePrefix("+")
+        if (!duration.startsWith("P")) return null
+        val weeks = Regex("""(\d+)W""").find(duration)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+        val days = Regex("""(\d+)D""").find(duration)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+        val hours = Regex("""(\d+)H""").find(duration)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+        val minutes = Regex("""(\d+)M""").find(duration.substringAfter('T', ""))?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+        val totalMinutes = weeks * 7 * 24 * 60 + days * 24 * 60 + hours * 60 + minutes
+        if (totalMinutes > Int.MAX_VALUE) return null
+        return when {
+            negative -> totalMinutes.toInt()
+            totalMinutes == 0L -> 0
+            else -> null
+        }
     }
 
     /**

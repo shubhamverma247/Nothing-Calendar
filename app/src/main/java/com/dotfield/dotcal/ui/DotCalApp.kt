@@ -6531,6 +6531,7 @@ private fun SettingsRoot(
             )
             SettingsProBadgeRow(
                 title = "Date Calculator",
+                isPro = isPro,
                 palette = palette,
                 onClick = onDateCalculator,
             )
@@ -7593,7 +7594,7 @@ private fun SettingsImportExportRow(
                 Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
                 if (!isPro) {
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Pro feature", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
+                    ProFeatureTag(palette)
                 }
             }
             Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
@@ -7608,7 +7609,7 @@ private fun SettingsImportExportRow(
 }
 
 @Composable
-private fun SettingsProBadgeRow(title: String, palette: DotCalPalette, onClick: () -> Unit) {
+private fun SettingsProBadgeRow(title: String, isPro: Boolean, palette: DotCalPalette, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -7617,8 +7618,10 @@ private fun SettingsProBadgeRow(title: String, palette: DotCalPalette, onClick: 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text("Pro feature", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
+        if (!isPro) {
+            Spacer(modifier = Modifier.width(8.dp))
+            ProFeatureTag(palette)
+        }
         Spacer(modifier = Modifier.weight(1f))
         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
     }

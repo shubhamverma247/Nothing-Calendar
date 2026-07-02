@@ -129,6 +129,7 @@ Branch `profeature` (WIP, not on main):
 - ICS import/export Pro feature (local files only, no network — honors sync rule). New package `data/ics`: `IcsExporter.kt` (VEVENT + VTODO, RFC5545, line-folding, UID = event id, RRULE/EXDATE round-trip) and `IcsParser.kt` (unfold, VEVENT/VTODO subset, DTSTART/DTEND/DUE, TZID + all-day, EXDATE, STATUS; RRULE normalized to app's FREQ subset; unknown props ignored, no-crash). Pure Kotlin, no new dependency.
 - `CalendarDao.getAllUserEventsForExport()` selects master rows excluding BIRTHDAY/HOLIDAY/GOOGLE. `DotCalRepository.exportIcs()/importIcs()/countExportableEvents()` + `IcsImportResult`. Import upserts by UID (match existing local id -> update, else insert), preserves images/voice/color/reminders on existing rows, validates timed span, reuses `LOCAL` source. No schema/column change.
 - `DotCalViewModel.exportIcs{}` / `importIcs{}`. UI: SAF `CreateDocument("text/calendar")` + `OpenDocument()` launchers in `DotCalApp.kt`; new Settings "Data" section rows `Export Calendar` / `Import Calendar` via `SettingsImportExportRow` (Pro-gated -> Paywall for non-Pro, lock icon). Toast summaries.
+- ICS reminders now round-trip via `VALARM` (`ACTION:DISPLAY`, relative `TRIGGER:-PT{minutes}M`). Import maps supported display alarms back to `event_reminders`, replaces existing reminders only when alarms are present, and schedules future reminders. Unsupported alarm types and positive after-start triggers are ignored.
 - Paywall `PRO_FEATURES` gained "Import / Export".
 - Verified: `:app:assembleDebug` passed (2m 27s), real `compileDebugKotlin`. No phone/manual QA.
 
@@ -145,6 +146,8 @@ Latest local work:
 - Paywall purchase success auto-dismiss fixed.
 - Paywall adaptive-icon crash fixed.
 - Large widget locked Unlock button rounded.
+- Settings Pro feature tags fixed: Date Calculator and Import/Export now show `Pro feature` only for non-Pro users.
+- ICS `VALARM` export/import added for event and task reminders.
 - `Docs/HANDOFF.md` flattened/shortened.
 - Date Calculator UI polish (`DateCalculatorScreen` in `ui/DotCalApp.kt`, no VM/logic change): both tabs now use uppercase section labels + bordered field groups. Days Between result now big accent hero number. Add/Subtract: cryptic square `+/−` toggle replaced by an Add/Subtract segmented control; day count is a `[−] [n] [+]` stepper (still typeable); result shows direction caption + big date. New private composables: `CalcSectionLabel`, `CalcFieldGroup`, `CalcResultHero`, `CalcDaysStepper`, `CalcStepperButton`. Added imports: `BasicTextField`, `SolidColor`.
 
@@ -152,6 +155,8 @@ Latest verification:
 - 2026-07-02: Paywall purchase success auto-dismiss fix: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (2m 40s).
 - 2026-07-02: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after version bump (2m 35s).
 - 2026-07-02: Date Calculator UI polish: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (2m 14s).
+- 2026-07-03: Settings Pro feature tag visibility fix: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (2m 35s).
+- 2026-07-03: ICS `VALARM` reminder round-trip: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (1m 15s).
 - No phone/manual UI QA run.
 
 Current dirty files may include earlier Pro/UI polish and release assets. Do not revert unrelated user/local changes.
