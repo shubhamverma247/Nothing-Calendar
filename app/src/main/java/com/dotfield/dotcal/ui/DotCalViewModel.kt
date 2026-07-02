@@ -11,6 +11,7 @@ import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
+import com.dotfield.dotcal.data.billing.ProManager
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.sync.CalendarSyncResult
@@ -32,9 +33,15 @@ data class HolidayCountryUiItem(
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
+class DotCalViewModel(
+    private val repository: DotCalRepository,
+    val proManager: ProManager,
+) : ViewModel() {
     private val currentMonth = MutableStateFlow(LocalDate.now().withDayOfMonth(1))
     val selectedDate = MutableStateFlow(LocalDate.now())
+
+    val isPro: StateFlow<Boolean> = proManager.isPro
+    val billingState: StateFlow<ProManager.BillingConnectionState> = proManager.billingState
 
     val month: StateFlow<LocalDate> = currentMonth
     val events: StateFlow<List<CalendarEvent>> = currentMonth
@@ -77,6 +84,27 @@ class DotCalViewModel(private val repository: DotCalRepository) : ViewModel() {
 
     private val _detailEvent = MutableStateFlow<CalendarEvent?>(null)
     val detailEvent: StateFlow<CalendarEvent?> = _detailEvent
+
+    // ----- Pro / Billing -----
+    val productDetails = proManager.productDetails
+    val purchaseResult = proManager.purchaseResultFlow
+
+    fun purchasePro(activity: android.app.Activity) {
+        viewModelScope.launch {
+            val result = proManager.launchPurchaseFlow(activity)
+            // Pre-flight failures surface immediately; the real purchase outcome
+            // (Success/Cancelled) arrives later through purchaseResult.
+            if (result is ProManager.PurchaseResult.Error) {
+                proManager.pushPurchaseResult(result)
+            }
+        }
+    }
+
+    fun restorePro(onResult: (Boolean) -> Unit) {
+        viewModelScope.launch { onResult(proManager.restorePurchases()) }
+    }
+
+    fun clearPurchaseResult() = proManager.clearPurchaseResult()
 
     init {
         viewModelScope.launch { repository.ensureLocalAccount() }

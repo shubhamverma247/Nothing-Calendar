@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return DotCalViewModel(app.repository) as T
+                return DotCalViewModel(app.repository, app.proManager) as T
             }
         }
     }
@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
                     initialCalendarDate = target?.calendarDate,
                     initialAddEvent = target?.addEvent == true,
                     initialAddEventDate = target?.addEventDate,
+                    initialPaywall = target?.paywall == true,
                     initialRouteToken = target?.routeToken,
                 )
             }
@@ -96,6 +97,8 @@ class MainActivity : ComponentActivity() {
             uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" -> DotCalDeepLinkTarget(eventId = uri.pathSegments.getOrNull(1), routeToken = token)
             uri.scheme == "dotcal" && uri.host == "task" -> DotCalDeepLinkTarget(taskId = uri.lastPathSegment, routeToken = token)
             uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "task" -> DotCalDeepLinkTarget(taskId = uri.pathSegments.getOrNull(1), routeToken = token)
+            uri.scheme == "dotcal" && uri.host == "paywall" -> DotCalDeepLinkTarget(paywall = true, routeToken = token)
+            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "paywall" -> DotCalDeepLinkTarget(paywall = true, routeToken = token)
             uri.scheme == "dotcal" && uri.host == "calendar" -> DotCalDeepLinkTarget(calendarTab = uri.lastPathSegment, calendarDate = uri.getQueryParameter("date"), routeToken = token)
             uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "calendar" -> DotCalDeepLinkTarget(calendarTab = uri.pathSegments.getOrNull(1), calendarDate = uri.getQueryParameter("date"), routeToken = token)
             else -> null
@@ -110,5 +113,6 @@ private data class DotCalDeepLinkTarget(
     val calendarDate: String? = null,
     val addEvent: Boolean = false,
     val addEventDate: String? = null,
+    val paywall: Boolean = false,
     val routeToken: Long,
 )

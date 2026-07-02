@@ -392,9 +392,35 @@ Latest committed behavior:
 
 ## Current Next Step
 
-Phase 1 Step 2 pending: Print to PDF.
+Pro / Billing phase (Steps 1-10) COMPLETE in code and building. Next work is Play Console account setup by the developer:
+
+- Play Console: fix Payments profile issue, create `dotcal_pro` product, add License Testing emails, set up Merchant Account. Then test full purchase flow end-to-end using License Tester credentials.
+
+Phase 1 Step 2 (Print to PDF) was SKIPPED by explicit user decision — not pending, not planned. Do not resurrect it unless the user asks.
 
 Keep existing app behavior source of truth. Future work must not change package, scheme, DB filename, schema columns, or 5-table count unless explicitly requested.
+
+## Pro / Billing
+
+Status: Steps 1-10 COMPLETE. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passes. No phone/manual UI QA run (per rules). Schema untouched — still 5 tables, no new columns.
+
+Key architecture deviations from the step spec, and why:
+- **No Hilt.** The spec said "Hilt singleton / DI module". This project has no Hilt — it uses manual DI. `ProManager` is created once in `DotCalApplication.onCreate` (`val proManager: ProManager by lazy { ProManager(this, repository) }`, `proManager.initialize()`), and reaches the UI through the existing manual `DotCalViewModel` factory (constructor param `val proManager: ProManager`). This matches how `DotCalRepository` is already wired. Do NOT add Hilt just for billing.
+- **No separate Compose Navigation graph.** The app has no Nav graph — it is a single `DotCalApp` composable driving full-screen overlays with `AnimatedVisibility` + `BackHandler` (same pattern as Settings/EventDetail). Paywall and Date Calculator are overlays gated by `showPaywall` / `showDateCalculator` booleans, NOT nav routes. "Add route to nav graph" was satisfied by this overlay pattern.
+- **UI lives in `DotCalApp.kt`.** All screen composables are `private` in `DotCalApp.kt` and share private tokens (`DotCalPalette`, `mono`, `noRippleClickable`, `AccentColor`). Paywall + Date Calculator screens are implemented in-file so they reuse those tokens (the "reuse existing components, no new variants" rule). Only the pure calc logic is a standalone file: `presentation/datecalculator/DateCalculatorViewModel.kt`. `presentation/paywall/*` was not created as separate files for this reason.
+- **Fonts.** Uses the existing `mono` family (`FontFamily.SansSerif`) everywhere — no new font added, per user instruction.
+
+Step-by-step:
+1. **Billing permission + dep — COMPLETE.** `com.android.vending.BILLING` in `AndroidManifest.xml`. `billing-ktx 7.1.1` via `gradle/libs.versions.toml` (`billing = "7.1.1"`, `billing-ktx` lib) + `app/build.gradle.kts` (`implementation(libs.billing.ktx)`). Stayed on latest stable 7.x (8.x is a major bump; spec said no 6.x-or-below, 7.x preferred).
+2. **DataStore key — COMPLETE.** `KEY_IS_PRO = booleanPreferencesKey("is_pro")` in `prefs/CalendarPreferences.kt`. Read/update via existing `calendarPreferencesDataStore` in `DotCalRepository` (`observeIsPro` flow, `readIsProOnce()` first(), `setIsPro(Boolean)` edit) — same style as other keys, writes on IO. Reuses the single existing DataStore instance; no second instance.
+3. **ProManager — COMPLETE.** `data/billing/ProManager.kt`. `PRODUCT_ID_PRO = "dotcal_pro"`. `_isPro`/`isPro` StateFlow, `BillingConnectionState` (Connecting/Connected/Disconnected/Error), `PurchaseResult` (Success/Cancelled/Error), `productDetails` StateFlow (drives real price), `purchaseResultFlow`. Reads cached `KEY_IS_PRO` immediately on init for fast offline read, builds BillingClient with PurchasesUpdatedListener, startConnection with exponential-backoff retry (max 3) on SERVICE_DISCONNECTED, queryPurchasesAsync(INAPP) on connect, acknowledges unacked PURCHASED, trusts live query over cache. `launchPurchaseFlow(activity)` and `restorePurchases()` implemented. Never crashes — always falls back to last DataStore value; raw exceptions mapped to friendly messages.
+4. **Paywall — COMPLETE.** In-file `PaywallScreen` overlay (slide-in, back dismisses). VM surface on `DotCalViewModel`: `productDetails`, `purchaseResult`, `purchasePro(activity)`, `restorePro(onResult)`. Layout: X close (no title), inline Canvas flat calendar illustration (no bitmap), "DotCal Pro" title (mono bold), 4 feature rows (Image Attachments / Voice Notes / Large Widget / Date Calculator), price row reads price from `ProductDetails` with `₹199` string-resource fallback marked estimate, "Buy Pro" full-width 0dp-corner accent button (reuses Save Event button style, shows progress, disabled when not Connected / in progress), "Restore Purchase" text button with snackbar. Success → "You're Pro!" then auto-dismiss ~1500ms; Cancelled → stay silent; Error → snackbar.
+5. **Gate image attachments — COMPLETE.** In Add/Edit Event, `+ ADD IMAGE` tap checks `if (!isPro) { showPaywall = true; return }` before the Photo Picker. Existing max-5/thumbnail/URI logic unchanged.
+6. **Gate voice notes — COMPLETE.** `TAP TO RECORD` tap checks `if (!isPro) { showPaywall = true; return }` before RECORD_AUDIO / MediaRecorder. Recording/playback/storage/delete unchanged.
+7. **Gate Large widget — COMPLETE.** `widget/DotCalWidgets.kt`: `provideGlance` reads `KEY_IS_PRO` from `calendarPreferencesDataStore` once; Large renders `LargeWidgetLocked` (lock glyph, "DotCal Pro", "Unlock the Large widget in DotCal Pro", Unlock box) when not Pro, else normal `LargeWidget`. Locked state + Unlock both `actionStartActivity(openPaywallIntent(context))` → `dotcal://paywall`. Small/Medium untouched. `dotcal://paywall` deep link handled in `MainActivity` (`DotCalDeepLinkTarget(paywall = true)`) → `initialPaywall` → opens Paywall overlay.
+8. **Date Calculator — COMPLETE.** `presentation/datecalculator/DateCalculatorViewModel.kt` (pure `java.time` math, no DB/network; Mode DAYS_BETWEEN | ADD_SUBTRACT, `CalculatorResult` sealed, derived-state recompute, working days = Mon-Fri, no holiday awareness for v1). In-file `DateCalculatorScreen` overlay: back + "Date Calculator" header (SettingsLargeHeader style), 2-option segmented control (reuses calendar segmented control), reuses existing date picker sheet, result cards (surface, 0dp, 1dp border). Settings entry with PRO badge (Step 9).
+9. **Settings additions — COMPLETE.** New params threaded `SettingsPreview -> SettingsRoot`: `isPro`, `onDotCalPro`, `onRestorePurchase`, `onDateCalculator`. "DotCal Pro" row near top (`SettingsProRow`, star/crown accent icon, dynamic subtitle, tap → snackbar if Pro else Paywall). "Restore Purchase" row only when not Pro → `restorePro` + snackbar. "Date Calculator" row with PRO badge (`SettingsProBadgeRow`) → Paywall if not Pro else Date Calculator. Accent color selection left FREE.
+10. **Splash black background — COMPLETE.** `windowSplashScreenBackground = #000000` in `res/values-v31/styles.xml` (both theme entries) and `res/values-night-v31/styles.xml`. Icon/tagline unchanged.
 
 ## Phase 1 - Easy Features
 
@@ -633,7 +659,7 @@ Known gaps:
 - Python was unavailable in the local environment, so the asset was generated with transient workspace-local NPM tooling and the `date-holidays` package; no generator dependency or script ships with the app.
 
 Next step:
-- Return to Phase 1 roadmap: Step 2 Print to PDF pending. Do not start Step 3 until Step 2 builds and is marked complete.
+- Pro / Billing phase (Steps 1-10) COMPLETE — see the `Pro / Billing` section above. Phase 1 Step 2 (Print to PDF) was SKIPPED by explicit user decision. Next action is Play Console account setup (see `Current Next Step`).
 
 ## Architecture Rules
 
@@ -697,6 +723,63 @@ Phone/manual UI QA:
 - Switch phone light/dark mode while app theme is System: widgets should refresh to matching light/dark appearance.
 - Animation polish (2026-06-28): tap Calendar → Tasks → Calendar in bottom nav: should fade smoothly between tabs. Tap a bottom nav item: icon/label should animate from gray to accent color over ~200ms. Switch Task filter tabs (All/Today/Upcoming/Completed): selected background should fade in, not snap. Open Event Detail/Event Editor/Settings: slide-in should feel faster (~220ms) than before. Add tasks and complete/delete them: list items should animate out. Open a calendar date with events: event rows in the sheet should animate in.
 
+### Pro / Billing (2026-07-02)
+
+Step 1 (permission + dep):
+- Upload the new APK to Play Console internal test track.
+- Confirm Play Console now allows creating One-time products (the BILLING permission error should be resolved).
+
+Step 4 (Paywall):
+- Open Paywall from Settings > DotCal Pro row.
+- Feature list shows 4 items correctly.
+- "Buy Pro" button present (may be disabled/loading if the Play Console product isn't live yet — expected).
+- X button dismisses Paywall.
+- "Restore Purchase" shows correct snackbar.
+
+Steps 5-6 (gates):
+- Add/Edit Event: tap image + icon → Paywall opens.
+- Add/Edit Event: tap voice-note mic → Paywall opens.
+- After purchasing Pro via License Testing → image and voice note work normally, no Paywall.
+
+Step 7 (Large widget):
+- Add Large widget to home screen → shows locked state with "Unlock in DotCal Pro".
+- Tapping "Unlock" opens the app to the Paywall.
+- After purchasing Pro → Large widget shows normal month grid + events.
+- Small and Medium widgets unchanged (still free).
+
+Step 8 (Date Calculator):
+- Settings shows "Date Calculator" row with PRO badge.
+- Tapping without Pro → Paywall opens.
+- After Pro → Date Calculator opens.
+- "Days Between": enter two dates, verify total / working (Mon-Fri) / weekend counts are correct.
+- "Add/Subtract": start date + N days → verify result date is correct.
+- Any 7-day range should have exactly 2 weekends (holidays intentionally ignored in v1).
+
+Step 10 (splash):
+- Set system to Light theme, force-close, relaunch → splash background is BLACK, no harsh box around the icon.
+- Dark theme splash looks identical to before.
+
+Note: full purchase-flow verification is BLOCKED until the developer creates the `dotcal_pro` product + License Testers in Play Console. Until then, "Buy Pro" disabled/loading is the expected state.
+
 ## Resume Prompt
 
+You are continuing development of DotCal (com.dotfield.dotcal).
+
+Read Docs/HANDOFF.md first before doing anything. It is the source of truth. Pay special attention to the `Pro / Billing`, `Current Next Step`, and `Hard Rules` sections.
+
+STRICT RULES:
+1. Do NOT touch any already-working feature unless explicitly required.
+2. Do NOT change the Room schema — exactly 5 tables (calendar_accounts, calendar_events, event_reminders, sync_metadata, deleted_event_log), no new columns.
+3. Do NOT touch onboarding, calendar views, sync, holidays, tasks, or any completed feature.
+4. Do NOT run phone/manual UI testing — only update HANDOFF.md.
+5. Build after every step: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`. Fix failures before moving on.
+6. This project has NO Hilt and NO Compose Nav graph — use manual DI (ProManager created in DotCalApplication, injected via the DotCalViewModel factory) and full-screen overlay screens gated by booleans (showPaywall / showDateCalculator). Do not introduce Hilt or a Nav graph.
+7. Reuse existing UI components and the existing `mono` font — do not add new fonts or component variants. UI screens live in ui/DotCalApp.kt as private composables sharing private tokens.
+
+STATUS: The Pro / Billing phase (Steps 1-10) is COMPLETE in code and the debug build passes. What remains is developer-side Play Console setup — NOT code:
+- Fix Payments profile issue, create one-time product ID `dotcal_pro`, add License Testing emails, set up Merchant Account, then test the full purchase flow end-to-end with License Tester credentials.
+
+Phase 1 Step 2 (Print to PDF) was SKIPPED by explicit user decision — do not resurrect it.
+
+If asked to work on code next, confirm you have read Docs/HANDOFF.md, then wait for the specific task. Do not start changing things unprompted.
 

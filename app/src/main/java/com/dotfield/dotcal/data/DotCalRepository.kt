@@ -71,6 +71,21 @@ class DotCalRepository(
         providerDataSource = CalendarProviderDataSource(context.applicationContext),
     )
 
+    fun observeIsPro(): Flow<Boolean> =
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_IS_PRO] ?: false
+        }
+
+    suspend fun readIsPro(): Boolean = withContext(Dispatchers.IO) {
+        context.calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_IS_PRO] ?: false
+    }
+
+    suspend fun setIsPro(isPro: Boolean) = withContext(Dispatchers.IO) {
+        context.calendarPreferencesDataStore.edit { preferences ->
+            preferences[CalendarPreferences.KEY_IS_PRO] = isPro
+        }
+    }
+
     fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts()
 
     fun observeSelectedHolidayCountries(): Flow<List<String>> = dao.observeHolidayAccountIds()

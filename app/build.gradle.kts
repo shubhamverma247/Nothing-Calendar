@@ -64,6 +64,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.play.app.update.ktx)
+    implementation(libs.billing.ktx)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.ui.tooling)

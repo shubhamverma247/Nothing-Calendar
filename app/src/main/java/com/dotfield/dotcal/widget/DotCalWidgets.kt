@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.GlanceId
+import androidx.compose.ui.graphics.Color
 import androidx.glance.GlanceModifier
 import androidx.glance.layout.ContentScale
 import androidx.glance.action.clickable
@@ -38,6 +39,9 @@ import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.dotfield.dotcal.R
+import com.dotfield.dotcal.prefs.CalendarPreferences
+import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -61,12 +65,13 @@ abstract class DotCalWidget(
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val data = WidgetDataRepository.create(context).load(widgetSize)
         val palette = dotCalWidgetPalette(context)
+        val isPro = context.calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_IS_PRO] ?: false
         provideContent {
             DotCalGlanceTheme {
                 when (widgetSize) {
                     DotCalWidgetSize.Small -> SmallWidget(context, data, palette)
                     DotCalWidgetSize.Medium -> MediumWidget(context, data, palette)
-                    DotCalWidgetSize.Large -> LargeWidget(context, data, palette)
+                    DotCalWidgetSize.Large -> if (isPro) LargeWidget(context, data, palette) else LargeWidgetLocked(context, palette)
                 }
             }
         }
@@ -247,6 +252,41 @@ private fun LargeWidget(context: Context, data: WidgetCalendarData, palette: Dot
                         style = monoStyle(palette.secondary, 12, FontWeight.Bold),
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LargeWidgetLocked(context: Context, palette: DotCalWidgetPalette) {
+    WidgetSurfaceBox(palette) {
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .padding(24.dp)
+                .clickable(actionStartActivity(openPaywallIntent(context))),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("🔒", style = monoStyle(palette.accent, 28, FontWeight.Bold, TextAlign.Center))
+            Spacer(GlanceModifier.height(12.dp))
+            Text("DotCal Pro", style = primaryStyle(palette, 18, FontWeight.Bold))
+            Spacer(GlanceModifier.height(6.dp))
+            Text(
+                "Unlock the Large widget in DotCal Pro",
+                maxLines = 2,
+                style = monoStyle(palette.secondary, 12, FontWeight.Normal, TextAlign.Center),
+            )
+            Spacer(GlanceModifier.height(18.dp))
+            Box(
+                modifier = GlanceModifier
+                    .background(palette.accent)
+                    .cornerRadius(0.dp)
+                    .padding(horizontal = 22.dp, vertical = 10.dp)
+                    .clickable(actionStartActivity(openPaywallIntent(context))),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Unlock", style = monoStyle(ColorProvider(Color.White), 14, FontWeight.Bold, TextAlign.Center))
             }
         }
     }
@@ -496,6 +536,10 @@ private fun itemIntent(context: Context, item: WidgetEventItem): Intent {
 
 private fun openCalendarMonthIntent(context: Context): Intent {
     return Intent(Intent.ACTION_VIEW, Uri.parse("dotcal://calendar/month")).setPackage(context.packageName)
+}
+
+private fun openPaywallIntent(context: Context): Intent {
+    return Intent(Intent.ACTION_VIEW, Uri.parse("dotcal://paywall")).setPackage(context.packageName)
 }
 
 private fun openCalendarDateIntent(context: Context, dateIso: String?): Intent {

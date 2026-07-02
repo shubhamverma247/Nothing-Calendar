@@ -3,4 +3,5 @@
     <string name="widget_small_description">Next Event</string>
     <string name="widget_medium_description">Event Details</string>
     <string name="widget_large_description">Calendar Dashboard</string>
+    <string name="pro_price_fallback">₹199</string>
 </resources>

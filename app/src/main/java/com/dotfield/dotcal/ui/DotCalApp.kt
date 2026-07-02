@@ -101,6 +101,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings as SettingsGearIcon
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
@@ -176,6 +177,14 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.zIndex
 import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.layout.ColumnScope
+import com.dotfield.dotcal.R
+import com.dotfield.dotcal.data.billing.ProManager
+import com.dotfield.dotcal.presentation.datecalculator.DateCalculatorViewModel
 import androidx.datastore.preferences.core.edit
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -259,6 +268,7 @@ fun DotCalApp(
     initialCalendarDate: String? = null,
     initialAddEvent: Boolean = false,
     initialAddEventDate: String? = null,
+    initialPaywall: Boolean = false,
     initialRouteToken: Long? = null,
 ) {
     val month by viewModel.month.collectAsStateWithLifecycle()
@@ -284,12 +294,15 @@ fun DotCalApp(
     var showTaskEditor by remember { mutableStateOf(false) }
     var editorSessionKey by remember { mutableStateOf(UUID.randomUUID().toString()) }
     var settingsScreen by remember { mutableStateOf(SettingsScreen.Root) }
+    var showPaywall by remember { mutableStateOf(false) }
+    var showDateCalculator by remember { mutableStateOf(false) }
+    val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
     var pendingTaskDelete by remember { mutableStateOf<CalendarEvent?>(null) }
     var handledTaskDeepLinkId by remember { mutableStateOf<String?>(null) }
     var handledRouteToken by remember { mutableStateOf<Long?>(null) }
     var routePending by remember(initialRouteToken) {
-        mutableStateOf(initialRouteToken != null && (initialEventId != null || !initialTaskId.isNullOrBlank() || initialAddEvent || initialCalendarDate != null))
+        mutableStateOf(initialRouteToken != null && (initialEventId != null || !initialTaskId.isNullOrBlank() || initialAddEvent || initialCalendarDate != null || initialPaywall))
     }
     var isSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -633,6 +646,16 @@ fun DotCalApp(
             routePending = false
         }
     }
+    LaunchedEffect(initialRouteToken, initialPaywall) {
+        if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialPaywall) {
+            viewModel.closeEventDetail()
+            taskDetail = null
+            settingsScreen = SettingsScreen.Root
+            showPaywall = true
+            handledRouteToken = initialRouteToken
+            routePending = false
+        }
+    }
     fun openEditEditor(event: CalendarEvent) {
         editorSessionKey = UUID.randomUUID().toString()
         addEditorDateOverride = null
@@ -641,6 +664,8 @@ fun DotCalApp(
     }
     fun closeTopSurface() {
         when {
+            showPaywall -> showPaywall = false
+            showDateCalculator -> showDateCalculator = false
             addSheet -> {
                 editingEvent = null
                 addEditorDateOverride = null
@@ -731,7 +756,7 @@ fun DotCalApp(
     BackHandler(enabled = showOnboarding) {
         if (onboardingPageIndex > 0) onboardingPageIndex -= 1 else finishOnboarding()
     }
-    BackHandler(enabled = !showOnboarding && (detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || showDateCalculator || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -1096,6 +1121,26 @@ fun DotCalApp(
                         )
                     }
                 },
+                isPro = isPro,
+                onDotCalPro = {
+                    if (isPro) {
+                        Toast.makeText(context, "You're already Pro!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        showPaywall = true
+                    }
+                },
+                onRestorePurchase = {
+                    viewModel.restorePro { restored ->
+                        Toast.makeText(
+                            context,
+                            if (restored) "Purchase restored — enjoy DotCal Pro!" else "No previous purchase found on this account",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                },
+                onDateCalculator = {
+                    if (isPro) showDateCalculator = true else showPaywall = true
+                },
             )
         }
         // Floating bottom nav — rendered AFTER Settings overlay so it appears on top of Settings,
@@ -1229,6 +1274,8 @@ fun DotCalApp(
                     reminders.firstOrNull { it.eventId == editingEvent?.baseEventId() }?.minutesBefore
                 },
                 palette = palette,
+                isPro = isPro,
+                onRequestPro = { showPaywall = true },
                 onDismiss = {
                     editingEvent = null
                     addEditorDateOverride = null
@@ -1247,6 +1294,29 @@ fun DotCalApp(
                         pendingDelete = PendingDelete(eventToDelete, scope, DeleteSource.Editor)
                     }
                 },
+            )
+        }
+        AnimatedVisibility(
+            visible = showPaywall,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            PaywallScreen(
+                viewModel = viewModel,
+                palette = palette,
+                onDismiss = { showPaywall = false },
+            )
+        }
+        AnimatedVisibility(
+            visible = showDateCalculator,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            DateCalculatorScreen(
+                palette = palette,
+                onBack = { showDateCalculator = false },
             )
         }
         pendingDelete?.let { request ->
@@ -3655,6 +3725,8 @@ private fun VoiceNoteEditorSection(
     eventId: String,
     voiceNotePath: String?,
     palette: DotCalPalette,
+    isPro: Boolean,
+    onRequestPro: () -> Unit,
     onVoiceNoteChanged: (String?) -> Unit,
 ) {
     val context = LocalContext.current
@@ -3726,6 +3798,10 @@ private fun VoiceNoteEditorSection(
                 palette = palette,
                 permissionDenied = permissionDenied,
                 onRecord = {
+                    if (!isPro) {
+                        onRequestPro()
+                        return@EmptyVoiceNoteRow
+                    }
                     if (permissionDenied) {
                         context.startActivity(
                             Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -3894,6 +3970,8 @@ private fun EventEditorScreen(
     selectedTime: LocalTime,
     initialReminderMinutes: Int?,
     palette: DotCalPalette,
+    isPro: Boolean,
+    onRequestPro: () -> Unit,
     onDismiss: () -> Unit,
     onSave: (EventEditorData, RecurringEditScope) -> Unit,
     onDelete: ((RecurringEditScope) -> Unit)?,
@@ -4089,6 +4167,10 @@ private fun EventEditorScreen(
                 palette = palette,
                 onAddImage = {
                     clearEditorFocus()
+                    if (!isPro) {
+                        onRequestPro()
+                        return@ImageAttachmentSection
+                    }
                     val availableSlots = (5 - imageUris.size).coerceAtLeast(0)
                     if (availableSlots > 0) {
                         imagePicker.launch(
@@ -4103,6 +4185,8 @@ private fun EventEditorScreen(
                 eventId = draftEventId,
                 voiceNotePath = voiceNotePath,
                 palette = palette,
+                isPro = isPro,
+                onRequestPro = onRequestPro,
                 onVoiceNoteChanged = { voiceNotePath = it },
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -6139,6 +6223,10 @@ private fun SettingsPreview(
     onCheckForUpdates: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
     onAddAccount: () -> Unit,
+    isPro: Boolean,
+    onDotCalPro: () -> Unit,
+    onRestorePurchase: () -> Unit,
+    onDateCalculator: () -> Unit,
 ) {
     BackHandler {
         when (screen) {
@@ -6181,6 +6269,10 @@ private fun SettingsPreview(
             onCheckForUpdates = onCheckForUpdates,
             onRequestCalendarAccess = onRequestCalendarAccess,
             onAddAccount = { onScreenChange(SettingsScreen.AddAccount) },
+            isPro = isPro,
+            onDotCalPro = onDotCalPro,
+            onRestorePurchase = onRestorePurchase,
+            onDateCalculator = onDateCalculator,
         )
         AnimatedVisibility(
             visible = screen == SettingsScreen.Theme,
@@ -6290,6 +6382,10 @@ private fun SettingsRoot(
     onCheckForUpdates: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
     onAddAccount: () -> Unit,
+    isPro: Boolean,
+    onDotCalPro: () -> Unit,
+    onRestorePurchase: () -> Unit,
+    onDateCalculator: () -> Unit,
 ) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
@@ -6301,6 +6397,23 @@ private fun SettingsRoot(
                 Spacer(modifier = Modifier.height(10.dp))
             }
             item {
+            SettingsSectionTitle("DotCal Pro", palette)
+            SettingsProRow(
+                isPro = isPro,
+                palette = palette,
+                onClick = onDotCalPro,
+            )
+            if (!isPro) {
+                SettingsMenuRow(
+                    title = "Restore Purchase",
+                    value = "",
+                    palette = palette,
+                    showChevron = false,
+                    onClick = onRestorePurchase,
+                )
+            }
+            SettingsDivider(palette)
+
             SettingsSectionTitle("Accounts", palette)
             SettingsMenuRow(
                 title = "Calendar Accounts",
@@ -6350,6 +6463,11 @@ private fun SettingsRoot(
                 checked = birthdayEnabled,
                 palette = palette,
                 onCheckedChange = onBirthdayEnabledChange,
+            )
+            SettingsProBadgeRow(
+                title = "Date Calculator",
+                palette = palette,
+                onClick = onDateCalculator,
             )
             SettingsToggleRow(title = "Sync enabled", checked = syncEnabled, palette = palette, onCheckedChange = onSyncEnabledChange)
             SettingsSyncIntervalRow(intervalMins = syncIntervalMins, palette = palette, onIntervalSelected = onSyncIntervalSelected)
@@ -7272,6 +7390,60 @@ private fun SettingsMenuRow(
 }
 
 @Composable
+private fun ProBadge(palette: DotCalPalette) {
+    Box(
+        modifier = Modifier
+            .background(palette.accent)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+    ) {
+        Text("PRO", color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun SettingsProRow(isPro: Boolean, palette: DotCalPalette, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Default.Star, contentDescription = null, tint = palette.accent, modifier = Modifier.size(22.dp))
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text("DotCal Pro", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(
+                if (isPro) "Active — thank you for your support!" else "Unlock Pro features",
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+            )
+        }
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun SettingsProBadgeRow(title: String, palette: DotCalPalette, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ProBadge(palette)
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+@Composable
 private fun SettingsSyncNowRow(
     syncMetadata: List<SyncMetadata>,
     isSyncing: Boolean,
@@ -8148,4 +8320,481 @@ private enum class ScreenTab {
     Calendar,
     Tasks,
     Settings,
+}
+
+private fun android.content.Context.findActivity(): android.app.Activity? {
+    var ctx: android.content.Context? = this
+    while (ctx is android.content.ContextWrapper) {
+        if (ctx is android.app.Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
+}
+
+private data class ProFeature(val name: String, val description: String)
+
+private val PRO_FEATURES = listOf(
+    ProFeature("Image Attachments", "Add up to 5 photos to any event"),
+    ProFeature("Voice Notes", "Record audio notes on your events"),
+    ProFeature("Large Widget", "Full month grid widget for your home screen"),
+    ProFeature("Date Calculator", "Calculate days between dates instantly"),
+)
+
+@Composable
+private fun PaywallScreen(
+    viewModel: DotCalViewModel,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val productDetails by viewModel.productDetails.collectAsStateWithLifecycle()
+    val billingState by viewModel.billingState.collectAsStateWithLifecycle()
+    val purchaseResult by viewModel.purchaseResult.collectAsStateWithLifecycle()
+    var purchasing by remember { mutableStateOf(false) }
+    var showSuccess by remember { mutableStateOf(false) }
+
+    LaunchedEffect(purchaseResult) {
+        when (val result = purchaseResult) {
+            is ProManager.PurchaseResult.Success -> {
+                purchasing = false
+                viewModel.clearPurchaseResult()
+                showSuccess = true
+                delay(1500)
+                onDismiss()
+            }
+            is ProManager.PurchaseResult.Cancelled -> {
+                purchasing = false
+                viewModel.clearPurchaseResult()
+            }
+            is ProManager.PurchaseResult.Error -> {
+                purchasing = false
+                Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                viewModel.clearPurchaseResult()
+            }
+            null -> Unit
+        }
+    }
+
+    if (showSuccess) {
+        Column(
+            modifier = Modifier.fillMaxSize().background(palette.background),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = palette.accent,
+                modifier = Modifier.size(64.dp),
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("You're Pro!", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+        }
+        return
+    }
+
+    val connected = billingState is ProManager.BillingConnectionState.Connected
+    val price = productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
+        ?: stringResource(R.string.pro_price_fallback)
+    val priceIsEstimate = productDetails?.oneTimePurchaseOfferDetails?.formattedPrice == null
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(palette.background)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        // ① Top bar: close only, no title.
+        Box(modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 8.dp)) {
+            IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart).size(44.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = palette.primaryText)
+            }
+        }
+
+        // ② Flat calendar illustration.
+        PaywallCalendarIllustration(
+            palette = palette,
+            modifier = Modifier
+                .padding(top = 8.dp, bottom = 24.dp)
+                .align(Alignment.CenterHorizontally),
+        )
+
+        // ③ Title.
+        Text(
+            "DotCal Pro",
+            color = palette.primaryText,
+            fontFamily = mono,
+            fontWeight = FontWeight.Bold,
+            fontSize = 30.sp,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // ④ Feature list.
+        Column(modifier = Modifier.padding(horizontal = 28.dp)) {
+            PRO_FEATURES.forEach { feature ->
+                PaywallFeatureRow(feature = feature, palette = palette)
+                Spacer(modifier = Modifier.height(18.dp))
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // ⑤ Price row.
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(price, color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 40.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("One-time purchase", color = palette.primaryText, fontFamily = mono, fontSize = 15.sp)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                if (priceIsEstimate) "No subscriptions. Pay once, own it forever. (est.)" else "No subscriptions. Pay once, own it forever.",
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // ⑥ Buy button — accent bg, 0dp corner, full width.
+        val buyEnabled = connected && !purchasing
+        Box(
+            modifier = Modifier
+                .padding(horizontal = 28.dp)
+                .fillMaxWidth()
+                .height(54.dp)
+                .background(if (buyEnabled) palette.accent else palette.disabledText)
+                .noRippleClickable(enabled = buyEnabled) {
+                    val activity = context.findActivity()
+                    if (activity != null) {
+                        purchasing = true
+                        viewModel.purchasePro(activity)
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (purchasing) {
+                CircularProgressIndicator(color = palette.onAccent, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+            } else {
+                Text("Buy Pro", color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ⑦ Restore purchase.
+        Text(
+            "Restore Purchase",
+            color = palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 13.sp,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .noRippleClickable {
+                    viewModel.restorePro { restored ->
+                        val message = if (restored) {
+                            "Purchase restored — enjoy DotCal Pro!"
+                        } else {
+                            "No previous purchase found on this account"
+                        }
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .padding(8.dp),
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun PaywallCalendarIllustration(palette: DotCalPalette, modifier: Modifier = Modifier) {
+    // Flat calendar in the app-icon style: red header bar, dot grid, square corners.
+    Canvas(modifier = modifier.size(120.dp)) {
+        val bodyTop = size.height * 0.18f
+        drawRect(
+            color = palette.accent,
+            topLeft = Offset(0f, 0f),
+            size = androidx.compose.ui.geometry.Size(size.width, bodyTop),
+        )
+        drawRect(
+            color = palette.eventCardSurface,
+            topLeft = Offset(0f, bodyTop),
+            size = androidx.compose.ui.geometry.Size(size.width, size.height - bodyTop),
+        )
+        drawRect(
+            color = palette.line,
+            topLeft = Offset(0f, 0f),
+            size = androidx.compose.ui.geometry.Size(size.width, size.height),
+            style = Stroke(width = 2.dp.toPx()),
+        )
+        val cols = 5
+        val rows = 4
+        val gridTop = bodyTop + (size.height - bodyTop) * 0.18f
+        val gridBottom = size.height * 0.88f
+        val gridLeft = size.width * 0.14f
+        val gridRight = size.width * 0.86f
+        val dotRadius = 2.6.dp.toPx()
+        for (r in 0 until rows) {
+            for (c in 0 until cols) {
+                val x = gridLeft + (gridRight - gridLeft) * (c / (cols - 1f))
+                val y = gridTop + (gridBottom - gridTop) * (r / (rows - 1f))
+                drawCircle(color = palette.primaryText.copy(alpha = 0.75f), radius = dotRadius, center = Offset(x, y))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaywallFeatureRow(feature: ProFeature, palette: DotCalPalette) {
+    Row(verticalAlignment = Alignment.Top) {
+        Icon(
+            Icons.Default.Check,
+            contentDescription = null,
+            tint = palette.accent,
+            modifier = Modifier.size(20.dp).padding(top = 2.dp),
+        )
+        Spacer(modifier = Modifier.width(14.dp))
+        Column {
+            Text(feature.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(feature.description, color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun DateCalculatorScreen(
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    calcViewModel: DateCalculatorViewModel = viewModel(),
+) {
+    val mode by calcViewModel.mode.collectAsStateWithLifecycle()
+    val fromDate by calcViewModel.fromDate.collectAsStateWithLifecycle()
+    val toDate by calcViewModel.toDate.collectAsStateWithLifecycle()
+    val startDate by calcViewModel.startDate.collectAsStateWithLifecycle()
+    val daysCount by calcViewModel.daysCount.collectAsStateWithLifecycle()
+    val isSubtract by calcViewModel.isSubtract.collectAsStateWithLifecycle()
+    val result by calcViewModel.result.collectAsStateWithLifecycle()
+
+    var picker by remember { mutableStateOf<CalcDateField?>(null) }
+
+    Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
+        // ① Top bar: back + title.
+        Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+            }
+            Text(
+                "Date Calculator",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp, vertical = 16.dp),
+        ) {
+            // ② Mode segmented control.
+            TwoOptionSegmentedControl(
+                options = listOf("Days Between", "Add / Subtract"),
+                selectedIndex = if (mode == DateCalculatorViewModel.Mode.DAYS_BETWEEN) 0 else 1,
+                palette = palette,
+                onSelected = {
+                    calcViewModel.setMode(
+                        if (it == 0) DateCalculatorViewModel.Mode.DAYS_BETWEEN else DateCalculatorViewModel.Mode.ADD_SUBTRACT,
+                    )
+                },
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (mode == DateCalculatorViewModel.Mode.DAYS_BETWEEN) {
+                CalcDateRow("From", fromDate, palette) { picker = CalcDateField.From }
+                HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
+                CalcDateRow("To", toDate, palette) { picker = CalcDateField.To }
+                Spacer(modifier = Modifier.height(20.dp))
+                (result as? DateCalculatorViewModel.CalculatorResult.DaysBetween)?.let { r ->
+                    CalcResultCard(palette) {
+                        CalcResultLine("Total days", "${r.totalDays} days", palette)
+                        CalcResultLine("Working days (Mon-Fri)", "${r.workingDays} days", palette)
+                        CalcResultLine("Weekends", "${r.weekends} days", palette)
+                    }
+                }
+            } else {
+                CalcDateRow("Start date", startDate, palette) { picker = CalcDateField.Start }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = if (daysCount == 0) "" else daysCount.toString(),
+                        onValueChange = { text ->
+                            calcViewModel.setDaysCount(text.filter { it.isDigit() }.take(6).toIntOrNull() ?: 0)
+                        },
+                        label = { Text("Days", fontFamily = mono, color = palette.secondaryText) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = palette.primaryText,
+                            unfocusedTextColor = palette.primaryText,
+                            focusedBorderColor = palette.accent,
+                            unfocusedBorderColor = palette.textFieldBorder,
+                            cursorColor = palette.accent,
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .background(palette.accent)
+                            .noRippleClickable { calcViewModel.setSubtract(!isSubtract) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(if (isSubtract) "−" else "+", color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+                (result as? DateCalculatorViewModel.CalculatorResult.AddSubtractResult)?.let { r ->
+                    CalcResultCard(palette) {
+                        CalcResultLine("Result date", r.formattedDate, palette)
+                    }
+                }
+            }
+        }
+    }
+
+    picker?.let { field ->
+        val current = when (field) {
+            CalcDateField.From -> fromDate
+            CalcDateField.To -> toDate
+            CalcDateField.Start -> startDate
+        } ?: LocalDate.now()
+        DateTimeChoiceSheet(
+            title = when (field) {
+                CalcDateField.From -> "From"
+                CalcDateField.To -> "To"
+                CalcDateField.Start -> "Start date"
+            },
+            selectedDate = current,
+            selectedTime = LocalTime.of(9, 0),
+            minDate = null,
+            includeTime = false,
+            palette = palette,
+            onDismiss = { picker = null },
+            onSelected = { date, _ ->
+                when (field) {
+                    CalcDateField.From -> calcViewModel.setFromDate(date)
+                    CalcDateField.To -> calcViewModel.setToDate(date)
+                    CalcDateField.Start -> calcViewModel.setStartDate(date)
+                }
+                picker = null
+            },
+        )
+    }
+}
+
+private enum class CalcDateField { From, To, Start }
+
+@Composable
+private fun CalcDateRow(label: String, date: LocalDate?, palette: DotCalPalette, onClick: () -> Unit) {
+    val formatter = remember { java.time.format.DateTimeFormatter.ofPattern("EEE, dd MMM yyyy", java.util.Locale.getDefault()) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .noRippleClickable(onClick = onClick)
+            .padding(vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, color = palette.primaryText, fontFamily = mono, fontSize = 16.sp)
+        Text(
+            date?.format(formatter)?.uppercase(java.util.Locale.getDefault()) ?: "Select",
+            color = if (date != null) palette.accent else palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 14.sp,
+        )
+    }
+}
+
+@Composable
+private fun CalcResultCard(palette: DotCalPalette, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(palette.eventCardSurface)
+            .drawBehind {
+                drawRect(color = palette.eventCardBorder, size = size, style = Stroke(width = 1.dp.toPx()))
+            }
+            .padding(20.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun CalcResultLine(label: String, value: String, palette: DotCalPalette) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+        Text(value, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    }
+}
+
+@Composable
+private fun TwoOptionSegmentedControl(
+    options: List<String>,
+    selectedIndex: Int,
+    palette: DotCalPalette,
+    onSelected: (Int) -> Unit,
+) {
+    val segmentShape = RoundedCornerShape(28.dp)
+    val segmentBorder = palette.disabledText.copy(alpha = if (palette.isDark) 0.35f else 0.45f)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(42.dp)
+            .clip(segmentShape)
+            .background(palette.topBarSurface)
+            .drawBehind {
+                drawRoundRect(
+                    color = segmentBorder,
+                    size = size,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(28.dp.toPx(), 28.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            }
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        options.forEachIndexed { index, label ->
+            val isSelected = index == selectedIndex
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) palette.segmentSelected else Color.Transparent)
+                    .noRippleClickable { onSelected(index) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    fontFamily = mono,
+                    color = if (isSelected) palette.primaryText else palette.secondaryText,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
 }
