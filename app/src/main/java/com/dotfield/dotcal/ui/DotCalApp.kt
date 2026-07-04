@@ -96,6 +96,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
@@ -185,7 +186,9 @@ import androidx.compose.ui.zIndex
 import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.ColumnScope
@@ -200,6 +203,8 @@ import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
+import com.dotfield.dotcal.data.nlp.QuickAddParser
+import com.dotfield.dotcal.data.nlp.QuickAddResult
 import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.isRecurrenceOccurrence
 import com.dotfield.dotcal.data.RecurringEditScope
@@ -303,6 +308,8 @@ fun DotCalApp(
     var settingsScreen by remember { mutableStateOf(SettingsScreen.Root) }
     var showPaywall by remember { mutableStateOf(false) }
     var showDateCalculator by remember { mutableStateOf(false) }
+    var showQuickAdd by remember { mutableStateOf(false) }
+    var quickAddPrefill by remember { mutableStateOf<QuickAddResult?>(null) }
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
     var pendingTaskDelete by remember { mutableStateOf<CalendarEvent?>(null) }
@@ -672,9 +679,19 @@ fun DotCalApp(
     }
     fun openAddEditor(startTime: LocalTime = LocalTime.of(9, 0), date: LocalDate? = null) {
         editorSessionKey = UUID.randomUUID().toString()
+        quickAddPrefill = null
         addStartTime = startTime
         addEditorDateOverride = date
         editingEvent = null
+        addSheet = true
+    }
+    fun openQuickAddResult(result: QuickAddResult) {
+        editorSessionKey = UUID.randomUUID().toString()
+        quickAddPrefill = result
+        addStartTime = result.startTime ?: LocalTime.of(9, 0)
+        addEditorDateOverride = result.date
+        editingEvent = null
+        showQuickAdd = false
         addSheet = true
     }
     LaunchedEffect(initialRouteToken, initialAddEvent, initialAddEventDate) {
@@ -705,6 +722,7 @@ fun DotCalApp(
     }
     fun openEditEditor(event: CalendarEvent) {
         editorSessionKey = UUID.randomUUID().toString()
+        quickAddPrefill = null
         addEditorDateOverride = null
         editingEvent = event
         addSheet = true
@@ -713,9 +731,11 @@ fun DotCalApp(
         when {
             showPaywall -> showPaywall = false
             showDateCalculator -> showDateCalculator = false
+            showQuickAdd -> showQuickAdd = false
             addSheet -> {
                 editingEvent = null
                 addEditorDateOverride = null
+                quickAddPrefill = null
                 addSheet = false
             }
             showTaskEditor -> {
@@ -803,7 +823,7 @@ fun DotCalApp(
     BackHandler(enabled = showOnboarding) {
         if (onboardingPageIndex > 0) onboardingPageIndex -= 1 else finishOnboarding()
     }
-    BackHandler(enabled = !showOnboarding && (showPaywall || showDateCalculator || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -855,6 +875,7 @@ fun DotCalApp(
                             palette = palette,
                             onTitleClick = { viewModel.selectDate(LocalDate.now()) },
                             onAdd = { openAddEditor() },
+                            onQuickAdd = { if (isPro) showQuickAdd = true else showPaywall = true },
                             onCalendarTabSelected = {
                                 screenTab = ScreenTab.Calendar
                                 previousScreenTab = ScreenTab.Calendar
@@ -1337,10 +1358,12 @@ fun DotCalApp(
                 },
                 palette = palette,
                 isPro = isPro,
+                prefill = quickAddPrefill,
                 onRequestPro = { showPaywall = true },
                 onDismiss = {
                     editingEvent = null
                     addEditorDateOverride = null
+                    quickAddPrefill = null
                     addSheet = false
                 },
                 onSave = { data, scope ->
@@ -1348,6 +1371,7 @@ fun DotCalApp(
                         viewModel.selectDate(data.date)
                         editingEvent = null
                         addEditorDateOverride = null
+                        quickAddPrefill = null
                         addSheet = false
                     }
                 },
@@ -1379,6 +1403,18 @@ fun DotCalApp(
             DateCalculatorScreen(
                 palette = palette,
                 onBack = { showDateCalculator = false },
+            )
+        }
+        AnimatedVisibility(
+            visible = showQuickAdd,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            QuickAddScreen(
+                palette = palette,
+                onBack = { showQuickAdd = false },
+                onContinue = { result -> openQuickAddResult(result) },
             )
         }
         pendingDelete?.let { request ->
@@ -2407,6 +2443,7 @@ private fun CalendarTabContainer(
     palette: DotCalPalette,
     onTitleClick: () -> Unit,
     onAdd: () -> Unit,
+    onQuickAdd: (() -> Unit)? = null,
     onCalendarTabSelected: (CalendarTab) -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -2425,6 +2462,7 @@ private fun CalendarTabContainer(
                 palette = palette,
                 onTitleClick = onTitleClick,
                 onAdd = onAdd,
+                onQuickAdd = onQuickAdd,
             )
         }
         Spacer(
@@ -2460,6 +2498,7 @@ private fun CalendarActionBar(
     palette: DotCalPalette,
     onTitleClick: () -> Unit,
     onAdd: () -> Unit,
+    onQuickAdd: (() -> Unit)? = null,
 ) {
     val topIconTint = if (palette.isDark) NWhite else palette.accent
     Row(
@@ -2481,6 +2520,14 @@ private fun CalendarActionBar(
             maxLines = 1,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (onQuickAdd != null) {
+                IconButton(
+                    onClick = onQuickAdd,
+                    modifier = Modifier.size(44.dp),
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = "Quick add", tint = topIconTint)
+                }
+            }
             IconButton(
                 onClick = onAdd,
                 modifier = Modifier.size(44.dp),
@@ -4048,25 +4095,28 @@ private fun EventEditorScreen(
     onDismiss: () -> Unit,
     onSave: (EventEditorData, RecurringEditScope) -> Unit,
     onDelete: ((RecurringEditScope) -> Unit)?,
+    prefill: QuickAddResult? = null,
 ) {
-    val editorDate = event?.localDate() ?: selectedDate
-    val initialStart = event?.startLocalTime() ?: selectedTime
-    val initialEnd = event?.endLocalTime() ?: selectedTime.plusHours(1)
-    val initialEndDate = event?.endLocalDateForEditor() ?: editorDate
+    // Quick-add prefill only seeds a brand-new event, never an existing one being edited.
+    val seed = if (event == null) prefill else null
+    val editorDate = event?.localDate() ?: seed?.date ?: selectedDate
+    val initialStart = event?.startLocalTime() ?: seed?.startTime ?: selectedTime
+    val initialEnd = event?.endLocalTime() ?: seed?.endTime ?: initialStart.plusHours(1)
+    val initialEndDate = event?.endLocalDateForEditor() ?: seed?.endDate ?: editorDate
     val editorStateKey = event?.id ?: editorSessionKey
     val draftEventId = remember(editorStateKey) {
         if (event == null || event.isRecurrenceOccurrence()) UUID.randomUUID().toString() else event.baseEventId()
     }
-    var title by remember(editorStateKey) { mutableStateOf(event?.title.orEmpty()) }
+    var title by remember(editorStateKey) { mutableStateOf(event?.title ?: seed?.title.orEmpty()) }
     var description by remember(editorStateKey) { mutableStateOf(event?.description.orEmpty()) }
     var location by remember(editorStateKey) { mutableStateOf(event?.location.orEmpty()) }
     var startDate by remember(editorStateKey) { mutableStateOf(editorDate) }
     var endDate by remember(editorStateKey) { mutableStateOf(maxOf(editorDate, initialEndDate)) }
     var startTime by remember(editorStateKey) { mutableStateOf(initialStart) }
     var endTime by remember(editorStateKey) { mutableStateOf(coerceEndAfterStart(initialStart, initialEnd)) }
-    var allDay by remember(editorStateKey) { mutableStateOf(event?.isAllDay == 1) }
+    var allDay by remember(editorStateKey) { mutableStateOf(event?.let { it.isAllDay == 1 } ?: seed?.isAllDay ?: false) }
     var reminderMinutes by remember(editorStateKey, initialReminderMinutes) { mutableStateOf(initialReminderMinutes) }
-    var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule) }
+    var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule ?: seed?.rrule) }
     var imageUris by remember(editorStateKey) { mutableStateOf(parseJsonStringArray(event?.imageUris ?: "[]")) }
     var voiceNotePath by remember(editorStateKey) { mutableStateOf(event?.voiceNotePath) }
     var dateTimePicker by remember { mutableStateOf<DateTimeField?>(null) }
@@ -8859,6 +8909,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Date Calculator", "Calculate days between dates instantly"),
     ProFeature("Custom Accent Colors", "Extra palettes plus any custom hex color"),
     ProFeature("Import / Export", "Back up and restore events & tasks as .ics"),
+    ProFeature("Quick Add", "Type 'gym every mon 7am' — we build the event"),
 )
 
 @Composable
@@ -9052,6 +9103,186 @@ private fun PaywallFeatureRow(feature: ProFeature, palette: DotCalPalette) {
             Text(feature.description, color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp)
         }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun QuickAddScreen(
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onContinue: (QuickAddResult) -> Unit,
+) {
+    var text by remember { mutableStateOf("") }
+    val trimmed = text.trim()
+    // Re-parsed on every keystroke; pure and cheap.
+    val parsed = remember(trimmed) { if (trimmed.isEmpty()) null else QuickAddParser.parse(trimmed) }
+    val focusRequester = remember { FocusRequester() }
+    val examples = listOf("Gym every mon 7am", "Lunch tomorrow noon", "Pay rent on 1st", "Standup daily 9:30am")
+
+    fun submit() {
+        parsed?.let(onContinue)
+    }
+
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+
+    Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
+        // Top bar: back + title.
+        Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+            }
+            Text(
+                "Quick Add",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp, vertical = 16.dp),
+        ) {
+            CalcSectionLabel("Describe your event", palette)
+            Spacer(modifier = Modifier.height(10.dp))
+            CalcFieldGroup(palette) {
+                BasicTextField(
+                    value = text,
+                    onValueChange = { text = it.replace("\n", "") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
+                    textStyle = TextStyle(
+                        color = palette.primaryText,
+                        fontFamily = mono,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                    ),
+                    cursorBrush = SolidColor(palette.accent),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
+                        .padding(vertical = 18.dp),
+                    decorationBox = { inner ->
+                        if (text.isEmpty()) {
+                            Text(
+                                "gym every mon 7am",
+                                color = palette.disabledText,
+                                fontFamily = mono,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                            )
+                        }
+                        inner()
+                    },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (parsed != null) {
+                CalcSectionLabel("Preview", palette)
+                Spacer(modifier = Modifier.height(10.dp))
+                CalcFieldGroup(palette) {
+                    QuickAddPreviewRow("Title", parsed.title.ifBlank { "(none — add in next step)" }, palette)
+                    HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
+                    QuickAddPreviewRow("When", quickAddWhenLabel(parsed), palette)
+                    parsed.rrule?.let { rule ->
+                        HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
+                        QuickAddPreviewRow("Repeats", quickAddRepeatLabel(rule), palette)
+                    }
+                }
+            } else {
+                CalcSectionLabel("Try one", palette)
+                Spacer(modifier = Modifier.height(10.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    examples.forEach { example ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(palette.eventCardSurface)
+                                .drawBehind {
+                                    drawRoundRect(
+                                        color = palette.eventCardBorder,
+                                        size = size,
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx(), 10.dp.toPx()),
+                                        style = Stroke(width = 1.dp.toPx()),
+                                    )
+                                }
+                                .noRippleClickable { text = example }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Text(example, color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Continue button pinned to the bottom.
+        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp)) {
+            val enabled = parsed != null
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (enabled) palette.accent else palette.disabledText.copy(alpha = 0.25f))
+                    .noRippleClickable(enabled = enabled) { submit() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "Continue",
+                    color = if (enabled) NWhite else palette.disabledText,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickAddPreviewRow(label: String, value: String, palette: DotCalPalette) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp, modifier = Modifier.width(72.dp))
+        Text(
+            value,
+            color = palette.primaryText,
+            fontFamily = mono,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+private fun quickAddWhenLabel(result: QuickAddResult): String {
+    val date = result.date.format(editorDateFormatter)
+    val time = result.startTime
+    return if (result.isAllDay || time == null) {
+        "$date · All-day"
+    } else {
+        "$date · ${time.format(editorTimeFormatter)}"
+    }
+}
+
+private fun quickAddRepeatLabel(rrule: String): String = when (rrule.trim()) {
+    "FREQ=DAILY" -> "Daily"
+    "FREQ=WEEKLY" -> "Weekly"
+    "FREQ=MONTHLY" -> "Monthly"
+    "FREQ=YEARLY" -> "Yearly"
+    else -> "Custom"
 }
 
 @Composable

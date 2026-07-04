@@ -112,6 +112,7 @@ Pro gates:
 - Date Calculator.
 - Custom Accent Colors (extra preset palette + custom hex picker; 5 base accents stay free).
 - Calendar Import / Export (local `.ics` via SAF; no cloud/network).
+- Natural-language Quick Add (offline parser; sparkle icon in Calendar top bar).
 
 Paywall:
 - Route: `dotcal://paywall`.
@@ -127,7 +128,7 @@ Known Pro fixes:
 
 Offline/hardware/customization moat only. No network (honors no-cloud Hard Rule). No new columns (5-table lock intact). Reuses existing `rrule`, `deleted_event_log`, `imageUris`, `voiceNotePath`, DataStore. Ranked best-first.
 
-1. Natural-language quick-add — parse "gym every mon 7am" -> event. Local parser. Top cited worth-it feature.
+1. Natural-language quick-add — parse "gym every mon 7am" -> event. Local parser. Top cited worth-it feature. **BUILT (branch `pro-features`, not yet on main) — see Latest Work.**
 2. Widget pack + config — agenda-list, month-grid, event-countdown widgets + transparency/theme/calendar picker. #1 Android paid draw.
 3. Glyph reminder flash + timer — rear Glyph pulses when event near, face-down. Nothing-only moat; native Glyph can't read local events.
 4. App lock + private vault — PIN/biometric + hidden events. DataStore flag, no column.
@@ -139,6 +140,13 @@ Offline/hardware/customization moat only. No network (honors no-cloud Hard Rule)
 Deferred (needs internet + Play Data Safety + Privacy Policy + `INTERNET` perm, blocked by current no-network Hard Rule): ICS URL subscribe (webcal), weather strip, live holiday refresh. Keep FREE if ever built.
 
 ## Latest Work
+
+Branch `pro-features` (WIP, not on main):
+- Natural-language Quick Add (Pro Backlog #1). New `data/nlp/QuickAddParser.kt` — pure Kotlin, offline, no new dependency. `QuickAddParser.parse(text, now)` turns a line like `gym every mon 7am` into a `QuickAddResult` (title, date, endDate, startTime?, endTime?, isAllDay, rrule?) that maps 1:1 onto `EventEditorData`. Recognizes times (`7am`/`7:30pm`/`19:00`/`noon`/`midnight`), dates (`today`/`tonight`/`tomorrow`/weekday names/`next <weekday>`/`in N days|weeks|months`/`jul 4`/`4 july`/`M/D[/Y]`/`5th`), and recurrence limited to the app's real engine (bare `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY`, no BYDAY/INTERVAL). `every <weekday>` = `FREQ=WEEKLY` with the start date pinned to that weekday (the anchor-based expander repeats it correctly). Everything matched is stripped from the title; unparseable input falls back to today at 9am timed. Nothing throws.
+- UI in `ui/DotCalApp.kt`: new sparkle icon (`Icons.Default.AutoAwesome`) added to `CalendarActionBar` (via optional `onQuickAdd`, forwarded through `CalendarTabContainer`; Tasks-tab bar unaffected). Pro-gated — non-Pro tap opens Paywall. New full-screen right-slide overlay `showQuickAdd` hosting `QuickAddScreen`: auto-focused text field, live parsed preview (Title / When / Repeats rows), example chips, Continue button (+ IME Done). On Continue, `openQuickAddResult` seeds the standard `EventEditorScreen` via a new optional `prefill: QuickAddResult?` param (only applied when `event == null`) so the user reviews and taps Save through the normal `viewModel.saveEvent` -> `saveLocalEvent` path. No change to save/validation/repository/VM logic.
+- `quickAddPrefill` state cleared on every normal add/edit open and on editor dismiss/save so a prefill never leaks into a plain "+" add. `showQuickAdd` added to `BackHandler` + `closeTopSurface`.
+- Paywall `PRO_FEATURES` gained "Quick Add". No Room/schema/DataStore/manifest change. No version bump yet.
+- Verified: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (2m 56s), real `compileDebugKotlin`. No phone/manual QA.
 
 Branch `profeature` (WIP, not on main):
 - ICS import/export Pro feature (local files only, no network — honors sync rule). New package `data/ics`: `IcsExporter.kt` (VEVENT + VTODO, RFC5545, line-folding, UID = event id, RRULE/EXDATE round-trip) and `IcsParser.kt` (unfold, VEVENT/VTODO subset, DTSTART/DTEND/DUE, TZID + all-day, EXDATE, STATUS; RRULE normalized to app's FREQ subset; unknown props ignored, no-crash). Pure Kotlin, no new dependency.
@@ -191,6 +199,7 @@ Latest verification:
 - 2026-07-04: Added Glyph progress ring. `drawProgressRing()` lights an outer-edge arc (`RING_BRIGHTNESS=1400`, between bg dots 400 and text 4095), clockwise from top via `atan2(dx,-dy)`, on a band at `radius = size/2 - RING_INSET(1.5)`, thickness `RING_BAND(0.7)`. Fill = `progressFraction()` = time-left / 24h window, clamped 0..1 (full when event far, drains as it nears, empty at/after start). `renderText`/`buildCountdownFrame` now take a `fraction` arg (`-1f` = no ring, used for the empty `--` state). `:app:assembleDebug` passed (1m 11s). On-device confirmation of ring brightness/sweep still needed.
 - 2026-07-04: Glyph background now a FULL dim plate after on-device photo (user: other toys fill the whole round matrix; DotCal's plate looked sparse/center-only). `drawBackgroundGrid` changed from sparse dots (`BG_DOT_SPACING=3`, brightness 400) to every-LED fill (`BG_DOT_SPACING=1`, brightness `180`) inside the circular mask — a soft glowing disc filling the whole matrix, with ring (1400) and text (4095) still popping on top. `:app:assembleDebug` passed (1m 14s).
 - 2026-07-04: REVERTED the hardware background plate AND the progress ring — on-device the dim gray wash "looked bad" and the user wants the rear render to be JUST the clean countdown. `buildCountdownFrame(text)` now only calls `drawCenteredText`; removed `drawBackgroundGrid`, `drawProgressRing`, `progressFraction`, the `fraction` plumbing on `renderText`, the `RING_*`/`RING_WINDOW_MS` consts, and the `kotlin.math.{PI,atan2,sqrt}` imports. Hardware render is now only countdown text (4095) on black.
+- 2026-07-04: Natural-language Quick Add (Pro Backlog #1): new `data/nlp/QuickAddParser.kt` + `QuickAddScreen` overlay + editor `prefill` param + action-bar sparkle icon. Past-time guard added: explicit time with no explicit date (example `meet neha at 5pm`) rolls to tomorrow if that time already passed today. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (2m 44s), real `compileDebugKotlin`. No phone/manual QA.
 - 2026-07-04: Picker thumbnail rebuilt to match other Glyph Toys (gray dot-matrix plate + white icon). New generator `scripts/gen_glyph_thumbnail.js` (pure Node, hand-rolled PNG encoder — no Python/PIL on this box) writes `app/src/main/res/drawable/glyph_toy_thumbnail.png` (144x144 RGBA, transparent bg so no black card): a round 25-dot plate of dark gray dots (`GRAY=45`) filling the circular mask, with a white (`255`) calendar icon on top (hangers + box border + solid header band + 3x2 date dots = 3 top, 3 bottom). Re-run with `node scripts/gen_glyph_thumbnail.js`. `:app:assembleDebug` passed (1m 7s), new PNG packaged. On-device confirmation of the clean hardware render + new picker thumbnail still needed.
 - No phone/manual UI QA run.
 
