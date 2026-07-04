@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_preview_background"
+    android:orientation="vertical"
+    android:padding="18dp">
+
+    <!-- Header: JUNE 2026 | 5 EVENTS -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:includeFontPadding="false"
+                android:text="JUNE"
+                android:textColor="@color/widget_preview_primary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:fontFamily="monospace"
+                android:includeFontPadding="false"
+                android:text="2026"
+                android:textColor="@color/widget_preview_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:includeFontPadding="false"
+            android:text="5 EVENTS"
+            android:textColor="@color/widget_accent"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Calendar grid -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:orientation="vertical">
+
+        <!-- Weekday headers -->
+        <LinearLayout style="@style/WidgetPreviewCalendarRow">
+            <TextView style="@style/WidgetPreviewWeekday" android:text="S" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="M" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="T" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="W" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="T" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="F" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="S" />
+        </LinearLayout>
+
+        <!-- Week 1: Jun 1–6 (Mon start, Sun empty) -->
+        <LinearLayout style="@style/WidgetPreviewCalendarRow">
+            <TextView style="@style/WidgetPreviewDay" android:text="" />
+            <TextView style="@style/WidgetPreviewDay" android:text="1" />
+            <TextView style="@style/WidgetPreviewDay" android:text="2" />
+            <TextView style="@style/WidgetPreviewDay" android:text="3" />
+            <TextView style="@style/WidgetPreviewDay" android:text="4" />
+            <TextView style="@style/WidgetPreviewDay" android:text="5" />
+            <TextView style="@style/WidgetPreviewDay" android:text="6" />
+        </LinearLayout>
+
+        <!-- Week 2: 7–13, 9 has event -->
+        <LinearLayout style="@style/WidgetPreviewCalendarRow">
+            <TextView style="@style/WidgetPreviewDay" android:text="7" />
+            <TextView style="@style/WidgetPreviewDay" android:text="8" />
+            <LinearLayout style="@style/WidgetPreviewEventCell">
+                <TextView style="@style/WidgetPreviewEventDayNum" android:text="9" />
+                <ImageView style="@style/WidgetPreviewEventDot" />
+            </LinearLayout>
+            <TextView style="@style/WidgetPreviewDay" android:text="10" />
+            <TextView style="@style/WidgetPreviewDay" android:text="11" />
+            <TextView style="@style/WidgetPreviewDay" android:text="12" />
+            <TextView style="@style/WidgetPreviewDay" android:text="13" />
+        </LinearLayout>
+
+        <!-- Week 3: 14–20, 18 has event -->
+        <LinearLayout style="@style/WidgetPreviewCalendarRow">
+            <TextView style="@style/WidgetPreviewDay" android:text="14" />
+            <TextView style="@style/WidgetPreviewDay" android:text="15" />
+            <TextView style="@style/WidgetPreviewDay" android:text="16" />
+            <TextView style="@style/WidgetPreviewDay" android:text="17" />
+            <LinearLayout style="@style/WidgetPreviewEventCell">
+                <TextView style="@style/WidgetPreviewEventDayNum" android:text="18" />
+                <ImageView style="@style/WidgetPreviewEventDot" />
+            </LinearLayout>
+            <TextView style="@style/WidgetPreviewDay" android:text="19" />
+            <TextView style="@style/WidgetPreviewDay" android:text="20" />
+        </LinearLayout>
+
+        <!-- Week 4: 21–27, 25 has event, 27 is today -->
+        <LinearLayout style="@style/WidgetPreviewCalendarRow">
+            <TextView style="@style/WidgetPreviewDay" android:text="21" />
+            <TextView style="@style/WidgetPreviewDay" android:text="22" />
+            <TextView style="@style/WidgetPreviewDay" android:text="23" />
+            <TextView style="@style/WidgetPreviewDay" android:text="24" />
+            <LinearLayout style="@style/WidgetPreviewEventCell">
+                <TextView style="@style/WidgetPreviewEventDayNum" android:text="25" />
+                <ImageView style="@style/WidgetPreviewEventDot" />
+            </LinearLayout>
+            <TextView style="@style/WidgetPreviewDay" android:text="26" />
+            <FrameLayout style="@style/WidgetPreviewTodayCell">
+                <TextView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/widget_preview_ring_accent"
+                    android:fontFamily="monospace"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="27"
+                    android:textColor="@color/widget_accent"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Week 5: 28–30 -->
+        <LinearLayout style="@style/WidgetPreviewCalendarRow">
+            <TextView style="@style/WidgetPreviewDay" android:text="28" />
+            <LinearLayout style="@style/WidgetPreviewEventCell">
+                <TextView style="@style/WidgetPreviewEventDayNum" android:text="29" />
+                <ImageView style="@style/WidgetPreviewEventDot" />
+            </LinearLayout>
+            <TextView style="@style/WidgetPreviewDay" android:text="30" />
+            <TextView style="@style/WidgetPreviewDay" android:text="" />
+            <TextView style="@style/WidgetPreviewDay" android:text="" />
+            <TextView style="@style/WidgetPreviewDay" android:text="" />
+            <TextView style="@style/WidgetPreviewDay" android:text="" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Dashed divider -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="8dp"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_small_horizontal_divider" />
+
+    <!-- Agenda row 1 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="43dp"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:includeFontPadding="false"
+            android:text="10:00"
+            android:textColor="@color/widget_accent"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="Design Review - Q3..."
+                android:textColor="@color/widget_preview_primary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:includeFontPadding="false"
+                android:text="CONFERENCE ROOM B"
+                android:textColor="@color/widget_preview_secondary"
+                android:textSize="8sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Agenda row 2 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="43dp"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:includeFontPadding="false"
+            android:text="14:30"
+            android:textColor="@color/widget_accent"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="Client Call: Acme Corp"
+            android:textColor="@color/widget_preview_primary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- +N MORE aligned with title column -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:fontFamily="monospace"
+        android:includeFontPadding="false"
+        android:paddingStart="43dp"
+        android:text="+3 MORE"
+        android:textColor="@color/widget_preview_secondary"
+        android:textSize="8sp" />
+</LinearLayout>

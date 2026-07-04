@@ -46,12 +46,12 @@ class WidgetDataRepository(
     private val context: Context,
     private val dao: CalendarDao,
 ) {
-    suspend fun load(size: DotCalWidgetSize, nowMs: Long = System.currentTimeMillis()): WidgetCalendarData = withContext(Dispatchers.IO) {
+    suspend fun load(size: DotCalWidgetSize, accountId: String? = null, nowMs: Long = System.currentTimeMillis()): WidgetCalendarData = withContext(Dispatchers.IO) {
         val zoneId = ZoneId.systemDefault()
         val now = Instant.ofEpochMilli(nowMs).atZone(zoneId)
         val today = now.toLocalDate()
         val rangeEnd = today.plusDays(WIDGET_RANGE_DAYS)
-        val visibleItems = dao.getVisibleEventsForWidget(today.atStartMs(zoneId), rangeEnd.atStartMs(zoneId))
+        val visibleItems = dao.getVisibleEventsForWidget(today.atStartMs(zoneId), rangeEnd.atStartMs(zoneId), accountId)
             .expandRecurring(today, rangeEnd)
             .filter { it.endTimeMs >= nowMs }
             .sortedForWidget(zoneId)

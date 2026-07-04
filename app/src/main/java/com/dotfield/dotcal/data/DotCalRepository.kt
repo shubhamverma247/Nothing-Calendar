@@ -23,11 +23,13 @@ import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 import java.util.UUID
 import kotlin.math.absoluteValue
 
 data class EventEditorData(
     val eventId: String? = null,
+    val accountId: String? = null,
     val title: String,
     val description: String,
     val location: String,
@@ -88,6 +90,14 @@ class DotCalRepository(
     }
 
     fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts()
+
+    fun observeAssignableAccounts(): Flow<List<CalendarAccount>> {
+        return dao.observeAccounts().map { accounts ->
+            accounts
+                .filterNot { it.isReadOnlyGeneratedAccount() }
+                .sortedWith(compareBy<CalendarAccount> { it.sortOrder }.thenBy { it.displayName })
+        }
+    }
 
     /** Result summary of an ICS import. */
     data class IcsImportResult(
@@ -419,8 +429,10 @@ class DotCalRepository(
         }
         require(end > start) { "END MUST BE AFTER START" }
         val now = System.currentTimeMillis()
+        val targetAccountId = data.accountId ?: existingMaster?.accountId ?: existing?.accountId ?: LOCAL_ACCOUNT_ID
         val event = existingMaster?.copy(
             id = eventId,
+            accountId = targetAccountId,
             title = data.title.trim(),
             description = data.description.trim(),
             location = data.location.trim(),
@@ -434,7 +446,7 @@ class DotCalRepository(
             updatedAtMs = now,
         ) ?: CalendarEvent(
                 id = eventId,
-                accountId = LOCAL_ACCOUNT_ID,
+                accountId = targetAccountId,
                 title = data.title.trim(),
                 description = data.description.trim(),
                 location = data.location.trim(),
@@ -621,6 +633,7 @@ class DotCalRepository(
         val detachedId = data.eventId ?: UUID.randomUUID().toString()
         val detachedEvent = master.copy(
             id = detachedId,
+            accountId = data.accountId ?: master.accountId,
             title = data.title.trim(),
             description = data.description.trim(),
             location = data.location.trim(),
@@ -830,6 +843,20 @@ class DotCalRepository(
 
         fun holidayAccountId(countryCode: String): String = "$HOLIDAY_ACCOUNT_PREFIX$countryCode"
     }
+}
+
+private fun CalendarAccount.isReadOnlyGeneratedAccount(): Boolean {
+    val raw = listOf(id, accountName, displayName, accountType).joinToString(" ").lowercase(Locale.US)
+    return id == ContactsProviderDataSource.BIRTHDAY_ACCOUNT_ID ||
+        id.startsWith("holiday-") ||
+        raw.contains("birthday") ||
+        raw.contains("#holiday@") ||
+        raw.contains("holiday@group.v.calendar.google.com") ||
+        raw.contains("#contacts@") ||
+        raw.contains("contacts@group.v.calendar.google.com") ||
+        raw.contains("addressbook#contacts") ||
+        accountName.equals("BIRTHDAY", ignoreCase = true) ||
+        displayName.startsWith("Holidays -", ignoreCase = true)
 }
 
 private const val RECURRENCE_OCCURRENCE_SEPARATOR = "::occurrence::"

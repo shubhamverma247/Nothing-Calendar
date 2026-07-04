@@ -201,6 +201,7 @@ import androidx.core.view.WindowCompat
 import com.dotfield.dotcal.BuildConfig
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
+import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.nlp.QuickAddParser
@@ -289,6 +290,8 @@ fun DotCalApp(
     val agendaEvents by viewModel.agendaEvents.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val assignableAccounts by viewModel.assignableAccounts.collectAsStateWithLifecycle()
+    val lastSelectedEventAccountId by viewModel.lastSelectedEventAccountId.collectAsStateWithLifecycle()
     val holidayCountries by viewModel.holidayCountries.collectAsStateWithLifecycle()
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val syncMetadata by viewModel.syncMetadata.collectAsStateWithLifecycle()
@@ -445,6 +448,16 @@ fun DotCalApp(
             parseWeekStartOption(preferences[CalendarPreferences.KEY_WEEK_START])
         }
     }.collectAsStateWithLifecycle(initialValue = WeekStartOption.RegionDefault)
+    val widgetTransparent by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_WIDGET_TRANSPARENT] ?: false
+        }
+    }.collectAsStateWithLifecycle(initialValue = false)
+    val widgetDotTexture by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_WIDGET_DOT_TEXTURE] ?: true
+        }
+    }.collectAsStateWithLifecycle(initialValue = true)
     val weekStartDay = remember(weekStartOption) { resolveWeekStartDay(weekStartOption) }
     val onboardingDone by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
@@ -1052,6 +1065,8 @@ fun DotCalApp(
                 defaultReminderMinutes = defaultReminderMinutes,
                 defaultAllDayReminderTime = defaultAllDayReminderTime,
                 weekStartOption = weekStartOption,
+                widgetTransparent = widgetTransparent,
+                widgetDotTexture = widgetDotTexture,
                 holidayCountries = holidayCountries,
                 accounts = accounts,
                 hasCalendarPermission = hasCalendarPermission,
@@ -1108,6 +1123,30 @@ fun DotCalApp(
                     scope.launch {
                         context.calendarPreferencesDataStore.edit { preferences ->
                             preferences[CalendarPreferences.KEY_WEEK_START] = option.storageKey
+                        }
+                    }
+                },
+                onWidgetTransparentChange = { enabled ->
+                    if (!isPro) {
+                        showPaywall = true
+                    } else {
+                        scope.launch {
+                            context.calendarPreferencesDataStore.edit { preferences ->
+                                preferences[CalendarPreferences.KEY_WIDGET_TRANSPARENT] = enabled
+                            }
+                            WidgetUpdateWorker.updateNow(context)
+                        }
+                    }
+                },
+                onWidgetDotTextureChange = { enabled ->
+                    if (!isPro) {
+                        showPaywall = true
+                    } else {
+                        scope.launch {
+                            context.calendarPreferencesDataStore.edit { preferences ->
+                                preferences[CalendarPreferences.KEY_WIDGET_DOT_TEXTURE] = enabled
+                            }
+                            WidgetUpdateWorker.updateNow(context)
                         }
                     }
                 },
@@ -1356,6 +1395,8 @@ fun DotCalApp(
                 } else {
                     reminders.firstOrNull { it.eventId == editingEvent?.baseEventId() }?.minutesBefore
                 },
+                accounts = assignableAccounts,
+                lastSelectedAccountId = lastSelectedEventAccountId,
                 palette = palette,
                 isPro = isPro,
                 prefill = quickAddPrefill,
@@ -4089,6 +4130,8 @@ private fun EventEditorScreen(
     selectedDate: LocalDate,
     selectedTime: LocalTime,
     initialReminderMinutes: Int?,
+    accounts: List<CalendarAccount>,
+    lastSelectedAccountId: String?,
     palette: DotCalPalette,
     isPro: Boolean,
     onRequestPro: () -> Unit,
@@ -4119,6 +4162,15 @@ private fun EventEditorScreen(
     var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule ?: seed?.rrule) }
     var imageUris by remember(editorStateKey) { mutableStateOf(parseJsonStringArray(event?.imageUris ?: "[]")) }
     var voiceNotePath by remember(editorStateKey) { mutableStateOf(event?.voiceNotePath) }
+    val writableAccounts = accounts
+    var selectedAccountId by remember(editorStateKey, writableAccounts, lastSelectedAccountId) {
+        mutableStateOf(event?.accountId?.takeIf { id -> writableAccounts.any { it.id == id } }
+            ?: lastSelectedAccountId?.takeIf { id -> event == null && writableAccounts.any { it.id == id } }
+            ?: writableAccounts.firstOrNull { it.isPrimary == 1 }?.id
+            ?: writableAccounts.firstOrNull()?.id
+            ?: DotCalRepository.LOCAL_ACCOUNT_ID)
+    }
+    var showCalendarPicker by remember { mutableStateOf(false) }
     var dateTimePicker by remember { mutableStateOf<DateTimeField?>(null) }
     var showReminderPicker by remember { mutableStateOf(false) }
     var showRepeatPicker by remember { mutableStateOf(false) }
@@ -4176,6 +4228,7 @@ private fun EventEditorScreen(
     fun currentEditorData(): EventEditorData {
         return EventEditorData(
             eventId = draftEventId,
+            accountId = selectedAccountId,
             title = title,
             description = description,
             location = location,
@@ -4251,6 +4304,16 @@ private fun EventEditorScreen(
         ) {
             Box(modifier = Modifier.size(1.dp).focusRequester(focusSinkRequester).focusable())
             Spacer(modifier = Modifier.height(16.dp))
+            CalendarFieldPill(
+                account = writableAccounts.firstOrNull { it.id == selectedAccountId },
+                palette = palette,
+                enabled = writableAccounts.size > 1,
+                onClick = {
+                    clearEditorFocus()
+                    showCalendarPicker = true
+                },
+            )
+            Spacer(modifier = Modifier.height(10.dp))
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
@@ -4475,6 +4538,153 @@ private fun EventEditorScreen(
                 showApplyScopePicker = false
             },
         )
+    }
+    if (showCalendarPicker) {
+        CalendarChoiceDialog(
+            accounts = writableAccounts,
+            selectedAccountId = selectedAccountId,
+            palette = palette,
+            onDismiss = { showCalendarPicker = false },
+            onSelected = {
+                selectedAccountId = it
+                showCalendarPicker = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun CalendarFieldPill(
+    account: CalendarAccount?,
+    palette: DotCalPalette,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val swatch = account?.color?.let { Color(parseColor(it)) } ?: palette.accent
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.dialogSurface)
+            .drawBehind {
+                drawRoundRect(
+                    color = palette.line.copy(alpha = 0.55f),
+                    cornerRadius = CornerRadius(14.dp.toPx(), 14.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            }
+            .noRippleClickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(9.dp)
+                .clip(CircleShape)
+                .background(swatch),
+        )
+        Text(
+            "Calendar",
+            color = palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(start = 10.dp),
+        )
+        Text(
+            account?.displayName?.readableCalendarLabel() ?: "Personal",
+            color = palette.primaryText,
+            fontFamily = mono,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f).padding(start = 12.dp),
+        )
+        if (enabled) {
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun CalendarChoiceDialog(
+    accounts: List<CalendarAccount>,
+    selectedAccountId: String,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        title = {
+            Text("Choose calendar", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold)
+        },
+        text = {
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                lazyItems(accounts, key = { it.id }) { account ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelected(account.id) }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(Color(parseColor(account.color))),
+                        )
+                        Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text(
+                                account.displayName.readableCalendarLabel(),
+                                color = palette.primaryText,
+                                fontFamily = mono,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 15.sp,
+                            )
+                            CalendarAccountSubtitle(account = account, palette = palette)
+                        }
+                        if (account.id == selectedAccountId) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = palette.accent, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                    HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = palette.primaryText, fontFamily = mono)
+            }
+        },
+    )
+}
+
+@Composable
+private fun CalendarAccountSubtitle(account: CalendarAccount, palette: DotCalPalette) {
+    val subtitle = account.cleanPickerSubtitle()
+    if (subtitle.isBlank()) return
+    Text(
+        subtitle,
+        color = palette.secondaryText,
+        fontFamily = mono,
+        fontSize = 12.sp,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+private fun CalendarAccount.cleanPickerSubtitle(): String {
+    return when {
+        id == DotCalRepository.LOCAL_ACCOUNT_ID || accountType.equals("LOCAL", ignoreCase = true) -> "On this device"
+        accountType.equals("GOOGLE", ignoreCase = true) -> "Google calendar"
+        accountType.equals("DEVICE", ignoreCase = true) -> "Device calendar"
+        accountType.isNotBlank() -> accountType.readableCalendarLabel()
+        else -> ""
     }
 }
 
@@ -6330,6 +6540,8 @@ private fun SettingsPreview(
     defaultReminderMinutes: Int?,
     defaultAllDayReminderTime: LocalTime,
     weekStartOption: WeekStartOption,
+    widgetTransparent: Boolean,
+    widgetDotTexture: Boolean,
     holidayCountries: List<HolidayCountryUiItem>,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
@@ -6340,6 +6552,8 @@ private fun SettingsPreview(
     onDefaultReminderSelected: (Int?) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
+    onWidgetTransparentChange: (Boolean) -> Unit,
+    onWidgetDotTextureChange: (Boolean) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
     onAddHolidayCountry: (HolidayCountryUiItem) -> Unit,
     onRemoveHolidayCountry: (HolidayCountryUiItem) -> Unit,
@@ -6378,6 +6592,8 @@ private fun SettingsPreview(
             defaultReminderMinutes = defaultReminderMinutes,
             defaultAllDayReminderTime = defaultAllDayReminderTime,
             weekStartOption = weekStartOption,
+            widgetTransparent = widgetTransparent,
+            widgetDotTexture = widgetDotTexture,
             holidayCountries = holidayCountries,
             accounts = accounts,
             hasCalendarPermission = hasCalendarPermission,
@@ -6388,6 +6604,8 @@ private fun SettingsPreview(
             onDefaultReminderSelected = onDefaultReminderSelected,
             onDefaultAllDayReminderTimeSelected = onDefaultAllDayReminderTimeSelected,
             onWeekStartSelected = onWeekStartSelected,
+            onWidgetTransparentChange = onWidgetTransparentChange,
+            onWidgetDotTextureChange = onWidgetDotTextureChange,
             onBirthdayEnabledChange = onBirthdayEnabledChange,
             onGlobalHolidays = { onScreenChange(SettingsScreen.GlobalHolidays) },
             onPrivacyPolicy = { onScreenChange(SettingsScreen.PrivacyPolicy) },
@@ -6495,6 +6713,8 @@ private fun SettingsRoot(
     defaultReminderMinutes: Int?,
     defaultAllDayReminderTime: LocalTime,
     weekStartOption: WeekStartOption,
+    widgetTransparent: Boolean,
+    widgetDotTexture: Boolean,
     holidayCountries: List<HolidayCountryUiItem>,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
@@ -6505,6 +6725,8 @@ private fun SettingsRoot(
     onDefaultReminderSelected: (Int?) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
+    onWidgetTransparentChange: (Boolean) -> Unit,
+    onWidgetDotTextureChange: (Boolean) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
     onGlobalHolidays: () -> Unit,
     onPrivacyPolicy: () -> Unit,
@@ -6584,6 +6806,23 @@ private fun SettingsRoot(
                 isPro = isPro,
                 palette = palette,
                 onClick = onDateCalculator,
+            )
+            SettingsWidgetToggleRow(
+                title = "Transparent Widgets",
+                subtitle = "Let wallpaper show through all DotCal widgets",
+                checked = widgetTransparent,
+                isPro = isPro,
+                palette = palette,
+                onCheckedChange = onWidgetTransparentChange,
+            )
+            SettingsWidgetToggleRow(
+                title = "Widget Dot Texture",
+                subtitle = if (widgetTransparent) "Only applies when transparent widgets are off" else "Show the subtle DotCal dotted surface",
+                checked = !widgetTransparent && widgetDotTexture,
+                enabled = !widgetTransparent,
+                isPro = isPro,
+                palette = palette,
+                onCheckedChange = onWidgetDotTextureChange,
             )
             SettingsToggleRow(title = "Sync enabled", checked = syncEnabled, palette = palette, onCheckedChange = onSyncEnabledChange)
             SettingsSyncIntervalRow(intervalMins = syncIntervalMins, palette = palette, onIntervalSelected = onSyncIntervalSelected)
@@ -7782,6 +8021,56 @@ private fun SettingsToggleRow(
             palette = palette,
             onCheckedChange = onCheckedChange,
         )
+    }
+}
+
+@Composable
+private fun SettingsWidgetToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    isPro: Boolean,
+    palette: DotCalPalette,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val titleColor = if (enabled || !isPro) palette.primaryText else palette.secondaryText
+    val subtitleColor = if (enabled || !isPro) palette.secondaryText else palette.disabledText
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(76.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, color = titleColor, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+                if (!isPro) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    ProFeatureTag(palette)
+                }
+            }
+            Text(subtitle, color = subtitleColor, fontFamily = mono, fontSize = 13.sp, lineHeight = 16.sp)
+        }
+        if (isPro) {
+            DotCalSwitch(
+                checked = checked,
+                palette = palette,
+                enabled = enabled,
+                onCheckedChange = onCheckedChange,
+            )
+        } else {
+            Icon(
+                Icons.Default.Lock,
+                contentDescription = null,
+                tint = palette.secondaryText,
+                modifier = Modifier
+                    .size(34.dp)
+                    .padding(8.dp)
+                    .noRippleClickable { onCheckedChange(!checked) },
+            )
+        }
     }
 }
 

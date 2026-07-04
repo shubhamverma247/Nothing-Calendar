@@ -25,4 +25,7 @@ object CalendarPreferences {
     val KEY_ACCENT_COLOR = stringPreferencesKey("accent_color")
     val KEY_LAST_SELECTED_DATE = stringPreferencesKey("last_selected_date")
     val KEY_IS_PRO = booleanPreferencesKey("is_pro")
+    val KEY_WIDGET_TRANSPARENT = booleanPreferencesKey("widget_transparent")
+    val KEY_WIDGET_DOT_TEXTURE = booleanPreferencesKey("widget_dot_texture")
+    val KEY_WIDGET_ACCOUNT_ID = stringPreferencesKey("widget_account_id")
 }

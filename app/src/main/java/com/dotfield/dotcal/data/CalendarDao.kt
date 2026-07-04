@@ -12,6 +12,9 @@ interface CalendarDao {
     @Query("SELECT * FROM calendar_accounts ORDER BY sortOrder ASC")
     fun observeAccounts(): Flow<List<CalendarAccount>>
 
+    @Query("SELECT * FROM calendar_accounts ORDER BY sortOrder ASC")
+    suspend fun getAccountsForWidgetConfig(): List<CalendarAccount>
+
     @Query("SELECT * FROM sync_metadata ORDER BY lastSyncMs DESC")
     fun observeSyncMetadata(): Flow<List<SyncMetadata>>
 
@@ -84,6 +87,7 @@ interface CalendarDao {
         SELECT calendar_events.* FROM calendar_events
         INNER JOIN calendar_accounts ON calendar_accounts.id = calendar_events.accountId
         WHERE calendar_accounts.isVisible = 1
+        AND (:accountId IS NULL OR calendar_events.accountId = :accountId)
         AND calendar_events.isTask = 0
         AND (
             (calendar_events.startTimeMs < :rangeEndMs AND calendar_events.endTimeMs >= :rangeStartMs)
@@ -92,7 +96,7 @@ interface CalendarDao {
         ORDER BY calendar_events.startTimeMs ASC
         """,
     )
-    suspend fun getVisibleEventsForWidget(rangeStartMs: Long, rangeEndMs: Long): List<CalendarEvent>
+    suspend fun getVisibleEventsForWidget(rangeStartMs: Long, rangeEndMs: Long, accountId: String?): List<CalendarEvent>
 
     @Query(
         """

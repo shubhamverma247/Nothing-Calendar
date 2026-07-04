@@ -57,6 +57,12 @@ class DotCalViewModel(
     val accounts: StateFlow<List<CalendarAccount>> = repository.observeAccounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val assignableAccounts: StateFlow<List<CalendarAccount>> = repository.observeAssignableAccounts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _lastSelectedEventAccountId = MutableStateFlow<String?>(null)
+    val lastSelectedEventAccountId: StateFlow<String?> = _lastSelectedEventAccountId
+
     val syncMetadata: StateFlow<List<SyncMetadata>> = repository.observeSyncMetadata()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -162,6 +168,9 @@ class DotCalViewModel(
                 data = data,
                 recurringEditScope = recurringEditScope,
             )
+            if (existing == null) {
+                _lastSelectedEventAccountId.value = data.accountId
+            }
             onSaved()
         }
     }

@@ -20,6 +20,8 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
+import androidx.glance.state.GlanceStateDefinition
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -42,34 +44,42 @@ import com.dotfield.dotcal.R
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import kotlinx.coroutines.flow.first
+import java.time.Duration
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 enum class DotCalWidgetSize(val maxItems: Int) {
     Small(maxItems = 1),
-    Medium(maxItems = 1),
-    Large(maxItems = 2),
+    Countdown(maxItems = 1),
+    Medium(maxItems = 3),
+    Large(maxItems = 3),
 }
 
 class SmallDotCalWidget : DotCalWidget(DotCalWidgetSize.Small, DpSize(110.dp, 110.dp))
 class MediumDotCalWidget : DotCalWidget(DotCalWidgetSize.Medium, DpSize(250.dp, 140.dp))
 class LargeDotCalWidget : DotCalWidget(DotCalWidgetSize.Large, DpSize(250.dp, 250.dp))
+class EventCountdownDotCalWidget : DotCalWidget(DotCalWidgetSize.Countdown, DpSize(110.dp, 110.dp))
+class AgendaListDotCalWidget : DotCalWidget(DotCalWidgetSize.Medium, DpSize(250.dp, 140.dp))
+class MonthGridDotCalWidget : DotCalWidget(DotCalWidgetSize.Large, DpSize(250.dp, 250.dp))
 
 abstract class DotCalWidget(
     private val widgetSize: DotCalWidgetSize,
     private val minSize: DpSize,
 ) : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Responsive(setOf(minSize))
+    override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = WidgetDataRepository.create(context).load(widgetSize)
-        val palette = dotCalWidgetPalette(context)
+        val settings = syncDotCalWidgetState(context, id)
+        val data = WidgetDataRepository.create(context).load(widgetSize, settings.accountId)
         val isPro = context.calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_IS_PRO] ?: false
         provideContent {
+            val palette = dotCalWidgetPalette(context, currentDotCalWidgetSettings())
             DotCalGlanceTheme {
                 when (widgetSize) {
                     DotCalWidgetSize.Small -> SmallWidget(context, data, palette)
+                    DotCalWidgetSize.Countdown -> CountdownWidget(context, data, palette)
                     DotCalWidgetSize.Medium -> MediumWidget(context, data, palette)
                     DotCalWidgetSize.Large -> if (isPro) LargeWidget(context, data, palette) else LargeWidgetLocked(context, palette)
                 }
@@ -150,7 +160,9 @@ private fun SmallWidget(context: Context, data: WidgetCalendarData, palette: Dot
                     CompactAddPrompt("ADD EVENT", 22, palette)
                 }
             } else {
-                Text(item.title, maxLines = 1, style = primaryStyle(palette, 16, FontWeight.Bold))
+                Text(countdownLabel(item), maxLines = 1, style = monoStyle(palette.accent, 18, FontWeight.Bold))
+                Spacer(GlanceModifier.height(2.dp))
+                Text(item.title, maxLines = 1, style = primaryStyle(palette, 14, FontWeight.Bold))
                 Spacer(GlanceModifier.height(3.dp))
                 Text(item.detailLine(), maxLines = 1, style = monoStyle(palette.secondary, 9, FontWeight.Normal))
             }
@@ -159,8 +171,38 @@ private fun SmallWidget(context: Context, data: WidgetCalendarData, palette: Dot
 }
 
 @Composable
-private fun MediumWidget(context: Context, data: WidgetCalendarData, palette: DotCalWidgetPalette) {
+private fun CountdownWidget(context: Context, data: WidgetCalendarData, palette: DotCalWidgetPalette) {
     val item = data.nextEvent
+    WidgetSurfaceBox(palette) {
+        Box(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .padding(14.dp)
+                .clickable(actionStartActivity(item?.let { itemIntent(context, it) } ?: openAddEventIntent(context))),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (item == null) {
+                CompactAddPrompt("ADD EVENT", 30, palette)
+            } else {
+                Column(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("NEXT IN", maxLines = 1, style = monoStyle(palette.secondary, 10, FontWeight.Bold, TextAlign.Center))
+                    Spacer(GlanceModifier.height(5.dp))
+                    Text(countdownLabel(item), maxLines = 1, style = monoStyle(palette.accent, 25, FontWeight.Bold, TextAlign.Center))
+                    Spacer(GlanceModifier.height(7.dp))
+                    Text(item.title, maxLines = 2, style = primaryStyle(palette, 14, FontWeight.Bold))
+                    Spacer(GlanceModifier.height(4.dp))
+                    Text(item.timeLabel, maxLines = 1, style = monoStyle(palette.secondary, 9, FontWeight.Normal, TextAlign.Center))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediumWidget(context: Context, data: WidgetCalendarData, palette: DotCalWidgetPalette) {
     WidgetSurfaceBox(palette) {
         Row(
             modifier = GlanceModifier.fillMaxSize().padding(start = 18.dp, end = 14.dp),
@@ -170,14 +212,14 @@ private fun MediumWidget(context: Context, data: WidgetCalendarData, palette: Do
                 modifier = GlanceModifier.width(54.dp).clickable(actionStartActivity(openCalendarMonthIntent(context))),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                RingBadge(item?.dayOfMonth ?: data.todayLabel, 46, palette, textSize = 20, textColor = palette.primary)
+                RingBadge(data.nextEvent?.dayOfMonth ?: data.todayLabel, 46, palette, textSize = 20, textColor = palette.primary)
                 Spacer(GlanceModifier.height(7.dp))
                 Text(todayDayAbbrev(), maxLines = 1, style = monoStyle(palette.secondary, 11, FontWeight.Bold))
             }
             Spacer(GlanceModifier.width(16.dp))
             MediumVerticalDivider()
             Spacer(GlanceModifier.width(16.dp))
-            if (item == null) {
+            if (data.events.isEmpty()) {
                 Box(
                     modifier = GlanceModifier.fillMaxWidth().clickable(actionStartActivity(openAddEventIntent(context))),
                     contentAlignment = Alignment.CenterStart,
@@ -185,22 +227,18 @@ private fun MediumWidget(context: Context, data: WidgetCalendarData, palette: Do
                     Text("NO EVENTS - TAP TO ADD", maxLines = 1, style = monoStyle(palette.secondary, 12, FontWeight.Bold))
                 }
             } else {
-                Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(
-                        modifier = GlanceModifier
-                            .width(180.dp)
-                            .clickable(actionStartActivity(itemIntent(context, item))),
-                    ) {
-                        Text(item.title, maxLines = 2, style = primaryStyle(palette, 20, FontWeight.Bold))
-                        Spacer(GlanceModifier.height(6.dp))
-                        Text(item.detailLine(), maxLines = 1, style = monoStyle(palette.secondary, 12, FontWeight.Normal))
+                Column(modifier = GlanceModifier.fillMaxWidth()) {
+                    Text("AGENDA", maxLines = 1, style = monoStyle(palette.secondary, 10, FontWeight.Bold))
+                    Spacer(GlanceModifier.height(6.dp))
+                    data.events.take(3).forEach { item ->
+                        MediumAgendaRow(context, item, palette)
                     }
                     if (data.moreItemCount > 0) {
-                        Spacer(GlanceModifier.width(4.dp))
-                        Column(modifier = GlanceModifier.height(132.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            OutlinePill("+${data.moreItemCount}", palette, verticalPadding = 1)
-                            Spacer(GlanceModifier.height(92.dp))
-                        }
+                        Text(
+                            "+${data.moreItemCount} MORE",
+                            modifier = GlanceModifier.padding(start = 58.dp).clickable(actionStartActivity(openCalendarMonthIntent(context))),
+                            style = monoStyle(palette.secondary, 10, FontWeight.Bold),
+                        )
                     }
                 }
             }
@@ -215,7 +253,7 @@ private fun LargeWidget(context: Context, data: WidgetCalendarData, palette: Dot
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .padding(start = 18.dp, top = 26.dp, end = 18.dp, bottom = 18.dp),
+                .padding(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 12.dp),
         ) {
             Row(
                 modifier = GlanceModifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp),
@@ -231,9 +269,9 @@ private fun LargeWidget(context: Context, data: WidgetCalendarData, palette: Dot
                     )
                 }
             }
-            Spacer(GlanceModifier.height(17.dp))
+            Spacer(GlanceModifier.height(10.dp))
             MonthCalendar(context, data, palette)
-            Spacer(GlanceModifier.height(15.dp))
+            Spacer(GlanceModifier.height(8.dp))
             if (data.events.isEmpty()) {
                 Box(
                     modifier = GlanceModifier.fillMaxWidth().height(46.dp).clickable(actionStartActivity(openAddEventIntent(context))),
@@ -335,7 +373,7 @@ private fun RingBadge(
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            modifier = GlanceModifier.size((size - 4).dp).background(palette.background).cornerRadius(((size - 4) / 2).dp),
+            modifier = GlanceModifier.size((size - 4).dp).background(palette.solidSurface).cornerRadius(((size - 4) / 2).dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(value, maxLines = 1, style = monoStyle(textColor, textSize, FontWeight.Bold))
@@ -348,18 +386,68 @@ private fun AgendaRow(context: Context, item: WidgetEventItem, palette: DotCalWi
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .padding(start = 12.dp, bottom = 5.dp)
+            .padding(start = 12.dp, bottom = 2.dp)
             .clickable(actionStartActivity(itemIntent(context, item))),
         verticalAlignment = Alignment.Top,
     ) {
-        Text(item.timeLabel, maxLines = 1, modifier = GlanceModifier.width(50.dp).padding(top = 3.dp), style = monoStyle(palette.accent, 10, FontWeight.Bold))
+        Text(item.timeLabel, maxLines = 1, modifier = GlanceModifier.width(50.dp).padding(top = 2.dp), style = monoStyle(palette.accent, 9, FontWeight.Bold))
         Spacer(GlanceModifier.width(6.dp))
         Column(modifier = GlanceModifier.width(168.dp)) {
-            Text(item.title, maxLines = 1, style = primaryStyle(palette, 16, FontWeight.Bold))
+            Text(item.title, maxLines = 1, style = primaryStyle(palette, 14, FontWeight.Bold))
             if (item.location.isNotBlank()) {
-                Spacer(GlanceModifier.height(1.dp))
-                Text(item.location.uppercase(Locale.getDefault()), maxLines = 1, style = monoStyle(palette.secondary, 10, FontWeight.Normal))
+                Text(item.location.uppercase(Locale.getDefault()), maxLines = 1, style = monoStyle(palette.secondary, 9, FontWeight.Normal))
             }
+        }
+    }
+}
+
+class EventCountdownWidgetReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = EventCountdownDotCalWidget()
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+            WidgetUpdateWorker.enqueue(context)
+        }
+    }
+}
+
+class AgendaListWidgetReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = AgendaListDotCalWidget()
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+            WidgetUpdateWorker.enqueue(context)
+        }
+    }
+}
+
+class MonthGridWidgetReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = MonthGridDotCalWidget()
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+            WidgetUpdateWorker.enqueue(context)
+        }
+    }
+}
+
+@Composable
+private fun MediumAgendaRow(context: Context, item: WidgetEventItem, palette: DotCalWidgetPalette) {
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .padding(bottom = 7.dp)
+            .clickable(actionStartActivity(itemIntent(context, item))),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(item.timeLabel, maxLines = 1, modifier = GlanceModifier.width(52.dp).padding(top = 2.dp), style = monoStyle(palette.accent, 10, FontWeight.Bold))
+        Spacer(GlanceModifier.width(6.dp))
+        Column(modifier = GlanceModifier.width(134.dp)) {
+            Text(item.title, maxLines = 1, style = primaryStyle(palette, 14, FontWeight.Bold))
+            Text(item.dateLabel.uppercase(Locale.getDefault()), maxLines = 1, style = monoStyle(palette.secondary, 9, FontWeight.Normal))
         }
     }
 }
@@ -375,7 +463,7 @@ private fun MonthCalendar(context: Context, data: WidgetCalendarData, palette: D
 private fun MonthGrid(context: Context, days: List<WidgetCalendarDay>, palette: DotCalWidgetPalette) {
     Row(GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         listOf("S", "M", "T", "W", "T", "F", "S").forEach {
-            Box(GlanceModifier.width(CalendarCellWidth).height(16.dp), contentAlignment = Alignment.Center) {
+            Box(GlanceModifier.width(CalendarCellWidth).height(15.dp), contentAlignment = Alignment.Center) {
                 Text(it, style = monoStyle(palette.secondary, 10, FontWeight.Bold))
             }
         }
@@ -386,7 +474,7 @@ private fun MonthGrid(context: Context, days: List<WidgetCalendarDay>, palette: 
                 Box(
                     modifier = GlanceModifier
                         .width(CalendarCellWidth)
-                        .height(25.dp)
+                        .height(23.dp)
                         .clickable(actionStartActivity(openCalendarDateIntent(context, day.dateIso))),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -488,7 +576,7 @@ private fun OutlinePill(text: String, palette: DotCalWidgetPalette, verticalPadd
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            modifier = GlanceModifier.background(palette.background).cornerRadius(9.dp).padding(horizontal = 6.dp, vertical = verticalPadding.dp),
+            modifier = GlanceModifier.background(palette.solidSurface).cornerRadius(9.dp).padding(horizontal = 6.dp, vertical = verticalPadding.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(text, maxLines = 1, style = monoStyle(palette.accent, 10, FontWeight.Bold, TextAlign.Center))
@@ -501,7 +589,7 @@ private fun WidgetSurfaceBox(palette: DotCalWidgetPalette, content: @Composable 
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(palette.background)
+            .background(ImageProvider(palette.surfaceDrawable))
             .cornerRadius(18.dp),
     ) {
         // Dot texture: a tiled BitmapDrawable applied as a view background.
@@ -551,6 +639,18 @@ private val CalendarCellWidth = 35.dp
 
 private fun todayDayAbbrev(): String {
     return LocalDate.now().format(DateTimeFormatter.ofPattern("EEE", Locale.getDefault())).uppercase(Locale.getDefault())
+}
+
+private fun countdownLabel(item: WidgetEventItem): String {
+    val millis = item.startTimeMs - System.currentTimeMillis()
+    if (millis <= 0L) return "NOW"
+    val duration = Duration.ofMillis(millis)
+    val days = duration.toDays()
+    if (days > 0) return "${days}D"
+    val hours = duration.toHours()
+    val minutes = duration.toMinutes() % 60
+    if (hours > 0) return if (minutes > 0) "${hours}H ${minutes}M" else "${hours}H"
+    return "${duration.toMinutes().coerceAtLeast(1)}M"
 }
 
 private fun openAddEventIntent(context: Context): Intent {
