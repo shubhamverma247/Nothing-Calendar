@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
@@ -227,6 +228,31 @@ class DotCalRepository(
     }
 
     fun observeUpcomingTasks(nowMs: Long = System.currentTimeMillis()): Flow<List<CalendarEvent>> = dao.observeUpcomingTasks(nowMs)
+
+    /**
+     * One-shot snapshot of the next upcoming items whose start is still in the future,
+     * soonest first. Reuses the existing recurrence expansion so Glyph surfaces stay
+     * consistent with the agenda. [includeTasks] adds tasks to the list (Pro). Returns
+     * an empty list when nothing is coming up. No schema or storage change.
+     */
+    suspend fun getNextUpcomingList(
+        includeTasks: Boolean,
+        nowMs: Long = System.currentTimeMillis(),
+        limit: Int = 5,
+    ): List<CalendarEvent> {
+        val today = Instant.ofEpochMilli(nowMs).atZone(ZoneId.systemDefault()).toLocalDate()
+        val events = observeUpcomingAgendaEvents(today).first()
+            .filter { it.isTask == 0 && it.startTimeMs > nowMs }
+        val tasks = if (includeTasks) {
+            observeUpcomingTasks(nowMs).first()
+                .filter { it.isCompleted == 0 && it.startTimeMs > nowMs }
+        } else {
+            emptyList()
+        }
+        return (events + tasks)
+            .sortedBy { it.startTimeMs }
+            .take(limit.coerceAtLeast(1))
+    }
 
     fun observeCompletedTasks(): Flow<List<CalendarEvent>> = dao.observeCompletedTasks()
 

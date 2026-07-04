@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Glyph Matrix SDK ships minSdk 33; DotCal supports 30. The Glyph Toy is guarded
+         to run only on Nothing hardware (Android 14+), so overriding is safe: the SDK
+         classes are never loaded on unsupported/older devices. -->
+    <uses-sdk tools:overrideLibrary="com.nothing.thirdparty" />
+
+    <!-- Nothing Glyph permission. Absent on non-Nothing devices; feature stays inert. -->
+    <uses-permission android:name="com.nothing.ketchum.permission.ENABLE" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
@@ -11,6 +19,10 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Nothing Glyph Toy runs as a special-use foreground service. Every shipping
+         third-party Glyph toy declares this; the Glyph Toys picker only lists toy
+         services declared with a foreground-service type. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="com.android.vending.BILLING" />
 
@@ -22,6 +34,11 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.DotCal">
+        <!-- Required by Nothing's Glyph Matrix toy manager for third-party toy discovery. -->
+        <meta-data
+            android:name="NothingKey"
+            android:value="test" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -99,5 +116,32 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/dotcal_widget_large" />
         </receiver>
+
+        <!-- Glyph Matrix Toy: live countdown to the next DotCal event/task on Nothing
+             Phone (3) / (4a) Pro. Free shows next event; Pro adds tasks + long-press cycle. -->
+        <service
+            android:name=".glyph.DotCalGlyphToyService"
+            android:exported="true"
+            android:foregroundServiceType="specialUse"
+            tools:ignore="ExportedService">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Used for service launch via Glyph SDK on Nothing Phone devices" />
+            <intent-filter>
+                <action android:name="com.nothing.glyph.TOY" />
+            </intent-filter>
+            <meta-data
+                android:name="com.nothing.glyph.toy.name"
+                android:resource="@string/glyph_toy_name" />
+            <meta-data
+                android:name="com.nothing.glyph.toy.image"
+                android:resource="@drawable/glyph_toy_thumbnail" />
+            <meta-data
+                android:name="com.nothing.glyph.toy.summary"
+                android:resource="@string/glyph_toy_summary" />
+            <meta-data
+                android:name="com.nothing.glyph.toy.longpress"
+                android:value="1" />
+        </service>
     </application>
 </manifest>

@@ -47,6 +47,9 @@ ksp {
 }
 
 dependencies {
+    // Nothing Glyph Matrix SDK (local AAR). Used only by the Glyph Toy on Nothing
+    // Phone (3) / (4a) Pro; guarded at runtime so it never runs on other devices.
+    implementation(files("libs/glyph-matrix-sdk-2.0.aar"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)

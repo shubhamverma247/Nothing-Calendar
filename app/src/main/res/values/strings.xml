@@ -4,4 +4,6 @@
     <string name="widget_medium_description">Event Details</string>
     <string name="widget_large_description">Calendar Dashboard</string>
     <string name="pro_price_fallback">₹149</string>
+    <string name="glyph_toy_name">DotCal</string>
+    <string name="glyph_toy_summary">Shows a live countdown to your next DotCal event.</string>
 </resources>
