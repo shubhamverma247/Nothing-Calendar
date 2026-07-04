@@ -123,6 +123,21 @@ Known Pro fixes:
 - 2026-07-02: Paywall purchase success auto-dismiss fixed. Root cause: success handler called `clearPurchaseResult()` before `delay(1500)`, causing `LaunchedEffect(purchaseResult)` to restart with `null` and cancel `onDismiss()`. Flow now shows `You're Pro!` for ~1.5s, closes Paywall, then clears purchase result. Version bumped to `versionCode 8`, `versionName 1.1.3`.
 - 2026-07-02: Paywall crash fix changed app icon painter from adaptive `R.mipmap.ic_launcher` to bitmap `R.mipmap.ic_launcher_foreground`. Large locked widget Unlock radius changed `0dp -> 20dp`. Version bumped to `versionCode 7`, `versionName 1.1.2` so Play Internal Testing can accept fix over broken `1.1.1`.
 
+## Pro Backlog (proposed, not built)
+
+Offline/hardware/customization moat only. No network (honors no-cloud Hard Rule). No new columns (5-table lock intact). Reuses existing `rrule`, `deleted_event_log`, `imageUris`, `voiceNotePath`, DataStore. Ranked best-first.
+
+1. Natural-language quick-add — parse "gym every mon 7am" -> event. Local parser. Top cited worth-it feature.
+2. Widget pack + config — agenda-list, month-grid, event-countdown widgets + transparency/theme/calendar picker. #1 Android paid draw.
+3. Glyph reminder flash + timer — rear Glyph pulses when event near, face-down. Nothing-only moat; native Glyph can't read local events.
+4. App lock + private vault — PIN/biometric + hidden events. DataStore flag, no column.
+5. Backup & restore (JSON via SAF) — whole-DB snapshot, offline. Pairs ICS import/export.
+6. Offline OCR event capture — snap poster/card -> ML Kit on-device text -> prefill event. Cloud-free differentiator.
+7. Advanced recurrence — custom RRULE (every N weeks, nth weekday, until/count). `rrule` column already exists, no schema change.
+8. Recently-Deleted / restore — expose `deleted_event_log` as 30-day trash + undo. Table already present, near-zero cost.
+
+Deferred (needs internet + Play Data Safety + Privacy Policy + `INTERNET` perm, blocked by current no-network Hard Rule): ICS URL subscribe (webcal), weather strip, live holiday refresh. Keep FREE if ever built.
+
 ## Latest Work
 
 Branch `profeature` (WIP, not on main):
