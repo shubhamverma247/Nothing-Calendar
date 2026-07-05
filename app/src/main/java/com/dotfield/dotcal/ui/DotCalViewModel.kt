@@ -303,6 +303,22 @@ class DotCalViewModel(
         }
     }
 
+    // ----- Backup / restore (Pro) -----
+
+    /** Produces the backup JSON off the main thread, then hands it to [onReady] for file IO. */
+    fun exportBackup(onReady: (Result<String>) -> Unit) {
+        viewModelScope.launch {
+            onReady(runCatching { repository.exportBackup() })
+        }
+    }
+
+    /** Restores the supplied backup JSON (non-destructive merge), reporting a summary via [onResult]. */
+    fun importBackup(json: String, onResult: (Result<DotCalRepository.BackupImportResult>) -> Unit) {
+        viewModelScope.launch {
+            onResult(runCatching { repository.importBackup(json) })
+        }
+    }
+
     private fun CalendarEvent.startDate(): LocalDate {
         return java.time.Instant.ofEpochMilli(startTimeMs)
             .atZone(java.time.ZoneId.of(timeZone))

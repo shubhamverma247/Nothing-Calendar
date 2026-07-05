@@ -594,6 +594,44 @@ fun DotCalApp(
             }
         }
     }
+    val backupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        viewModel.exportBackup { result ->
+            result.onSuccess { text ->
+                val ok = runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+                }.isSuccess
+                Toast.makeText(context, if (ok) "Backup saved" else "Backup failed", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, "Backup failed", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    val restoreLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        }.getOrNull()
+        if (text.isNullOrBlank()) {
+            Toast.makeText(context, "Couldn't read file", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+        viewModel.importBackup(text) { result ->
+            result.onSuccess { summary ->
+                Toast.makeText(
+                    context,
+                    "Restored: ${summary.eventsInserted} new, ${summary.eventsUpdated} updated",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }.onFailure {
+                Toast.makeText(context, "Restore failed — not a valid DotCal backup", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     var calendarTab by remember { mutableStateOf<CalendarTab?>(null) }
     LaunchedEffect(storedCalendarTab) {
         if (calendarTab == null) calendarTab = storedCalendarTab
@@ -1273,6 +1311,21 @@ fun DotCalApp(
                         showPaywall = true
                     } else {
                         importIcsLauncher.launch(arrayOf("text/calendar", "application/octet-stream", "*/*"))
+                    }
+                },
+                onBackup = {
+                    if (!isPro) {
+                        showPaywall = true
+                    } else {
+                        val stamp = java.time.LocalDate.now().toString()
+                        backupLauncher.launch("dotcal-backup-$stamp.json")
+                    }
+                },
+                onRestore = {
+                    if (!isPro) {
+                        showPaywall = true
+                    } else {
+                        restoreLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
                     }
                 },
             )
@@ -6596,6 +6649,8 @@ private fun SettingsPreview(
     onRecentlyDeleted: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
+    onBackup: () -> Unit,
+    onRestore: () -> Unit,
 ) {
     BackHandler {
         when (screen) {
@@ -6649,6 +6704,8 @@ private fun SettingsPreview(
             onRecentlyDeleted = onRecentlyDeleted,
             onExportIcs = onExportIcs,
             onImportIcs = onImportIcs,
+            onBackup = onBackup,
+            onRestore = onRestore,
         )
         AnimatedVisibility(
             visible = screen == SettingsScreen.Theme,
@@ -6771,6 +6828,8 @@ private fun SettingsRoot(
     onRecentlyDeleted: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
+    onBackup: () -> Unit,
+    onRestore: () -> Unit,
 ) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
@@ -6879,6 +6938,20 @@ private fun SettingsRoot(
                 isPro = isPro,
                 palette = palette,
                 onClick = onImportIcs,
+            )
+            SettingsImportExportRow(
+                title = "Back Up Data",
+                subtitle = "Save all events, tasks & reminders to a file",
+                isPro = isPro,
+                palette = palette,
+                onClick = onBackup,
+            )
+            SettingsImportExportRow(
+                title = "Restore Data",
+                subtitle = "Merge a backup file into this device",
+                isPro = isPro,
+                palette = palette,
+                onClick = onRestore,
             )
             SettingsMenuRow(
                 title = "Recently Deleted",
@@ -9236,6 +9309,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Custom Accent Colors", "Extra palettes plus any custom hex color"),
     ProFeature("Import / Export", "Back up and restore events & tasks as .ics"),
     ProFeature("Quick Add", "Type 'gym every mon 7am' — we build the event"),
+    ProFeature("Backup & Restore", "Save & restore your whole calendar as a file"),
 )
 
 @Composable

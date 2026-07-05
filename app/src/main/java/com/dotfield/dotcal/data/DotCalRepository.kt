@@ -2,6 +2,8 @@ package com.dotfield.dotcal.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import com.dotfield.dotcal.data.backup.BackupData
+import com.dotfield.dotcal.data.backup.BackupSerializer
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
@@ -196,6 +198,82 @@ class DotCalRepository(
         }
         dao.insertReminders(reminders)
         reminders.forEach { reminder -> reminderScheduler.scheduleReminder(reminder, event) }
+    }
+
+    /** Result summary of a Backup restore. */
+    data class BackupImportResult(
+        val accountsAdded: Int,
+        val eventsInserted: Int,
+        val eventsUpdated: Int,
+        val remindersRestored: Int,
+    )
+
+    /**
+     * Serializes a full-fidelity snapshot of the user's calendar (accounts that own the events,
+     * the user-owned events/tasks, and their reminders) to a JSON document. Excludes generated
+     * (birthday/holiday) and Google-synced rows, which regenerate from their sources.
+     */
+    suspend fun exportBackup(): String = withContext(Dispatchers.IO) {
+        val events = dao.getAllUserEventsForExport()
+        val accounts = events.map { it.accountId }.toSet().mapNotNull { dao.getAccount(it) }
+        val reminders = events.flatMap { dao.getRemindersForEvent(it.id) }
+        BackupSerializer.encode(
+            BackupData(
+                accounts = accounts,
+                events = events,
+                reminders = reminders,
+                createdAtMs = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    /**
+     * Restores a backup produced by [exportBackup]. Non-destructive merge: absent accounts are
+     * added (existing account config is preserved), events are upserted by id (existing rows
+     * updated in place, unknown ids inserted), and an event's reminders are replaced + rescheduled
+     * only when the backup carries reminders for it (matching ICS import semantics). Live data not
+     * present in the backup is never deleted. Throws on a foreign/unparseable file.
+     */
+    suspend fun importBackup(json: String): BackupImportResult = withContext(Dispatchers.IO) {
+        val data = BackupSerializer.decode(json)
+        ensureLocalAccount()
+        var accountsAdded = 0
+        data.accounts.forEach { account ->
+            if (account.id != LOCAL_ACCOUNT_ID && dao.getAccount(account.id) == null) {
+                dao.insertAccountIfAbsent(account)
+                accountsAdded++
+            }
+        }
+        val remindersByEventId = data.reminders.groupBy { it.eventId }
+        var eventsInserted = 0
+        var eventsUpdated = 0
+        var remindersRestored = 0
+        val now = System.currentTimeMillis()
+        data.events.forEach { event ->
+            val existing = dao.getEvent(event.id)
+            // The event's account may be missing on this device; fall back to local so the FK holds.
+            val accountId = if (dao.getAccount(event.accountId) != null) event.accountId else LOCAL_ACCOUNT_ID
+            val row = event.copy(accountId = accountId)
+            dao.upsertEvent(row)
+            val reminders = remindersByEventId[event.id].orEmpty()
+            if (reminders.isNotEmpty()) {
+                dao.getRemindersForEvent(row.id).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+                dao.deleteRemindersForEvent(row.id)
+                dao.insertReminders(reminders)
+                reminders
+                    .filter { it.triggerAtMs > now && it.isDelivered == 0 }
+                    .forEach { reminderScheduler.scheduleReminder(it, row) }
+                remindersRestored += reminders.size
+            }
+            if (existing != null) eventsUpdated++ else eventsInserted++
+        }
+        if (eventsInserted > 0 || eventsUpdated > 0 || accountsAdded > 0) updateWidgets()
+        BackupImportResult(
+            accountsAdded = accountsAdded,
+            eventsInserted = eventsInserted,
+            eventsUpdated = eventsUpdated,
+            remindersRestored = remindersRestored,
+        )
     }
 
     fun observeSelectedHolidayCountries(): Flow<List<String>> = dao.observeHolidayAccountIds()
