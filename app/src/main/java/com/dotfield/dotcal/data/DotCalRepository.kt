@@ -6,6 +6,8 @@ import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
+import com.dotfield.dotcal.data.trash.DeletedSnapshot
+import com.dotfield.dotcal.data.trash.RecentlyDeletedStore
 import com.dotfield.dotcal.reminders.ReminderScheduler
 import com.dotfield.dotcal.sync.CalendarSyncRepository
 import com.dotfield.dotcal.sync.CalendarSyncResult
@@ -67,6 +69,7 @@ class DotCalRepository(
     private val context: Context,
 ) {
     private val reminderScheduler = ReminderScheduler(context)
+    private val recentlyDeletedStore = RecentlyDeletedStore(context)
     private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
     private val holidayDataSource = HolidayDataSource(context.applicationContext)
     private val syncRepository = CalendarSyncRepository(
@@ -490,7 +493,10 @@ class DotCalRepository(
             return
         }
         val eventId = event.baseEventId()
-        dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        val reminders = dao.getRemindersForEvent(eventId)
+        reminders.forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        val master = dao.getEvent(eventId) ?: event
+        recentlyDeletedStore.save(master, reminders, System.currentTimeMillis())
         event.googleEventId?.let { googleEventId ->
             dao.insertDeletedEventLog(
                 DeletedEventLog(
@@ -606,10 +612,60 @@ class DotCalRepository(
 
     suspend fun deleteTask(task: CalendarEvent) {
         val taskId = task.baseEventId()
-        dao.getRemindersForEvent(taskId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        val reminders = dao.getRemindersForEvent(taskId)
+        reminders.forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        val master = dao.getEvent(taskId) ?: task
+        recentlyDeletedStore.save(master, reminders, System.currentTimeMillis())
         dao.deleteRemindersForEvent(taskId)
         dao.deleteEvent(taskId)
         updateWidgets()
+    }
+
+    // ----- Recently Deleted (file-based trash; no Room/schema change) -----
+
+    /** Snapshots of deleted events/tasks within the 30-day window, newest first. */
+    suspend fun listRecentlyDeleted(): List<DeletedSnapshot> = withContext(Dispatchers.IO) {
+        recentlyDeletedStore.list(System.currentTimeMillis())
+    }
+
+    /**
+     * Restore a deleted event/task back into the calendar. Re-inserts the row and its
+     * reminders, reschedules any still-future reminders, and drops the snapshot.
+     * Returns false if the snapshot is gone.
+     */
+    suspend fun restoreDeleted(eventId: String): Boolean = withContext(Dispatchers.IO) {
+        val snapshot = recentlyDeletedStore.get(eventId) ?: return@withContext false
+        ensureLocalAccount()
+        // The original account may have been removed; fall back to the local account
+        // so the FK constraint holds and the event is never lost.
+        val accountId = if (dao.getAccount(snapshot.event.accountId) != null) {
+            snapshot.event.accountId
+        } else {
+            LOCAL_ACCOUNT_ID
+        }
+        val event = snapshot.event.copy(accountId = accountId)
+        dao.upsertEvent(event)
+        dao.deleteRemindersForEvent(event.id)
+        if (snapshot.reminders.isNotEmpty()) {
+            dao.insertReminders(snapshot.reminders)
+            val now = System.currentTimeMillis()
+            snapshot.reminders
+                .filter { it.triggerAtMs > now && it.isDelivered == 0 }
+                .forEach { reminderScheduler.scheduleReminder(it, event) }
+        }
+        recentlyDeletedStore.remove(eventId)
+        updateWidgets()
+        true
+    }
+
+    /** Permanently drop one snapshot from the trash. */
+    suspend fun purgeDeleted(eventId: String) = withContext(Dispatchers.IO) {
+        recentlyDeletedStore.remove(eventId)
+    }
+
+    /** Empty the entire trash. */
+    suspend fun emptyRecentlyDeleted() = withContext(Dispatchers.IO) {
+        recentlyDeletedStore.clear()
     }
 
     private fun LocalDate.atStartMs(): Long {

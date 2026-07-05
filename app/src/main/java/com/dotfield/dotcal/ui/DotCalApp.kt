@@ -52,9 +52,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.ui.layout.onSizeChanged
@@ -211,6 +216,7 @@ import com.dotfield.dotcal.data.isRecurrenceOccurrence
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
+import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
@@ -312,6 +318,7 @@ fun DotCalApp(
     var showPaywall by remember { mutableStateOf(false) }
     var showDateCalculator by remember { mutableStateOf(false) }
     var showQuickAdd by remember { mutableStateOf(false) }
+    var showRecentlyDeleted by remember { mutableStateOf(false) }
     var quickAddPrefill by remember { mutableStateOf<QuickAddResult?>(null) }
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
@@ -743,6 +750,7 @@ fun DotCalApp(
     fun closeTopSurface() {
         when {
             showPaywall -> showPaywall = false
+            showRecentlyDeleted -> showRecentlyDeleted = false
             showDateCalculator -> showDateCalculator = false
             showQuickAdd -> showQuickAdd = false
             addSheet -> {
@@ -836,7 +844,7 @@ fun DotCalApp(
     BackHandler(enabled = showOnboarding) {
         if (onboardingPageIndex > 0) onboardingPageIndex -= 1 else finishOnboarding()
     }
-    BackHandler(enabled = !showOnboarding && (showPaywall || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || showRecentlyDeleted || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -1248,6 +1256,10 @@ fun DotCalApp(
                 onDateCalculator = {
                     if (isPro) showDateCalculator = true else showPaywall = true
                 },
+                onRecentlyDeleted = {
+                    viewModel.refreshRecentlyDeleted()
+                    showRecentlyDeleted = true
+                },
                 onExportIcs = {
                     if (!isPro) {
                         showPaywall = true
@@ -1456,6 +1468,22 @@ fun DotCalApp(
                 palette = palette,
                 onBack = { showQuickAdd = false },
                 onContinue = { result -> openQuickAddResult(result) },
+            )
+        }
+        AnimatedVisibility(
+            visible = showRecentlyDeleted,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            val deletedItems by viewModel.recentlyDeleted.collectAsStateWithLifecycle()
+            RecentlyDeletedScreen(
+                palette = palette,
+                items = deletedItems,
+                onBack = { showRecentlyDeleted = false },
+                onRestore = { id -> viewModel.restoreDeleted(id) },
+                onPurge = { id -> viewModel.purgeDeleted(id) },
+                onEmptyAll = { viewModel.emptyRecentlyDeleted() },
             )
         }
         pendingDelete?.let { request ->
@@ -6565,6 +6593,7 @@ private fun SettingsPreview(
     onDotCalPro: () -> Unit,
     onRestorePurchase: () -> Unit,
     onDateCalculator: () -> Unit,
+    onRecentlyDeleted: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
 ) {
@@ -6617,6 +6646,7 @@ private fun SettingsPreview(
             onDotCalPro = onDotCalPro,
             onRestorePurchase = onRestorePurchase,
             onDateCalculator = onDateCalculator,
+            onRecentlyDeleted = onRecentlyDeleted,
             onExportIcs = onExportIcs,
             onImportIcs = onImportIcs,
         )
@@ -6738,6 +6768,7 @@ private fun SettingsRoot(
     onDotCalPro: () -> Unit,
     onRestorePurchase: () -> Unit,
     onDateCalculator: () -> Unit,
+    onRecentlyDeleted: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
 ) {
@@ -6848,6 +6879,12 @@ private fun SettingsRoot(
                 isPro = isPro,
                 palette = palette,
                 onClick = onImportIcs,
+            )
+            SettingsMenuRow(
+                title = "Recently Deleted",
+                value = "",
+                palette = palette,
+                onClick = onRecentlyDeleted,
             )
             SettingsDivider(palette)
 
@@ -9572,6 +9609,254 @@ private fun quickAddRepeatLabel(rrule: String): String = when (rrule.trim()) {
     "FREQ=MONTHLY" -> "Monthly"
     "FREQ=YEARLY" -> "Yearly"
     else -> "Custom"
+}
+
+@Composable
+private fun RecentlyDeletedScreen(
+    palette: DotCalPalette,
+    items: List<DeletedSnapshot>,
+    onBack: () -> Unit,
+    onRestore: (String) -> Unit,
+    onPurge: (String) -> Unit,
+    onEmptyAll: () -> Unit,
+) {
+    var purgeTarget by remember { mutableStateOf<DeletedSnapshot?>(null) }
+    var confirmEmpty by remember { mutableStateOf(false) }
+    var openRowId by remember { mutableStateOf<String?>(null) }
+    val now = System.currentTimeMillis()
+
+    Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
+        Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+            }
+            Text(
+                "Recently Deleted",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            if (items.isNotEmpty()) {
+                Text(
+                    "Empty",
+                    color = palette.accent,
+                    fontFamily = mono,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 18.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { confirmEmpty = true }
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                )
+            }
+            HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+
+        if (items.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(horizontal = 40.dp), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Nothing here",
+                        color = palette.secondaryText,
+                        fontFamily = mono,
+                        fontSize = 16.sp,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Deleted events and tasks show up here for 30 days, so you can bring them back.",
+                        color = palette.dimText,
+                        fontFamily = mono,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(bottom = 120.dp),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                item {
+                    Text(
+                        "Swipe left to restore or delete. Kept for 30 days.",
+                        color = palette.dimText,
+                        fontFamily = mono,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 16.dp, bottom = 6.dp),
+                    )
+                }
+                lazyItems(items, key = { it.event.id }) { snap ->
+                    SwipeableDeletedRow(
+                        snapshot = snap,
+                        nowMs = now,
+                        palette = palette,
+                        isOpen = openRowId == snap.event.id,
+                        onOpen = { openRowId = snap.event.id },
+                        onClose = { if (openRowId == snap.event.id) openRowId = null },
+                        onRestore = {
+                            openRowId = null
+                            onRestore(snap.event.id)
+                        },
+                        onDelete = { purgeTarget = snap },
+                    )
+                    HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
+                }
+            }
+        }
+    }
+
+    purgeTarget?.let { snap ->
+        ConfirmDeleteDialog(
+            title = "Delete permanently?",
+            confirmLabel = "Delete",
+            palette = palette,
+            onDismiss = { purgeTarget = null },
+            onConfirm = {
+                onPurge(snap.event.id)
+                purgeTarget = null
+            },
+        )
+    }
+    if (confirmEmpty) {
+        ConfirmDeleteDialog(
+            title = "Empty Recently Deleted?",
+            confirmLabel = "Empty",
+            palette = palette,
+            onDismiss = { confirmEmpty = false },
+            onConfirm = {
+                onEmptyAll()
+                confirmEmpty = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun SwipeableDeletedRow(
+    snapshot: DeletedSnapshot,
+    nowMs: Long,
+    palette: DotCalPalette,
+    isOpen: Boolean,
+    onOpen: () -> Unit,
+    onClose: () -> Unit,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val event = snapshot.event
+    val density = LocalDensity.current
+    val actionButtonWidth = 92.dp
+    val revealPx = with(density) { (actionButtonWidth * 2).toPx() }
+    val offsetX = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+
+    // Snap shut when another row is opened (external close).
+    LaunchedEffect(isOpen) {
+        if (!isOpen && offsetX.value != 0f) offsetX.animateTo(0f)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .background(palette.background),
+    ) {
+        // Actions revealed behind the row: Restore (brand neutral) + Delete (red).
+        Row(modifier = Modifier.matchParentSize(), horizontalArrangement = Arrangement.End) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(actionButtonWidth)
+                    .background(palette.primaryText)
+                    .clickable { onRestore() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Restore", color = palette.background, fontFamily = mono, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(actionButtonWidth)
+                    .background(Color(0xFFFF3B30))
+                    .clickable { onDelete() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Delete", color = Color.White, fontFamily = mono, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+        // Foreground content — drag left to reveal actions, tap to close when open.
+        Row(
+            modifier = Modifier
+                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .fillMaxWidth()
+                .background(palette.background)
+                .draggable(
+                    orientation = Orientation.Horizontal,
+                    state = rememberDraggableState { delta ->
+                        scope.launch { offsetX.snapTo((offsetX.value + delta).coerceIn(-revealPx, 0f)) }
+                    },
+                    onDragStopped = {
+                        val target = if (offsetX.value < -revealPx / 2f) -revealPx else 0f
+                        scope.launch { offsetX.animateTo(target) }
+                        if (target != 0f) onOpen() else onClose()
+                    },
+                )
+                .noRippleClickable(enabled = isOpen) { onClose() }
+                .padding(horizontal = 22.dp, vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = event.title.ifBlank { "(No title)" },
+                    color = palette.primaryText,
+                    fontFamily = mono,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "${deletedWhenLabel(event)} · deleted ${deletedAgoLabel(snapshot.deletedAtMs, nowMs)}",
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** Human-readable "when" line for a deleted event or task snapshot. */
+private fun deletedWhenLabel(event: CalendarEvent): String {
+    val prefix = if (event.isTask == 1) "Task" else "Event"
+    // Tasks with no due date store startTimeMs = 0.
+    if (event.isTask == 1 && event.startTimeMs <= 0L) return "$prefix • No due date"
+    val zone = runCatching { java.time.ZoneId.of(event.timeZone) }.getOrDefault(java.time.ZoneId.systemDefault())
+    val start = java.time.Instant.ofEpochMilli(event.startTimeMs).atZone(zone)
+    val dateFmt = java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault())
+    val timeFmt = java.time.format.DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
+    val date = start.format(dateFmt)
+    return if (event.isAllDay == 1) "$prefix • $date" else "$prefix • $date, ${start.format(timeFmt)}"
+}
+
+/** Relative "deleted X ago" phrasing from a deletion timestamp. */
+private fun deletedAgoLabel(deletedAtMs: Long, nowMs: Long): String {
+    val diff = (nowMs - deletedAtMs).coerceAtLeast(0L)
+    val minutes = diff / 60_000L
+    val hours = diff / 3_600_000L
+    val days = diff / 86_400_000L
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "${minutes}m ago"
+        hours < 24 -> "${hours}h ago"
+        days < 30 -> "${days}d ago"
+        else -> "30d ago"
+    }
 }
 
 @Composable

@@ -12,6 +12,7 @@ import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.billing.ProManager
+import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.sync.CalendarSyncResult
@@ -209,6 +210,38 @@ class DotCalViewModel(
     fun deleteTask(task: CalendarEvent) {
         viewModelScope.launch {
             repository.deleteTask(task)
+        }
+    }
+
+    // ----- Recently Deleted (file-based trash) -----
+    private val _recentlyDeleted = MutableStateFlow<List<DeletedSnapshot>>(emptyList())
+    val recentlyDeleted: StateFlow<List<DeletedSnapshot>> = _recentlyDeleted
+
+    fun refreshRecentlyDeleted() {
+        viewModelScope.launch {
+            _recentlyDeleted.value = repository.listRecentlyDeleted()
+        }
+    }
+
+    fun restoreDeleted(eventId: String, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.restoreDeleted(eventId)
+            _recentlyDeleted.value = repository.listRecentlyDeleted()
+            onDone()
+        }
+    }
+
+    fun purgeDeleted(eventId: String) {
+        viewModelScope.launch {
+            repository.purgeDeleted(eventId)
+            _recentlyDeleted.value = repository.listRecentlyDeleted()
+        }
+    }
+
+    fun emptyRecentlyDeleted() {
+        viewModelScope.launch {
+            repository.emptyRecentlyDeleted()
+            _recentlyDeleted.value = emptyList()
         }
     }
 
