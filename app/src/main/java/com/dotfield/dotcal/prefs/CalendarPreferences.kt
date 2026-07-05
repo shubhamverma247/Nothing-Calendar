@@ -28,4 +28,8 @@ object CalendarPreferences {
     val KEY_WIDGET_TRANSPARENT = booleanPreferencesKey("widget_transparent")
     val KEY_WIDGET_DOT_TEXTURE = booleanPreferencesKey("widget_dot_texture")
     val KEY_WIDGET_ACCOUNT_ID = stringPreferencesKey("widget_account_id")
+    val KEY_APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
+    val KEY_APP_LOCK_PIN_SALT = stringPreferencesKey("app_lock_pin_salt")
+    val KEY_APP_LOCK_PIN_HASH = stringPreferencesKey("app_lock_pin_hash")
+    val KEY_PRIVATE_VAULT_EVENT_IDS = stringPreferencesKey("private_vault_event_ids")
 }

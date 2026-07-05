@@ -8,6 +8,8 @@ import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
+import com.dotfield.dotcal.data.privacy.AppLockState
+import com.dotfield.dotcal.data.privacy.AppPrivacyManager
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.trash.RecentlyDeletedStore
@@ -19,6 +21,7 @@ import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -71,6 +74,7 @@ class DotCalRepository(
     private val context: Context,
 ) {
     private val reminderScheduler = ReminderScheduler(context)
+    private val privacyManager = AppPrivacyManager(context.applicationContext)
     private val recentlyDeletedStore = RecentlyDeletedStore(context)
     private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
     private val holidayDataSource = HolidayDataSource(context.applicationContext)
@@ -92,6 +96,46 @@ class DotCalRepository(
         context.calendarPreferencesDataStore.edit { preferences ->
             preferences[CalendarPreferences.KEY_IS_PRO] = isPro
         }
+    }
+
+    fun observeAppLockState(): Flow<AppLockState> = privacyManager.observeAppLockState()
+
+    fun observePrivateVaultIds(): Flow<Set<String>> = privacyManager.observePrivateVaultIds()
+
+    suspend fun setAppLockPin(pin: String) = privacyManager.setPin(pin)
+
+    suspend fun verifyAppLockPin(pin: String): Boolean = privacyManager.verifyPin(pin)
+
+    suspend fun setAppLockEnabled(enabled: Boolean) = privacyManager.setAppLockEnabled(enabled)
+
+    suspend fun disableAppLock() = privacyManager.disableAppLock()
+
+    suspend fun clearAppLockPin() = privacyManager.clearPin()
+
+    suspend fun listPrivateVaultEvents(): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        privacyManager.observePrivateVaultIds().first()
+            .mapNotNull { eventId -> dao.getEvent(eventId) }
+            .sortedWith(compareBy<CalendarEvent> { it.isTask }.thenBy { it.startTimeMs }.thenBy { it.title })
+    }
+
+    suspend fun moveToPrivateVault(event: CalendarEvent) = withContext(Dispatchers.IO) {
+        val eventId = event.baseEventId()
+        dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        privacyManager.addPrivateEvent(eventId)
+        updateWidgets()
+    }
+
+    suspend fun restoreFromPrivateVault(eventId: String) = withContext(Dispatchers.IO) {
+        val baseId = eventId.substringBefore(RECURRENCE_OCCURRENCE_SEPARATOR)
+        val event = dao.getEvent(baseId)
+        privacyManager.removePrivateEvent(baseId)
+        if (event != null) {
+            val now = System.currentTimeMillis()
+            dao.getRemindersForEvent(baseId)
+                .filter { it.triggerAtMs > now && it.isDelivered == 0 }
+                .forEach { reminderScheduler.scheduleReminder(it, event) }
+        }
+        updateWidgets()
     }
 
     fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts()
@@ -290,6 +334,7 @@ class DotCalRepository(
         val start = monthStart.minusMonths(1)
         val end = monthStart.plusMonths(2)
         return dao.observeEvents(start.atStartMs(), end.atStartMs())
+            .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
             .map { events ->
                 withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
             }
@@ -300,6 +345,7 @@ class DotCalRepository(
         val end = start.plusMonths(6)
         val startMs = start.atStartMs()
         return dao.observeEvents(startMs, end.atStartMs())
+            .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
             .map { events ->
                 withContext(Dispatchers.Default) {
                     expandRecurringEvents(events, start, end)
@@ -309,6 +355,7 @@ class DotCalRepository(
     }
 
     fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks()
+        .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
         .map { tasks ->
             withContext(Dispatchers.Default) { expandRecurringTasks(tasks) }
         }
@@ -316,9 +363,12 @@ class DotCalRepository(
     fun observeTodayTasks(day: LocalDate): Flow<List<CalendarEvent>> {
         val start = day.atStartMs()
         return dao.observeTodayTasks(start, day.plusDays(1).atStartMs() - 1)
+            .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
     }
 
-    fun observeUpcomingTasks(nowMs: Long = System.currentTimeMillis()): Flow<List<CalendarEvent>> = dao.observeUpcomingTasks(nowMs)
+    fun observeUpcomingTasks(nowMs: Long = System.currentTimeMillis()): Flow<List<CalendarEvent>> =
+        dao.observeUpcomingTasks(nowMs)
+            .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
 
     /**
      * One-shot snapshot of the next upcoming items whose start is still in the future,
@@ -345,7 +395,9 @@ class DotCalRepository(
             .take(limit.coerceAtLeast(1))
     }
 
-    fun observeCompletedTasks(): Flow<List<CalendarEvent>> = dao.observeCompletedTasks()
+    fun observeCompletedTasks(): Flow<List<CalendarEvent>> =
+        dao.observeCompletedTasks()
+            .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
 
     fun observeReminders(): Flow<List<EventReminder>> = dao.observeReminders()
 
@@ -815,6 +867,11 @@ class DotCalRepository(
 
     private fun updateWidgets() {
         WidgetUpdateWorker.enqueue(context)
+    }
+
+    private fun List<CalendarEvent>.filterOutPrivate(privateIds: Set<String>): List<CalendarEvent> {
+        if (privateIds.isEmpty()) return this
+        return filterNot { it.baseEventId() in privateIds }
     }
 
     private fun expandRecurringEvents(events: List<CalendarEvent>, rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {

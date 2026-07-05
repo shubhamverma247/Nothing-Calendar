@@ -196,6 +196,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.ColumnScope
 import com.dotfield.dotcal.R
@@ -212,6 +213,7 @@ import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
+import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.recurrence.ByDay
 import com.dotfield.dotcal.data.recurrence.RecurrenceFreq
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
@@ -333,8 +335,12 @@ fun DotCalApp(
     var showRecentlyDeleted by remember { mutableStateOf(false) }
     var quickAddPrefill by remember { mutableStateOf<QuickAddResult?>(null) }
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
+    val appLockState by viewModel.appLockState.collectAsStateWithLifecycle()
+    val privateVaultIds by viewModel.privateVaultIds.collectAsStateWithLifecycle()
+    val privateVaultEvents by viewModel.privateVaultEvents.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
     var pendingTaskDelete by remember { mutableStateOf<CalendarEvent?>(null) }
+    var appUnlocked by remember { mutableStateOf(false) }
     var handledTaskDeepLinkId by remember { mutableStateOf<String?>(null) }
     var handledRouteToken by remember { mutableStateOf<Long?>(null) }
     var routePending by remember(initialRouteToken) {
@@ -343,6 +349,22 @@ fun DotCalApp(
     var isSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val keyguardManager = remember(context) {
+        context.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+    }
+    val deviceCredentialLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) appUnlocked = true
+    }
+    val requestDeviceUnlock: () -> Unit = {
+        val intent = keyguardManager.createConfirmDeviceCredentialIntent("Unlock DotCal", "Confirm your device lock to continue.")
+        if (intent != null) {
+            deviceCredentialLauncher.launch(intent)
+        } else {
+            Toast.makeText(context, "Device lock unavailable", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // In-app update (Play Flexible). Silent-fails when not installed from Play Store.
     val appUpdateManager = remember(context) { AppUpdateManagerFactory.create(context) }
@@ -391,12 +413,14 @@ fun DotCalApp(
         onDispose { appUpdateManager.unregisterListener(listener) }
     }
     val updateLifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(updateLifecycleOwner, appUpdateManager) {
+    DisposableEffect(updateLifecycleOwner, appUpdateManager, appLockState.enabled) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
                     if (info.installStatus() == InstallStatus.DOWNLOADED) updateDownloaded = true
                 }
+            } else if (event == Lifecycle.Event.ON_STOP && appLockState.enabled) {
+                appUnlocked = false
             }
         }
         updateLifecycleOwner.lifecycle.addObserver(observer)
@@ -894,6 +918,8 @@ fun DotCalApp(
     BackHandler(enabled = showOnboarding) {
         if (onboardingPageIndex > 0) onboardingPageIndex -= 1 else finishOnboarding()
     }
+    val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
+    BackHandler(enabled = isAppLocked) {}
     BackHandler(enabled = !showOnboarding && (showPaywall || showRecentlyDeleted || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
@@ -1125,6 +1151,8 @@ fun DotCalApp(
                 weekStartOption = weekStartOption,
                 widgetTransparent = widgetTransparent,
                 widgetDotTexture = widgetDotTexture,
+                appLockState = appLockState,
+                privateVaultEvents = privateVaultEvents,
                 holidayCountries = holidayCountries,
                 accounts = accounts,
                 hasCalendarPermission = hasCalendarPermission,
@@ -1306,6 +1334,43 @@ fun DotCalApp(
                 onDateCalculator = {
                     if (isPro) showDateCalculator = true else showPaywall = true
                 },
+                onAppPrivacy = {
+                    if (!isPro) {
+                        showPaywall = true
+                    } else {
+                        viewModel.refreshPrivateVault()
+                        settingsScreen = SettingsScreen.AppPrivacy
+                    }
+                },
+                onSetAppLockPin = { pin, onResult ->
+                    viewModel.setAppLockPin(pin) { result ->
+                        if (result.isSuccess) appUnlocked = true
+                        onResult(result)
+                    }
+                },
+                onVerifyAppLockPin = viewModel::verifyAppLockPin,
+                onSetAppLockEnabled = { enabled ->
+                    viewModel.setAppLockEnabled(enabled) {
+                        appUnlocked = enabled
+                    }
+                },
+                onDisableAppLock = {
+                    viewModel.disableAppLock {
+                        appUnlocked = false
+                        Toast.makeText(context, "App Lock disabled", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onClearAppLockPin = {
+                    viewModel.clearAppLockPin {
+                        appUnlocked = false
+                        Toast.makeText(context, "PIN removed", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onRestorePrivateEvent = { eventId ->
+                    viewModel.restoreFromPrivateVault(eventId) {
+                        Toast.makeText(context, "Restored from Private Vault", Toast.LENGTH_SHORT).show()
+                    }
+                },
                 onRecentlyDeleted = {
                     viewModel.refreshRecentlyDeleted()
                     showRecentlyDeleted = true
@@ -1393,10 +1458,26 @@ fun DotCalApp(
                     reminders = reminders.filter { it.eventId == event.baseEventId() },
                     account = accounts.firstOrNull { it.id == event.accountId },
                     palette = palette,
+                    isPrivate = event.baseEventId() in privateVaultIds,
                     onBack = viewModel::closeEventDetail,
                     onEdit = {
                         openEditEditor(event)
                         viewModel.closeEventDetail()
+                    },
+                    onMoveToPrivate = {
+                        if (!isPro) {
+                            showPaywall = true
+                        } else {
+                            viewModel.moveToPrivateVault(event) {
+                                viewModel.closeEventDetail()
+                                Toast.makeText(context, "Moved to Private Vault", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    onRestoreFromPrivate = {
+                        viewModel.restoreFromPrivateVault(event.baseEventId()) {
+                            Toast.makeText(context, "Restored from Private Vault", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     onDelete = {
                         pendingDelete = PendingDelete(event, RecurringEditScope.WholeSeries, DeleteSource.Detail)
@@ -1415,10 +1496,26 @@ fun DotCalApp(
                     task = task,
                     reminder = reminders.firstOrNull { it.eventId == task.baseEventId() },
                     palette = palette,
+                    isPrivate = task.baseEventId() in privateVaultIds,
                     onBack = { taskDetail = null },
                     onEdit = {
                         editingTask = task
                         showTaskEditor = true
+                    },
+                    onMoveToPrivate = {
+                        if (!isPro) {
+                            showPaywall = true
+                        } else {
+                            viewModel.moveToPrivateVault(task) {
+                                taskDetail = null
+                                Toast.makeText(context, "Moved to Private Vault", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    onRestoreFromPrivate = {
+                        viewModel.restoreFromPrivateVault(task.baseEventId()) {
+                            Toast.makeText(context, "Restored from Private Vault", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     onComplete = {
                         if (task.isCompleted == 1) {
@@ -1585,6 +1682,19 @@ fun DotCalApp(
                     showTaskEditor = false
                     pendingTaskDelete = null
                 },
+            )
+        }
+        if (isAppLocked) {
+            AppLockScreen(
+                palette = palette,
+                canUseDeviceLock = keyguardManager.isKeyguardSecure,
+                onUnlockWithPin = { pin, onResult ->
+                    viewModel.verifyAppLockPin(pin) { ok ->
+                        if (ok) appUnlocked = true
+                        onResult(ok)
+                    }
+                },
+                onDeviceUnlock = requestDeviceUnlock,
             )
         }
         if (updateAvailable) {
@@ -3448,8 +3558,11 @@ private fun EventDetailScreen(
     reminders: List<EventReminder>,
     account: CalendarAccount?,
     palette: DotCalPalette,
+    isPrivate: Boolean,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onMoveToPrivate: () -> Unit,
+    onRestoreFromPrivate: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val isReadOnly = event.source == "BIRTHDAY" || event.source == "HOLIDAY"
@@ -3594,6 +3707,18 @@ private fun EventDetailScreen(
                     DetailDivider(palette)
                     Spacer(modifier = Modifier.height(24.dp))
                     if (!isReadOnly) {
+                        Text(
+                            if (isPrivate) "Restore From Private Vault" else "Move to Private Vault",
+                            color = palette.primaryText,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 15.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(onClick = if (isPrivate) onRestoreFromPrivate else onMoveToPrivate)
+                                .padding(vertical = 12.dp),
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             "Delete Event",
                             color = palette.accent,
@@ -5862,8 +5987,11 @@ private fun TaskDetailScreen(
     task: CalendarEvent,
     reminder: EventReminder?,
     palette: DotCalPalette,
+    isPrivate: Boolean,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onMoveToPrivate: () -> Unit,
+    onRestoreFromPrivate: () -> Unit,
     onComplete: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -5938,13 +6066,22 @@ private fun TaskDetailScreen(
             }
             item {
                 DetailDivider(palette)
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 24.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    Text(
+                        if (isPrivate) "Restore From Private Vault" else "Move to Private Vault",
+                        color = palette.primaryText,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .clickable(onClick = if (isPrivate) onRestoreFromPrivate else onMoveToPrivate)
+                            .padding(vertical = 12.dp),
+                    )
                     if (task.isCompleted != 1) {
                         Text(
                             "Mark Complete",
@@ -5956,7 +6093,6 @@ private fun TaskDetailScreen(
                                 .clickable(onClick = onComplete)
                                 .padding(vertical = 12.dp),
                         )
-                        Spacer(modifier = Modifier.width(32.dp))
                     }
                     Text(
                         "Delete Task",
@@ -7010,6 +7146,8 @@ private fun SettingsPreview(
     weekStartOption: WeekStartOption,
     widgetTransparent: Boolean,
     widgetDotTexture: Boolean,
+    appLockState: AppLockState,
+    privateVaultEvents: List<CalendarEvent>,
     holidayCountries: List<HolidayCountryUiItem>,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
@@ -7033,6 +7171,13 @@ private fun SettingsPreview(
     onDotCalPro: () -> Unit,
     onRestorePurchase: () -> Unit,
     onDateCalculator: () -> Unit,
+    onAppPrivacy: () -> Unit,
+    onSetAppLockPin: (String, (Result<Unit>) -> Unit) -> Unit,
+    onVerifyAppLockPin: (String, (Boolean) -> Unit) -> Unit,
+    onSetAppLockEnabled: (Boolean) -> Unit,
+    onDisableAppLock: () -> Unit,
+    onClearAppLockPin: () -> Unit,
+    onRestorePrivateEvent: (String) -> Unit,
     onRecentlyDeleted: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
@@ -7065,6 +7210,8 @@ private fun SettingsPreview(
             weekStartOption = weekStartOption,
             widgetTransparent = widgetTransparent,
             widgetDotTexture = widgetDotTexture,
+            appLockState = appLockState,
+            privateVaultEvents = privateVaultEvents,
             holidayCountries = holidayCountries,
             accounts = accounts,
             hasCalendarPermission = hasCalendarPermission,
@@ -7088,6 +7235,7 @@ private fun SettingsPreview(
             onDotCalPro = onDotCalPro,
             onRestorePurchase = onRestorePurchase,
             onDateCalculator = onDateCalculator,
+            onAppPrivacy = onAppPrivacy,
             onRecentlyDeleted = onRecentlyDeleted,
             onExportIcs = onExportIcs,
             onImportIcs = onImportIcs,
@@ -7157,6 +7305,25 @@ private fun SettingsPreview(
             )
         }
         AnimatedVisibility(
+            visible = screen == SettingsScreen.AppPrivacy,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+        ) {
+            AppPrivacySettings(
+                palette = palette,
+                appLockState = appLockState,
+                privateVaultEvents = privateVaultEvents,
+                onBack = { onScreenChange(SettingsScreen.Root) },
+                onSetPin = onSetAppLockPin,
+                onVerifyPin = onVerifyAppLockPin,
+                onSetLockEnabled = onSetAppLockEnabled,
+                onDisableLock = onDisableAppLock,
+                onClearPin = onClearAppLockPin,
+                onRestorePrivateEvent = onRestorePrivateEvent,
+            )
+        }
+        AnimatedVisibility(
             visible = screen == SettingsScreen.PrivacyPolicy,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
@@ -7189,6 +7356,8 @@ private fun SettingsRoot(
     weekStartOption: WeekStartOption,
     widgetTransparent: Boolean,
     widgetDotTexture: Boolean,
+    appLockState: AppLockState,
+    privateVaultEvents: List<CalendarEvent>,
     holidayCountries: List<HolidayCountryUiItem>,
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
@@ -7212,6 +7381,7 @@ private fun SettingsRoot(
     onDotCalPro: () -> Unit,
     onRestorePurchase: () -> Unit,
     onDateCalculator: () -> Unit,
+    onAppPrivacy: () -> Unit,
     onRecentlyDeleted: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
@@ -7283,6 +7453,12 @@ private fun SettingsRoot(
                 isPro = isPro,
                 palette = palette,
                 onClick = onDateCalculator,
+            )
+            SettingsProBadgeRow(
+                title = "App Lock & Private Vault",
+                isPro = isPro,
+                palette = palette,
+                onClick = onAppPrivacy,
             )
             SettingsWidgetToggleRow(
                 title = "Transparent Widgets",
@@ -7375,6 +7551,338 @@ private fun SettingsRoot(
             SettingsCompactHeader(palette = palette, onBack = onBack, showBack = false)
         }
     }
+}
+
+@Composable
+private fun AppPrivacySettings(
+    palette: DotCalPalette,
+    appLockState: AppLockState,
+    privateVaultEvents: List<CalendarEvent>,
+    onBack: () -> Unit,
+    onSetPin: (String, (Result<Unit>) -> Unit) -> Unit,
+    onVerifyPin: (String, (Boolean) -> Unit) -> Unit,
+    onSetLockEnabled: (Boolean) -> Unit,
+    onDisableLock: () -> Unit,
+    onClearPin: () -> Unit,
+    onRestorePrivateEvent: (String) -> Unit,
+) {
+    var showSetPin by remember { mutableStateOf(false) }
+    var showDisableConfirm by remember { mutableStateOf(false) }
+    var showClearConfirm by remember { mutableStateOf(false) }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        contentPadding = PaddingValues(bottom = 120.dp),
+    ) {
+        item {
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Privacy")
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+        item {
+            SettingsSectionTitle("App Lock", palette)
+            SettingsWidgetToggleRow(
+                title = "Require PIN",
+                subtitle = if (appLockState.hasPin) "Lock DotCal after leaving the app" else "Set a 4-8 digit PIN",
+                checked = appLockState.enabled,
+                isPro = true,
+                palette = palette,
+                onCheckedChange = { enabled ->
+                    when {
+                        enabled && !appLockState.hasPin -> showSetPin = true
+                        enabled -> onSetLockEnabled(true)
+                        else -> showDisableConfirm = true
+                    }
+                },
+            )
+            SettingsMenuRow(
+                title = if (appLockState.hasPin) "Change PIN" else "Set PIN",
+                value = "",
+                palette = palette,
+                onClick = { showSetPin = true },
+            )
+            if (appLockState.hasPin) {
+                SettingsMenuRow(
+                    title = "Remove PIN",
+                    value = "",
+                    palette = palette,
+                    onClick = { showClearConfirm = true },
+                )
+            }
+            SettingsDivider(palette)
+            SettingsSectionTitle("Private Vault", palette)
+            Text(
+                "Hidden events and tasks stay off calendars, task lists, widgets, and reminders until restored.",
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        if (privateVaultEvents.isEmpty()) {
+            item {
+                Text(
+                    "No private items",
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 15.sp,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 22.dp),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        } else {
+            lazyItems(privateVaultEvents, key = { it.id }) { event ->
+                PrivateVaultRow(
+                    event = event,
+                    palette = palette,
+                    onRestore = { onRestorePrivateEvent(event.baseEventId()) },
+                )
+                PrivateVaultDivider(palette)
+            }
+        }
+    }
+    if (showSetPin) {
+        AppPinDialog(
+            title = if (appLockState.hasPin) "Change PIN" else "Set PIN",
+            confirmLabel = "Save",
+            palette = palette,
+            onDismiss = { showSetPin = false },
+            onConfirm = { pin, onResult ->
+                onSetPin(pin) { result ->
+                    onResult(result.isSuccess)
+                    if (result.isSuccess) showSetPin = false
+                }
+            },
+        )
+    }
+    if (showDisableConfirm) {
+        AppPinDialog(
+            title = "Disable App Lock",
+            confirmLabel = "Disable",
+            palette = palette,
+            onDismiss = { showDisableConfirm = false },
+            onConfirm = { pin, onResult ->
+                onVerifyPin(pin) { ok ->
+                    onResult(ok)
+                    if (ok) {
+                        onDisableLock()
+                        showDisableConfirm = false
+                    }
+                }
+            },
+        )
+    }
+    if (showClearConfirm) {
+        AppPinDialog(
+            title = "Remove PIN",
+            confirmLabel = "Remove",
+            palette = palette,
+            onDismiss = { showClearConfirm = false },
+            onConfirm = { pin, onResult ->
+                onVerifyPin(pin) { ok ->
+                    onResult(ok)
+                    if (ok) {
+                        onClearPin()
+                        showClearConfirm = false
+                    }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun PrivateVaultRow(
+    event: CalendarEvent,
+    palette: DotCalPalette,
+    onRestore: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                event.title.ifBlank { "(No title)" },
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                privateVaultWhenLabel(event),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            "Restore",
+            color = palette.accent,
+            fontFamily = mono,
+            fontWeight = FontWeight.Medium,
+            fontSize = 14.sp,
+            modifier = Modifier.noRippleClickable(onClick = onRestore).padding(horizontal = 10.dp, vertical = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun PrivateVaultDivider(palette: DotCalPalette) {
+    HorizontalDivider(color = palette.line, thickness = 1.dp, modifier = Modifier.fillMaxWidth())
+}
+
+private fun privateVaultWhenLabel(event: CalendarEvent): String {
+    if (event.isTask == 1 && event.startTimeMs <= 0L) return "Task - No due date"
+    val zone = runCatching { ZoneId.of(event.timeZone) }.getOrDefault(ZoneId.systemDefault())
+    val start = Instant.ofEpochMilli(event.startTimeMs).atZone(zone)
+    val type = if (event.isTask == 1) "Task" else "Event"
+    return "$type - ${start.format(compactDateFormatter)}"
+}
+
+@Composable
+private fun AppLockScreen(
+    palette: DotCalPalette,
+    canUseDeviceLock: Boolean,
+    onUnlockWithPin: (String, (Boolean) -> Unit) -> Unit,
+    onDeviceUnlock: () -> Unit,
+) {
+    var pin by remember { mutableStateOf("") }
+    var showError by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(palette.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .zIndex(20f),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 34.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(palette.eventCardSurface)
+                    .border(1.dp, palette.eventCardBorder, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = null, tint = palette.accent, modifier = Modifier.size(30.dp))
+            }
+            Spacer(modifier = Modifier.height(22.dp))
+            Text("DotCal Locked", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Enter your PIN to continue", color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+            Spacer(modifier = Modifier.height(24.dp))
+            OutlinedTextField(
+                value = pin,
+                onValueChange = { value ->
+                    pin = value.filter(Char::isDigit).take(8)
+                    showError = false
+                },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onUnlockWithPin(pin) { ok -> showError = !ok } }),
+                textStyle = TextStyle(color = palette.primaryText, fontFamily = mono, fontSize = 20.sp, textAlign = TextAlign.Center),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = palette.primaryText,
+                    unfocusedTextColor = palette.primaryText,
+                    focusedBorderColor = palette.accent,
+                    unfocusedBorderColor = palette.textFieldBorder,
+                    cursorColor = palette.accent,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (showError) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text("Incorrect PIN", color = palette.accent, fontFamily = mono, fontSize = 13.sp)
+            }
+            Spacer(modifier = Modifier.height(18.dp))
+            Button(
+                onClick = { onUnlockWithPin(pin) { ok -> showError = !ok } },
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+                shape = RoundedCornerShape(18.dp),
+            ) {
+                Text("Unlock", fontFamily = mono, fontWeight = FontWeight.SemiBold)
+            }
+            if (canUseDeviceLock) {
+                Spacer(modifier = Modifier.height(10.dp))
+                TextButton(onClick = onDeviceUnlock) {
+                    Text("Use Device Lock", color = palette.primaryText, fontFamily = mono)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppPinDialog(
+    title: String,
+    confirmLabel: String,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onConfirm: (String, (Boolean) -> Unit) -> Unit,
+) {
+    var pin by remember { mutableStateOf("") }
+    var showError by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        titleContentColor = palette.primaryText,
+        textContentColor = palette.secondaryText,
+        title = { Text(title, fontFamily = mono) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { value ->
+                        pin = value.filter(Char::isDigit).take(8)
+                        showError = false
+                    },
+                    singleLine = true,
+                    label = { Text("PIN") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        onConfirm(pin) { ok -> showError = !ok }
+                    }),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = palette.primaryText,
+                        unfocusedTextColor = palette.primaryText,
+                        focusedBorderColor = palette.accent,
+                        unfocusedBorderColor = palette.textFieldBorder,
+                        cursorColor = palette.accent,
+                        focusedLabelColor = palette.accent,
+                        unfocusedLabelColor = palette.secondaryText,
+                    ),
+                )
+                if (showError) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Enter the correct 4-8 digit PIN", color = palette.accent, fontFamily = mono, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(pin) { ok -> showError = !ok } }) {
+                Text(confirmLabel, color = palette.accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = palette.primaryText)
+            }
+        },
+    )
 }
 
 @Composable
@@ -9425,6 +9933,7 @@ private enum class SettingsScreen {
     CalendarAccounts,
     AddAccount,
     GlobalHolidays,
+    AppPrivacy,
     PrivacyPolicy,
 }
 
@@ -9699,6 +10208,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Quick Add", "Type 'gym every mon 7am' — we build the event"),
     ProFeature("Backup & Restore", "Save & restore your whole calendar as a file"),
     ProFeature("Advanced Recurrence", "Every N weeks, nth weekday, end date or count"),
+    ProFeature("App Lock & Private Vault", "PIN lock plus hidden events and tasks"),
 )
 
 @Composable

@@ -12,6 +12,7 @@ import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.billing.ProManager
+import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -43,6 +45,10 @@ class DotCalViewModel(
 
     val isPro: StateFlow<Boolean> = proManager.isPro
     val billingState: StateFlow<ProManager.BillingConnectionState> = proManager.billingState
+    val appLockState: StateFlow<AppLockState> = repository.observeAppLockState()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppLockState(enabled = false, hasPin = false))
+    val privateVaultIds: StateFlow<Set<String>> = repository.observePrivateVaultIds()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     val month: StateFlow<LocalDate> = currentMonth
     val events: StateFlow<List<CalendarEvent>> = currentMonth
@@ -140,6 +146,10 @@ class DotCalViewModel(
 
     fun openEventDetailById(eventId: String, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
+            if (eventId.substringBefore("::occurrence::") in repository.observePrivateVaultIds().first()) {
+                onComplete()
+                return@launch
+            }
             val event = repository.getEvent(eventId)
             if (event == null) {
                 onComplete()
@@ -217,6 +227,9 @@ class DotCalViewModel(
     private val _recentlyDeleted = MutableStateFlow<List<DeletedSnapshot>>(emptyList())
     val recentlyDeleted: StateFlow<List<DeletedSnapshot>> = _recentlyDeleted
 
+    private val _privateVaultEvents = MutableStateFlow<List<CalendarEvent>>(emptyList())
+    val privateVaultEvents: StateFlow<List<CalendarEvent>> = _privateVaultEvents
+
     fun refreshRecentlyDeleted() {
         viewModelScope.launch {
             _recentlyDeleted.value = repository.listRecentlyDeleted()
@@ -242,6 +255,64 @@ class DotCalViewModel(
         viewModelScope.launch {
             repository.emptyRecentlyDeleted()
             _recentlyDeleted.value = emptyList()
+        }
+    }
+
+    fun setAppLockPin(pin: String, onResult: (Result<Unit>) -> Unit = {}) {
+        viewModelScope.launch {
+            onResult(runCatching {
+                repository.setAppLockPin(pin)
+                Unit
+            })
+        }
+    }
+
+    fun verifyAppLockPin(pin: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            onResult(repository.verifyAppLockPin(pin))
+        }
+    }
+
+    fun disableAppLock(onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.disableAppLock()
+            onDone()
+        }
+    }
+
+    fun setAppLockEnabled(enabled: Boolean, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.setAppLockEnabled(enabled)
+            onDone()
+        }
+    }
+
+    fun clearAppLockPin(onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.clearAppLockPin()
+            onDone()
+        }
+    }
+
+    fun refreshPrivateVault() {
+        viewModelScope.launch {
+            _privateVaultEvents.value = repository.listPrivateVaultEvents()
+        }
+    }
+
+    fun moveToPrivateVault(event: CalendarEvent, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.moveToPrivateVault(event)
+            _privateVaultEvents.value = repository.listPrivateVaultEvents()
+            onDone()
+        }
+    }
+
+    fun restoreFromPrivateVault(eventId: String, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.restoreFromPrivateVault(eventId)
+            _privateVaultEvents.value = repository.listPrivateVaultEvents()
+            onDone()
         }
     }
 
