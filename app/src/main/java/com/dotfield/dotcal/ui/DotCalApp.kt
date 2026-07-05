@@ -3819,10 +3819,10 @@ private fun ImageAttachmentSection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top,
         ) {
-            Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Images", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 if (!isPro) {
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("Pro feature", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
                 }
             }
@@ -4016,10 +4016,12 @@ private fun VoiceNoteEditorSection(
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("Voice note", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-        if (!isPro) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text("Pro feature", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Voice note", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            if (!isPro) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Pro feature", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
+            }
         }
         Spacer(modifier = Modifier.height(10.dp))
         when {
@@ -7998,12 +8000,7 @@ private fun SettingsImportExportRow(
             }
             Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
         }
-        Icon(
-            if (isPro) Icons.Default.ChevronRight else Icons.Default.Lock,
-            contentDescription = null,
-            tint = palette.secondaryText,
-            modifier = Modifier.size(if (isPro) 20.dp else 16.dp),
-        )
+        SettingsTrailingIcon(isPro = isPro, palette = palette)
     }
 }
 
@@ -8022,7 +8019,22 @@ private fun SettingsProBadgeRow(title: String, isPro: Boolean, palette: DotCalPa
             ProFeatureTag(palette)
         }
         Spacer(modifier = Modifier.weight(1f))
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+        SettingsTrailingIcon(isPro = isPro, palette = palette)
+    }
+}
+
+@Composable
+private fun SettingsTrailingIcon(isPro: Boolean, palette: DotCalPalette) {
+    Box(
+        modifier = Modifier.width(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (isPro) Icons.Default.ChevronRight else Icons.Default.Lock,
+            contentDescription = null,
+            tint = palette.secondaryText,
+            modifier = Modifier.size(if (isPro) 20.dp else 16.dp),
+        )
     }
 }
 
@@ -8149,7 +8161,8 @@ private fun SettingsWidgetToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(76.dp),
+            .height(76.dp)
+            .noRippleClickable(enabled = !isPro) { onCheckedChange(!checked) },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -8171,15 +8184,9 @@ private fun SettingsWidgetToggleRow(
                 onCheckedChange = onCheckedChange,
             )
         } else {
-            Icon(
-                Icons.Default.Lock,
-                contentDescription = null,
-                tint = palette.secondaryText,
-                modifier = Modifier
-                    .size(34.dp)
-                    .padding(8.dp)
-                    .noRippleClickable { onCheckedChange(!checked) },
-            )
+            Box(modifier = Modifier.noRippleClickable { onCheckedChange(!checked) }) {
+                SettingsTrailingIcon(isPro = false, palette = palette)
+            }
         }
     }
 }
@@ -9377,65 +9384,88 @@ private fun PaywallScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(palette.background)
-            .verticalScroll(rememberScrollState()),
+            .background(palette.background),
     ) {
         // ① Top bar: close only, no title.
-        Box(modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 8.dp)) {
-            IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart).size(44.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = palette.primaryText)
+        Box(modifier = Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 8.dp)) {
+            IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart).size(40.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
         }
 
-        // ② App icon.
-        Image(
-            painter = androidx.compose.ui.res.painterResource(id = R.mipmap.ic_launcher_foreground),
-            contentDescription = null,
+        // ② Header — icon + title side by side, no vertical gap.
+        Column(
             modifier = Modifier
-                .padding(top = 8.dp, bottom = 24.dp)
-                .align(Alignment.CenterHorizontally)
-                .size(96.dp)
-                .clip(RoundedCornerShape(24.dp)),
-        )
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Image(
+                painter = androidx.compose.ui.res.painterResource(id = R.mipmap.ic_launcher_foreground),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(RoundedCornerShape(30.dp)),
+            )
+            Text(
+                "DotCal Pro",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 24.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.offset(y = (-18).dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(0.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+        ) {
 
-        // ③ Title.
-        Text(
-            "DotCal Pro",
-            color = palette.primaryText,
-            fontFamily = mono,
-            fontWeight = FontWeight.Bold,
-            fontSize = 30.sp,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        )
-        Spacer(modifier = Modifier.height(28.dp))
-
-        // ④ Feature list.
-        Column(modifier = Modifier.padding(horizontal = 28.dp)) {
-            PRO_FEATURES.forEach { feature ->
+        // ③ Feature list — bordered card.
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 28.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .border(1.dp, palette.eventCardBorder, RoundedCornerShape(14.dp))
+                .background(palette.eventCardSurface)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        ) {
+            PRO_FEATURES.forEachIndexed { index, feature ->
                 PaywallFeatureRow(feature = feature, palette = palette)
-                Spacer(modifier = Modifier.height(18.dp))
+                if (index != PRO_FEATURES.lastIndex) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // ⑤ Price row.
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(price, color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 40.sp)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("One-time purchase", color = palette.primaryText, fontFamily = mono, fontSize = 15.sp)
-            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                if (priceIsEstimate) "No subscriptions. Pay once, own it forever. (est.)" else "No subscriptions. Pay once, own it forever.",
+                "Pay once. Own it forever.",
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center,
             )
+            Spacer(modifier = Modifier.height(1.dp))
+            Text(
+                if (priceIsEstimate) "No subscription. Price estimate." else "No subscription.",
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 10.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 28.dp),
+            )
         }
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // ⑥ Buy button — accent bg, rounded, full width.
         val buyEnabled = connected && !purchasing
@@ -9443,8 +9473,8 @@ private fun PaywallScreen(
             modifier = Modifier
                 .padding(horizontal = 28.dp)
                 .fillMaxWidth()
-                .height(54.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .height(52.dp)
+                .clip(RoundedCornerShape(18.dp))
                 .background(if (buyEnabled) palette.accent else palette.disabledText)
                 .noRippleClickable(enabled = buyEnabled) {
                     val activity = context.findActivity()
@@ -9458,17 +9488,17 @@ private fun PaywallScreen(
             if (purchasing) {
                 CircularProgressIndicator(color = palette.onAccent, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
             } else {
-                Text("Buy Pro", color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Buy Pro - $price", color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // ⑦ Restore purchase.
         Text(
             "Restore Purchase",
             color = palette.secondaryText,
             fontFamily = mono,
-            fontSize = 13.sp,
+            fontSize = 12.sp,
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
                 .noRippleClickable {
@@ -9483,7 +9513,8 @@ private fun PaywallScreen(
                 }
                 .padding(8.dp),
         )
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+        }
     }
 }
 
@@ -9495,12 +9526,12 @@ private fun PaywallFeatureRow(feature: ProFeature, palette: DotCalPalette) {
             Icons.Default.Check,
             contentDescription = null,
             tint = palette.accent,
-            modifier = Modifier.size(20.dp).padding(top = 2.dp),
+            modifier = Modifier.size(16.dp).padding(top = 1.dp),
         )
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(10.dp))
         Column {
-            Text(feature.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(feature.description, color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp)
+            Text(feature.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(feature.description, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp, lineHeight = 13.sp)
         }
     }
 }

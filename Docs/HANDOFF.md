@@ -178,7 +178,7 @@ Branch `glyph-toy` (WIP, not on main):
 - Verified: `:app:assembleDebug` passed (4m 09s), real `compileDebugKotlin`. No phone/manual QA. Real Glyph render UNTESTED — needs a Nothing Phone 3 to confirm on-device behavior.
 
 Latest local work:
-- `versionCode = 8`, `versionName = "1.1.3"`.
+- `versionCode = 9`, `versionName = "1.1.3"`.
 - Paywall purchase success auto-dismiss fixed.
 - Paywall adaptive-icon crash fixed.
 - Large widget locked Unlock button rounded.
@@ -220,7 +220,7 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## Current Next Step
 
-Upload `1.1.3` / `versionCode 8` to Play Internal Testing.
+Upload `1.1.3` / `versionCode 9` to Play Internal Testing.
 
 Then wait on Google:
 1. Payments profile verification.
