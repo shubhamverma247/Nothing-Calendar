@@ -8,6 +8,7 @@ import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
+import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.trash.RecentlyDeletedStore
 import com.dotfield.dotcal.reminders.ReminderScheduler
@@ -24,7 +25,6 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.YearMonth
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -819,13 +819,8 @@ class DotCalRepository(
 
     private fun expandRecurringEvents(events: List<CalendarEvent>, rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
         val expanded = events.flatMap { event ->
-            when (event.rrule?.trim()) {
-                "FREQ=DAILY" -> event.expandDaily(rangeStart, rangeEndExclusive)
-                "FREQ=WEEKLY" -> event.expandWeekly(rangeStart, rangeEndExclusive)
-                "FREQ=MONTHLY" -> event.expandMonthly(rangeStart, rangeEndExclusive)
-                "FREQ=YEARLY" -> event.expandYearly(rangeStart, rangeEndExclusive)
-                else -> listOf(event)
-            }
+            val rule = RecurrenceRule.parse(event.rrule)
+            if (rule == null) listOf(event) else event.expandRule(rule, rangeStart, rangeEndExclusive)
         }
         return expanded.sortedWith(compareBy<CalendarEvent> { it.startTimeMs }.thenBy { it.title })
     }
@@ -834,75 +829,46 @@ class DotCalRepository(
         val today = LocalDate.now()
         val rangeEnd = today.plusYears(1)
         val expanded = tasks.flatMap { task ->
-            when (task.rrule?.trim()) {
-                "FREQ=DAILY" -> task.expandDaily(today, rangeEnd)
-                "FREQ=WEEKLY" -> task.expandWeekly(today, rangeEnd)
-                "FREQ=MONTHLY" -> task.expandMonthly(today, rangeEnd)
-                "FREQ=YEARLY" -> task.expandYearly(today, rangeEnd)
-                else -> listOf(task)
-            }
+            val rule = RecurrenceRule.parse(task.rrule)
+            if (rule == null) listOf(task) else task.expandRule(rule, today, rangeEnd)
         }
         return expanded.sortedWith(compareBy<CalendarEvent> { it.isCompleted }.thenBy { if (it.startTimeMs > 0L) it.startTimeMs else Long.MAX_VALUE }.thenBy { it.title })
     }
 
-    private fun CalendarEvent.expandDaily(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
-        val firstDate = startDate()
-        val firstVisibleDate = maxOf(firstDate, rangeStart)
-        return generateOccurrences(firstVisibleDate, rangeEndExclusive) { it.plusDays(1) }
-    }
-
-    private fun CalendarEvent.expandWeekly(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
-        val firstDate = startDate()
-        val daysToRange = ChronoUnit.DAYS.between(firstDate, rangeStart).coerceAtLeast(0)
-        val weeksToRange = daysToRange / 7
-        val firstVisibleDate = firstDate.plusWeeks(weeksToRange).let { candidate ->
-            if (candidate < rangeStart) candidate.plusWeeks(1) else candidate
-        }
-        return generateOccurrences(firstVisibleDate, rangeEndExclusive) { it.plusWeeks(1) }
-    }
-
-    private fun CalendarEvent.expandMonthly(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
-        val firstDate = startDate()
-        val monthsToRange = ChronoUnit.MONTHS.between(firstDate.withDayOfMonth(1), rangeStart.withDayOfMonth(1)).coerceAtLeast(0)
-        var cursorMonth = firstDate.withDayOfMonth(1).plusMonths(monthsToRange)
-        val occurrences = mutableListOf<CalendarEvent>()
-        while (cursorMonth < rangeEndExclusive.withDayOfMonth(1).plusMonths(1)) {
-            val date = cursorMonth.dayOrNull(firstDate.dayOfMonth)
-            if (date != null && date >= firstDate && date >= rangeStart && date < rangeEndExclusive) {
-                occurrenceOn(date)?.let { occurrences += it }
-            }
-            cursorMonth = cursorMonth.plusMonths(1)
-        }
-        return occurrences
-    }
-
-    private fun CalendarEvent.expandYearly(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
-        val firstDate = startDate()
-        var cursorYear = maxOf(firstDate.year, rangeStart.year)
-        val occurrences = mutableListOf<CalendarEvent>()
-        while (cursorYear <= rangeEndExclusive.year) {
-            val date = LocalDate.of(cursorYear, 1, 1).monthDayOrNull(firstDate.monthValue, firstDate.dayOfMonth)
-            if (date != null && date >= firstDate && date >= rangeStart && date < rangeEndExclusive) {
-                occurrenceOn(date)?.let { occurrences += it }
-            }
-            cursorYear += 1
-        }
-        return occurrences
-    }
-
-    private fun CalendarEvent.generateOccurrences(
-        firstVisibleDate: LocalDate,
+    /**
+     * Expand a structured [RecurrenceRule] into visible occurrences within [rangeStart, rangeEndExclusive).
+     * Honors INTERVAL, weekly/monthly BYDAY, COUNT and UNTIL. COUNT is evaluated from the series anchor
+     * (so counts stay stable across scroll/views); the unbounded/UNTIL-only case fast-forwards to the range
+     * for performance. EXDATE handling and per-occurrence timing are delegated to [occurrenceOn].
+     */
+    private fun CalendarEvent.expandRule(
+        rule: RecurrenceRule,
+        rangeStart: LocalDate,
         rangeEndExclusive: LocalDate,
-        nextDate: (LocalDate) -> LocalDate,
     ): List<CalendarEvent> {
         val firstDate = startDate()
-        var cursor = firstVisibleDate
-        val occurrences = mutableListOf<CalendarEvent>()
-        while (cursor < rangeEndExclusive) {
-            if (cursor >= firstDate) occurrenceOn(cursor)?.let { occurrences += it }
-            cursor = nextDate(cursor)
+        val anchorCount = rule.count != null
+        var block = if (anchorCount) 0 else rule.fastForwardBlock(firstDate, rangeStart)
+        val out = mutableListOf<CalendarEvent>()
+        var emittedCount = 0
+        var iterations = 0
+        while (iterations < MAX_RECURRENCE_BLOCKS) {
+            iterations++
+            for (date in rule.datesForBlock(firstDate, block)) {
+                if (rule.until != null && date > rule.until) return out
+                if (anchorCount && emittedCount >= rule.count!!) return out
+                emittedCount++
+                if (date >= rangeStart && date < rangeEndExclusive) {
+                    occurrenceOn(date)?.let { out += it }
+                }
+            }
+            if (anchorCount && emittedCount >= rule.count!!) break
+            val anchor = rule.blockAnchorDate(firstDate, block)
+            if (rule.until != null && anchor > rule.until) break
+            if (!anchorCount && anchor >= rangeEndExclusive) break
+            block++
         }
-        return occurrences
+        return out
     }
 
     private fun CalendarEvent.occurrenceOn(date: LocalDate): CalendarEvent? {
@@ -920,15 +886,6 @@ class DotCalRepository(
 
     private fun CalendarEvent.startDate(): LocalDate {
         return java.time.Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.of(timeZone)).toLocalDate()
-    }
-
-    private fun LocalDate.dayOrNull(day: Int): LocalDate? {
-        val yearMonth = YearMonth.from(this)
-        return if (day <= yearMonth.lengthOfMonth()) withDayOfMonth(day) else null
-    }
-
-    private fun LocalDate.monthDayOrNull(month: Int, day: Int): LocalDate? {
-        return runCatching { withMonth(month).dayOrNull(day) }.getOrNull()
     }
 
     private suspend fun disableBirthdayCalendar() {
@@ -974,6 +931,9 @@ class DotCalRepository(
         private const val BIRTHDAY_COLOR = ContactsProviderDataSource.BIRTHDAY_COLOR
         private const val BIRTHDAY_REMINDER_MINUTES = 1440
         private const val BIRTHDAY_SORT_ORDER = 10
+
+        /** Safety cap on recurrence-block iteration; ~27 years of a daily rule. Guards pathological rules. */
+        private const val MAX_RECURRENCE_BLOCKS = 10_000
 
         fun holidayAccountId(countryCode: String): String = "$HOLIDAY_ACCOUNT_PREFIX$countryCode"
     }

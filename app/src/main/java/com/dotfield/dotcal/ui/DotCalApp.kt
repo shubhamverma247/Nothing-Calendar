@@ -78,6 +78,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -211,6 +212,9 @@ import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
+import com.dotfield.dotcal.data.recurrence.ByDay
+import com.dotfield.dotcal.data.recurrence.RecurrenceFreq
+import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.isRecurrenceOccurrence
 import com.dotfield.dotcal.data.RecurringEditScope
@@ -261,7 +265,15 @@ private val recurrenceOptions = listOf(
     RecurrenceOption("Daily", "FREQ=DAILY"),
     RecurrenceOption("Weekly", "FREQ=WEEKLY"),
     RecurrenceOption("Monthly", "FREQ=MONTHLY"),
+    RecurrenceOption("Yearly", "FREQ=YEARLY"),
 )
+
+/** Label for a Repeat row: "None", a preset name, or a custom rule's human sentence. */
+private fun repeatRowLabel(rrule: String?): String {
+    if (rrule.isNullOrBlank()) return "None"
+    recurrenceOptions.firstOrNull { it.rrule == rrule }?.let { return it.label }
+    return RecurrenceRule.parse(rrule)?.humanLabel() ?: "None"
+}
 private val onboardingPages = listOf(
     OnboardingPage.Welcome,
     OnboardingPage.CalendarPermission,
@@ -1427,6 +1439,8 @@ fun DotCalApp(
                 task = editingTask,
                 initialReminder = editingTask?.let { task -> reminders.firstOrNull { it.eventId == task.baseEventId() } },
                 palette = palette,
+                isPro = isPro,
+                onRequestPro = { showPaywall = true },
                 onDismiss = {
                     editingTask = null
                     showTaskEditor = false
@@ -4508,7 +4522,7 @@ private fun EventEditorScreen(
             )
             EditorValueRow(
                 title = "Repeat",
-                value = if (recurringEditScope == RecurringEditScope.ThisEvent) "None" else recurrenceOptions.firstOrNull { it.rrule == recurrenceRule }?.label ?: "None",
+                value = if (recurringEditScope == RecurringEditScope.ThisEvent) "None" else repeatRowLabel(recurrenceRule),
                 palette = palette,
                 onClick = {
                     clearEditorFocus()
@@ -4603,8 +4617,11 @@ private fun EventEditorScreen(
     if (showRepeatPicker) {
         RepeatChoiceSheet(
             selected = recurrenceRule,
+            anchorDate = startDate,
+            isPro = isPro,
             palette = palette,
             onDismiss = { showRepeatPicker = false },
+            onRequestPro = onRequestPro,
             onSelected = {
                 recurrenceRule = it
                 showRepeatPicker = false
@@ -5080,7 +5097,19 @@ private fun ReminderChoiceSheet(selected: Int?, palette: DotCalPalette, onDismis
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RepeatChoiceSheet(selected: String?, palette: DotCalPalette, onDismiss: () -> Unit, onSelected: (String?) -> Unit) {
+private fun RepeatChoiceSheet(
+    selected: String?,
+    anchorDate: LocalDate,
+    isPro: Boolean,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onRequestPro: () -> Unit,
+    onSelected: (String?) -> Unit,
+) {
+    val isCustomSelected = !selected.isNullOrBlank() && recurrenceOptions.none { it.rrule == selected }
+    val selectedRule = remember(selected) { RecurrenceRule.parse(selected) }
+    var showBuilder by remember { mutableStateOf(false) }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
@@ -5088,15 +5117,366 @@ private fun RepeatChoiceSheet(selected: String?, palette: DotCalPalette, onDismi
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         dragHandle = { BottomSheetDragHandle(palette) },
     ) {
-        ChoiceSheetContent(
-            title = "Repeat",
-            items = recurrenceOptions,
-            selected = recurrenceOptions.firstOrNull { it.rrule == selected } ?: recurrenceOptions.first(),
-            label = { it.label },
+        Column(modifier = Modifier.fillMaxWidth().background(palette.dialogSurface).padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("Repeat", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            recurrenceOptions.forEach { option ->
+                RepeatOptionRow(
+                    label = option.label,
+                    selected = !isCustomSelected && option.rrule == selected,
+                    palette = palette,
+                    onClick = {
+                        onSelected(option.rrule)
+                        onDismiss()
+                    },
+                )
+                HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
+            }
+            RepeatOptionRow(
+                label = if (isCustomSelected) (selectedRule?.humanLabel() ?: "Custom…") else "Custom…",
+                selected = isCustomSelected,
+                palette = palette,
+                locked = !isPro,
+                onClick = {
+                    if (!isPro) {
+                        onDismiss()
+                        onRequestPro()
+                    } else {
+                        showBuilder = true
+                    }
+                },
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+
+    if (showBuilder) {
+        CustomRecurrenceSheet(
+            initial = selectedRule,
+            anchorDate = anchorDate,
             palette = palette,
-            onSelected = { onSelected(it.rrule) },
+            onDismiss = { showBuilder = false },
+            onConfirm = { rrule ->
+                showBuilder = false
+                onSelected(rrule)
+                onDismiss()
+            },
         )
     }
+}
+
+@Composable
+private fun RepeatOptionRow(
+    label: String,
+    selected: Boolean,
+    palette: DotCalPalette,
+    locked: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = palette.primaryText, fontFamily = mono, fontSize = 15.sp, modifier = Modifier.weight(1f))
+        when {
+            locked -> Icon(Icons.Default.Lock, contentDescription = "Pro feature", tint = palette.secondaryText, modifier = Modifier.size(16.dp))
+            selected -> Icon(Icons.Default.Check, contentDescription = null, tint = palette.primaryText, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+private enum class RecurrenceEndMode { Never, OnDate, AfterCount }
+
+/** Pro custom recurrence builder: frequency, interval, weekday/monthly-mode, and an end condition. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CustomRecurrenceSheet(
+    initial: RecurrenceRule?,
+    anchorDate: LocalDate,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    val freqOrder = listOf(RecurrenceFreq.DAILY, RecurrenceFreq.WEEKLY, RecurrenceFreq.MONTHLY, RecurrenceFreq.YEARLY)
+    var freq by remember { mutableStateOf(initial?.freq ?: RecurrenceFreq.WEEKLY) }
+    var interval by remember { mutableStateOf((initial?.interval ?: 1).coerceAtLeast(1)) }
+    var weekdays by remember {
+        mutableStateOf(
+            initial?.byDay?.map { it.day }?.toSet()?.takeIf { it.isNotEmpty() } ?: setOf(anchorDate.dayOfWeek)
+        )
+    }
+    // Monthly: false = on day-of-month, true = on the nth weekday.
+    var monthlyByWeekday by remember { mutableStateOf(initial?.freq == RecurrenceFreq.MONTHLY && initial.byDay.isNotEmpty()) }
+    var endMode by remember {
+        mutableStateOf(
+            when {
+                initial?.count != null -> RecurrenceEndMode.AfterCount
+                initial?.until != null -> RecurrenceEndMode.OnDate
+                else -> RecurrenceEndMode.Never
+            }
+        )
+    }
+    var untilDate by remember { mutableStateOf(initial?.until ?: anchorDate.plusMonths(3)) }
+    var countN by remember { mutableStateOf(initial?.count ?: 10) }
+    var showUntilPicker by remember { mutableStateOf(false) }
+
+    val anchorNthByDay = remember(anchorDate) { anchorDate.nthWeekdayByDay() }
+
+    fun buildRule(): RecurrenceRule = RecurrenceRule(
+        freq = freq,
+        interval = interval.coerceAtLeast(1),
+        byDay = when (freq) {
+            RecurrenceFreq.WEEKLY -> {
+                val days = weekdays.ifEmpty { setOf(anchorDate.dayOfWeek) }
+                if (days.size == 1 && days.first() == anchorDate.dayOfWeek) emptyList()
+                else days.sortedBy { it.value }.map { ByDay(null, it) }
+            }
+            RecurrenceFreq.MONTHLY -> if (monthlyByWeekday) listOf(anchorNthByDay) else emptyList()
+            else -> emptyList()
+        },
+        count = if (endMode == RecurrenceEndMode.AfterCount) countN.coerceAtLeast(1) else null,
+        until = if (endMode == RecurrenceEndMode.OnDate) untilDate else null,
+    )
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.92f)
+                .background(palette.dialogSurface),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 96.dp),
+            ) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("Custom Repeat", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(buildRule().humanLabel(), color = palette.accent, fontFamily = mono, fontSize = 14.sp)
+
+            Spacer(modifier = Modifier.height(18.dp))
+            CalcSectionLabelSafe("FREQUENCY", palette)
+            Spacer(modifier = Modifier.height(8.dp))
+            TwoOptionSegmentedControl(
+                options = listOf("Day", "Week", "Month", "Year"),
+                selectedIndex = freqOrder.indexOf(freq).coerceAtLeast(0),
+                palette = palette,
+                onSelected = { freq = freqOrder[it] },
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+            CalcSectionLabelSafe("EVERY", palette)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CalcStepperButton("−", palette) { interval = (interval - 1).coerceAtLeast(1) }
+                Text(
+                    "$interval " + freqUnitLabel(freq, interval),
+                    color = palette.primaryText,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                )
+                CalcStepperButton("+", palette) { interval = (interval + 1).coerceAtMost(999) }
+            }
+
+            if (freq == RecurrenceFreq.WEEKLY) {
+                Spacer(modifier = Modifier.height(18.dp))
+                CalcSectionLabelSafe("ON DAYS", palette)
+                Spacer(modifier = Modifier.height(8.dp))
+                WeekdayPickerRow(
+                    selected = weekdays,
+                    palette = palette,
+                    onToggle = { day ->
+                        weekdays = if (day in weekdays) (weekdays - day) else (weekdays + day)
+                    },
+                )
+            }
+
+            if (freq == RecurrenceFreq.MONTHLY) {
+                Spacer(modifier = Modifier.height(18.dp))
+                CalcSectionLabelSafe("ON", palette)
+                Spacer(modifier = Modifier.height(8.dp))
+                RepeatOptionRow(
+                    label = "Day ${anchorDate.dayOfMonth} of the month",
+                    selected = !monthlyByWeekday,
+                    palette = palette,
+                    onClick = { monthlyByWeekday = false },
+                )
+                HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
+                RepeatOptionRow(
+                    label = "The ${nthWeekdayPhrase(anchorNthByDay)}",
+                    selected = monthlyByWeekday,
+                    palette = palette,
+                    onClick = { monthlyByWeekday = true },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+            CalcSectionLabelSafe("ENDS", palette)
+            Spacer(modifier = Modifier.height(8.dp))
+            RepeatOptionRow(
+                label = "Never",
+                selected = endMode == RecurrenceEndMode.Never,
+                palette = palette,
+                onClick = { endMode = RecurrenceEndMode.Never },
+            )
+            HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
+            RepeatOptionRow(
+                label = if (endMode == RecurrenceEndMode.OnDate) "On ${untilDate.format(editorDateFormatter)}" else "On a date",
+                selected = endMode == RecurrenceEndMode.OnDate,
+                palette = palette,
+                onClick = {
+                    endMode = RecurrenceEndMode.OnDate
+                    showUntilPicker = true
+                },
+            )
+            HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { endMode = RecurrenceEndMode.AfterCount }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("After", color = palette.primaryText, fontFamily = mono, fontSize = 15.sp)
+                Spacer(modifier = Modifier.width(12.dp))
+                if (endMode == RecurrenceEndMode.AfterCount) {
+                    CalcStepperButton("−", palette) { countN = (countN - 1).coerceAtLeast(1) }
+                    Text(
+                        "$countN",
+                        color = palette.primaryText,
+                        fontFamily = mono,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.widthIn(min = 44.dp).padding(horizontal = 8.dp),
+                    )
+                    CalcStepperButton("+", palette) { countN = (countN + 1).coerceAtMost(999) }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (countN == 1) "time" else "times", color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+                } else {
+                    Text("a number of times", color = palette.secondaryText, fontFamily = mono, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.Transparent, modifier = Modifier.size(18.dp))
+                }
+            }
+
+            }
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(palette.dialogSurface)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onDismiss) { Text("Cancel", color = palette.primaryText, fontFamily = mono) }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(palette.accent)
+                        .noRippleClickable { onConfirm(buildRule().toRRule()) }
+                        .padding(horizontal = 28.dp, vertical = 12.dp),
+                ) {
+                    Text("Done", color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+
+    if (showUntilPicker) {
+        DateTimeChoiceSheet(
+            title = "Ends on",
+            selectedDate = untilDate,
+            selectedTime = LocalTime.NOON,
+            minDate = anchorDate,
+            includeTime = false,
+            palette = palette,
+            onDismiss = { showUntilPicker = false },
+            onSelected = { pickedDate, _ ->
+                untilDate = pickedDate
+                endMode = RecurrenceEndMode.OnDate
+                showUntilPicker = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun WeekdayPickerRow(selected: Set<DayOfWeek>, palette: DotCalPalette, onToggle: (DayOfWeek) -> Unit) {
+    val order = listOf(
+        DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY,
+        DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY,
+    )
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        order.forEach { day ->
+            val isOn = day in selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isOn) palette.accent else palette.topBarSurface)
+                    .noRippleClickable { onToggle(day) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    day.getDisplayName(java.time.format.TextStyle.NARROW, Locale.US),
+                    color = if (isOn) palette.onAccent else palette.secondaryText,
+                    fontFamily = mono,
+                    fontWeight = if (isOn) FontWeight.Bold else FontWeight.Normal,
+                    fontSize = 14.sp,
+                )
+            }
+        }
+    }
+}
+
+private fun freqUnitLabel(freq: RecurrenceFreq, interval: Int): String {
+    val plural = interval != 1
+    return when (freq) {
+        RecurrenceFreq.DAILY -> if (plural) "days" else "day"
+        RecurrenceFreq.WEEKLY -> if (plural) "weeks" else "week"
+        RecurrenceFreq.MONTHLY -> if (plural) "months" else "month"
+        RecurrenceFreq.YEARLY -> if (plural) "years" else "year"
+    }
+}
+
+/** The nth (or last) weekday of the month containing this date, as a BYDAY token. */
+private fun LocalDate.nthWeekdayByDay(): ByDay {
+    val ordinal = if (dayOfMonth > lengthOfMonth() - 7) -1 else ((dayOfMonth - 1) / 7) + 1
+    return ByDay(ordinal, dayOfWeek)
+}
+
+private fun nthWeekdayPhrase(byDay: ByDay): String {
+    val ord = when (byDay.ordinal) {
+        -1 -> "last"
+        2 -> "2nd"
+        3 -> "3rd"
+        4 -> "4th"
+        5 -> "5th"
+        else -> "1st"
+    }
+    return "$ord ${byDay.day.getDisplayName(java.time.format.TextStyle.FULL, Locale.US)}"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -5960,6 +6340,8 @@ private fun TaskEditorSheet(
     task: CalendarEvent?,
     initialReminder: EventReminder?,
     palette: DotCalPalette,
+    isPro: Boolean,
+    onRequestPro: () -> Unit,
     onDismiss: () -> Unit,
     onSave: (TaskEditorData) -> Unit,
     onDelete: (() -> Unit)? = null,
@@ -6116,7 +6498,7 @@ private fun TaskEditorSheet(
             )
             EditorValueRow(
                 title = "Repeat",
-                value = recurrenceOptions.firstOrNull { it.rrule == recurrenceRule }?.label ?: "None",
+                value = repeatRowLabel(recurrenceRule),
                 palette = palette,
                 enabled = dueDate != null,
                 leadingIcon = Icons.Default.CalendarMonth,
@@ -6223,8 +6605,11 @@ private fun TaskEditorSheet(
     if (showRepeatPicker && dueDate != null) {
         RepeatChoiceSheet(
             selected = recurrenceRule,
+            anchorDate = dueDate ?: LocalDate.now(),
+            isPro = isPro,
             palette = palette,
             onDismiss = { showRepeatPicker = false },
+            onRequestPro = onRequestPro,
             onSelected = {
                 recurrenceRule = it
                 showRepeatPicker = false
@@ -8914,13 +9299,8 @@ private fun CalendarEvent.detailTimeLine(): String {
 }
 
 private fun CalendarEvent.recurrenceDetailLabel(): String? {
-    return when (rrule?.trim()) {
-        "FREQ=DAILY" -> "REPEATS DAILY"
-        "FREQ=WEEKLY" -> "REPEATS WEEKLY"
-        "FREQ=MONTHLY" -> "REPEATS MONTHLY"
-        "FREQ=YEARLY" -> "REPEATS YEARLY"
-        else -> null
-    }
+    val rule = RecurrenceRule.parse(rrule) ?: return null
+    return "REPEATS · " + rule.humanLabel().uppercase()
 }
 
 private fun EventReminder.detailLabel(): String {
@@ -9318,6 +9698,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Import / Export", "Back up and restore events & tasks as .ics"),
     ProFeature("Quick Add", "Type 'gym every mon 7am' — we build the event"),
     ProFeature("Backup & Restore", "Save & restore your whole calendar as a file"),
+    ProFeature("Advanced Recurrence", "Every N weeks, nth weekday, end date or count"),
 )
 
 @Composable
@@ -9709,13 +10090,8 @@ private fun quickAddWhenLabel(result: QuickAddResult): String {
     }
 }
 
-private fun quickAddRepeatLabel(rrule: String): String = when (rrule.trim()) {
-    "FREQ=DAILY" -> "Daily"
-    "FREQ=WEEKLY" -> "Weekly"
-    "FREQ=MONTHLY" -> "Monthly"
-    "FREQ=YEARLY" -> "Yearly"
-    else -> "Custom"
-}
+private fun quickAddRepeatLabel(rrule: String): String =
+    RecurrenceRule.parse(rrule)?.humanLabel() ?: "Custom"
 
 @Composable
 private fun RecentlyDeletedScreen(
