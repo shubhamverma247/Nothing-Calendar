@@ -9312,6 +9312,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Image Attachments", "Add up to 5 photos to any event"),
     ProFeature("Voice Notes", "Record audio notes on your events"),
     ProFeature("Large Widget", "Full month grid widget for your home screen"),
+    ProFeature("Widget Pack Config", "Transparent widgets plus DotCal dot texture"),
     ProFeature("Date Calculator", "Calculate days between dates instantly"),
     ProFeature("Custom Accent Colors", "Extra palettes plus any custom hex color"),
     ProFeature("Import / Export", "Back up and restore events & tasks as .ics"),
