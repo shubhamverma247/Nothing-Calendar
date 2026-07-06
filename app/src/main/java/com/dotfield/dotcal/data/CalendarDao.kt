@@ -58,6 +58,28 @@ interface CalendarDao {
     )
     suspend fun getAllUserEventsForExport(): List<CalendarEvent>
 
+    /**
+     * Global Search: master rows (events + tasks) from visible calendars whose title,
+     * description, or location matches the query. Excludes generated BIRTHDAY/HOLIDAY rows
+     * (noise). Recurring events return their single master row (not per-occurrence). Read-only
+     * query — no schema change. Private Vault filtering is applied in the repository.
+     */
+    @Query(
+        """
+        SELECT calendar_events.* FROM calendar_events
+        INNER JOIN calendar_accounts ON calendar_accounts.id = calendar_events.accountId
+        WHERE calendar_accounts.isVisible = 1
+        AND calendar_events.source NOT IN ('BIRTHDAY', 'HOLIDAY')
+        AND (
+            calendar_events.title LIKE '%' || :q || '%'
+            OR calendar_events.description LIKE '%' || :q || '%'
+            OR calendar_events.location LIKE '%' || :q || '%'
+        )
+        ORDER BY calendar_events.startTimeMs DESC
+        """,
+    )
+    suspend fun searchUserEvents(q: String): List<CalendarEvent>
+
     @Query("SELECT * FROM event_reminders WHERE eventId = :eventId ORDER BY triggerAtMs ASC")
     suspend fun getRemindersForEvent(eventId: String): List<EventReminder>
 

@@ -360,6 +360,19 @@ class DotCalRepository(
             withContext(Dispatchers.Default) { expandRecurringTasks(tasks) }
         }
 
+    /**
+     * Global Search (FREE): one-shot text match over user events + tasks (master rows).
+     * Reuses [CalendarDao.searchUserEvents] for the SQL LIKE, then drops Private Vault items
+     * via the existing [filterOutPrivate] helper. Facet filtering (calendar/type/date) is
+     * applied in-memory by the caller. Blank query returns empty. No schema change.
+     */
+    suspend fun searchItems(query: String): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        val q = query.trim()
+        if (q.isBlank()) return@withContext emptyList()
+        val privateIds = privacyManager.observePrivateVaultIds().first()
+        dao.searchUserEvents(q).filterOutPrivate(privateIds)
+    }
+
     fun observeTodayTasks(day: LocalDate): Flow<List<CalendarEvent>> {
         val start = day.atStartMs()
         return dao.observeTodayTasks(start, day.plusDays(1).atStartMs() - 1)

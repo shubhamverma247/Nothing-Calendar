@@ -230,6 +230,20 @@ class DotCalViewModel(
     private val _privateVaultEvents = MutableStateFlow<List<CalendarEvent>>(emptyList())
     val privateVaultEvents: StateFlow<List<CalendarEvent>> = _privateVaultEvents
 
+    // ----- Global Search (FREE) -----
+    private val _searchResults = MutableStateFlow<List<CalendarEvent>>(emptyList())
+    val searchResults: StateFlow<List<CalendarEvent>> = _searchResults
+
+    fun search(query: String) {
+        viewModelScope.launch {
+            _searchResults.value = repository.searchItems(query)
+        }
+    }
+
+    fun clearSearch() {
+        _searchResults.value = emptyList()
+    }
+
     fun refreshRecentlyDeleted() {
         viewModelScope.launch {
             _recentlyDeleted.value = repository.listRecentlyDeleted()

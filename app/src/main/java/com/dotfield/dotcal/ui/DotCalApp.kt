@@ -105,6 +105,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
@@ -333,6 +334,7 @@ fun DotCalApp(
     var showDateCalculator by remember { mutableStateOf(false) }
     var showQuickAdd by remember { mutableStateOf(false) }
     var showRecentlyDeleted by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
     var quickAddPrefill by remember { mutableStateOf<QuickAddResult?>(null) }
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     val appLockState by viewModel.appLockState.collectAsStateWithLifecycle()
@@ -824,6 +826,7 @@ fun DotCalApp(
     fun closeTopSurface() {
         when {
             showPaywall -> showPaywall = false
+            showSearch -> showSearch = false
             showRecentlyDeleted -> showRecentlyDeleted = false
             showDateCalculator -> showDateCalculator = false
             showQuickAdd -> showQuickAdd = false
@@ -920,7 +923,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || showRecentlyDeleted || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || showSearch || showRecentlyDeleted || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -973,6 +976,7 @@ fun DotCalApp(
                             onTitleClick = { viewModel.selectDate(LocalDate.now()) },
                             onAdd = { openAddEditor() },
                             onQuickAdd = { if (isPro) showQuickAdd = true else showPaywall = true },
+                            onSearch = { showSearch = true },
                             onCalendarTabSelected = {
                                 screenTab = ScreenTab.Calendar
                                 previousScreenTab = ScreenTab.Calendar
@@ -1636,6 +1640,35 @@ fun DotCalApp(
                 onRestore = { id -> viewModel.restoreDeleted(id) },
                 onPurge = { id -> viewModel.purgeDeleted(id) },
                 onEmptyAll = { viewModel.emptyRecentlyDeleted() },
+            )
+        }
+        AnimatedVisibility(
+            visible = showSearch,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+            val searchAccounts by viewModel.assignableAccounts.collectAsStateWithLifecycle()
+            SearchScreen(
+                palette = palette,
+                results = searchResults,
+                accounts = searchAccounts,
+                onQueryChange = { viewModel.search(it) },
+                onOpenEvent = { event ->
+                    showSearch = false
+                    viewModel.clearSearch()
+                    viewModel.openEventDetail(event)
+                },
+                onOpenTask = { task ->
+                    showSearch = false
+                    viewModel.clearSearch()
+                    taskDetail = task
+                },
+                onBack = {
+                    showSearch = false
+                    viewModel.clearSearch()
+                },
             )
         }
         pendingDelete?.let { request ->
@@ -2678,6 +2711,7 @@ private fun CalendarTabContainer(
     onTitleClick: () -> Unit,
     onAdd: () -> Unit,
     onQuickAdd: (() -> Unit)? = null,
+    onSearch: (() -> Unit)? = null,
     onCalendarTabSelected: (CalendarTab) -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -2697,6 +2731,7 @@ private fun CalendarTabContainer(
                 onTitleClick = onTitleClick,
                 onAdd = onAdd,
                 onQuickAdd = onQuickAdd,
+                onSearch = onSearch,
             )
         }
         Spacer(
@@ -2733,6 +2768,7 @@ private fun CalendarActionBar(
     onTitleClick: () -> Unit,
     onAdd: () -> Unit,
     onQuickAdd: (() -> Unit)? = null,
+    onSearch: (() -> Unit)? = null,
 ) {
     val topIconTint = if (palette.isDark) NWhite else palette.accent
     Row(
@@ -2754,6 +2790,14 @@ private fun CalendarActionBar(
             maxLines = 1,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (onSearch != null) {
+                IconButton(
+                    onClick = onSearch,
+                    modifier = Modifier.size(44.dp),
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = "Search", tint = topIconTint)
+                }
+            }
             if (onQuickAdd != null) {
                 IconButton(
                     onClick = onQuickAdd,
@@ -10413,6 +10457,232 @@ private fun PaywallFeatureRow(feature: ProFeature, palette: DotCalPalette) {
             Text(feature.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             Text(feature.description, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp, lineHeight = 13.sp)
         }
+    }
+}
+
+private enum class SearchTypeFilter(val label: String) { All("All"), Events("Events"), Tasks("Tasks") }
+
+private enum class SearchDatePreset(val label: String) {
+    AnyTime("Any time"), Upcoming("Upcoming"), Past("Past"), ThisMonth("This month")
+}
+
+/**
+ * Global Search (FREE): full-screen overlay to find events + tasks by text, with in-memory
+ * type / date-preset / calendar facets over the ViewModel's [searchResults]. Reuses [EventRow]
+ * for events and a lightweight local row for tasks. No Pro gate. Mirrors the QuickAdd overlay.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SearchScreen(
+    palette: DotCalPalette,
+    results: List<CalendarEvent>,
+    accounts: List<CalendarAccount>,
+    onQueryChange: (String) -> Unit,
+    onOpenEvent: (CalendarEvent) -> Unit,
+    onOpenTask: (CalendarEvent) -> Unit,
+    onBack: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    var typeFilter by remember { mutableStateOf(SearchTypeFilter.All) }
+    var datePreset by remember { mutableStateOf(SearchDatePreset.AnyTime) }
+    var accountId by remember { mutableStateOf<String?>(null) }
+    val focusRequester = remember { FocusRequester() }
+    val trimmed = query.trim()
+
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    // Debounced query — re-run the DAO search a beat after typing stops.
+    LaunchedEffect(query) {
+        delay(220)
+        onQueryChange(query)
+    }
+
+    // In-memory facet filtering over the already-fetched results (cheap; no re-query).
+    val zone = ZoneId.systemDefault()
+    val todayStartMs = LocalDate.now().atStartOfDay(zone).toInstant().toEpochMilli()
+    val month = YearMonth.now()
+    val monthStartMs = month.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    val monthEndMs = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    val filtered = results.filter { item ->
+        val typeOk = when (typeFilter) {
+            SearchTypeFilter.All -> true
+            SearchTypeFilter.Events -> item.isTask == 0
+            SearchTypeFilter.Tasks -> item.isTask == 1
+        }
+        val dateOk = when (datePreset) {
+            SearchDatePreset.AnyTime -> true
+            SearchDatePreset.Upcoming -> item.startTimeMs >= todayStartMs
+            SearchDatePreset.Past -> item.startTimeMs < todayStartMs
+            SearchDatePreset.ThisMonth -> item.startTimeMs in monthStartMs until monthEndMs
+        }
+        val accountOk = accountId == null || item.accountId == accountId
+        typeOk && dateOk && accountOk
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
+        // Top bar: back + search field.
+        Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+            }
+            Text(
+                "Search",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp)) {
+            CalcFieldGroup(palette) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it.replace("\n", "") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        textStyle = TextStyle(
+                            color = palette.primaryText,
+                            fontFamily = mono,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                        ),
+                        cursorBrush = SolidColor(palette.accent),
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(focusRequester)
+                            .padding(vertical = 16.dp),
+                        decorationBox = { inner ->
+                            if (query.isEmpty()) {
+                                Text(
+                                    "Title, location, notes…",
+                                    color = palette.disabledText,
+                                    fontFamily = mono,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 17.sp,
+                                )
+                            }
+                            inner()
+                        },
+                    )
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { query = "" }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = palette.secondaryText, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Facet chips: type, then date preset, then calendar.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SearchTypeFilter.values().forEach { t ->
+                    SearchFilterChip(label = t.label, selected = typeFilter == t, palette = palette) { typeFilter = t }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SearchDatePreset.values().forEach { d ->
+                    SearchFilterChip(label = d.label, selected = datePreset == d, palette = palette) { datePreset = d }
+                }
+            }
+            if (accounts.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SearchFilterChip(label = "All calendars", selected = accountId == null, palette = palette) { accountId = null }
+                    accounts.forEach { acc ->
+                        SearchFilterChip(label = acc.displayName, selected = accountId == acc.id, palette = palette) { accountId = acc.id }
+                    }
+                }
+            }
+        }
+
+        HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
+
+        when {
+            trimmed.isEmpty() -> SearchHintBox("Search your events and tasks", palette)
+            filtered.isEmpty() -> SearchHintBox("No results for \"$trimmed\"", palette)
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                lazyItems(filtered, key = { it.id }) { item ->
+                    if (item.isTask == 1) {
+                        SearchTaskResultRow(task = item, palette = palette, onClick = { onOpenTask(item) })
+                    } else {
+                        EventRow(event = item, palette = palette, onClick = { onOpenEvent(item) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchFilterChip(label: String, selected: Boolean, palette: DotCalPalette, onClick: () -> Unit) {
+    val bg = if (selected) palette.accent.copy(alpha = 0.16f) else palette.eventCardSurface
+    val border = if (selected) palette.accent else palette.eventCardBorder
+    val textColor = if (selected) palette.accent else palette.secondaryText
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(bg)
+            .drawBehind {
+                drawRoundRect(
+                    color = border,
+                    size = size,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx(), 10.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            }
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(label, color = textColor, fontFamily = mono, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontSize = 13.sp, maxLines = 1)
+    }
+}
+
+@Composable
+private fun SearchHintBox(message: String, palette: DotCalPalette) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(message, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+    }
+}
+
+@Composable
+private fun SearchTaskResultRow(task: CalendarEvent, palette: DotCalPalette, onClick: () -> Unit) {
+    val whenLabel = Instant.ofEpochMilli(task.startTimeMs).atZone(ZoneId.systemDefault()).toLocalDate()
+        .format(DateTimeFormatter.ofPattern("EEE, dd MMM yyyy", Locale.US))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(palette.eventCardSurface)
+            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(16.dp))
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("TASK • $whenLabel", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 1)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                task.title,
+                color = if (task.isCompleted == 1) palette.primaryText.copy(alpha = 0.5f) else palette.primaryText,
+                fontFamily = mono,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        EventCardChevron(tint = palette.eventCardChevron)
     }
 }
 
