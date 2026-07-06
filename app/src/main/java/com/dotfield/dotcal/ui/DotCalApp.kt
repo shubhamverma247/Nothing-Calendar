@@ -1376,34 +1376,22 @@ fun DotCalApp(
                     showRecentlyDeleted = true
                 },
                 onExportIcs = {
-                    if (!isPro) {
-                        showPaywall = true
-                    } else {
-                        val stamp = java.time.LocalDate.now().toString()
-                        exportIcsLauncher.launch("dotcal-$stamp.ics")
-                    }
+                    // FREE feature (data portability): no Pro gate.
+                    val stamp = java.time.LocalDate.now().toString()
+                    exportIcsLauncher.launch("dotcal-$stamp.ics")
                 },
                 onImportIcs = {
-                    if (!isPro) {
-                        showPaywall = true
-                    } else {
-                        importIcsLauncher.launch(arrayOf("text/calendar", "application/octet-stream", "*/*"))
-                    }
+                    // FREE feature (data portability): no Pro gate.
+                    importIcsLauncher.launch(arrayOf("text/calendar", "application/octet-stream", "*/*"))
                 },
                 onBackup = {
-                    if (!isPro) {
-                        showPaywall = true
-                    } else {
-                        val stamp = java.time.LocalDate.now().toString()
-                        backupLauncher.launch("dotcal-backup-$stamp.json")
-                    }
+                    // FREE feature (data safety): no Pro gate.
+                    val stamp = java.time.LocalDate.now().toString()
+                    backupLauncher.launch("dotcal-backup-$stamp.json")
                 },
                 onRestore = {
-                    if (!isPro) {
-                        showPaywall = true
-                    } else {
-                        restoreLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
-                    }
+                    // FREE feature (data safety): never trap user data behind a paywall.
+                    restoreLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
                 },
             )
         }
@@ -7488,31 +7476,33 @@ private fun SettingsRoot(
             SettingsDivider(palette)
 
             SettingsSectionTitle("Data", palette)
+            // Import/Export + Backup/Restore are FREE (data portability & safety).
+            // isPro = true forces the unlocked chevron and suppresses the Pro tag/lock.
             SettingsImportExportRow(
                 title = "Export Calendar",
                 subtitle = "Save all events & tasks to an .ics file",
-                isPro = isPro,
+                isPro = true,
                 palette = palette,
                 onClick = onExportIcs,
             )
             SettingsImportExportRow(
                 title = "Import Calendar",
                 subtitle = "Load events & tasks from an .ics file",
-                isPro = isPro,
+                isPro = true,
                 palette = palette,
                 onClick = onImportIcs,
             )
             SettingsImportExportRow(
                 title = "Back Up Data",
                 subtitle = "Save all events, tasks & reminders to a file",
-                isPro = isPro,
+                isPro = true,
                 palette = palette,
                 onClick = onBackup,
             )
             SettingsImportExportRow(
                 title = "Restore Data",
                 subtitle = "Merge a backup file into this device",
-                isPro = isPro,
+                isPro = true,
                 palette = palette,
                 onClick = onRestore,
             )
@@ -10204,9 +10194,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Widget Pack Config", "Transparent widgets plus DotCal dot texture"),
     ProFeature("Date Calculator", "Calculate days between dates instantly"),
     ProFeature("Custom Accent Colors", "Extra palettes plus any custom hex color"),
-    ProFeature("Import / Export", "Back up and restore events & tasks as .ics"),
     ProFeature("Quick Add", "Type 'gym every mon 7am' — we build the event"),
-    ProFeature("Backup & Restore", "Save & restore your whole calendar as a file"),
     ProFeature("Advanced Recurrence", "Every N weeks, nth weekday, end date or count"),
     ProFeature("App Lock & Private Vault", "PIN lock plus hidden events and tasks"),
 )

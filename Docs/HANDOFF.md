@@ -112,9 +112,11 @@ Pro gates:
 - Widget Pack Config (transparent background + dot texture controls for existing widgets).
 - Date Calculator.
 - Custom Accent Colors (extra preset palette + custom hex picker; 5 base accents stay free).
-- Calendar Import / Export (local `.ics` via SAF; no cloud/network).
 - Natural-language Quick Add (offline parser; sparkle icon in Calendar top bar).
-- Backup & Restore (full-fidelity offline JSON snapshot via SAF; non-destructive merge restore; no network).
+
+Ungated to FREE (2026-07-06, data portability/safety — market norm; avoids "won't let me export my own data" reviews):
+- Calendar Import / Export (local `.ics` via SAF; no cloud/network). Now FREE.
+- Backup & Restore (full-fidelity offline JSON snapshot via SAF; non-destructive merge restore; no network). Now FREE.
 
 Paywall:
 - Route: `dotcal://paywall`.
@@ -228,6 +230,7 @@ Latest verification:
 - 2026-07-05: Advanced Recurrence Custom dialog layout fix after phone report. Root cause: `CustomRecurrenceSheet` used default partial `ModalBottomSheet` behavior and put Cancel/Done at the bottom of one tall scroll column, so buttons were initially hidden and state changes could collapse the sheet. Fix: `rememberModalBottomSheetState(skipPartiallyExpanded = true)`, 92% height sheet, scrollable form content, sticky bottom Cancel/Done action bar with navigation-bar padding. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (2m 46s). Installed debug APK on device `4ab0d020`.
 - 2026-07-05: App Lock + Private Vault (Pro Backlog #4) built. Pro-gated, no Room/schema/manifest/permission change, no new dependency. New `data/privacy/AppPrivacyManager.kt` stores app-lock state, salted SHA-256 PIN hash, and private event/task IDs in existing DataStore (`calendar_preferences`); no PIN plaintext is stored. App Lock screen appears over the app after launch/background when enabled, supports 4-8 digit PIN unlock plus Android system device credential via `KeyguardManager.createConfirmDeviceCredentialIntent()` when configured. Settings > Additional gained Pro row "App Lock & Private Vault"; privacy screen can set/change/remove PIN, enable/disable lock (disable/remove requires current PIN), and list/restore hidden events/tasks. Event Detail and Task Detail gained Move/Restore Private Vault actions. Private items are filtered out of normal event/task/agenda flows, task deep links, event deep links, and widgets; moving an item private cancels its existing reminders to prevent notification leaks, restoring reschedules still-future reminders. Paywall `PRO_FEATURES` gained "App Lock & Private Vault". `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed. No phone/manual UI QA.
 - 2026-07-06: Private Vault divider polish after phone report. Root cause: vault rows reused `SettingsContentDivider`, which has a start inset for account/settings content rows, so the divider looked half-cut on the left. Added `PrivateVaultDivider` with full-width line under each private row. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed. Installed debug APK on device `4ab0d020`.
+- 2026-07-06: ICS Import/Export + Backup & Restore ungated to FREE (data portability/safety; market norm — Simple Calendar and most offline apps give import/export free, and gating "restore my own data" earns 1-star reviews). UI-only change in `ui/DotCalApp.kt`: removed the `if (!isPro) showPaywall` gate from `onExportIcs`/`onImportIcs`/`onBackup`/`onRestore` (now launch SAF directly); the four Settings > Data rows (Export/Import Calendar, Back Up/Restore Data) pass `isPro = true` so they show the unlocked chevron and no Pro tag; removed "Import / Export" and "Backup & Restore" from Paywall `PRO_FEATURES`. No ViewModel/repository/serializer change (they never gated). No Room/schema/DataStore/manifest/permission change, no new dependency, no version bump. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (2m 34s), real `compileDebugKotlin`. No phone/manual QA.
 - No phone/manual UI QA run.
 
 Current dirty files may include earlier Pro/UI polish and release assets. Do not revert unrelated user/local changes.
