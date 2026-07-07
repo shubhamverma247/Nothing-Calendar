@@ -11,6 +11,8 @@ import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.privacy.AppPrivacyManager
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
+import com.dotfield.dotcal.data.templates.EventTemplate
+import com.dotfield.dotcal.data.templates.EventTemplateStore
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.trash.RecentlyDeletedStore
 import com.dotfield.dotcal.reminders.ReminderScheduler
@@ -76,6 +78,7 @@ class DotCalRepository(
     private val reminderScheduler = ReminderScheduler(context)
     private val privacyManager = AppPrivacyManager(context.applicationContext)
     private val recentlyDeletedStore = RecentlyDeletedStore(context)
+    private val eventTemplateStore = EventTemplateStore(context)
     private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
     private val holidayDataSource = HolidayDataSource(context.applicationContext)
     private val syncRepository = CalendarSyncRepository(
@@ -809,6 +812,23 @@ class DotCalRepository(
     /** Empty the entire trash. */
     suspend fun emptyRecentlyDeleted() = withContext(Dispatchers.IO) {
         recentlyDeletedStore.clear()
+    }
+
+    // ----- Event/Task Templates (file-based, Pro) -----
+
+    /** All saved templates, newest first. */
+    suspend fun listTemplates(): List<EventTemplate> = withContext(Dispatchers.IO) {
+        eventTemplateStore.list()
+    }
+
+    /** Insert or overwrite a template. */
+    suspend fun saveTemplate(template: EventTemplate) = withContext(Dispatchers.IO) {
+        eventTemplateStore.save(template)
+    }
+
+    /** Permanently delete a template. */
+    suspend fun deleteTemplate(id: String) = withContext(Dispatchers.IO) {
+        eventTemplateStore.remove(id)
     }
 
     private fun LocalDate.atStartMs(): Long {

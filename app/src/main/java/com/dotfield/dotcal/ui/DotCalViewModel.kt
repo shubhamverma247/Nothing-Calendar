@@ -13,6 +13,7 @@ import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.billing.ProManager
 import com.dotfield.dotcal.data.privacy.AppLockState
+import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
@@ -269,6 +270,31 @@ class DotCalViewModel(
         viewModelScope.launch {
             repository.emptyRecentlyDeleted()
             _recentlyDeleted.value = emptyList()
+        }
+    }
+
+    // ----- Event/Task Templates (file-based, Pro) -----
+    private val _templates = MutableStateFlow<List<EventTemplate>>(emptyList())
+    val templates: StateFlow<List<EventTemplate>> = _templates
+
+    fun refreshTemplates() {
+        viewModelScope.launch {
+            _templates.value = repository.listTemplates()
+        }
+    }
+
+    fun saveTemplate(template: EventTemplate, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.saveTemplate(template)
+            _templates.value = repository.listTemplates()
+            onDone()
+        }
+    }
+
+    fun deleteTemplate(id: String) {
+        viewModelScope.launch {
+            repository.deleteTemplate(id)
+            _templates.value = repository.listTemplates()
         }
     }
 

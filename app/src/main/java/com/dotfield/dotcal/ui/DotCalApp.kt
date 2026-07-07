@@ -105,6 +105,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
@@ -112,6 +113,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings as SettingsGearIcon
 import androidx.compose.material.icons.filled.Star
@@ -223,6 +225,7 @@ import com.dotfield.dotcal.data.isRecurrenceOccurrence
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
+import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
@@ -335,7 +338,10 @@ fun DotCalApp(
     var showQuickAdd by remember { mutableStateOf(false) }
     var showRecentlyDeleted by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
+    var showTemplates by remember { mutableStateOf(false) }
     var quickAddPrefill by remember { mutableStateOf<QuickAddResult?>(null) }
+    var templatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
+    var taskTemplatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     val appLockState by viewModel.appLockState.collectAsStateWithLifecycle()
     val privateVaultIds by viewModel.privateVaultIds.collectAsStateWithLifecycle()
@@ -423,6 +429,14 @@ fun DotCalApp(
                 }
             } else if (event == Lifecycle.Event.ON_STOP && appLockState.enabled) {
                 appUnlocked = false
+                // Bottom sheets and dialogs render in their own window, above the
+                // AppLockScreen composable. Dismiss any that are open so event content
+                // can't float over the PIN screen while the app is re-locked.
+                showSheet = false
+                showTaskEditor = false
+                editingTask = null
+                pendingDelete = null
+                pendingTaskDelete = null
             }
         }
         updateLifecycleOwner.lifecycle.addObserver(observer)
@@ -776,6 +790,7 @@ fun DotCalApp(
     fun openAddEditor(startTime: LocalTime = LocalTime.of(9, 0), date: LocalDate? = null) {
         editorSessionKey = UUID.randomUUID().toString()
         quickAddPrefill = null
+        templatePrefill = null
         addStartTime = startTime
         addEditorDateOverride = date
         editingEvent = null
@@ -784,11 +799,49 @@ fun DotCalApp(
     fun openQuickAddResult(result: QuickAddResult) {
         editorSessionKey = UUID.randomUUID().toString()
         quickAddPrefill = result
+        templatePrefill = null
         addStartTime = result.startTime ?: LocalTime.of(9, 0)
         addEditorDateOverride = result.date
         editingEvent = null
         showQuickAdd = false
         addSheet = true
+    }
+    fun blockFromTask(task: CalendarEvent) {
+        // Task Time Blocking (FREE): seed a brand-new calendar event from the task so the
+        // user can place it on the timeline. Reuses the QuickAdd prefill path; the original
+        // task is left untouched (non-destructive).
+        val hasDate = task.hasTaskDate()
+        val blockDate = if (hasDate) task.localDate() else selectedDate
+        val timed = hasDate && task.isAllDay == 0
+        val startTime = if (timed) task.startLocalTime() else LocalTime.of(9, 0)
+        val endTime = startTime.plusHours(1)
+        val prefill = QuickAddResult(
+            title = task.title,
+            date = blockDate,
+            endDate = blockDate,
+            startTime = startTime,
+            endTime = endTime,
+            isAllDay = false,
+            rrule = null,
+        )
+        taskDetail = null
+        openQuickAddResult(prefill)
+    }
+    fun useTemplate(template: EventTemplate) {
+        showTemplates = false
+        if (template.isTask) {
+            taskTemplatePrefill = template
+            editingTask = null
+            showTaskEditor = true
+        } else {
+            editorSessionKey = UUID.randomUUID().toString()
+            quickAddPrefill = null
+            templatePrefill = template
+            addStartTime = template.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60) } ?: LocalTime.of(9, 0)
+            addEditorDateOverride = selectedDate
+            editingEvent = null
+            addSheet = true
+        }
     }
     LaunchedEffect(initialRouteToken, initialAddEvent, initialAddEventDate) {
         if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialAddEvent) {
@@ -819,6 +872,7 @@ fun DotCalApp(
     fun openEditEditor(event: CalendarEvent) {
         editorSessionKey = UUID.randomUUID().toString()
         quickAddPrefill = null
+        templatePrefill = null
         addEditorDateOverride = null
         editingEvent = event
         addSheet = true
@@ -826,6 +880,7 @@ fun DotCalApp(
     fun closeTopSurface() {
         when {
             showPaywall -> showPaywall = false
+            showTemplates -> showTemplates = false
             showSearch -> showSearch = false
             showRecentlyDeleted -> showRecentlyDeleted = false
             showDateCalculator -> showDateCalculator = false
@@ -834,10 +889,12 @@ fun DotCalApp(
                 editingEvent = null
                 addEditorDateOverride = null
                 quickAddPrefill = null
+                templatePrefill = null
                 addSheet = false
             }
             showTaskEditor -> {
                 editingTask = null
+                taskTemplatePrefill = null
                 showTaskEditor = false
             }
             taskDetail != null -> taskDetail = null
@@ -923,7 +980,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || showSearch || showRecentlyDeleted || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || showTemplates || showSearch || showRecentlyDeleted || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -975,6 +1032,14 @@ fun DotCalApp(
                             palette = palette,
                             onTitleClick = { viewModel.selectDate(LocalDate.now()) },
                             onAdd = { openAddEditor() },
+                            onTemplates = {
+                                if (isPro) {
+                                    viewModel.refreshTemplates()
+                                    showTemplates = true
+                                } else {
+                                    showPaywall = true
+                                }
+                            },
                             onQuickAdd = { if (isPro) showQuickAdd = true else showPaywall = true },
                             onSearch = { showSearch = true },
                             onCalendarTabSelected = {
@@ -1074,6 +1139,7 @@ fun DotCalApp(
                             palette = palette,
                             onAddClick = {
                                 editingTask = null
+                                taskTemplatePrefill = null
                                 showTaskEditor = true
                             },
                             onTaskClick = { taskDetail = it },
@@ -1379,6 +1445,14 @@ fun DotCalApp(
                     viewModel.refreshRecentlyDeleted()
                     showRecentlyDeleted = true
                 },
+                onTemplates = {
+                    if (isPro) {
+                        viewModel.refreshTemplates()
+                        showTemplates = true
+                    } else {
+                        showPaywall = true
+                    }
+                },
                 onExportIcs = {
                     // FREE feature (data portability): no Pro gate.
                     val stamp = java.time.LocalDate.now().toString()
@@ -1492,8 +1566,10 @@ fun DotCalApp(
                     onBack = { taskDetail = null },
                     onEdit = {
                         editingTask = task
+                        taskTemplatePrefill = null
                         showTaskEditor = true
                     },
+                    onTimeBlock = { blockFromTask(task) },
                     onMoveToPrivate = {
                         if (!isPro) {
                             showPaywall = true
@@ -1530,13 +1606,17 @@ fun DotCalApp(
                 palette = palette,
                 isPro = isPro,
                 onRequestPro = { showPaywall = true },
+                templatePrefill = taskTemplatePrefill,
+                onSaveTemplate = { template -> viewModel.saveTemplate(template) },
                 onDismiss = {
                     editingTask = null
+                    taskTemplatePrefill = null
                     showTaskEditor = false
                 },
                 onSave = { data ->
                     viewModel.saveTask(editingTask, data) {
                         editingTask = null
+                        taskTemplatePrefill = null
                         showTaskEditor = false
                     }
                 },
@@ -1568,11 +1648,14 @@ fun DotCalApp(
                 palette = palette,
                 isPro = isPro,
                 prefill = quickAddPrefill,
+                templatePrefill = templatePrefill,
+                onSaveTemplate = { template -> viewModel.saveTemplate(template) },
                 onRequestPro = { showPaywall = true },
                 onDismiss = {
                     editingEvent = null
                     addEditorDateOverride = null
                     quickAddPrefill = null
+                    templatePrefill = null
                     addSheet = false
                 },
                 onSave = { data, scope ->
@@ -1581,6 +1664,7 @@ fun DotCalApp(
                         editingEvent = null
                         addEditorDateOverride = null
                         quickAddPrefill = null
+                        templatePrefill = null
                         addSheet = false
                     }
                 },
@@ -1624,6 +1708,21 @@ fun DotCalApp(
                 palette = palette,
                 onBack = { showQuickAdd = false },
                 onContinue = { result -> openQuickAddResult(result) },
+            )
+        }
+        AnimatedVisibility(
+            visible = showTemplates,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            val templateItems by viewModel.templates.collectAsStateWithLifecycle()
+            TemplatesScreen(
+                palette = palette,
+                templates = templateItems,
+                onBack = { showTemplates = false },
+                onUse = { template -> useTemplate(template) },
+                onDelete = { id -> viewModel.deleteTemplate(id) },
             )
         }
         AnimatedVisibility(
@@ -1798,6 +1897,47 @@ private fun ConfirmDeleteDialog(
         confirmButton = {
             TextButton(onClick = onConfirm) {
                 Text(confirmLabel, color = palette.accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = palette.primaryText)
+            }
+        },
+    )
+}
+
+@Composable
+private fun TemplateNameDialog(
+    defaultName: String,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf(defaultName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        titleContentColor = palette.primaryText,
+        textContentColor = palette.secondaryText,
+        title = { Text("Save as template", fontFamily = mono) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Template name", fontFamily = mono, color = palette.secondaryText) },
+                colors = dotCalTextFieldColors(palette),
+                textStyle = TextStyle(color = palette.primaryText, fontFamily = mono),
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(name) },
+                enabled = name.isNotBlank(),
+            ) {
+                Text("Save", color = if (name.isNotBlank()) palette.accent else palette.disabledText)
             }
         },
         dismissButton = {
@@ -2710,6 +2850,7 @@ private fun CalendarTabContainer(
     palette: DotCalPalette,
     onTitleClick: () -> Unit,
     onAdd: () -> Unit,
+    onTemplates: (() -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
     onCalendarTabSelected: (CalendarTab) -> Unit,
@@ -2730,6 +2871,7 @@ private fun CalendarTabContainer(
                 palette = palette,
                 onTitleClick = onTitleClick,
                 onAdd = onAdd,
+                onTemplates = onTemplates,
                 onQuickAdd = onQuickAdd,
                 onSearch = onSearch,
             )
@@ -2767,10 +2909,12 @@ private fun CalendarActionBar(
     palette: DotCalPalette,
     onTitleClick: () -> Unit,
     onAdd: () -> Unit,
+    onTemplates: (() -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
 ) {
     val topIconTint = if (palette.isDark) NWhite else palette.accent
+    var showOverflow by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2798,22 +2942,89 @@ private fun CalendarActionBar(
                     Icon(Icons.Default.Search, contentDescription = "Search", tint = topIconTint)
                 }
             }
-            if (onQuickAdd != null) {
-                IconButton(
-                    onClick = onQuickAdd,
-                    modifier = Modifier.size(44.dp),
-                ) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = "Quick add", tint = topIconTint)
-                }
-            }
             IconButton(
                 onClick = onAdd,
                 modifier = Modifier.size(44.dp),
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add event", tint = topIconTint)
             }
+            // Quick Add and Templates live together in the overflow menu.
+            if (onQuickAdd != null || onTemplates != null) {
+                Box {
+                    IconButton(
+                        onClick = { showOverflow = true },
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = topIconTint)
+                    }
+                    DropdownMenu(
+                        expanded = showOverflow,
+                        onDismissRequest = { showOverflow = false },
+                        containerColor = palette.dialogSurface,
+                        shape = RoundedCornerShape(16.dp),
+                        tonalElevation = 0.dp,
+                        modifier = Modifier.width(216.dp),
+                    ) {
+                        if (onQuickAdd != null) {
+                            ActionBarMenuItem(
+                                label = "Quick Add",
+                                subtitle = "Type it, we schedule it",
+                                icon = Icons.Default.AutoAwesome,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onQuickAdd()
+                                },
+                            )
+                        }
+                        if (onTemplates != null) {
+                            ActionBarMenuItem(
+                                label = "Templates",
+                                subtitle = "Reuse saved events & tasks",
+                                icon = Icons.Default.Description,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onTemplates()
+                                },
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun ActionBarMenuItem(
+    label: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    DropdownMenuItem(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+        leadingIcon = {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(palette.accent.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = palette.accent, modifier = Modifier.size(18.dp))
+            }
+        },
+        text = {
+            Column {
+                Text(label, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+            }
+        },
+    )
 }
 
 @Composable
@@ -4393,32 +4604,44 @@ private fun EventEditorScreen(
     onSave: (EventEditorData, RecurringEditScope) -> Unit,
     onDelete: ((RecurringEditScope) -> Unit)?,
     prefill: QuickAddResult? = null,
+    templatePrefill: EventTemplate? = null,
+    onSaveTemplate: ((EventTemplate) -> Unit)? = null,
 ) {
     // Quick-add prefill only seeds a brand-new event, never an existing one being edited.
     val seed = if (event == null) prefill else null
+    // Template prefill likewise only seeds a brand-new event. Applied to the current date.
+    val tpl = if (event == null) templatePrefill else null
+    val tplStartTime: LocalTime? = tpl?.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60) }
     val editorDate = event?.localDate() ?: seed?.date ?: selectedDate
-    val initialStart = event?.startLocalTime() ?: seed?.startTime ?: selectedTime
-    val initialEnd = event?.endLocalTime() ?: seed?.endTime ?: initialStart.plusHours(1)
-    val initialEndDate = event?.endLocalDateForEditor() ?: seed?.endDate ?: editorDate
+    val initialStart = event?.startLocalTime() ?: seed?.startTime ?: tplStartTime ?: selectedTime
+    val tplEndTime: LocalTime? = if (tpl != null && tplStartTime != null) {
+        tplStartTime.plusMinutes(tpl.durationMinutes.toLong())
+    } else null
+    val tplEndDate: LocalDate? = if (tpl != null && tpl.startMinuteOfDay != null) {
+        editorDate.plusDays(((tpl.startMinuteOfDay + tpl.durationMinutes) / (24 * 60)).toLong())
+    } else null
+    val initialEnd = event?.endLocalTime() ?: seed?.endTime ?: tplEndTime ?: initialStart.plusHours(1)
+    val initialEndDate = event?.endLocalDateForEditor() ?: seed?.endDate ?: tplEndDate ?: editorDate
     val editorStateKey = event?.id ?: editorSessionKey
     val draftEventId = remember(editorStateKey) {
         if (event == null || event.isRecurrenceOccurrence()) UUID.randomUUID().toString() else event.baseEventId()
     }
-    var title by remember(editorStateKey) { mutableStateOf(event?.title ?: seed?.title.orEmpty()) }
-    var description by remember(editorStateKey) { mutableStateOf(event?.description.orEmpty()) }
-    var location by remember(editorStateKey) { mutableStateOf(event?.location.orEmpty()) }
+    var title by remember(editorStateKey) { mutableStateOf(event?.title ?: seed?.title ?: tpl?.title ?: "") }
+    var description by remember(editorStateKey) { mutableStateOf(event?.description ?: tpl?.description ?: "") }
+    var location by remember(editorStateKey) { mutableStateOf(event?.location ?: tpl?.location ?: "") }
     var startDate by remember(editorStateKey) { mutableStateOf(editorDate) }
     var endDate by remember(editorStateKey) { mutableStateOf(maxOf(editorDate, initialEndDate)) }
     var startTime by remember(editorStateKey) { mutableStateOf(initialStart) }
     var endTime by remember(editorStateKey) { mutableStateOf(coerceEndAfterStart(initialStart, initialEnd)) }
-    var allDay by remember(editorStateKey) { mutableStateOf(event?.let { it.isAllDay == 1 } ?: seed?.isAllDay ?: false) }
-    var reminderMinutes by remember(editorStateKey, initialReminderMinutes) { mutableStateOf(initialReminderMinutes) }
-    var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule ?: seed?.rrule) }
+    var allDay by remember(editorStateKey) { mutableStateOf(event?.let { it.isAllDay == 1 } ?: seed?.isAllDay ?: tpl?.isAllDay ?: false) }
+    var reminderMinutes by remember(editorStateKey, initialReminderMinutes) { mutableStateOf(if (tpl != null) tpl.reminderMinutes else initialReminderMinutes) }
+    var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule ?: seed?.rrule ?: tpl?.rrule) }
     var imageUris by remember(editorStateKey) { mutableStateOf(parseJsonStringArray(event?.imageUris ?: "[]")) }
     var voiceNotePath by remember(editorStateKey) { mutableStateOf(event?.voiceNotePath) }
     val writableAccounts = accounts
     var selectedAccountId by remember(editorStateKey, writableAccounts, lastSelectedAccountId) {
         mutableStateOf(event?.accountId?.takeIf { id -> writableAccounts.any { it.id == id } }
+            ?: tpl?.accountId?.takeIf { id -> writableAccounts.any { it.id == id } }
             ?: lastSelectedAccountId?.takeIf { id -> event == null && writableAccounts.any { it.id == id } }
             ?: writableAccounts.firstOrNull { it.isPrimary == 1 }?.id
             ?: writableAccounts.firstOrNull()?.id
@@ -4431,6 +4654,8 @@ private fun EventEditorScreen(
     var showApplyScopePicker by remember { mutableStateOf(false) }
     var pendingPermissionSave by remember { mutableStateOf<Pair<EventEditorData, RecurringEditScope>?>(null) }
     var submitted by remember { mutableStateOf(false) }
+    var showSaveTemplateDialog by remember { mutableStateOf(false) }
+    var showEditorMenu by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusSinkRequester = remember { FocusRequester() }
@@ -4497,6 +4722,30 @@ private fun EventEditorScreen(
             voiceNotePath = voiceNotePath,
         )
     }
+    fun buildTemplate(name: String): EventTemplate {
+        val startMinute = if (allDay) null else startTime.hour * 60 + startTime.minute
+        val durationMinutes = if (allDay) {
+            0
+        } else {
+            java.time.temporal.ChronoUnit.MINUTES.between(startDate.atTime(startTime), endDate.atTime(endTime))
+                .coerceIn(0L, (7L * 24 * 60)).toInt()
+        }
+        return EventTemplate(
+            id = EventTemplate.newId(),
+            name = name.trim().ifBlank { title.trim().ifBlank { "Template" } },
+            isTask = false,
+            title = title.trim(),
+            description = description.trim(),
+            location = location.trim(),
+            accountId = selectedAccountId,
+            isAllDay = allDay,
+            startMinuteOfDay = startMinute,
+            durationMinutes = durationMinutes,
+            reminderMinutes = reminderMinutes,
+            rrule = recurrenceRule,
+            createdAtMs = System.currentTimeMillis(),
+        )
+    }
     fun trySave() {
         submitted = true
         val startDateTime = startDate.atTime(startTime)
@@ -4537,6 +4786,29 @@ private fun EventEditorScreen(
             )
             IconButton(onClick = { trySave() }, modifier = Modifier.size(48.dp)) {
                 Icon(Icons.Default.Check, contentDescription = "Save event", tint = palette.primaryText)
+            }
+            // "Save as template" lives in an overflow menu, and only when editing an
+            // existing event (the Add screen stays clean per design).
+            if (event != null && onSaveTemplate != null) {
+                Box {
+                    IconButton(onClick = { showEditorMenu = true }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = palette.primaryText)
+                    }
+                    DropdownMenu(
+                        expanded = showEditorMenu,
+                        onDismissRequest = { showEditorMenu = false },
+                        containerColor = palette.dialogSurface,
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Save as template", color = palette.primaryText, fontFamily = mono, fontSize = 15.sp) },
+                            onClick = {
+                                showEditorMenu = false
+                                clearEditorFocus()
+                                if (!isPro) onRequestPro() else showSaveTemplateDialog = true
+                            },
+                        )
+                    }
+                }
             }
         }
         HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp)
@@ -4722,12 +4994,24 @@ private fun EventEditorScreen(
                     fontSize = 15.sp,
                     modifier = Modifier
                         .align(Alignment.CenterHorizontally)
-                        .padding(top = 28.dp)
+                        .padding(top = 20.dp)
                         .clickable { onDelete(recurringEditScope) },
                 )
             }
             Spacer(modifier = Modifier.height(28.dp))
         }
+    }
+    if (showSaveTemplateDialog && onSaveTemplate != null) {
+        TemplateNameDialog(
+            defaultName = title.trim(),
+            palette = palette,
+            onDismiss = { showSaveTemplateDialog = false },
+            onConfirm = { name ->
+                onSaveTemplate(buildTemplate(name))
+                showSaveTemplateDialog = false
+                Toast.makeText(context, "Template saved", Toast.LENGTH_SHORT).show()
+            },
+        )
     }
     dateTimePicker?.let { field ->
         DateTimeChoiceSheet(
@@ -6022,6 +6306,7 @@ private fun TaskDetailScreen(
     isPrivate: Boolean,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onTimeBlock: () -> Unit,
     onMoveToPrivate: () -> Unit,
     onRestoreFromPrivate: () -> Unit,
     onComplete: () -> Unit,
@@ -6104,6 +6389,18 @@ private fun TaskDetailScreen(
                         .padding(top = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    if (task.isCompleted != 1) {
+                        Text(
+                            "Add to Calendar",
+                            color = palette.primaryText,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .clickable(onClick = onTimeBlock)
+                                .padding(vertical = 12.dp),
+                        )
+                    }
                     Text(
                         if (isPrivate) "Restore From Private Vault" else "Move to Private Vault",
                         color = palette.primaryText,
@@ -6513,14 +6810,21 @@ private fun TaskEditorSheet(
     onDismiss: () -> Unit,
     onSave: (TaskEditorData) -> Unit,
     onDelete: (() -> Unit)? = null,
+    templatePrefill: EventTemplate? = null,
+    onSaveTemplate: ((EventTemplate) -> Unit)? = null,
 ) {
     val taskKey = task?.id ?: "new-task"
-    var title by remember(taskKey) { mutableStateOf(task?.title.orEmpty()) }
+    // Template prefill only seeds a brand-new task.
+    val tpl = if (task == null) templatePrefill else null
+    val tplTime: LocalTime? = tpl?.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60) }
+    var title by remember(taskKey) { mutableStateOf(task?.title ?: tpl?.title ?: "") }
     var titleError by remember { mutableStateOf(false) }
     var dueDate by remember(taskKey) { mutableStateOf<LocalDate?>(task?.takeIf { it.hasTaskDate() }?.localDate() ?: LocalDate.now()) }
-    var dueTime by remember(taskKey) { mutableStateOf<LocalTime?>(task?.takeIf { it.hasTaskDate() && it.isAllDay == 0 }?.startLocalTime()) }
-    var reminderMinutes by remember(taskKey, initialReminder?.minutesBefore) { mutableStateOf<Int?>(initialReminder?.minutesBefore) }
-    var recurrenceRule by remember(taskKey) { mutableStateOf(task?.rrule) }
+    var dueTime by remember(taskKey) { mutableStateOf<LocalTime?>(task?.takeIf { it.hasTaskDate() && it.isAllDay == 0 }?.startLocalTime() ?: tplTime) }
+    var reminderMinutes by remember(taskKey, initialReminder?.minutesBefore) { mutableStateOf<Int?>(if (tpl != null) tpl.reminderMinutes else initialReminder?.minutesBefore) }
+    var recurrenceRule by remember(taskKey) { mutableStateOf(task?.rrule ?: tpl?.rrule) }
+    var showSaveTemplateDialog by remember { mutableStateOf(false) }
+    var showTaskMenu by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showReminderPicker by remember { mutableStateOf(false) }
@@ -6585,7 +6889,38 @@ private fun TaskEditorSheet(
                 .padding(bottom = 22.dp),
         ) {
             Box(modifier = Modifier.size(1.dp).focusRequester(focusSinkRequester).focusable())
-            Text(if (task == null) "Add Task" else "Edit Task", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 22.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (task == null) "Add Task" else "Edit Task",
+                    color = palette.primaryText,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 22.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                // "Save as template" overflow — only when editing an existing task.
+                if (task != null && onSaveTemplate != null) {
+                    Box {
+                        IconButton(onClick = { showTaskMenu = true }, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = palette.primaryText)
+                        }
+                        DropdownMenu(
+                            expanded = showTaskMenu,
+                            onDismissRequest = { showTaskMenu = false },
+                            containerColor = palette.dialogSurface,
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Save as template", color = palette.primaryText, fontFamily = mono, fontSize = 15.sp) },
+                                onClick = {
+                                    showTaskMenu = false
+                                    clearTaskFocus()
+                                    if (!isPro) onRequestPro() else showSaveTemplateDialog = true
+                                },
+                            )
+                        }
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
                 value = title,
@@ -6720,6 +7055,33 @@ private fun TaskEditorSheet(
                 )
             }
         }
+    }
+    if (showSaveTemplateDialog && onSaveTemplate != null) {
+        TemplateNameDialog(
+            defaultName = title.trim(),
+            palette = palette,
+            onDismiss = { showSaveTemplateDialog = false },
+            onConfirm = { name ->
+                val template = EventTemplate(
+                    id = EventTemplate.newId(),
+                    name = name.trim().ifBlank { title.trim().ifBlank { "Template" } },
+                    isTask = true,
+                    title = title.trim(),
+                    description = "",
+                    location = "",
+                    accountId = null,
+                    isAllDay = dueTime == null,
+                    startMinuteOfDay = dueTime?.let { it.hour * 60 + it.minute },
+                    durationMinutes = 0,
+                    reminderMinutes = reminderMinutes,
+                    rrule = if (dueDate == null) null else recurrenceRule,
+                    createdAtMs = System.currentTimeMillis(),
+                )
+                onSaveTemplate(template)
+                showSaveTemplateDialog = false
+                Toast.makeText(context, "Template saved", Toast.LENGTH_SHORT).show()
+            },
+        )
     }
     if (showDatePicker) {
         DateTimeChoiceSheet(
@@ -7211,6 +7573,7 @@ private fun SettingsPreview(
     onClearAppLockPin: () -> Unit,
     onRestorePrivateEvent: (String) -> Unit,
     onRecentlyDeleted: () -> Unit,
+    onTemplates: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
     onBackup: () -> Unit,
@@ -7269,6 +7632,7 @@ private fun SettingsPreview(
             onDateCalculator = onDateCalculator,
             onAppPrivacy = onAppPrivacy,
             onRecentlyDeleted = onRecentlyDeleted,
+            onTemplates = onTemplates,
             onExportIcs = onExportIcs,
             onImportIcs = onImportIcs,
             onBackup = onBackup,
@@ -7415,6 +7779,7 @@ private fun SettingsRoot(
     onDateCalculator: () -> Unit,
     onAppPrivacy: () -> Unit,
     onRecentlyDeleted: () -> Unit,
+    onTemplates: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
     onBackup: () -> Unit,
@@ -7555,6 +7920,12 @@ private fun SettingsRoot(
                 value = "",
                 palette = palette,
                 onClick = onRecentlyDeleted,
+            )
+            SettingsProBadgeRow(
+                title = "Templates",
+                isPro = isPro,
+                palette = palette,
+                onClick = onTemplates,
             )
             SettingsDivider(palette)
 
@@ -8985,15 +9356,14 @@ private fun SettingsSyncNowRow(
                 if (isSyncing) "Syncing..." else "Sync Now",
                 color = palette.primaryText,
                 fontFamily = mono,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal,
+                fontSize = 16.sp,
             )
             Text(
                 syncMetadata.lastSyncedSubtitle(),
                 color = palette.secondaryText,
                 fontFamily = mono,
-                fontSize = 11.sp,
-                lineHeight = 13.sp,
+                fontSize = 12.sp,
             )
         }
         if (isSyncing) {
@@ -10241,6 +10611,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Quick Add", "Type 'gym every mon 7am' — we build the event"),
     ProFeature("Advanced Recurrence", "Every N weeks, nth weekday, end date or count"),
     ProFeature("App Lock & Private Vault", "PIN lock plus hidden events and tasks"),
+    ProFeature("Event & Task Templates", "Save presets and reuse them from the + button"),
 )
 
 @Composable
@@ -10860,6 +11231,140 @@ private fun quickAddWhenLabel(result: QuickAddResult): String {
 
 private fun quickAddRepeatLabel(rrule: String): String =
     RecurrenceRule.parse(rrule)?.humanLabel() ?: "Custom"
+
+@Composable
+private fun TemplatesScreen(
+    palette: DotCalPalette,
+    templates: List<EventTemplate>,
+    onBack: () -> Unit,
+    onUse: (EventTemplate) -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    var deleteTarget by remember { mutableStateOf<EventTemplate?>(null) }
+    Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
+        Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+            }
+            Text(
+                "Templates",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+        if (templates.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("No templates yet", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    "Open any event or task, then tap \"Save as template\" to reuse it any time.",
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp,
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp),
+                contentPadding = PaddingValues(vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                lazyItems(templates, key = { it.id }) { template ->
+                    TemplateCard(
+                        template = template,
+                        palette = palette,
+                        onUse = { onUse(template) },
+                        onDelete = { deleteTarget = template },
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+            }
+        }
+    }
+    deleteTarget?.let { target ->
+        ConfirmDeleteDialog(
+            title = "Delete template?",
+            confirmLabel = "Delete",
+            palette = palette,
+            onDismiss = { deleteTarget = null },
+            onConfirm = {
+                onDelete(target.id)
+                deleteTarget = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun TemplateCard(
+    template: EventTemplate,
+    palette: DotCalPalette,
+    onUse: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.eventCardSurface)
+            .drawBehind {
+                drawRoundRect(
+                    color = palette.eventCardBorder,
+                    size = size,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(14.dp.toPx(), 14.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            }
+            .noRippleClickable(onClick = onUse)
+            .padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(template.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1)
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(templateSummaryLabel(template), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 1)
+        }
+        IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete template", tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+private fun templateSummaryLabel(t: EventTemplate): String {
+    val type = if (t.isTask) "Task" else "Event"
+    val timeLabel = if (t.startMinuteOfDay == null) {
+        if (t.isTask) "No time" else "All-day"
+    } else {
+        LocalTime.of(t.startMinuteOfDay / 60, t.startMinuteOfDay % 60).format(editorTimeFormatter)
+    }
+    val parts = mutableListOf(type, timeLabel)
+    if (!t.isTask && t.startMinuteOfDay != null && t.durationMinutes > 0) {
+        parts.add(formatDurationShort(t.durationMinutes))
+    }
+    t.rrule?.let { parts.add(RecurrenceRule.parse(it)?.humanLabel() ?: "Repeats") }
+    return parts.joinToString(" · ")
+}
+
+private fun formatDurationShort(minutes: Int): String {
+    val h = minutes / 60
+    val m = minutes % 60
+    return when {
+        h > 0 && m > 0 -> "${h}h ${m}m"
+        h > 0 -> "${h}h"
+        else -> "${m}m"
+    }
+}
 
 @Composable
 private fun RecentlyDeletedScreen(
