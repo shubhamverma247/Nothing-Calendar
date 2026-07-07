@@ -225,6 +225,7 @@ import com.dotfield.dotcal.data.isRecurrenceOccurrence
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
+import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.CalendarPreferences
@@ -339,6 +340,7 @@ fun DotCalApp(
     var showRecentlyDeleted by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var showTemplates by remember { mutableStateOf(false) }
+    var showFocusProfiles by remember { mutableStateOf(false) }
     var quickAddPrefill by remember { mutableStateOf<QuickAddResult?>(null) }
     var templatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     var taskTemplatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
@@ -881,6 +883,7 @@ fun DotCalApp(
         when {
             showPaywall -> showPaywall = false
             showTemplates -> showTemplates = false
+            showFocusProfiles -> showFocusProfiles = false
             showSearch -> showSearch = false
             showRecentlyDeleted -> showRecentlyDeleted = false
             showDateCalculator -> showDateCalculator = false
@@ -980,7 +983,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || showTemplates || showSearch || showRecentlyDeleted || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || showTemplates || showFocusProfiles || showSearch || showRecentlyDeleted || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -1453,6 +1456,14 @@ fun DotCalApp(
                         showPaywall = true
                     }
                 },
+                onCalendarSets = {
+                    if (isPro) {
+                        viewModel.refreshFocusProfiles()
+                        showFocusProfiles = true
+                    } else {
+                        showPaywall = true
+                    }
+                },
                 onExportIcs = {
                     // FREE feature (data portability): no Pro gate.
                     val stamp = java.time.LocalDate.now().toString()
@@ -1726,6 +1737,38 @@ fun DotCalApp(
             )
         }
         AnimatedVisibility(
+            visible = showFocusProfiles,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            val focusProfileItems by viewModel.focusProfiles.collectAsStateWithLifecycle()
+            FocusProfilesScreen(
+                palette = palette,
+                profiles = focusProfileItems,
+                totalCalendars = accounts.size,
+                onBack = { showFocusProfiles = false },
+                onApply = { id ->
+                    viewModel.applyFocusProfile(id) {
+                        Toast.makeText(context, "Calendar set applied", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onSaveCurrent = { name ->
+                    val visibleIds = accounts.filter { it.isVisible == 1 }.map { it.id }.toSet()
+                    viewModel.saveFocusProfile(
+                        FocusProfile(
+                            id = FocusProfile.newId(),
+                            name = name,
+                            accountIds = visibleIds,
+                            createdAtMs = System.currentTimeMillis(),
+                        ),
+                    )
+                    Toast.makeText(context, "Calendar set saved", Toast.LENGTH_SHORT).show()
+                },
+                onDelete = { id -> viewModel.deleteFocusProfile(id) },
+            )
+        }
+        AnimatedVisibility(
             visible = showRecentlyDeleted,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
@@ -1913,6 +1956,7 @@ private fun TemplateNameDialog(
     palette: DotCalPalette,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
+    title: String = "Save as template",
 ) {
     var name by remember { mutableStateOf(defaultName) }
     AlertDialog(
@@ -1920,7 +1964,7 @@ private fun TemplateNameDialog(
         containerColor = palette.dialogSurface,
         titleContentColor = palette.primaryText,
         textContentColor = palette.secondaryText,
-        title = { Text("Save as template", fontFamily = mono) },
+        title = { Text(title, fontFamily = mono) },
         text = {
             OutlinedTextField(
                 value = name,
@@ -7574,6 +7618,7 @@ private fun SettingsPreview(
     onRestorePrivateEvent: (String) -> Unit,
     onRecentlyDeleted: () -> Unit,
     onTemplates: () -> Unit,
+    onCalendarSets: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
     onBackup: () -> Unit,
@@ -7633,6 +7678,7 @@ private fun SettingsPreview(
             onAppPrivacy = onAppPrivacy,
             onRecentlyDeleted = onRecentlyDeleted,
             onTemplates = onTemplates,
+            onCalendarSets = onCalendarSets,
             onExportIcs = onExportIcs,
             onImportIcs = onImportIcs,
             onBackup = onBackup,
@@ -7780,6 +7826,7 @@ private fun SettingsRoot(
     onAppPrivacy: () -> Unit,
     onRecentlyDeleted: () -> Unit,
     onTemplates: () -> Unit,
+    onCalendarSets: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
     onBackup: () -> Unit,
@@ -7926,6 +7973,12 @@ private fun SettingsRoot(
                 isPro = isPro,
                 palette = palette,
                 onClick = onTemplates,
+            )
+            SettingsProBadgeRow(
+                title = "Calendar Sets",
+                isPro = isPro,
+                palette = palette,
+                onClick = onCalendarSets,
             )
             SettingsDivider(palette)
 
@@ -8842,7 +8895,7 @@ private fun PrivacySection(title: String, content: String, palette: DotCalPalett
 }
 
 @Composable
-private fun CalendarAddAccountRow(palette: DotCalPalette, onClick: () -> Unit) {
+private fun CalendarAddAccountRow(palette: DotCalPalette, onClick: () -> Unit, label: String = "Add Account") {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -8867,7 +8920,7 @@ private fun CalendarAddAccountRow(palette: DotCalPalette, onClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                "Add Account",
+                label,
                 color = palette.onAccent,
                 fontFamily = mono,
                 fontWeight = FontWeight.SemiBold,
@@ -10612,6 +10665,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Advanced Recurrence", "Every N weeks, nth weekday, end date or count"),
     ProFeature("App Lock & Private Vault", "PIN lock plus hidden events and tasks"),
     ProFeature("Event & Task Templates", "Save presets and reuse them from the + button"),
+    ProFeature("Calendar Sets", "Save Work/Personal/Family visibility and switch instantly"),
 )
 
 @Composable
@@ -11363,6 +11417,144 @@ private fun formatDurationShort(minutes: Int): String {
         h > 0 && m > 0 -> "${h}h ${m}m"
         h > 0 -> "${h}h"
         else -> "${m}m"
+    }
+}
+
+@Composable
+private fun FocusProfilesScreen(
+    palette: DotCalPalette,
+    profiles: List<FocusProfile>,
+    totalCalendars: Int,
+    onBack: () -> Unit,
+    onApply: (String) -> Unit,
+    onSaveCurrent: (String) -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    var deleteTarget by remember { mutableStateOf<FocusProfile?>(null) }
+    var showSaveDialog by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
+        Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+            }
+            Text(
+                "Calendar Sets",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+        if (profiles.isEmpty()) {
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 32.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("No calendar sets yet", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    "Show or hide calendars the way you want, then save that view as a set — Work, Personal, Family — and switch between them any time.",
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp,
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 22.dp),
+                contentPadding = PaddingValues(vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                lazyItems(profiles, key = { it.id }) { profile ->
+                    FocusProfileCard(
+                        profile = profile,
+                        totalCalendars = totalCalendars,
+                        palette = palette,
+                        onApply = { onApply(profile.id) },
+                        onDelete = { deleteTarget = profile },
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+            }
+        }
+        CalendarAddAccountRow(
+            palette = palette,
+            onClick = { showSaveDialog = true },
+            label = "Save Current as Set",
+        )
+        Spacer(modifier = Modifier.height(40.dp))
+    }
+    if (showSaveDialog) {
+        TemplateNameDialog(
+            title = "Save current calendars as a set",
+            defaultName = "",
+            palette = palette,
+            onDismiss = { showSaveDialog = false },
+            onConfirm = { name ->
+                onSaveCurrent(name.trim().ifBlank { "Set" })
+                showSaveDialog = false
+            },
+        )
+    }
+    deleteTarget?.let { target ->
+        ConfirmDeleteDialog(
+            title = "Delete calendar set?",
+            confirmLabel = "Delete",
+            palette = palette,
+            onDismiss = { deleteTarget = null },
+            onConfirm = {
+                onDelete(target.id)
+                deleteTarget = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun FocusProfileCard(
+    profile: FocusProfile,
+    totalCalendars: Int,
+    palette: DotCalPalette,
+    onApply: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.eventCardSurface)
+            .drawBehind {
+                drawRoundRect(
+                    color = palette.eventCardBorder,
+                    size = size,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(14.dp.toPx(), 14.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            }
+            .noRippleClickable(onClick = onApply)
+            .padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(profile.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1)
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                "${profile.accountIds.size} of $totalCalendars calendars",
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+                maxLines = 1,
+            )
+        }
+        IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete calendar set", tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+        }
     }
 }
 

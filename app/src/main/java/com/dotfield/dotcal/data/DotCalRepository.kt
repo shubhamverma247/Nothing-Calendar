@@ -11,6 +11,8 @@ import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.privacy.AppPrivacyManager
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
+import com.dotfield.dotcal.data.profiles.FocusProfile
+import com.dotfield.dotcal.data.profiles.FocusProfileStore
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.templates.EventTemplateStore
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
@@ -79,6 +81,7 @@ class DotCalRepository(
     private val privacyManager = AppPrivacyManager(context.applicationContext)
     private val recentlyDeletedStore = RecentlyDeletedStore(context)
     private val eventTemplateStore = EventTemplateStore(context)
+    private val focusProfileStore = FocusProfileStore(context)
     private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
     private val holidayDataSource = HolidayDataSource(context.applicationContext)
     private val syncRepository = CalendarSyncRepository(
@@ -829,6 +832,37 @@ class DotCalRepository(
     /** Permanently delete a template. */
     suspend fun deleteTemplate(id: String) = withContext(Dispatchers.IO) {
         eventTemplateStore.remove(id)
+    }
+
+    // ----- Calendar Sets / Focus Profiles (file-based, Pro) -----
+
+    /** All saved calendar sets, newest first. */
+    suspend fun listFocusProfiles(): List<FocusProfile> = withContext(Dispatchers.IO) {
+        focusProfileStore.list()
+    }
+
+    /** Insert or overwrite a calendar set. */
+    suspend fun saveFocusProfile(profile: FocusProfile) = withContext(Dispatchers.IO) {
+        focusProfileStore.save(profile)
+    }
+
+    /** Permanently delete a calendar set. */
+    suspend fun deleteFocusProfile(id: String) = withContext(Dispatchers.IO) {
+        focusProfileStore.remove(id)
+    }
+
+    /** Show only the calendars saved in this set; hide every other calendar. LOCAL_ACCOUNT_ID always stays visible. */
+    suspend fun applyFocusProfile(id: String) = withContext(Dispatchers.IO) {
+        val profile = focusProfileStore.list().firstOrNull { it.id == id } ?: return@withContext
+        val accounts = dao.getAccountsForWidgetConfig()
+        for (account in accounts) {
+            if (account.id == LOCAL_ACCOUNT_ID) continue
+            val shouldBeVisible = account.id in profile.accountIds
+            if ((account.isVisible == 1) != shouldBeVisible) {
+                dao.updateAccountVisibility(account.id, if (shouldBeVisible) 1 else 0)
+            }
+        }
+        updateWidgets()
     }
 
     private fun LocalDate.atStartMs(): Long {

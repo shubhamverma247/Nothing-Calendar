@@ -13,6 +13,7 @@ import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.billing.ProManager
 import com.dotfield.dotcal.data.privacy.AppLockState
+import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.holiday.HolidayCountry
@@ -295,6 +296,38 @@ class DotCalViewModel(
         viewModelScope.launch {
             repository.deleteTemplate(id)
             _templates.value = repository.listTemplates()
+        }
+    }
+
+    // ----- Calendar Sets / Focus Profiles (file-based, Pro) -----
+    private val _focusProfiles = MutableStateFlow<List<FocusProfile>>(emptyList())
+    val focusProfiles: StateFlow<List<FocusProfile>> = _focusProfiles
+
+    fun refreshFocusProfiles() {
+        viewModelScope.launch {
+            _focusProfiles.value = repository.listFocusProfiles()
+        }
+    }
+
+    fun saveFocusProfile(profile: FocusProfile, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.saveFocusProfile(profile)
+            _focusProfiles.value = repository.listFocusProfiles()
+            onDone()
+        }
+    }
+
+    fun deleteFocusProfile(id: String) {
+        viewModelScope.launch {
+            repository.deleteFocusProfile(id)
+            _focusProfiles.value = repository.listFocusProfiles()
+        }
+    }
+
+    fun applyFocusProfile(id: String, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.applyFocusProfile(id)
+            onDone()
         }
     }
 
