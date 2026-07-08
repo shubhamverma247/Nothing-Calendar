@@ -13,6 +13,13 @@ import com.dotfield.dotcal.data.privacy.AppPrivacyManager
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.profiles.FocusProfileStore
+import com.dotfield.dotcal.data.shifts.GeneratedShiftOccurrence
+import com.dotfield.dotcal.data.shifts.ShiftApplyResult
+import com.dotfield.dotcal.data.shifts.ShiftGenerationRecord
+import com.dotfield.dotcal.data.shifts.ShiftPattern
+import com.dotfield.dotcal.data.shifts.ShiftPatternStore
+import com.dotfield.dotcal.data.shifts.ShiftType
+import com.dotfield.dotcal.data.shifts.expandShiftPattern
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.templates.EventTemplateStore
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
@@ -53,6 +60,7 @@ data class EventEditorData(
     val rrule: String?,
     val imageUris: String = "[]",
     val voiceNotePath: String? = null,
+    val colorHex: String? = null,
 )
 
 data class TaskEditorData(
@@ -82,6 +90,7 @@ class DotCalRepository(
     private val recentlyDeletedStore = RecentlyDeletedStore(context)
     private val eventTemplateStore = EventTemplateStore(context)
     private val focusProfileStore = FocusProfileStore(context)
+    private val shiftPatternStore = ShiftPatternStore(context)
     private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
     private val holidayDataSource = HolidayDataSource(context.applicationContext)
     private val syncRepository = CalendarSyncRepository(
@@ -592,6 +601,7 @@ class DotCalRepository(
             endTimeMs = end,
             timeZone = zoneId.id,
             isAllDay = if (data.isAllDay) 1 else 0,
+            colorHex = data.colorHex ?: existingMaster.colorHex,
             rrule = data.rrule,
             imageUris = data.imageUris,
             voiceNotePath = data.voiceNotePath,
@@ -606,7 +616,7 @@ class DotCalRepository(
                 endTimeMs = end,
                 timeZone = zoneId.id,
                 isAllDay = if (data.isAllDay) 1 else 0,
-                colorHex = null,
+                colorHex = data.colorHex,
                 rrule = data.rrule,
                 imageUris = data.imageUris,
                 source = "LOCAL",
@@ -834,6 +844,37 @@ class DotCalRepository(
         eventTemplateStore.remove(id)
     }
 
+    suspend fun applyTemplateToDates(
+        templateId: String,
+        dates: List<LocalDate>,
+        accountId: String?,
+    ): Int = withContext(Dispatchers.IO) {
+        val template = eventTemplateStore.list().firstOrNull { it.id == templateId } ?: return@withContext 0
+        val cleanDates = dates.distinct().sorted()
+        for (date in cleanDates) {
+            val startMinute = template.startMinuteOfDay ?: 0
+            val startTime = LocalTime.of(startMinute / 60, startMinute % 60)
+            val endDateTime = date.atTime(startTime).plusMinutes(template.durationMinutes.coerceAtLeast(1).toLong())
+            saveLocalEvent(
+                existing = null,
+                data = EventEditorData(
+                    accountId = accountId ?: template.accountId,
+                    title = template.title.ifBlank { template.name },
+                    description = template.description,
+                    location = template.location,
+                    date = date,
+                    endDate = if (template.isAllDay || template.startMinuteOfDay == null) date else endDateTime.toLocalDate(),
+                    startTime = startTime,
+                    endTime = if (template.isAllDay || template.startMinuteOfDay == null) LocalTime.of(23, 59) else endDateTime.toLocalTime(),
+                    isAllDay = template.isAllDay || template.startMinuteOfDay == null,
+                    reminderMinutes = template.reminderMinutes,
+                    rrule = null,
+                ),
+            )
+        }
+        cleanDates.size
+    }
+
     // ----- Calendar Sets / Focus Profiles (file-based, Pro) -----
 
     /** All saved calendar sets, newest first. */
@@ -865,6 +906,116 @@ class DotCalRepository(
         updateWidgets()
     }
 
+    // ----- Shift Patterns (file-based, Pro) -----
+
+    suspend fun listShiftTypes(): List<ShiftType> = withContext(Dispatchers.IO) {
+        shiftPatternStore.listTypes()
+    }
+
+    suspend fun saveShiftType(type: ShiftType) = withContext(Dispatchers.IO) {
+        shiftPatternStore.saveType(type)
+    }
+
+    suspend fun deleteShiftType(id: String) = withContext(Dispatchers.IO) {
+        shiftPatternStore.removeType(id)
+    }
+
+    suspend fun listShiftPatterns(): List<ShiftPattern> = withContext(Dispatchers.IO) {
+        shiftPatternStore.listPatterns()
+    }
+
+    suspend fun saveShiftPattern(pattern: ShiftPattern) = withContext(Dispatchers.IO) {
+        shiftPatternStore.savePattern(pattern)
+    }
+
+    suspend fun deleteShiftPattern(id: String, removeGeneratedEvents: Boolean) = withContext(Dispatchers.IO) {
+        if (removeGeneratedEvents) removeGeneratedShiftEvents(id)
+        shiftPatternStore.removePattern(id)
+        shiftPatternStore.removeGenerationsForPattern(id)
+    }
+
+    suspend fun applyShiftPattern(
+        patternId: String,
+        rangeStart: LocalDate,
+        rangeEnd: LocalDate,
+        accountId: String?,
+    ): ShiftApplyResult = withContext(Dispatchers.IO) {
+        val pattern = shiftPatternStore.listPatterns().firstOrNull { it.id == patternId }
+            ?: return@withContext ShiftApplyResult(generatedCount = 0)
+        val shiftTypes = shiftPatternStore.listTypes().associateBy { it.id }
+        val overlapping = shiftPatternStore.listGenerations()
+            .filter { it.patternId == patternId && rangesOverlap(it.rangeStart, it.rangeEnd, rangeStart, rangeEnd) }
+        val replaced = overlapping.sumOf { it.eventIds.size }
+        overlapping.forEach { record ->
+            record.eventIds.forEach { eventId ->
+                dao.getEvent(eventId)?.let { deleteLocalEvent(it) }
+            }
+            shiftPatternStore.removeGeneration(record.id)
+        }
+        val occurrences = expandShiftPattern(pattern, shiftTypes, rangeStart, rangeEnd)
+        val eventIds = saveShiftOccurrences(occurrences, accountId)
+        shiftPatternStore.saveGeneration(
+            ShiftGenerationRecord(
+                id = ShiftGenerationRecord.newId(),
+                patternId = patternId,
+                generatedAtMs = System.currentTimeMillis(),
+                eventIds = eventIds,
+                rangeStart = rangeStart,
+                rangeEnd = rangeEnd,
+            ),
+        )
+        ShiftApplyResult(generatedCount = eventIds.size, replacedCount = replaced)
+    }
+
+    private suspend fun removeGeneratedShiftEvents(patternId: String) {
+        shiftPatternStore.listGenerations()
+            .filter { it.patternId == patternId }
+            .forEach { record ->
+                record.eventIds.forEach { eventId ->
+                    dao.getEvent(eventId)?.let { deleteLocalEvent(it) }
+                }
+                shiftPatternStore.removeGeneration(record.id)
+            }
+    }
+
+    private suspend fun saveShiftOccurrences(
+        occurrences: List<GeneratedShiftOccurrence>,
+        accountId: String?,
+    ): List<String> {
+        val eventIds = ArrayList<String>(occurrences.size)
+        for (occurrence in occurrences) {
+            val eventId = UUID.randomUUID().toString()
+            val type = occurrence.shiftType
+            val startMinute = type.startMinuteOfDay ?: 0
+            val duration = type.durationMinutes ?: 24 * 60
+            val startTime = LocalTime.of(startMinute / 60, startMinute % 60)
+            val endDateTime = occurrence.date.atTime(startTime).plusMinutes(duration.toLong())
+            saveLocalEvent(
+                existing = null,
+                data = EventEditorData(
+                    eventId = eventId,
+                    accountId = accountId,
+                    title = type.name,
+                    description = "",
+                    location = "",
+                    date = occurrence.date,
+                    endDate = if (type.isAllDay) occurrence.date else endDateTime.toLocalDate(),
+                    startTime = startTime,
+                    endTime = if (type.isAllDay) LocalTime.of(23, 59) else endDateTime.toLocalTime(),
+                    isAllDay = type.isAllDay,
+                    reminderMinutes = type.reminderMinutes,
+                    rrule = null,
+                    colorHex = type.colorHex,
+                ),
+            )
+            eventIds.add(eventId)
+        }
+        return eventIds
+    }
+
+    private fun rangesOverlap(aStart: LocalDate, aEnd: LocalDate, bStart: LocalDate, bEnd: LocalDate): Boolean =
+        !aEnd.isBefore(bStart) && !bEnd.isBefore(aStart)
+
     private fun LocalDate.atStartMs(): Long {
         return atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
@@ -894,6 +1045,7 @@ class DotCalRepository(
             endTimeMs = end,
             timeZone = zoneId.id,
             isAllDay = if (data.isAllDay) 1 else 0,
+            colorHex = data.colorHex ?: master.colorHex,
             rrule = null,
             exceptionDates = "[]",
             imageUris = data.imageUris,

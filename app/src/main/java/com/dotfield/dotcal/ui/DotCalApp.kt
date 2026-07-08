@@ -105,6 +105,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ChevronRight
@@ -226,6 +227,8 @@ import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.profiles.FocusProfile
+import com.dotfield.dotcal.data.shifts.ShiftPattern
+import com.dotfield.dotcal.data.shifts.ShiftType
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.CalendarPreferences
@@ -256,11 +259,14 @@ private val mono = FontFamily.SansSerif
 private val sheetDateFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMM", Locale.US)
 private val detailDateFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy", Locale.US)
 private val agendaDateHeaderFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM", Locale.US)
+private val dayHeaderFormatter = DateTimeFormatter.ofPattern("EEE dd MMM", Locale.US)
 private val compactDateFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 private val editorDateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM, yyyy", Locale.US)
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
 private val editorTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
 private const val WEEK_HOUR_HEIGHT_DP = 64f
+private const val DAY_HOUR_HEIGHT_DP = 72f
+private const val TIMELINE_BOTTOM_CLEARANCE_DP = 104f
 private const val BOOT_PREFS = "dotcal_boot"
 private const val BOOT_THEME_KEY = "theme_mode"
 private const val BOOT_ACCENT_KEY = "accent_color"
@@ -341,6 +347,9 @@ fun DotCalApp(
     var showSearch by remember { mutableStateOf(false) }
     var showTemplates by remember { mutableStateOf(false) }
     var showFocusProfiles by remember { mutableStateOf(false) }
+    var showShiftPatterns by remember { mutableStateOf(false) }
+    var selectedBulkDates by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
+    var showBulkTemplatePicker by remember { mutableStateOf(false) }
     var quickAddPrefill by remember { mutableStateOf<QuickAddResult?>(null) }
     var templatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     var taskTemplatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
@@ -882,8 +891,10 @@ fun DotCalApp(
     fun closeTopSurface() {
         when {
             showPaywall -> showPaywall = false
+            showBulkTemplatePicker -> showBulkTemplatePicker = false
             showTemplates -> showTemplates = false
             showFocusProfiles -> showFocusProfiles = false
+            showShiftPatterns -> showShiftPatterns = false
             showSearch -> showSearch = false
             showRecentlyDeleted -> showRecentlyDeleted = false
             showDateCalculator -> showDateCalculator = false
@@ -1066,9 +1077,30 @@ fun DotCalApp(
                                         onPrevious = viewModel::previousMonth,
                                         onNext = viewModel::nextMonth,
                                         onJumpToday = { viewModel.selectDate(LocalDate.now()) },
+                                        selectedBulkDates = selectedBulkDates,
+                                        onBulkSelectionStart = { date ->
+                                            if (!isPro) {
+                                                showPaywall = true
+                                            } else {
+                                                selectedBulkDates = setOf(date)
+                                            }
+                                        },
+                                        onBulkApply = {
+                                            if (isPro) {
+                                                viewModel.refreshTemplates()
+                                                showBulkTemplatePicker = true
+                                            } else {
+                                                showPaywall = true
+                                            }
+                                        },
+                                        onBulkClear = { selectedBulkDates = emptySet() },
                                         onDateSelected = {
-                                            viewModel.selectDate(it)
-                                            showSheet = true
+                                            if (selectedBulkDates.isNotEmpty()) {
+                                                selectedBulkDates = if (it in selectedBulkDates) selectedBulkDates - it else selectedBulkDates + it
+                                            } else {
+                                                viewModel.selectDate(it)
+                                                showSheet = true
+                                            }
                                         },
                                     )
                                     CalendarTab.Week -> WeekView(
@@ -1464,6 +1496,14 @@ fun DotCalApp(
                         showPaywall = true
                     }
                 },
+                onShiftPatterns = {
+                    if (isPro) {
+                        viewModel.refreshShiftPatterns()
+                        showShiftPatterns = true
+                    } else {
+                        showPaywall = true
+                    }
+                },
                 onExportIcs = {
                     // FREE feature (data portability): no Pro gate.
                     val stamp = java.time.LocalDate.now().toString()
@@ -1766,6 +1806,56 @@ fun DotCalApp(
                     Toast.makeText(context, "Calendar set saved", Toast.LENGTH_SHORT).show()
                 },
                 onDelete = { id -> viewModel.deleteFocusProfile(id) },
+            )
+        }
+        AnimatedVisibility(
+            visible = showShiftPatterns,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            val shiftTypes by viewModel.shiftTypes.collectAsStateWithLifecycle()
+            val shiftPatterns by viewModel.shiftPatterns.collectAsStateWithLifecycle()
+            ShiftPatternsScreen(
+                palette = palette,
+                shiftTypes = shiftTypes,
+                patterns = shiftPatterns,
+                accounts = assignableAccounts,
+                onBack = { showShiftPatterns = false },
+                onSaveType = { type -> viewModel.saveShiftType(type) },
+                onDeleteType = { id -> viewModel.deleteShiftType(id) },
+                onSavePattern = { pattern -> viewModel.saveShiftPattern(pattern) },
+                onDeletePattern = { id, removeGenerated ->
+                    viewModel.deleteShiftPattern(id, removeGenerated) {
+                        Toast.makeText(context, "Shift pattern deleted", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onGenerate = { patternId, rangeStart, rangeEnd, accountId ->
+                    viewModel.applyShiftPattern(patternId, rangeStart, rangeEnd, accountId) { result ->
+                        val message = when {
+                            result.generatedCount == 0 -> "No shifts added. Check that the pattern uses Day/Night shift types, not only Off."
+                            result.replacedCount > 0 -> "${result.generatedCount} shifts added, ${result.replacedCount} replaced"
+                            else -> "${result.generatedCount} shifts added"
+                        }
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    }
+                },
+            )
+        }
+        if (showBulkTemplatePicker) {
+            val templateItems by viewModel.templates.collectAsStateWithLifecycle()
+            BulkTemplatePickerSheet(
+                palette = palette,
+                templates = templateItems.filterNot { it.isTask },
+                onDismiss = { showBulkTemplatePicker = false },
+                onTemplateSelected = { template ->
+                    val dates = selectedBulkDates.toList()
+                    viewModel.applyTemplateToDates(template.id, dates, template.accountId ?: assignableAccounts.firstOrNull()?.id) { count ->
+                        Toast.makeText(context, "$count events added", Toast.LENGTH_SHORT).show()
+                        selectedBulkDates = emptySet()
+                        showBulkTemplatePicker = false
+                    }
+                },
             )
         }
         AnimatedVisibility(
@@ -3294,6 +3384,10 @@ private fun MonthView(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onJumpToday: () -> Unit,
+    selectedBulkDates: Set<LocalDate>,
+    onBulkSelectionStart: (LocalDate) -> Unit,
+    onBulkApply: () -> Unit,
+    onBulkClear: () -> Unit,
     onDateSelected: (LocalDate) -> Unit,
 ) {
     val days = remember(month, weekStart) { monthGrid(month, weekStart) }
@@ -3335,10 +3429,28 @@ private fun MonthView(
                     date = day,
                     activeMonth = YearMonth.from(month),
                     isSelected = day == selectedDate,
+                    isBulkSelected = day in selectedBulkDates,
                     events = eventsByDate[day].orEmpty(),
                     palette = palette,
                     onClick = { onDateSelected(day) },
+                    onLongPress = { onBulkSelectionStart(day) },
                 )
+            }
+        }
+        if (selectedBulkDates.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().background(palette.calendarSurface).padding(horizontal = 18.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("${selectedBulkDates.size} selected", color = palette.primaryText, fontFamily = mono, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                TextButton(onClick = onBulkClear) { Text("Clear", color = palette.secondaryText, fontFamily = mono) }
+                Button(
+                    onClick = onBulkApply,
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+                    shape = RoundedCornerShape(18.dp),
+                ) {
+                    Text("Apply Template", fontFamily = mono, fontSize = 12.sp)
+                }
             }
         }
     }
@@ -3349,9 +3461,11 @@ private fun DayCell(
     date: LocalDate,
     activeMonth: YearMonth,
     isSelected: Boolean,
+    isBulkSelected: Boolean,
     events: List<CalendarEvent>,
     palette: DotCalPalette,
     onClick: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
     val isToday = date == LocalDate.now()
     val inMonth = YearMonth.from(date) == activeMonth
@@ -3360,9 +3474,17 @@ private fun DayCell(
         modifier = Modifier
             .aspectRatio(1f)
             .background(palette.calendarSurface)
-            .noRippleClickable {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onClick()
+            .pointerInput(date) {
+                detectTapGestures(
+                    onTap = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
+                    onLongPress = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onLongPress()
+                    },
+                )
             },
         contentAlignment = Alignment.TopCenter,
     ) {
@@ -3374,6 +3496,7 @@ private fun DayCell(
                         .then(
                             when {
                                 isToday -> Modifier.clip(CircleShape).background(palette.accent)
+                                isBulkSelected -> Modifier.border(2.dp, palette.accent, CircleShape).background(palette.accent.copy(alpha = 0.12f), CircleShape)
                                 isSelected -> Modifier.border(1.5.dp, palette.accent, CircleShape)
                                 else -> Modifier
                             },
@@ -3427,9 +3550,7 @@ private fun WeekView(
     val timedEvents = remember(weekEvents) { weekEvents.filter { it.isAllDay == 0 } }
     val allDayEvents = remember(weekEvents) { weekEvents.filter { it.isAllDay == 1 } }
     val eventLayouts = remember(timedEvents) { layoutTimedEvents(timedEvents) }
-    val timedEventsByDayHour = remember(timedEvents) {
-        timedEvents.groupBy { event -> event.localDate() to event.startLocalTime().hour }
-    }
+    val timedEventsByDay = remember(timedEvents) { timedEvents.groupBy { it.localDate() } }
 
     var dragTotal by remember { mutableFloatStateOf(0f) }
     Column(
@@ -3449,7 +3570,7 @@ private fun WeekView(
             },
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(64.dp).background(palette.calendarSurface)) {
-            Spacer(modifier = Modifier.width(48.dp))
+            Spacer(modifier = Modifier.width(32.dp))
             days.forEach { day ->
                 WeekDayHeader(
                     date = day,
@@ -3463,7 +3584,7 @@ private fun WeekView(
 
         if (allDayEvents.isNotEmpty()) {
             Row(modifier = Modifier.fillMaxWidth().height(32.dp).background(palette.calendarSurface)) {
-                Spacer(modifier = Modifier.width(48.dp))
+                Spacer(modifier = Modifier.width(32.dp))
                 days.forEach { day ->
                     val event = allDayEvents.firstOrNull { it.localDate() == day }
                     Box(
@@ -3478,19 +3599,34 @@ private fun WeekView(
             }
         }
 
-        LazyColumn(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
-            items(24) { hour ->
-                WeekHourRow(
-                    hour = hour,
-                    days = days,
-                    selectedDate = selectedDate,
-                    eventsByDayHour = timedEventsByDayHour,
-                    eventLayouts = eventLayouts,
-                    palette = palette,
-                    onAddAtDate = onAddAtDate,
-                    onEventClick = onEventClick,
-                )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(palette.calendarSurface),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    WeekTimeColumn(selectedDate = selectedDate, days = days, palette = palette)
+                    days.forEach { day ->
+                        WeekDayColumn(
+                            day = day,
+                            selectedDate = selectedDate,
+                            events = timedEventsByDay[day].orEmpty(),
+                            eventLayouts = eventLayouts,
+                            palette = palette,
+                            onAddAtDate = onAddAtDate,
+                            onEventClick = onEventClick,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(TIMELINE_BOTTOM_CLEARANCE_DP.dp))
             }
+            TimelineBottomBoundary(palette = palette, modifier = Modifier.align(Alignment.BottomCenter))
         }
     }
 }
@@ -3537,99 +3673,125 @@ private fun WeekDayHeader(
 }
 
 @Composable
-private fun WeekHourRow(
-    hour: Int,
-    days: List<LocalDate>,
+private fun WeekTimeColumn(
     selectedDate: LocalDate,
-    eventsByDayHour: Map<Pair<LocalDate, Int>, List<CalendarEvent>>,
+    days: List<LocalDate>,
+    palette: DotCalPalette,
+) {
+    val now = LocalTime.now()
+    val showNow = selectedDate in days && selectedDate == LocalDate.now()
+    Box(
+        modifier = Modifier
+            .width(32.dp)
+            .height((24 * WEEK_HOUR_HEIGHT_DP).dp)
+            .drawBehind {
+                repeat(23) { hour ->
+                    val y = (hour + 1) * WEEK_HOUR_HEIGHT_DP.dp.toPx()
+                    drawLine(palette.line, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
+                }
+            },
+    ) {
+        repeat(24) { hour ->
+            Text(
+                hour.toString().padStart(2, '0'),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 10.sp,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = (hour * WEEK_HOUR_HEIGHT_DP + 4).dp),
+            )
+        }
+        if (showNow) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = weekEventTopOffset(now))
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(palette.accent),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WeekDayColumn(
+    day: LocalDate,
+    selectedDate: LocalDate,
+    events: List<CalendarEvent>,
     eventLayouts: Map<String, WeekEventLayout>,
     palette: DotCalPalette,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val now = LocalTime.now()
-    val showNow = selectedDate in days && selectedDate == LocalDate.now() && hour == now.hour
-    Row(modifier = Modifier.fillMaxWidth().height(WEEK_HOUR_HEIGHT_DP.dp).background(palette.calendarSurface)) {
-        Box(
-            modifier = Modifier
-                .width(48.dp)
-                .height(WEEK_HOUR_HEIGHT_DP.dp)
-                .drawBehind {
-                    drawLine(palette.line, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-                },
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            Text("${hour.toString().padStart(2, '0')}:00", color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
-            if (showNow) {
-                Box(
-                    modifier = Modifier
-                        .offset(y = ((now.minute / 60f) * 64).dp)
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(palette.accent),
-                )
-            }
-        }
-        days.forEach { day ->
-            val dayEvents = eventsByDayHour[day to hour].orEmpty()
+    val showNow = day == selectedDate && day == LocalDate.now()
+    Box(
+        modifier = modifier
+            .height((24 * WEEK_HOUR_HEIGHT_DP).dp)
+            .background(palette.calendarSurface)
+            .drawBehind {
+                drawLine(palette.line, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
+                repeat(23) { hour ->
+                    val y = (hour + 1) * WEEK_HOUR_HEIGHT_DP.dp.toPx()
+                    drawLine(palette.line, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
+                }
+            },
+    ) {
+        repeat(24) { hour ->
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth()
                     .height(WEEK_HOUR_HEIGHT_DP.dp)
-                    .background(palette.calendarSurface)
-                    .drawBehind {
-                        drawLine(palette.line, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-                        drawLine(palette.line, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-                    },
+                    .offset(y = (hour * WEEK_HOUR_HEIGHT_DP).dp)
+                    .clickable { onAddAtDate(day, LocalTime.of(hour, 0)) },
+            )
+        }
+        if (showNow) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .offset(y = weekEventTopOffset(now))
+                    .background(palette.accent),
+            )
+        }
+        events.sortedBy { it.startTimeMs }.forEach { event ->
+            val layout = eventLayouts[event.id] ?: WeekEventLayout(column = 0, columnCount = 1)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(weekEventHeight(event))
+                    .offset(y = weekEventTopOffset(event.startLocalTime()))
+                    .zIndex(1f)
+                    .padding(horizontal = 2.dp),
             ) {
-                if (dayEvents.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable { onAddAtDate(day, LocalTime.of(hour, 0)) },
-                    )
-                }
-                if (showNow && day == selectedDate) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .offset(y = ((now.minute / 60f) * 64).dp)
-                            .background(palette.accent),
-                    )
-                }
-                dayEvents.sortedBy { it.startTimeMs }.forEach { event ->
-                    val layout = eventLayouts[event.id] ?: WeekEventLayout(column = 0, columnCount = 1)
-                    val top = ((event.startLocalTime().minute / 60f) * WEEK_HOUR_HEIGHT_DP).dp
-                    val height = ((event.durationMinutes() / 60f) * WEEK_HOUR_HEIGHT_DP).coerceAtLeast(22f).dp
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(height)
-                            .offset(y = top)
-                            .zIndex(1f)
-                            .padding(horizontal = 2.dp),
-                    ) {
-                        repeat(layout.columnCount) { column ->
-                            if (column == layout.column) {
-                                WeekEventBlock(
-                                    event = event,
-                                    palette = palette,
-                                    onClick = { onEventClick(event) },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                                )
-                            } else {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        }
+                repeat(layout.columnCount) { column ->
+                    if (column == layout.column) {
+                        WeekEventBlock(
+                            event = event,
+                            palette = palette,
+                            onClick = { onEventClick(event) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
         }
     }
 }
+
+private fun weekEventTopOffset(time: LocalTime) =
+    (((time.hour * 60 + time.minute) / 60f) * WEEK_HOUR_HEIGHT_DP).dp
+
+private fun weekEventHeight(event: CalendarEvent) =
+    ((event.durationMinutes() / 60f) * WEEK_HOUR_HEIGHT_DP).coerceAtLeast(22f).dp
 
 @Composable
 private fun WeekEventBlock(
@@ -3665,10 +3827,34 @@ private fun DayView(
     val dayEvents = remember(dayAll) { dayAll.filter { it.isTask == 0 } }
     val allDayEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 1 } }
     val timedEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 0 } }
-    val timedEventsByHour = remember(timedEvents) { timedEvents.groupBy { it.startLocalTime().hour } }
+    val eventLayouts = remember(timedEvents) { layoutTimedEvents(timedEvents) }
     val tasks = remember(dayAll) { dayAll.filter { it.isTask == 1 } }
+    var dragTotal by remember { mutableFloatStateOf(0f) }
 
-    Column(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(palette.calendarSurface)
+            .pointerInput(selectedDate) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        when {
+                            dragTotal < -50.dp.toPx() -> onNextDay()
+                            dragTotal > 50.dp.toPx() -> onPreviousDay()
+                        }
+                        dragTotal = 0f
+                    },
+                    onHorizontalDrag = { _, amount -> dragTotal += amount },
+                )
+            },
+    ) {
+        DayHeader(
+            selectedDate = selectedDate,
+            palette = palette,
+            onPreviousDay = onPreviousDay,
+            onNextDay = onNextDay,
+            onJumpToday = onJumpToday,
+        )
         if (allDayEvents.isNotEmpty()) {
             LazyColumn(modifier = Modifier.fillMaxWidth().height(44.dp).background(palette.calendarSurface)) {
                 items(allDayEvents.size) { index ->
@@ -3688,23 +3874,23 @@ private fun DayView(
             }
         }
 
-        LazyColumn(modifier = Modifier.weight(1f).background(palette.calendarSurface)) {
-            items(24) { hour ->
-                DayHourRow(
-                    hour = hour,
-                    selectedDate = selectedDate,
-                    eventsByHour = timedEventsByHour,
-                    palette = palette,
-                    onAddAtDate = onAddAtDate,
-                    onEventClick = onEventClick,
-                )
-            }
-            item {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text("Tasks", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
-                    if (tasks.isEmpty()) {
-                        Text("No tasks", color = palette.dimText, fontFamily = mono, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp, bottom = 28.dp))
-                    } else {
+        Box(modifier = Modifier.weight(1f).background(palette.calendarSurface)) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    DayTimeColumn(selectedDate = selectedDate, palette = palette)
+                    DayTimelineColumn(
+                        selectedDate = selectedDate,
+                        events = timedEvents,
+                        eventLayouts = eventLayouts,
+                        palette = palette,
+                        onAddAtDate = onAddAtDate,
+                        onEventClick = onEventClick,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (tasks.isNotEmpty()) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                        Text("Tasks", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
                         tasks.forEach { task ->
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Box(modifier = Modifier.size(18.dp).clip(RoundedCornerShape(3.dp)).background(palette.cell))
@@ -3720,81 +3906,197 @@ private fun DayView(
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(TIMELINE_BOTTOM_CLEARANCE_DP.dp))
             }
+            TimelineBottomBoundary(palette = palette, modifier = Modifier.align(Alignment.BottomCenter))
         }
     }
 }
 
 @Composable
-private fun DayHourRow(
-    hour: Int,
+private fun TimelineBottomBoundary(
+    palette: DotCalPalette,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(TIMELINE_BOTTOM_CLEARANCE_DP.dp)
+            .background(palette.calendarSurface)
+            .drawBehind {
+                drawLine(
+                    palette.line,
+                    Offset(0f, 0f),
+                    Offset(size.width, 0f),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            },
+    )
+}
+
+@Composable
+private fun DayHeader(
     selectedDate: LocalDate,
-    eventsByHour: Map<Int, List<CalendarEvent>>,
+    palette: DotCalPalette,
+    onPreviousDay: () -> Unit,
+    onNextDay: () -> Unit,
+    onJumpToday: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .background(palette.calendarSurface)
+            .padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onPreviousDay, modifier = Modifier.size(44.dp)) {
+            Icon(Icons.Default.ChevronLeft, contentDescription = "Previous day", tint = palette.primaryText)
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .noRippleClickable(onClick = onJumpToday),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                selectedDate.format(dayHeaderFormatter).uppercase(Locale.US),
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                maxLines = 1,
+            )
+            Text(
+                selectedDate.year.toString(),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 11.sp,
+                maxLines = 1,
+            )
+        }
+        IconButton(onClick = onNextDay, modifier = Modifier.size(44.dp)) {
+            Icon(Icons.Default.ChevronRight, contentDescription = "Next day", tint = palette.primaryText)
+        }
+    }
+}
+
+@Composable
+private fun DayTimeColumn(
+    selectedDate: LocalDate,
+    palette: DotCalPalette,
+) {
+    val now = LocalTime.now()
+    val showNow = selectedDate == LocalDate.now()
+    Box(
+        modifier = Modifier
+            .width(32.dp)
+            .height((24 * DAY_HOUR_HEIGHT_DP).dp)
+            .drawBehind {
+                repeat(23) { hour ->
+                    val y = (hour + 1) * DAY_HOUR_HEIGHT_DP.dp.toPx()
+                    drawLine(palette.line, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
+                }
+            },
+    ) {
+        repeat(24) { hour ->
+            Text(
+                hour.toString().padStart(2, '0'),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 10.sp,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = (hour * DAY_HOUR_HEIGHT_DP + 6).dp),
+            )
+        }
+        if (showNow) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = dayEventTopOffset(now))
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(palette.accent),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DayTimelineColumn(
+    selectedDate: LocalDate,
+    events: List<CalendarEvent>,
+    eventLayouts: Map<String, WeekEventLayout>,
     palette: DotCalPalette,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val now = LocalTime.now()
-    val showNow = selectedDate == LocalDate.now() && hour == now.hour
-    val hourEvents = eventsByHour[hour].orEmpty()
-
-    Row(modifier = Modifier.fillMaxWidth().height(72.dp).background(palette.calendarSurface)) {
-        Box(
-            modifier = Modifier
-                .width(56.dp)
-                .height(72.dp)
-                .drawBehind {
-                    drawLine(palette.line, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-                },
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            Text("${hour.toString().padStart(2, '0')}:00", color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
-            if (showNow) {
-                Box(
-                    modifier = Modifier
-                        .offset(y = ((now.minute / 60f) * 72).dp)
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(palette.accent),
-                )
-            }
+    val showNow = selectedDate == LocalDate.now()
+    Box(
+        modifier = modifier
+            .height((24 * DAY_HOUR_HEIGHT_DP).dp)
+            .background(palette.calendarSurface)
+            .drawBehind {
+                repeat(23) { hour ->
+                    val y = (hour + 1) * DAY_HOUR_HEIGHT_DP.dp.toPx()
+                    drawLine(palette.line, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
+                }
+            },
+    ) {
+        repeat(24) { hour ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(DAY_HOUR_HEIGHT_DP.dp)
+                    .offset(y = (hour * DAY_HOUR_HEIGHT_DP).dp)
+                    .clickable { onAddAtDate(selectedDate, LocalTime.of(hour, 0)) },
+            )
         }
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(72.dp)
-                .background(palette.calendarSurface)
-                .drawBehind {
-                    drawLine(palette.line, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-                },
-        ) {
-            if (hourEvents.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .clickable { onAddAtDate(selectedDate, LocalTime.of(hour, 0)) },
-                )
-            }
-            if (showNow) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .offset(y = ((now.minute / 60f) * 72).dp)
-                        .background(palette.accent),
-                )
-            }
-            hourEvents.take(2).forEachIndexed { index, event ->
-                WeekEventBlock(
-                    event = event,
-                    palette = palette,
-                    onClick = { onEventClick(event) },
-                    modifier = Modifier.zIndex(1f).padding(start = 6.dp, end = 8.dp, top = (6 + index * 30).dp).height(24.dp),
-                )
+        if (showNow) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .offset(y = dayEventTopOffset(now))
+                    .background(palette.accent),
+            )
+        }
+        events.sortedBy { it.startTimeMs }.forEach { event ->
+            val layout = eventLayouts[event.id] ?: WeekEventLayout(column = 0, columnCount = 1)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(dayEventHeight(event))
+                    .offset(y = dayEventTopOffset(event.startLocalTime()))
+                    .zIndex(1f)
+                    .padding(start = 6.dp, end = 8.dp),
+            ) {
+                repeat(layout.columnCount) { column ->
+                    if (column == layout.column) {
+                        WeekEventBlock(
+                            event = event,
+                            palette = palette,
+                            onClick = { onEventClick(event) },
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
             }
         }
     }
 }
+
+private fun dayEventTopOffset(time: LocalTime) =
+    (((time.hour * 60 + time.minute) / 60f) * DAY_HOUR_HEIGHT_DP).dp
+
+private fun dayEventHeight(event: CalendarEvent) =
+    ((event.durationMinutes() / 60f) * DAY_HOUR_HEIGHT_DP).coerceAtLeast(24f).dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -7619,6 +7921,7 @@ private fun SettingsPreview(
     onRecentlyDeleted: () -> Unit,
     onTemplates: () -> Unit,
     onCalendarSets: () -> Unit,
+    onShiftPatterns: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
     onBackup: () -> Unit,
@@ -7679,6 +7982,7 @@ private fun SettingsPreview(
             onRecentlyDeleted = onRecentlyDeleted,
             onTemplates = onTemplates,
             onCalendarSets = onCalendarSets,
+            onShiftPatterns = onShiftPatterns,
             onExportIcs = onExportIcs,
             onImportIcs = onImportIcs,
             onBackup = onBackup,
@@ -7827,6 +8131,7 @@ private fun SettingsRoot(
     onRecentlyDeleted: () -> Unit,
     onTemplates: () -> Unit,
     onCalendarSets: () -> Unit,
+    onShiftPatterns: () -> Unit,
     onExportIcs: () -> Unit,
     onImportIcs: () -> Unit,
     onBackup: () -> Unit,
@@ -7979,6 +8284,12 @@ private fun SettingsRoot(
                 isPro = isPro,
                 palette = palette,
                 onClick = onCalendarSets,
+            )
+            SettingsProBadgeRow(
+                title = "Shift Patterns",
+                isPro = isPro,
+                palette = palette,
+                onClick = onShiftPatterns,
             )
             SettingsDivider(palette)
 
@@ -9771,6 +10082,7 @@ private fun CustomAccentRow(
 private fun CustomAccentPickerDialog(
     initial: Color,
     palette: DotCalPalette,
+    title: String = "Custom Accent",
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
@@ -9794,7 +10106,7 @@ private fun CustomAccentPickerDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
         title = {
-            Text("Custom Accent", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 18.sp)
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -10666,6 +10978,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("App Lock & Private Vault", "PIN lock plus hidden events and tasks"),
     ProFeature("Event & Task Templates", "Save presets and reuse them from the + button"),
     ProFeature("Calendar Sets", "Save Work/Personal/Family visibility and switch instantly"),
+    ProFeature("Shift Patterns", "Build rotating shift cycles and generate them in bulk"),
 )
 
 @Composable
@@ -11286,6 +11599,48 @@ private fun quickAddWhenLabel(result: QuickAddResult): String {
 private fun quickAddRepeatLabel(rrule: String): String =
     RecurrenceRule.parse(rrule)?.humanLabel() ?: "Custom"
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BulkTemplatePickerSheet(
+    palette: DotCalPalette,
+    templates: List<EventTemplate>,
+    onDismiss: () -> Unit,
+    onTemplateSelected: (EventTemplate) -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = palette.dialogSurface,
+        dragHandle = null,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 22.dp, vertical = 18.dp)) {
+            Text("Apply Template", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("Choose an event template to stamp onto selected dates.", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            Spacer(modifier = Modifier.height(14.dp))
+            if (templates.isEmpty()) {
+                Text("No event templates yet", color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), textAlign = TextAlign.Center)
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    lazyItems(templates, key = { it.id }) { template ->
+                        TemplateCard(
+                            template = template,
+                            palette = palette,
+                            onUse = { onTemplateSelected(template) },
+                            onDelete = {},
+                            showDelete = false,
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+        }
+    }
+}
+
 @Composable
 private fun TemplatesScreen(
     palette: DotCalPalette,
@@ -11365,6 +11720,7 @@ private fun TemplateCard(
     palette: DotCalPalette,
     onUse: () -> Unit,
     onDelete: () -> Unit,
+    showDelete: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -11389,8 +11745,10 @@ private fun TemplateCard(
             Spacer(modifier = Modifier.height(3.dp))
             Text(templateSummaryLabel(template), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 1)
         }
-        IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
-            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete template", tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+        if (showDelete) {
+            IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete template", tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }
@@ -11557,6 +11915,441 @@ private fun FocusProfileCard(
         }
     }
 }
+
+@Composable
+private fun ShiftPatternsScreen(
+    palette: DotCalPalette,
+    shiftTypes: List<ShiftType>,
+    patterns: List<ShiftPattern>,
+    accounts: List<CalendarAccount>,
+    onBack: () -> Unit,
+    onSaveType: (ShiftType) -> Unit,
+    onDeleteType: (String) -> Unit,
+    onSavePattern: (ShiftPattern) -> Unit,
+    onDeletePattern: (String, Boolean) -> Unit,
+    onGenerate: (String, LocalDate, LocalDate, String?) -> Unit,
+) {
+    var showTypeEditor by remember { mutableStateOf(false) }
+    var showPatternEditor by remember { mutableStateOf(false) }
+    var editingType by remember { mutableStateOf<ShiftType?>(null) }
+    var generatingPattern by remember { mutableStateOf<ShiftPattern?>(null) }
+    var deletePattern by remember { mutableStateOf<ShiftPattern?>(null) }
+    Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
+        Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+            }
+            Text("Shift Patterns", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center))
+            HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 22.dp),
+            contentPadding = PaddingValues(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item {
+                SettingsSectionTitle("SHIFT TYPES", palette)
+                if (shiftTypes.isEmpty()) {
+                    ShiftEmptyText("Create Day, Night, and Off presets first.", palette)
+                }
+            }
+            lazyItems(shiftTypes, key = { it.id }) { type ->
+                ShiftTypeCard(
+                    type = type,
+                    palette = palette,
+                    onClick = { editingType = type },
+                    onDelete = { onDeleteType(type.id) },
+                )
+            }
+            item {
+                CalendarAddAccountRow(palette = palette, onClick = { showTypeEditor = true }, label = "Add Shift Type")
+                Spacer(modifier = Modifier.height(10.dp))
+                SettingsSectionTitle("PATTERNS", palette)
+                if (patterns.isEmpty()) {
+                    ShiftEmptyText("Build a cycle like Day, Day, Night, Night, Off x4.", palette)
+                }
+            }
+            lazyItems(patterns, key = { it.id }) { pattern ->
+                ShiftPatternCard(
+                    pattern = pattern,
+                    shiftTypes = shiftTypes,
+                    palette = palette,
+                    onGenerate = { generatingPattern = pattern },
+                    onDelete = { deletePattern = pattern },
+                )
+            }
+            item {
+                CalendarAddAccountRow(
+                    palette = palette,
+                    onClick = { showPatternEditor = true },
+                    label = "Build Pattern",
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+    if (showTypeEditor) {
+        ShiftTypeEditorDialog(
+            palette = palette,
+            existing = null,
+            onDismiss = { showTypeEditor = false },
+            onSave = {
+                onSaveType(it)
+                showTypeEditor = false
+            },
+        )
+    }
+    editingType?.let { type ->
+        ShiftTypeEditorDialog(
+            palette = palette,
+            existing = type,
+            onDismiss = { editingType = null },
+            onSave = {
+                onSaveType(it)
+                editingType = null
+            },
+        )
+    }
+    if (showPatternEditor) {
+        ShiftPatternEditorDialog(
+            palette = palette,
+            shiftTypes = shiftTypes,
+            onDismiss = { showPatternEditor = false },
+            onSave = {
+                onSavePattern(it)
+                showPatternEditor = false
+            },
+        )
+    }
+    generatingPattern?.let { pattern ->
+        ShiftGenerateDialog(
+            pattern = pattern,
+            accounts = accounts,
+            palette = palette,
+            onDismiss = { generatingPattern = null },
+            onGenerate = { start, months, accountId ->
+                onGenerate(pattern.id, start, start.plusMonths(months.toLong()), accountId)
+                generatingPattern = null
+            },
+        )
+    }
+    deletePattern?.let { pattern ->
+        ConfirmDeleteDialog(
+            title = "Delete shift pattern?",
+            confirmLabel = "Delete",
+            palette = palette,
+            onDismiss = { deletePattern = null },
+            onConfirm = {
+                onDeletePattern(pattern.id, true)
+                deletePattern = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun ShiftEmptyText(text: String, palette: DotCalPalette) {
+    Text(text, color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(vertical = 10.dp))
+}
+
+@Composable
+private fun ShiftTypeCard(type: ShiftType, palette: DotCalPalette, onClick: () -> Unit, onDelete: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.eventCardSurface)
+            .noRippleClickable(onClick = onClick)
+            .padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(14.dp).clip(CircleShape).background(Color(parseColor(type.colorHex))))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(type.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(shiftTypeSummary(type), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+        }
+        IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete shift type", tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun ShiftPatternCard(
+    pattern: ShiftPattern,
+    shiftTypes: List<ShiftType>,
+    palette: DotCalPalette,
+    onGenerate: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val typeMap = remember(shiftTypes) { shiftTypes.associateBy { it.id } }
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.eventCardSurface).noRippleClickable(onClick = onGenerate).padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(pattern.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(shiftPatternSummary(pattern, typeMap), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 2)
+        }
+        IconButton(onClick = onGenerate, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Default.Add, contentDescription = "Generate shifts", tint = palette.accent, modifier = Modifier.size(20.dp))
+        }
+        IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete shift pattern", tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun ShiftTypeEditorDialog(
+    palette: DotCalPalette,
+    existing: ShiftType?,
+    onDismiss: () -> Unit,
+    onSave: (ShiftType) -> Unit,
+) {
+    var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
+    var isOff by remember(existing?.id) { mutableStateOf(existing?.generatesEvent == false) }
+    var startHour by remember(existing?.id) { mutableStateOf(((existing?.startMinuteOfDay ?: 7 * 60) / 60).toString()) }
+    var durationHours by remember(existing?.id) { mutableStateOf(((existing?.durationMinutes ?: 12 * 60) / 60).coerceAtLeast(1).toString()) }
+    var color by remember(existing?.id) { mutableStateOf(existing?.colorHex ?: "#FF3B30") }
+    var showColorPicker by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        title = { Text(if (existing == null) "Shift type" else "Edit shift type", color = palette.primaryText, fontFamily = mono) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                SettingsToggleRow(title = "Off day", checked = isOff, palette = palette, onCheckedChange = { isOff = it })
+                if (!isOff) {
+                    OutlinedTextField(value = startHour, onValueChange = { startHour = it.filter(Char::isDigit).take(2) }, label = { Text("Start hour") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                    OutlinedTextField(value = durationHours, onValueChange = { durationHours = it.filter(Char::isDigit).take(2) }, label = { Text("Duration hours") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                    ShiftColorRow(colorHex = color, palette = palette, onClick = { showColorPicker = true })
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = {
+                    val hour = startHour.toIntOrNull()?.coerceIn(0, 23) ?: 7
+                    val duration = durationHours.toIntOrNull()?.coerceIn(1, 24) ?: 12
+                    onSave(
+                        ShiftType(
+                            id = existing?.id ?: ShiftType.newId(),
+                            name = name.trim(),
+                            colorHex = color.takeIf { it.matches(Regex("#[0-9A-Fa-f]{6}")) } ?: "#FF3B30",
+                            startMinuteOfDay = if (isOff) null else hour * 60,
+                            durationMinutes = if (isOff) null else duration * 60,
+                            isAllDay = false,
+                            reminderMinutes = null,
+                            createdAtMs = existing?.createdAtMs ?: System.currentTimeMillis(),
+                        ),
+                    )
+                },
+            ) { Text("Save", color = if (name.isNotBlank()) palette.accent else palette.disabledText) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = palette.primaryText) } },
+    )
+    if (showColorPicker) {
+        CustomAccentPickerDialog(
+            initial = Color(parseColor(color)),
+            palette = palette,
+            title = "Shift Color",
+            onDismiss = { showColorPicker = false },
+            onConfirm = {
+                color = it
+                showColorPicker = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun ShiftPatternEditorDialog(
+    palette: DotCalPalette,
+    shiftTypes: List<ShiftType>,
+    onDismiss: () -> Unit,
+    onSave: (ShiftPattern) -> Unit,
+) {
+    var name by remember { mutableStateOf("4 on 4 off") }
+    var cycle by remember { mutableStateOf<List<String>>(emptyList()) }
+    var startDate by remember { mutableStateOf(LocalDate.now()) }
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        title = { Text("Build pattern", color = palette.primaryText, fontFamily = mono) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                ShiftDateRow(label = "Start date", date = startDate, palette = palette, onClick = { showStartDatePicker = true })
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    lazyItems(shiftTypes, key = { it.id }) { type ->
+                        ShiftChip(type.name, palette, onClick = { cycle = cycle + type.id })
+                    }
+                }
+                Text(shiftCycleLabel(cycle, shiftTypes.associateBy { it.id }), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, lineHeight = 17.sp)
+                if (cycle.isNotEmpty()) {
+                    TextButton(onClick = { cycle = cycle.dropLast(1) }) { Text("Remove Last", color = palette.accent, fontFamily = mono) }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank() && cycle.isNotEmpty(),
+                onClick = {
+                    onSave(
+                        ShiftPattern(
+                            id = ShiftPattern.newId(),
+                            name = name.trim(),
+                            cycleShiftTypeIds = cycle,
+                            cycleStartDate = startDate,
+                            createdAtMs = System.currentTimeMillis(),
+                        ),
+                    )
+                },
+            ) { Text("Save", color = palette.accent) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = palette.primaryText) } },
+    )
+    if (showStartDatePicker) {
+        DateTimeChoiceSheet(
+            title = "Pattern start",
+            selectedDate = startDate,
+            selectedTime = LocalTime.NOON,
+            minDate = null,
+            includeTime = false,
+            palette = palette,
+            onDismiss = { showStartDatePicker = false },
+            onSelected = { date, _ ->
+                startDate = date
+                showStartDatePicker = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun ShiftGenerateDialog(
+    pattern: ShiftPattern,
+    accounts: List<CalendarAccount>,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onGenerate: (LocalDate, Int, String?) -> Unit,
+) {
+    var startDate by remember(pattern.id) { mutableStateOf(LocalDate.now()) }
+    var months by remember { mutableStateOf("6") }
+    var accountId by remember(accounts) { mutableStateOf(accounts.firstOrNull()?.id) }
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        title = { Text("Generate shifts", color = palette.primaryText, fontFamily = mono) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(pattern.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold)
+                ShiftDateRow(label = "Generate from", date = startDate, palette = palette, onClick = { showStartDatePicker = true })
+                OutlinedTextField(value = months, onValueChange = { months = it.filter(Char::isDigit).take(2) }, label = { Text("Months ahead") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                Text("Calendar", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    lazyItems(accounts, key = { it.id }) { account ->
+                        ShiftChip(account.displayName.readableCalendarLabel(), palette, selected = account.id == accountId, onClick = { accountId = account.id })
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onGenerate(startDate, months.toIntOrNull()?.coerceIn(1, 24) ?: 6, accountId) }) {
+                Text("Generate", color = palette.accent)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = palette.primaryText) } },
+    )
+    if (showStartDatePicker) {
+        DateTimeChoiceSheet(
+            title = "Generate from",
+            selectedDate = startDate,
+            selectedTime = LocalTime.NOON,
+            minDate = null,
+            includeTime = false,
+            palette = palette,
+            onDismiss = { showStartDatePicker = false },
+            onSelected = { date, _ ->
+                startDate = date
+                showStartDatePicker = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun ShiftDateRow(label: String, date: LocalDate, palette: DotCalPalette, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .border(1.dp, palette.textFieldBorder, RoundedCornerShape(10.dp))
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            Spacer(Modifier.height(2.dp))
+            Text(date.format(editorDateFormatter), color = palette.primaryText, fontFamily = mono, fontSize = 15.sp)
+        }
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun ShiftColorRow(colorHex: String, palette: DotCalPalette, onClick: () -> Unit) {
+    val swatchColor = remember(colorHex) { Color(parseColor(colorHex)) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .border(1.dp, palette.textFieldBorder, RoundedCornerShape(10.dp))
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(28.dp).clip(CircleShape).background(swatchColor))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Color", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            Spacer(Modifier.height(2.dp))
+            Text(colorHex.uppercase(Locale.US), color = palette.primaryText, fontFamily = mono, fontSize = 15.sp)
+        }
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun ShiftChip(label: String, palette: DotCalPalette, selected: Boolean = false, onClick: () -> Unit) {
+    Text(
+        label,
+        color = if (selected) palette.onAccent else palette.primaryText,
+        fontFamily = mono,
+        fontSize = 12.sp,
+        modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(if (selected) palette.accent else palette.cell).noRippleClickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp),
+    )
+}
+
+private fun shiftTypeSummary(type: ShiftType): String {
+    if (!type.generatesEvent) return "Off"
+    val start = type.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60).format(editorTimeFormatter) } ?: "All-day"
+    val duration = type.durationMinutes?.let { formatDurationShort(it) } ?: "All-day"
+    return "$start - $duration"
+}
+
+private fun shiftPatternSummary(pattern: ShiftPattern, types: Map<String, ShiftType>): String =
+    "${pattern.cycleShiftTypeIds.size}-day cycle: " + shiftCycleLabel(pattern.cycleShiftTypeIds, types)
+
+private fun shiftCycleLabel(ids: List<String>, types: Map<String, ShiftType>): String =
+    ids.map { types[it]?.name ?: "Missing" }.joinToString(", ").ifBlank { "No shifts selected" }
 
 @Composable
 private fun RecentlyDeletedScreen(

@@ -14,6 +14,9 @@ import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.billing.ProManager
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.profiles.FocusProfile
+import com.dotfield.dotcal.data.shifts.ShiftApplyResult
+import com.dotfield.dotcal.data.shifts.ShiftPattern
+import com.dotfield.dotcal.data.shifts.ShiftType
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.holiday.HolidayCountry
@@ -299,6 +302,17 @@ class DotCalViewModel(
         }
     }
 
+    fun applyTemplateToDates(
+        templateId: String,
+        dates: List<LocalDate>,
+        accountId: String?,
+        onDone: (Int) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            onDone(repository.applyTemplateToDates(templateId, dates, accountId))
+        }
+    }
+
     // ----- Calendar Sets / Focus Profiles (file-based, Pro) -----
     private val _focusProfiles = MutableStateFlow<List<FocusProfile>>(emptyList())
     val focusProfiles: StateFlow<List<FocusProfile>> = _focusProfiles
@@ -328,6 +342,63 @@ class DotCalViewModel(
         viewModelScope.launch {
             repository.applyFocusProfile(id)
             onDone()
+        }
+    }
+
+    // ----- Shift Patterns (file-based, Pro) -----
+    private val _shiftTypes = MutableStateFlow<List<ShiftType>>(emptyList())
+    val shiftTypes: StateFlow<List<ShiftType>> = _shiftTypes
+
+    private val _shiftPatterns = MutableStateFlow<List<ShiftPattern>>(emptyList())
+    val shiftPatterns: StateFlow<List<ShiftPattern>> = _shiftPatterns
+
+    fun refreshShiftPatterns() {
+        viewModelScope.launch {
+            _shiftTypes.value = repository.listShiftTypes()
+            _shiftPatterns.value = repository.listShiftPatterns()
+        }
+    }
+
+    fun saveShiftType(type: ShiftType, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.saveShiftType(type)
+            _shiftTypes.value = repository.listShiftTypes()
+            onDone()
+        }
+    }
+
+    fun deleteShiftType(id: String) {
+        viewModelScope.launch {
+            repository.deleteShiftType(id)
+            _shiftTypes.value = repository.listShiftTypes()
+        }
+    }
+
+    fun saveShiftPattern(pattern: ShiftPattern, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.saveShiftPattern(pattern)
+            _shiftPatterns.value = repository.listShiftPatterns()
+            onDone()
+        }
+    }
+
+    fun deleteShiftPattern(id: String, removeGeneratedEvents: Boolean, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.deleteShiftPattern(id, removeGeneratedEvents)
+            _shiftPatterns.value = repository.listShiftPatterns()
+            onDone()
+        }
+    }
+
+    fun applyShiftPattern(
+        patternId: String,
+        rangeStart: LocalDate,
+        rangeEnd: LocalDate,
+        accountId: String?,
+        onDone: (ShiftApplyResult) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            onDone(repository.applyShiftPattern(patternId, rangeStart, rangeEnd, accountId))
         }
     }
 
