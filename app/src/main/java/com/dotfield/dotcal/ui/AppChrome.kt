@@ -169,7 +169,7 @@ internal fun CalendarActionBar(
         Text(
             title,
             color = palette.primaryText,
-            fontFamily = FontFamily.Serif,
+            fontFamily = LocalHeadingFont.current,
             fontWeight = FontWeight.Bold,
             fontSize = if (title.length <= 4) 30.sp else 28.sp,
             modifier = Modifier.padding(start = 8.dp).clickable(onClick = onTitleClick),

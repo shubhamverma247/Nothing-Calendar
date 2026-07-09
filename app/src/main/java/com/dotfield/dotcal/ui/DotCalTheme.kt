@@ -1,7 +1,13 @@
 package com.dotfield.dotcal.ui
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import com.dotfield.dotcal.prefs.CalendarPreferences
+import com.dotfield.dotcal.R
 import com.dotfield.dotcal.ui.theme.NBlack
 
 internal data class DotCalPalette(
@@ -42,6 +48,27 @@ internal enum class DotCalThemeMode(val label: String) {
         fun fromStorage(value: String?): DotCalThemeMode {
             return entries.firstOrNull { it.name == value } ?: System
         }
+    }
+}
+
+internal enum class AppFont(val id: String, val label: String, val tagline: String) {
+    NDot("ndot", "Ndot", "Monospaced. Technical. Precise."),
+    NType("ntype", "NType 82", "Editorial. Redefined."),
+    System("system", "System", "Your device's own font.");
+
+    companion object {
+        fun fromId(id: String?): AppFont = entries.firstOrNull { it.id == id } ?: NDot
+    }
+}
+
+internal val LocalHeadingFont = staticCompositionLocalOf<FontFamily> { FontFamily.Default }
+
+@Composable
+internal fun rememberAppFontFamily(font: AppFont): FontFamily = remember(font) {
+    when (font) {
+        AppFont.NDot -> FontFamily(Font(R.font.ndot))
+        AppFont.NType -> FontFamily(Font(R.font.ntype82))
+        AppFont.System -> FontFamily.Default
     }
 }
 

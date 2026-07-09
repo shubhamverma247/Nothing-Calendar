@@ -180,6 +180,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
@@ -260,12 +261,14 @@ import kotlinx.coroutines.withContext
 internal fun SettingsPreview(
     themeMode: DotCalThemeMode,
     accentColor: AccentColor,
+    appFont: AppFont,
     palette: DotCalPalette,
     screen: SettingsScreen,
     onBack: () -> Unit,
     onScreenChange: (SettingsScreen) -> Unit,
     onThemeSelected: (DotCalThemeMode) -> Unit,
     onAccentSelected: (AccentColor) -> Unit,
+    onAppFontSelected: (AppFont) -> Unit,
     syncEnabled: Boolean,
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
@@ -328,10 +331,12 @@ internal fun SettingsPreview(
         SettingsRoot(
             themeMode = themeMode,
             accentColor = accentColor,
+            appFont = appFont,
             palette = palette,
             onBack = onBack,
             onThemeSelected = onThemeSelected,
             onAccentSelected = onAccentSelected,
+            onAppFontSelected = onAppFontSelected,
             onThemeSettings = { onScreenChange(SettingsScreen.Theme) },
             syncEnabled = syncEnabled,
             syncIntervalMins = syncIntervalMins,
@@ -477,10 +482,12 @@ internal fun SettingsPreview(
 internal fun SettingsRoot(
     themeMode: DotCalThemeMode,
     accentColor: AccentColor,
+    appFont: AppFont,
     palette: DotCalPalette,
     onBack: () -> Unit,
     onThemeSelected: (DotCalThemeMode) -> Unit,
     onAccentSelected: (AccentColor) -> Unit,
+    onAppFontSelected: (AppFont) -> Unit,
     onThemeSettings: () -> Unit,
     syncEnabled: Boolean,
     syncIntervalMins: Int,
@@ -530,6 +537,7 @@ internal fun SettingsRoot(
     val context = LocalContext.current
     val listState = rememberLazyListState()
     val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
+    var showFontSheet by remember { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 150.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
             item {
@@ -579,6 +587,11 @@ internal fun SettingsRoot(
                 value = "${themeMode.label} / ${accentColor.label}",
                 palette = palette,
                 onClick = onThemeSettings,
+            )
+            SettingsFontRow(
+                font = appFont,
+                palette = palette,
+                onClick = { showFontSheet = true },
             )
             SettingsToggleRow(
                 title = "Birthday calendar",
@@ -708,6 +721,17 @@ internal fun SettingsRoot(
         }
         if (showCompactHeader) {
             SettingsCompactHeader(palette = palette, onBack = onBack, showBack = false)
+        }
+        if (showFontSheet) {
+            FontPickerSheet(
+                current = appFont,
+                palette = palette,
+                onDismiss = { showFontSheet = false },
+                onSelect = { font ->
+                    showFontSheet = false
+                    onAppFontSelected(font)
+                },
+            )
         }
     }
 }
@@ -1060,7 +1084,7 @@ private fun SettingsLargeHeader(
         Text(
             title,
             color = palette.primaryText,
-            fontFamily = mono,
+            fontFamily = LocalHeadingFont.current,
             fontWeight = FontWeight.Normal,
             fontSize = 28.sp,
             modifier = Modifier.padding(start = 0.dp, top = if (showBack) 2.dp else 10.dp),
@@ -1089,7 +1113,7 @@ private fun SettingsCompactHeader(
         Text(
             title,
             color = palette.primaryText,
-            fontFamily = mono,
+            fontFamily = LocalHeadingFont.current,
             fontWeight = FontWeight.Bold,
             fontSize = 16.sp,
             modifier = Modifier.align(Alignment.Center),
@@ -1995,6 +2019,118 @@ private fun SettingsMenuRow(
                 UpDownChevron(tint = palette.secondaryText)
             } else if (showChevron) {
                 Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsFontRow(
+    font: AppFont,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .noRippleClickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Font",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Normal,
+                fontSize = 16.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "${font.label} / ${font.tagline}",
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FontPickerSheet(
+    current: AppFont,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelect: (AppFont) -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        dragHandle = null,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                "Font",
+                color = palette.primaryText,
+                fontFamily = LocalHeadingFont.current,
+                fontWeight = FontWeight.Bold,
+                fontSize = 22.sp,
+            )
+            AppFont.entries.forEach { font ->
+                val selected = font == current
+                val family = remember(font) {
+                    when (font) {
+                        AppFont.NDot -> FontFamily(Font(R.font.ndot))
+                        AppFont.NType -> FontFamily(Font(R.font.ntype82))
+                        AppFont.System -> FontFamily.Default
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (selected) palette.accent.copy(alpha = 0.10f) else palette.cancelSurface)
+                        .border(1.dp, if (selected) palette.accent else palette.cancelBorder, RoundedCornerShape(10.dp))
+                        .noRippleClickable { onSelect(font) }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            font.label,
+                            color = palette.primaryText,
+                            fontFamily = family,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            font.tagline,
+                            color = palette.secondaryText,
+                            fontFamily = mono,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (selected) {
+                        Icon(Icons.Default.Check, contentDescription = "Selected", tint = palette.accent, modifier = Modifier.size(22.dp))
+                    }
+                }
             }
         }
     }

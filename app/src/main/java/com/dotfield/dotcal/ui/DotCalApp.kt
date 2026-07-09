@@ -138,6 +138,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -444,6 +445,11 @@ fun DotCalApp(
             AccentColor.fromStorage(preferences[CalendarPreferences.KEY_ACCENT_COLOR])
         }
     }.collectAsStateWithLifecycle(initialValue = bootAccentColor)
+    val appFont by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            AppFont.fromId(preferences[CalendarPreferences.KEY_APP_FONT])
+        }
+    }.collectAsStateWithLifecycle(initialValue = AppFont.NDot)
     val storedCalendarTab by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             CalendarTab.fromStorage(preferences[CalendarPreferences.KEY_DEFAULT_VIEW])
@@ -970,6 +976,8 @@ fun DotCalApp(
     // Group events by day once at the top level so the buckets survive Calendar <-> Tasks
     // <-> Settings switches and every calendar view reuses them instead of re-deriving.
     val eventsByDate = remember(events) { events.groupBy { it.localDate() } }
+    val appFontFamily = rememberAppFontFamily(appFont)
+    CompositionLocalProvider(LocalHeadingFont provides appFontFamily) {
     Box(modifier = Modifier.fillMaxSize().background(palette.topBarSurface)) {
         val visibleMainTab = if (screenTab == ScreenTab.Settings) previousScreenTab else screenTab
         val calendarHeaderLabel = when (activeCalendarTab) {
@@ -1193,6 +1201,7 @@ fun DotCalApp(
             SettingsPreview(
                 themeMode = resolvedThemeMode,
                 accentColor = resolvedAccentColor,
+                appFont = appFont,
                 palette = palette,
                 screen = settingsScreen,
                 onBack = { closeTopSurface() },
@@ -1213,6 +1222,13 @@ fun DotCalApp(
                             preferences[CalendarPreferences.KEY_ACCENT_COLOR] = selectedAccent.storageValue
                         }
                         WidgetUpdateWorker.enqueue(context)
+                    }
+                },
+                onAppFontSelected = { selectedFont ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_APP_FONT] = selectedFont.id
+                        }
                     }
                 },
                 syncEnabled = syncEnabled,
@@ -1944,6 +1960,7 @@ fun DotCalApp(
             addEditorDateOverride = null
             addSheet = false
         }
+    }
     }
 
     if (showSheet) {

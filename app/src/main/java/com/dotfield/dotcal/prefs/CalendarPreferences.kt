@@ -23,6 +23,7 @@ object CalendarPreferences {
     val KEY_24_HOUR_FORMAT = booleanPreferencesKey("twenty_four_hour_format")
     val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
     val KEY_ACCENT_COLOR = stringPreferencesKey("accent_color")
+    val KEY_APP_FONT = stringPreferencesKey("app_font")
     val KEY_LAST_SELECTED_DATE = stringPreferencesKey("last_selected_date")
     val KEY_IS_PRO = booleanPreferencesKey("is_pro")
     val KEY_WIDGET_TRANSPARENT = booleanPreferencesKey("widget_transparent")
