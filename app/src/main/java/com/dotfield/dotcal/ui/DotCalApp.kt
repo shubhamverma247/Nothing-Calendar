@@ -255,18 +255,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
-private val mono = FontFamily.SansSerif
+internal val mono = FontFamily.SansSerif
 private val sheetDateFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMM", Locale.US)
 private val detailDateFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy", Locale.US)
 private val agendaDateHeaderFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM", Locale.US)
-private val dayHeaderFormatter = DateTimeFormatter.ofPattern("EEE dd MMM", Locale.US)
+internal val dayHeaderFormatter = DateTimeFormatter.ofPattern("EEE dd MMM", Locale.US)
 private val compactDateFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 private val editorDateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM, yyyy", Locale.US)
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
 private val editorTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
-private const val WEEK_HOUR_HEIGHT_DP = 64f
-private const val DAY_HOUR_HEIGHT_DP = 72f
-private const val TIMELINE_BOTTOM_CLEARANCE_DP = 104f
+internal const val WEEK_HOUR_HEIGHT_DP = 64f
+internal const val DAY_HOUR_HEIGHT_DP = 72f
+internal const val TIMELINE_BOTTOM_CLEARANCE_DP = 104f
 private const val BOOT_PREFS = "dotcal_boot"
 private const val BOOT_THEME_KEY = "theme_mode"
 private const val BOOT_ACCENT_KEY = "accent_color"
@@ -280,6 +280,31 @@ private val recurrenceOptions = listOf(
     RecurrenceOption("Monthly", "FREQ=MONTHLY"),
     RecurrenceOption("Yearly", "FREQ=YEARLY"),
 )
+
+private enum class SettingsScreen {
+    Root,
+    Theme,
+    CalendarAccounts,
+    AddAccount,
+    GlobalHolidays,
+    AppPrivacy,
+    PrivacyPolicy,
+}
+
+private enum class WeekStartOption(val storageKey: String, val label: String, val fixedDay: DayOfWeek?) {
+    RegionDefault("REGION_DEFAULT", "Region default", null),
+    Saturday("SATURDAY", "Saturday", DayOfWeek.SATURDAY),
+    Sunday("SUNDAY", "Sunday", DayOfWeek.SUNDAY),
+    Monday("MONDAY", "Monday", DayOfWeek.MONDAY),
+}
+
+private enum class OnboardingPage {
+    Welcome,
+    CalendarPermission,
+    Notifications,
+    Contacts,
+    Ready,
+}
 
 /** Label for a Repeat row: "None", a preset name, or a custom rule's human sentence. */
 private fun repeatRowLabel(rrule: String?): String {
@@ -2384,7 +2409,7 @@ private fun OnboardingProgress(pageIndex: Int, pageCount: Int, colors: Onboardin
                 fontWeight = FontWeight.Medium,
             )
         }
-        
+
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             repeat(pageCount) { index ->
                 val active = index == pageIndex
@@ -2532,12 +2557,12 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCalendarHero(co
     drawLeafCluster(colors, Offset(size.width * 0.15f, size.height * 0.68f), -1f)
     drawLeafCluster(colors, Offset(size.width * 0.85f, size.height * 0.68f), 1f)
     drawSoftShadow(colors, Offset(size.width * 0.5f, size.height * 0.78f), size.width * 0.34f, size.height * 0.055f)
-    
+
     val left = size.width * 0.19f
     val top = size.height * 0.28f
     val width = size.width * 0.56f
     val height = size.height * 0.42f
-    
+
     val standPath = androidx.compose.ui.graphics.Path().apply {
         moveTo(left + width - 12.dp.toPx(), top + 10.dp.toPx())
         lineTo(left + width + 24.dp.toPx(), top + height - 4.dp.toPx())
@@ -2562,7 +2587,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCalendarHero(co
 
     drawRoundRect(colors.surface, Offset(left, top), androidx.compose.ui.geometry.Size(width, height), CornerRadius(16.dp.toPx(), 16.dp.toPx()))
     drawRoundRect(colors.line.copy(alpha = 0.55f), Offset(left, top), androidx.compose.ui.geometry.Size(width, height), CornerRadius(16.dp.toPx(), 16.dp.toPx()), style = Stroke(1.dp.toPx()))
-    
+
     drawRoundRect(
         brush = Brush.verticalGradient(listOf(colors.accent, Color(0xFFFF2A22))),
         topLeft = Offset(left, top),
@@ -2608,14 +2633,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCalendarHero(co
             val x = gridStartX + col * colStep
             val y = gridStartY + row * rowStep
             val active = row == 2 && col == 2
-            
+
             drawRoundRect(
                 color = if (active) colors.accent else colors.line.copy(alpha = if (colors.isDark) 0.6f else 0.4f),
                 topLeft = Offset(x, y),
                 size = androidx.compose.ui.geometry.Size(cellW, cellH),
                 cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
             )
-            
+
             if (active) {
                 val checkPath = androidx.compose.ui.graphics.Path().apply {
                     moveTo(x + cellW * 0.25f, y + cellH * 0.5f)
@@ -2717,12 +2742,12 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBirthdayHero(co
     drawSoftShadow(colors, Offset(size.width * 0.5f, size.height * 0.76f), size.width * 0.32f, size.height * 0.055f)
     drawRoundRect(colors.surface, Offset(cardLeft, cardTop), androidx.compose.ui.geometry.Size(size.width * 0.64f, size.height * 0.25f), CornerRadius(26.dp.toPx(), 26.dp.toPx()))
     drawRoundRect(colors.line.copy(alpha = 0.75f), Offset(cardLeft, cardTop), androidx.compose.ui.geometry.Size(size.width * 0.64f, size.height * 0.25f), CornerRadius(26.dp.toPx(), 26.dp.toPx()), style = Stroke(1.dp.toPx()))
-    
+
     val avatarCenter = Offset(cardLeft + size.width * 0.12f, cardTop + size.height * 0.11f)
     drawCircle(colors.accent.copy(alpha = 0.85f), 22.dp.toPx(), avatarCenter)
     drawCircle(colors.surface, 8.dp.toPx(), avatarCenter - Offset(0f, 3.dp.toPx()))
     drawRoundRect(colors.surface, Offset(avatarCenter.x - 9.dp.toPx(), avatarCenter.y + 2.dp.toPx()), androidx.compose.ui.geometry.Size(18.dp.toPx(), 11.dp.toPx()), CornerRadius(6.dp.toPx(), 6.dp.toPx()))
-    
+
     val nativeCanvas = drawContext.canvas.nativeCanvas
     val textStartX = cardLeft + size.width * 0.22f
     val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -2923,7 +2948,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLeafCluster(
     } else {
         colors.mutedText.copy(alpha = 0.35f)
     }
-    
+
     val leafCount = 4
     repeat(leafCount) { index ->
         val angle = if (direction < 0) {
@@ -2934,7 +2959,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLeafCluster(
         val distance = (index * 8).dp.toPx()
         val leafX = origin.x + direction * distance
         val leafY = origin.y - (index * 6).dp.toPx()
-        
+
         rotate(degrees = angle, pivot = Offset(leafX, leafY)) {
             drawOval(
                 color = leafColor,
@@ -2943,7 +2968,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLeafCluster(
             )
         }
     }
-    
+
     val accentAngle = if (direction < 0) -25f else 25f
     val mainLeafX = origin.x + direction * 10.dp.toPx()
     val mainLeafY = origin.y + 4.dp.toPx()
@@ -2955,1148 +2980,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLeafCluster(
         )
     }
 }
-
-@Composable
-private fun SystemBarColorSync(palette: DotCalPalette) {
-    val view = LocalView.current
-    SideEffect {
-        val window = (view.context as? Activity)?.window ?: return@SideEffect
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        if (Build.VERSION.SDK_INT < 35) {
-            @Suppress("DEPRECATION")
-            window.statusBarColor = palette.topBarSurface.toArgb()
-            @Suppress("DEPRECATION")
-            window.navigationBarColor = android.graphics.Color.TRANSPARENT
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            window.isNavigationBarContrastEnforced = false
-        }
-        val controller = WindowCompat.getInsetsController(window, view)
-        controller.isAppearanceLightStatusBars = !palette.isDark
-        controller.isAppearanceLightNavigationBars = !palette.isDark
-    }
-}
-
-@Composable
-private fun CalendarTabContainer(
-    title: String,
-    activeCalendarTab: CalendarTab,
-    palette: DotCalPalette,
-    onTitleClick: () -> Unit,
-    onAdd: () -> Unit,
-    onTemplates: (() -> Unit)? = null,
-    onQuickAdd: (() -> Unit)? = null,
-    onSearch: (() -> Unit)? = null,
-    onCalendarTabSelected: (CalendarTab) -> Unit,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(palette.background),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(palette.topBarSurface),
-        ) {
-            CalendarActionBar(
-                title = title,
-                palette = palette,
-                onTitleClick = onTitleClick,
-                onAdd = onAdd,
-                onTemplates = onTemplates,
-                onQuickAdd = onQuickAdd,
-                onSearch = onSearch,
-            )
-        }
-        Spacer(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(12.dp)
-                .background(palette.topBarSurface),
-        )
-        CalendarViewSegmentedControl(
-            selected = activeCalendarTab,
-            palette = palette,
-            onSelected = onCalendarTabSelected,
-        )
-        Spacer(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(4.dp)
-                .background(palette.topBarSurface),
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(palette.background),
-        ) {
-            content()
-        }
-    }
-}
-
-@Composable
-private fun CalendarActionBar(
-    title: String,
-    palette: DotCalPalette,
-    onTitleClick: () -> Unit,
-    onAdd: () -> Unit,
-    onTemplates: (() -> Unit)? = null,
-    onQuickAdd: (() -> Unit)? = null,
-    onSearch: (() -> Unit)? = null,
-) {
-    val topIconTint = if (palette.isDark) NWhite else palette.accent
-    var showOverflow by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .background(palette.topBarSurface)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            title,
-            color = palette.primaryText,
-            fontFamily = FontFamily.Serif,
-            fontWeight = FontWeight.Bold,
-            fontSize = if (title.length <= 4) 30.sp else 28.sp,
-            modifier = Modifier.padding(start = 8.dp).clickable(onClick = onTitleClick),
-            maxLines = 1,
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (onSearch != null) {
-                IconButton(
-                    onClick = onSearch,
-                    modifier = Modifier.size(44.dp),
-                ) {
-                    Icon(Icons.Default.Search, contentDescription = "Search", tint = topIconTint)
-                }
-            }
-            IconButton(
-                onClick = onAdd,
-                modifier = Modifier.size(44.dp),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add event", tint = topIconTint)
-            }
-            // Quick Add and Templates live together in the overflow menu.
-            if (onQuickAdd != null || onTemplates != null) {
-                Box {
-                    IconButton(
-                        onClick = { showOverflow = true },
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = topIconTint)
-                    }
-                    DropdownMenu(
-                        expanded = showOverflow,
-                        onDismissRequest = { showOverflow = false },
-                        containerColor = palette.dialogSurface,
-                        shape = RoundedCornerShape(16.dp),
-                        tonalElevation = 0.dp,
-                        modifier = Modifier.width(216.dp),
-                    ) {
-                        if (onQuickAdd != null) {
-                            ActionBarMenuItem(
-                                label = "Quick Add",
-                                subtitle = "Type it, we schedule it",
-                                icon = Icons.Default.AutoAwesome,
-                                palette = palette,
-                                onClick = {
-                                    showOverflow = false
-                                    onQuickAdd()
-                                },
-                            )
-                        }
-                        if (onTemplates != null) {
-                            ActionBarMenuItem(
-                                label = "Templates",
-                                subtitle = "Reuse saved events & tasks",
-                                icon = Icons.Default.Description,
-                                palette = palette,
-                                onClick = {
-                                    showOverflow = false
-                                    onTemplates()
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActionBarMenuItem(
-    label: String,
-    subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    palette: DotCalPalette,
-    onClick: () -> Unit,
-) {
-    DropdownMenuItem(
-        onClick = onClick,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-        leadingIcon = {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(palette.accent.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, contentDescription = null, tint = palette.accent, modifier = Modifier.size(18.dp))
-            }
-        },
-        text = {
-            Column {
-                Text(label, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Medium, fontSize = 15.sp)
-                Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
-            }
-        },
-    )
-}
-
-@Composable
-private fun DotCalBottomNav(
-    selected: ScreenTab,
-    palette: DotCalPalette,
-    onCalendar: () -> Unit,
-    onTasks: () -> Unit,
-    onSettings: () -> Unit,
-) {
-    val active = palette.accent
-    val inactive = palette.secondaryText
-    val pillColor = if (palette.isDark) Color(0xFF1A1A1A) else Color(0xFFFFFFFF)
-    val borderColor = palette.disabledText.copy(alpha = if (palette.isDark) 0.22f else 0.16f)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 18.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        val pillShape = RoundedCornerShape(34.dp)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(68.dp)
-                .shadow(
-                    elevation = 6.dp,
-                    shape = pillShape,
-                    clip = false,
-                    ambientColor = if (palette.isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.12f),
-                    spotColor = if (palette.isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.10f),
-                )
-                .clip(pillShape)
-                .background(pillColor)
-                .border(width = 0.5.dp, color = borderColor, shape = pillShape)
-                .noRippleClickable {}
-                .padding(horizontal = 0.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(80.dp, Alignment.CenterHorizontally),
-        ) {
-            BottomNavItem(
-                selected = selected == ScreenTab.Calendar,
-                activeColor = active,
-                inactiveColor = inactive,
-                icon = { tint -> BottomCalendarIcon(tint) },
-                onClick = onCalendar,
-            )
-            BottomNavItem(
-                selected = selected == ScreenTab.Tasks,
-                activeColor = active,
-                inactiveColor = inactive,
-                icon = { tint -> BottomTaskIcon(tint) },
-                onClick = onTasks,
-            )
-            BottomNavItem(
-                selected = selected == ScreenTab.Settings,
-                activeColor = active,
-                inactiveColor = inactive,
-                icon = { tint -> BottomSettingsIcon(tint) },
-                onClick = onSettings,
-            )
-        }
-    }
-}
-
-@Composable
-private fun BottomNavItem(
-    selected: Boolean,
-    activeColor: Color,
-    inactiveColor: Color,
-    icon: @Composable (Color) -> Unit,
-    onClick: () -> Unit,
-) {
-    val tint by animateColorAsState(
-        targetValue = if (selected) activeColor else inactiveColor,
-        animationSpec = tween(200),
-        label = "navTint",
-    )
-    val selectedFill by animateColorAsState(
-        targetValue = Color.Transparent,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
-        label = "navSelectedFill",
-    )
-    Box(
-        modifier = Modifier
-            .size(30.dp)
-            .clip(CircleShape)
-            .background(selectedFill)
-            .noRippleClickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        icon(tint)
-    }
-}
-
-@Composable
-private fun CalendarViewSegmentedControl(
-    selected: CalendarTab,
-    palette: DotCalPalette,
-    onSelected: (CalendarTab) -> Unit,
-) {
-    val segmentShape = RoundedCornerShape(28.dp)
-    val compactTabs = CalendarTab.pickerEntries
-    val segmentSurface = palette.topBarSurface
-    val segmentBorder = palette.disabledText.copy(alpha = if (palette.isDark) 0.35f else 0.45f)
-    val segmentSelected = palette.segmentSelected
-    val inactiveText = palette.secondaryText
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(palette.topBarSurface)
-            .padding(horizontal = 22.dp, vertical = 0.dp)
-            .height(42.dp)
-            .clip(segmentShape)
-            .background(segmentSurface)
-            .drawBehind {
-                drawRoundRect(
-                    color = segmentBorder,
-                    size = size,
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(28.dp.toPx(), 28.dp.toPx()),
-                    style = Stroke(width = 1.dp.toPx()),
-                )
-            }
-            .padding(horizontal = 18.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        compactTabs.forEach { tab ->
-            val isSelected = selected == tab
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSelected) segmentSelected else Color.Transparent)
-                    .noRippleClickable { onSelected(tab) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    tab.shortLabel,
-                    fontFamily = mono,
-                    color = if (selected == tab) palette.primaryText else inactiveText,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                    fontSize = 15.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun BottomCalendarIcon(tint: Color) {
-    Canvas(modifier = Modifier.size(26.dp)) {
-        val stroke = Stroke(width = 1.85.dp.toPx())
-        val left = 4.5.dp.toPx()
-        val top = 5.5.dp.toPx()
-        val right = size.width - 4.5.dp.toPx()
-        val bottom = size.height - 3.5.dp.toPx()
-        drawRoundRect(
-            color = tint,
-            topLeft = Offset(left, top),
-            size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx(), 3.dp.toPx()),
-            style = stroke,
-        )
-        drawLine(tint, Offset(left, 10.5.dp.toPx()), Offset(right, 10.5.dp.toPx()), strokeWidth = 1.85.dp.toPx())
-        drawLine(tint, Offset(9.dp.toPx(), 2.5.dp.toPx()), Offset(9.dp.toPx(), 7.dp.toPx()), strokeWidth = 1.85.dp.toPx())
-        drawLine(tint, Offset(17.dp.toPx(), 2.5.dp.toPx()), Offset(17.dp.toPx(), 7.dp.toPx()), strokeWidth = 1.85.dp.toPx())
-        drawCircle(tint, radius = 1.2.dp.toPx(), center = Offset(9.5.dp.toPx(), 15.dp.toPx()))
-        drawCircle(tint, radius = 1.2.dp.toPx(), center = Offset(13.dp.toPx(), 15.dp.toPx()))
-        drawCircle(tint, radius = 1.2.dp.toPx(), center = Offset(16.5.dp.toPx(), 15.dp.toPx()))
-    }
-}
-
-@Composable
-private fun BottomTaskIcon(tint: Color) {
-    Canvas(modifier = Modifier.size(28.dp)) {
-        val stroke = Stroke(width = 1.8.dp.toPx())
-        drawRoundRect(
-            color = tint,
-            topLeft = Offset(5.dp.toPx(), 5.dp.toPx()),
-            size = androidx.compose.ui.geometry.Size(18.dp.toPx(), 18.dp.toPx()),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.5.dp.toPx(), 3.5.dp.toPx()),
-            style = stroke,
-        )
-        drawLine(tint, Offset(9.dp.toPx(), 11.dp.toPx()), Offset(11.dp.toPx(), 13.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-        drawLine(tint, Offset(11.dp.toPx(), 13.dp.toPx()), Offset(14.5.dp.toPx(), 9.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-        drawLine(tint, Offset(16.dp.toPx(), 11.dp.toPx()), Offset(20.dp.toPx(), 11.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-        drawLine(tint, Offset(9.dp.toPx(), 18.dp.toPx()), Offset(20.dp.toPx(), 18.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-    }
-}
-
-@Composable
-private fun BottomSettingsIcon(tint: Color) {
-    Icon(Icons.Filled.SettingsGearIcon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
-}
-
-@Composable
-private fun Modifier.noRippleClickable(
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-): Modifier {
-    val interactionSource = remember { MutableInteractionSource() }
-    return clickable(
-        interactionSource = interactionSource,
-        indication = null,
-        enabled = enabled,
-        onClick = onClick,
-    )
-}
-
-@Composable
-private fun MonthView(
-    month: LocalDate,
-    selectedDate: LocalDate,
-    eventsByDate: Map<LocalDate, List<CalendarEvent>>,
-    palette: DotCalPalette,
-    weekStart: DayOfWeek,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onJumpToday: () -> Unit,
-    selectedBulkDates: Set<LocalDate>,
-    onBulkSelectionStart: (LocalDate) -> Unit,
-    onBulkApply: () -> Unit,
-    onBulkClear: () -> Unit,
-    onDateSelected: (LocalDate) -> Unit,
-) {
-    val days = remember(month, weekStart) { monthGrid(month, weekStart) }
-    val weekDayLabels = remember(weekStart) { weekDayLabels(weekStart) }
-    var dragTotal by remember { mutableFloatStateOf(0f) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(month) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        when {
-                            dragTotal < -50.dp.toPx() -> onNext()
-                            dragTotal > 50.dp.toPx() -> onPrevious()
-                        }
-                        dragTotal = 0f
-                    },
-                    onHorizontalDrag = { _, amount -> dragTotal += amount },
-                )
-            },
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().height(32.dp).background(palette.calendarSurface)) {
-            weekDayLabels.forEach {
-                Text(
-                    it,
-                    modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
-                    fontFamily = mono,
-                    fontSize = 11.sp,
-                    color = palette.secondaryText,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-
-        LazyVerticalGrid(columns = GridCells.Fixed(7), userScrollEnabled = false, modifier = Modifier.fillMaxWidth()) {
-            items(days) { day ->
-                DayCell(
-                    date = day,
-                    activeMonth = YearMonth.from(month),
-                    isSelected = day == selectedDate,
-                    isBulkSelected = day in selectedBulkDates,
-                    events = eventsByDate[day].orEmpty(),
-                    palette = palette,
-                    onClick = { onDateSelected(day) },
-                    onLongPress = { onBulkSelectionStart(day) },
-                )
-            }
-        }
-        if (selectedBulkDates.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().background(palette.calendarSurface).padding(horizontal = 18.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("${selectedBulkDates.size} selected", color = palette.primaryText, fontFamily = mono, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                TextButton(onClick = onBulkClear) { Text("Clear", color = palette.secondaryText, fontFamily = mono) }
-                Button(
-                    onClick = onBulkApply,
-                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
-                    shape = RoundedCornerShape(18.dp),
-                ) {
-                    Text("Apply Template", fontFamily = mono, fontSize = 12.sp)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DayCell(
-    date: LocalDate,
-    activeMonth: YearMonth,
-    isSelected: Boolean,
-    isBulkSelected: Boolean,
-    events: List<CalendarEvent>,
-    palette: DotCalPalette,
-    onClick: () -> Unit,
-    onLongPress: () -> Unit,
-) {
-    val isToday = date == LocalDate.now()
-    val inMonth = YearMonth.from(date) == activeMonth
-    val haptic = LocalHapticFeedback.current
-    Box(
-        modifier = Modifier
-            .aspectRatio(1f)
-            .background(palette.calendarSurface)
-            .pointerInput(date) {
-                detectTapGestures(
-                    onTap = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onClick()
-                    },
-                    onLongPress = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onLongPress()
-                    },
-                )
-            },
-        contentAlignment = Alignment.TopCenter,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 8.dp)) {
-            if (inMonth) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .then(
-                            when {
-                                isToday -> Modifier.clip(CircleShape).background(palette.accent)
-                                isBulkSelected -> Modifier.border(2.dp, palette.accent, CircleShape).background(palette.accent.copy(alpha = 0.12f), CircleShape)
-                                isSelected -> Modifier.border(1.5.dp, palette.accent, CircleShape)
-                                else -> Modifier
-                            },
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        date.dayOfMonth.toString().padStart(2, '0'),
-                        color = if (isToday) palette.onAccent else palette.primaryText,
-                        fontFamily = mono,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    events.take(3).forEach { event ->
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(event.displayColor(palette)),
-                        )
-                    }
-                }
-            } else {
-                Spacer(
-                        modifier = Modifier
-                            .size(28.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WeekView(
-    selectedDate: LocalDate,
-    eventsByDate: Map<LocalDate, List<CalendarEvent>>,
-    palette: DotCalPalette,
-    weekStart: DayOfWeek,
-    onPreviousWeek: () -> Unit,
-    onNextWeek: () -> Unit,
-    onJumpToday: () -> Unit,
-    onDateSelected: (LocalDate) -> Unit,
-    onAddAtDate: (LocalDate, LocalTime) -> Unit,
-    onEventClick: (CalendarEvent) -> Unit,
-) {
-    val days = remember(selectedDate, weekStart) { weekDays(selectedDate, weekStart) }
-    val weekEvents = remember(eventsByDate, days) { days.flatMap { eventsByDate[it].orEmpty() } }
-    val timedEvents = remember(weekEvents) { weekEvents.filter { it.isAllDay == 0 } }
-    val allDayEvents = remember(weekEvents) { weekEvents.filter { it.isAllDay == 1 } }
-    val eventLayouts = remember(timedEvents) { layoutTimedEvents(timedEvents) }
-    val timedEventsByDay = remember(timedEvents) { timedEvents.groupBy { it.localDate() } }
-
-    var dragTotal by remember { mutableFloatStateOf(0f) }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(selectedDate) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        when {
-                            dragTotal < -50.dp.toPx() -> onNextWeek()
-                            dragTotal > 50.dp.toPx() -> onPreviousWeek()
-                        }
-                        dragTotal = 0f
-                    },
-                    onHorizontalDrag = { _, amount -> dragTotal += amount },
-                )
-            },
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().height(64.dp).background(palette.calendarSurface)) {
-            Spacer(modifier = Modifier.width(32.dp))
-            days.forEach { day ->
-                WeekDayHeader(
-                    date = day,
-                    selected = day == selectedDate,
-                    palette = palette,
-                    onClick = { onDateSelected(day) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-
-        if (allDayEvents.isNotEmpty()) {
-            Row(modifier = Modifier.fillMaxWidth().height(32.dp).background(palette.calendarSurface)) {
-                Spacer(modifier = Modifier.width(32.dp))
-                days.forEach { day ->
-                    val event = allDayEvents.firstOrNull { it.localDate() == day }
-                    Box(
-                        modifier = Modifier.weight(1f).height(32.dp).padding(2.dp).background(if (event == null) Color.Transparent else event.displayColor(palette).copy(alpha = 0.75f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (event != null) {
-                            Text(event.title, color = NWhite, fontFamily = mono, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(palette.calendarSurface),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    WeekTimeColumn(selectedDate = selectedDate, days = days, palette = palette)
-                    days.forEach { day ->
-                        WeekDayColumn(
-                            day = day,
-                            selectedDate = selectedDate,
-                            events = timedEventsByDay[day].orEmpty(),
-                            eventLayouts = eventLayouts,
-                            palette = palette,
-                            onAddAtDate = onAddAtDate,
-                            onEventClick = onEventClick,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(TIMELINE_BOTTOM_CLEARANCE_DP.dp))
-            }
-            TimelineBottomBoundary(palette = palette, modifier = Modifier.align(Alignment.BottomCenter))
-        }
-    }
-}
-
-@Composable
-private fun WeekDayHeader(
-    date: LocalDate,
-    selected: Boolean,
-    palette: DotCalPalette,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val today = date == LocalDate.now()
-    Column(
-        modifier = modifier.noRippleClickable(onClick = onClick).padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(date.dayOfWeek.name.take(3), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
-        Box(
-            modifier = Modifier
-                .padding(top = 4.dp)
-                .size(28.dp)
-                .then(
-                    when {
-                        today -> Modifier.clip(CircleShape).background(palette.accent)
-                        selected -> Modifier.clip(CircleShape).background(palette.dimText.copy(alpha = 0.45f))
-                        else -> Modifier
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                date.dayOfMonth.toString().padStart(2, '0'),
-                color = if (today) palette.onAccent else palette.primaryText,
-                fontFamily = mono,
-                fontSize = 14.sp,
-            )
-        }
-        if (selected && !today) {
-            Spacer(modifier = Modifier.padding(top = 4.dp).size(width = 20.dp, height = 2.dp).background(palette.accent))
-        }
-    }
-}
-
-@Composable
-private fun WeekTimeColumn(
-    selectedDate: LocalDate,
-    days: List<LocalDate>,
-    palette: DotCalPalette,
-) {
-    val now = LocalTime.now()
-    val showNow = selectedDate in days && selectedDate == LocalDate.now()
-    Box(
-        modifier = Modifier
-            .width(32.dp)
-            .height((24 * WEEK_HOUR_HEIGHT_DP).dp)
-            .drawBehind {
-                repeat(23) { hour ->
-                    val y = (hour + 1) * WEEK_HOUR_HEIGHT_DP.dp.toPx()
-                    drawLine(palette.line, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
-                }
-            },
-    ) {
-        repeat(24) { hour ->
-            Text(
-                hour.toString().padStart(2, '0'),
-                color = palette.secondaryText,
-                fontFamily = mono,
-                fontSize = 10.sp,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = (hour * WEEK_HOUR_HEIGHT_DP + 4).dp),
-            )
-        }
-        if (showNow) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = weekEventTopOffset(now))
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(palette.accent),
-            )
-        }
-    }
-}
-
-@Composable
-private fun WeekDayColumn(
-    day: LocalDate,
-    selectedDate: LocalDate,
-    events: List<CalendarEvent>,
-    eventLayouts: Map<String, WeekEventLayout>,
-    palette: DotCalPalette,
-    onAddAtDate: (LocalDate, LocalTime) -> Unit,
-    onEventClick: (CalendarEvent) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val now = LocalTime.now()
-    val showNow = day == selectedDate && day == LocalDate.now()
-    Box(
-        modifier = modifier
-            .height((24 * WEEK_HOUR_HEIGHT_DP).dp)
-            .background(palette.calendarSurface)
-            .drawBehind {
-                drawLine(palette.line, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-                repeat(23) { hour ->
-                    val y = (hour + 1) * WEEK_HOUR_HEIGHT_DP.dp.toPx()
-                    drawLine(palette.line, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
-                }
-            },
-    ) {
-        repeat(24) { hour ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(WEEK_HOUR_HEIGHT_DP.dp)
-                    .offset(y = (hour * WEEK_HOUR_HEIGHT_DP).dp)
-                    .clickable { onAddAtDate(day, LocalTime.of(hour, 0)) },
-            )
-        }
-        if (showNow) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .offset(y = weekEventTopOffset(now))
-                    .background(palette.accent),
-            )
-        }
-        events.sortedBy { it.startTimeMs }.forEach { event ->
-            val layout = eventLayouts[event.id] ?: WeekEventLayout(column = 0, columnCount = 1)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(weekEventHeight(event))
-                    .offset(y = weekEventTopOffset(event.startLocalTime()))
-                    .zIndex(1f)
-                    .padding(horizontal = 2.dp),
-            ) {
-                repeat(layout.columnCount) { column ->
-                    if (column == layout.column) {
-                        WeekEventBlock(
-                            event = event,
-                            palette = palette,
-                            onClick = { onEventClick(event) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(),
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun weekEventTopOffset(time: LocalTime) =
-    (((time.hour * 60 + time.minute) / 60f) * WEEK_HOUR_HEIGHT_DP).dp
-
-private fun weekEventHeight(event: CalendarEvent) =
-    ((event.durationMinutes() / 60f) * WEEK_HOUR_HEIGHT_DP).coerceAtLeast(22f).dp
-
-@Composable
-private fun WeekEventBlock(
-    event: CalendarEvent,
-    palette: DotCalPalette,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(event.displayColor(palette).copy(alpha = 0.80f))
-            .noRippleClickable(enabled = onClick != null) { onClick?.invoke() }
-            .padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(event.title, color = NWhite, fontFamily = mono, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun DayView(
-    selectedDate: LocalDate,
-    eventsByDate: Map<LocalDate, List<CalendarEvent>>,
-    palette: DotCalPalette,
-    onPreviousDay: () -> Unit,
-    onNextDay: () -> Unit,
-    onJumpToday: () -> Unit,
-    onAddAtDate: (LocalDate, LocalTime) -> Unit,
-    onEventClick: (CalendarEvent) -> Unit,
-) {
-    val dayAll = remember(eventsByDate, selectedDate) { eventsByDate[selectedDate].orEmpty() }
-    val dayEvents = remember(dayAll) { dayAll.filter { it.isTask == 0 } }
-    val allDayEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 1 } }
-    val timedEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 0 } }
-    val eventLayouts = remember(timedEvents) { layoutTimedEvents(timedEvents) }
-    val tasks = remember(dayAll) { dayAll.filter { it.isTask == 1 } }
-    var dragTotal by remember { mutableFloatStateOf(0f) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(palette.calendarSurface)
-            .pointerInput(selectedDate) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        when {
-                            dragTotal < -50.dp.toPx() -> onNextDay()
-                            dragTotal > 50.dp.toPx() -> onPreviousDay()
-                        }
-                        dragTotal = 0f
-                    },
-                    onHorizontalDrag = { _, amount -> dragTotal += amount },
-                )
-            },
-    ) {
-        DayHeader(
-            selectedDate = selectedDate,
-            palette = palette,
-            onPreviousDay = onPreviousDay,
-            onNextDay = onNextDay,
-            onJumpToday = onJumpToday,
-        )
-        if (allDayEvents.isNotEmpty()) {
-            LazyColumn(modifier = Modifier.fillMaxWidth().height(44.dp).background(palette.calendarSurface)) {
-                items(allDayEvents.size) { index ->
-                    Text(
-                        allDayEvents[index].title,
-                        color = NWhite,
-                        fontFamily = mono,
-                        fontSize = 12.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                            .background(allDayEvents[index].displayColor(palette).copy(alpha = 0.75f))
-                            .clickable { onEventClick(allDayEvents[index]) }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
-                }
-            }
-        }
-
-        Box(modifier = Modifier.weight(1f).background(palette.calendarSurface)) {
-            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    DayTimeColumn(selectedDate = selectedDate, palette = palette)
-                    DayTimelineColumn(
-                        selectedDate = selectedDate,
-                        events = timedEvents,
-                        eventLayouts = eventLayouts,
-                        palette = palette,
-                        onAddAtDate = onAddAtDate,
-                        onEventClick = onEventClick,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                if (tasks.isNotEmpty()) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                        Text("Tasks", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
-                        tasks.forEach { task ->
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(18.dp).clip(RoundedCornerShape(3.dp)).background(palette.cell))
-                                Text(
-                                    task.title,
-                                    color = if (task.isCompleted == 1) palette.secondaryText else palette.primaryText,
-                                    fontFamily = mono,
-                                    fontSize = 14.sp,
-                                    textDecoration = if (task.isCompleted == 1) TextDecoration.LineThrough else null,
-                                    modifier = Modifier.padding(start = 12.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(TIMELINE_BOTTOM_CLEARANCE_DP.dp))
-            }
-            TimelineBottomBoundary(palette = palette, modifier = Modifier.align(Alignment.BottomCenter))
-        }
-    }
-}
-
-@Composable
-private fun TimelineBottomBoundary(
-    palette: DotCalPalette,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(TIMELINE_BOTTOM_CLEARANCE_DP.dp)
-            .background(palette.calendarSurface)
-            .drawBehind {
-                drawLine(
-                    palette.line,
-                    Offset(0f, 0f),
-                    Offset(size.width, 0f),
-                    strokeWidth = 1.dp.toPx(),
-                )
-            },
-    )
-}
-
-@Composable
-private fun DayHeader(
-    selectedDate: LocalDate,
-    palette: DotCalPalette,
-    onPreviousDay: () -> Unit,
-    onNextDay: () -> Unit,
-    onJumpToday: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp)
-            .background(palette.calendarSurface)
-            .padding(horizontal = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onPreviousDay, modifier = Modifier.size(44.dp)) {
-            Icon(Icons.Default.ChevronLeft, contentDescription = "Previous day", tint = palette.primaryText)
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .noRippleClickable(onClick = onJumpToday),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                selectedDate.format(dayHeaderFormatter).uppercase(Locale.US),
-                color = palette.primaryText,
-                fontFamily = mono,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                maxLines = 1,
-            )
-            Text(
-                selectedDate.year.toString(),
-                color = palette.secondaryText,
-                fontFamily = mono,
-                fontSize = 11.sp,
-                maxLines = 1,
-            )
-        }
-        IconButton(onClick = onNextDay, modifier = Modifier.size(44.dp)) {
-            Icon(Icons.Default.ChevronRight, contentDescription = "Next day", tint = palette.primaryText)
-        }
-    }
-}
-
-@Composable
-private fun DayTimeColumn(
-    selectedDate: LocalDate,
-    palette: DotCalPalette,
-) {
-    val now = LocalTime.now()
-    val showNow = selectedDate == LocalDate.now()
-    Box(
-        modifier = Modifier
-            .width(32.dp)
-            .height((24 * DAY_HOUR_HEIGHT_DP).dp)
-            .drawBehind {
-                repeat(23) { hour ->
-                    val y = (hour + 1) * DAY_HOUR_HEIGHT_DP.dp.toPx()
-                    drawLine(palette.line, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
-                }
-            },
-    ) {
-        repeat(24) { hour ->
-            Text(
-                hour.toString().padStart(2, '0'),
-                color = palette.secondaryText,
-                fontFamily = mono,
-                fontSize = 10.sp,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = (hour * DAY_HOUR_HEIGHT_DP + 6).dp),
-            )
-        }
-        if (showNow) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = dayEventTopOffset(now))
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(palette.accent),
-            )
-        }
-    }
-}
-
-@Composable
-private fun DayTimelineColumn(
-    selectedDate: LocalDate,
-    events: List<CalendarEvent>,
-    eventLayouts: Map<String, WeekEventLayout>,
-    palette: DotCalPalette,
-    onAddAtDate: (LocalDate, LocalTime) -> Unit,
-    onEventClick: (CalendarEvent) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val now = LocalTime.now()
-    val showNow = selectedDate == LocalDate.now()
-    Box(
-        modifier = modifier
-            .height((24 * DAY_HOUR_HEIGHT_DP).dp)
-            .background(palette.calendarSurface)
-            .drawBehind {
-                repeat(23) { hour ->
-                    val y = (hour + 1) * DAY_HOUR_HEIGHT_DP.dp.toPx()
-                    drawLine(palette.line, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
-                }
-            },
-    ) {
-        repeat(24) { hour ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(DAY_HOUR_HEIGHT_DP.dp)
-                    .offset(y = (hour * DAY_HOUR_HEIGHT_DP).dp)
-                    .clickable { onAddAtDate(selectedDate, LocalTime.of(hour, 0)) },
-            )
-        }
-        if (showNow) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .offset(y = dayEventTopOffset(now))
-                    .background(palette.accent),
-            )
-        }
-        events.sortedBy { it.startTimeMs }.forEach { event ->
-            val layout = eventLayouts[event.id] ?: WeekEventLayout(column = 0, columnCount = 1)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(dayEventHeight(event))
-                    .offset(y = dayEventTopOffset(event.startLocalTime()))
-                    .zIndex(1f)
-                    .padding(start = 6.dp, end = 8.dp),
-            ) {
-                repeat(layout.columnCount) { column ->
-                    if (column == layout.column) {
-                        WeekEventBlock(
-                            event = event,
-                            palette = palette,
-                            onClick = { onEventClick(event) },
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun dayEventTopOffset(time: LocalTime) =
-    (((time.hour * 60 + time.minute) / 60f) * DAY_HOUR_HEIGHT_DP).dp
-
-private fun dayEventHeight(event: CalendarEvent) =
-    ((event.durationMinutes() / 60f) * DAY_HOUR_HEIGHT_DP).coerceAtLeast(24f).dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -7592,281 +6475,6 @@ private fun TaskTimeChoiceSheet(
 }
 
 @Composable
-private fun ThreeDayView(
-    selectedDate: LocalDate,
-    eventsByDate: Map<LocalDate, List<CalendarEvent>>,
-    palette: DotCalPalette,
-    onPreviousRange: () -> Unit,
-    onNextRange: () -> Unit,
-    onJumpToday: () -> Unit,
-    onDateSelected: (LocalDate) -> Unit,
-    onAddAtDate: (LocalDate, LocalTime) -> Unit,
-    onEventClick: (CalendarEvent) -> Unit,
-) {
-    val days = remember(selectedDate) { List(3) { selectedDate.plusDays(it.toLong()) } }
-    val rangeEvents = remember(eventsByDate, days) {
-        days.flatMap { eventsByDate[it].orEmpty() }.filter { it.isAllDay == 0 }
-    }
-    val rangeEventsByDayHour = remember(rangeEvents) {
-        rangeEvents.groupBy { event -> event.localDate() to event.startLocalTime().hour }
-    }
-    var dragTotal by remember { mutableFloatStateOf(0f) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(selectedDate) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        when {
-                            dragTotal < -50.dp.toPx() -> onNextRange()
-                            dragTotal > 50.dp.toPx() -> onPreviousRange()
-                        }
-                        dragTotal = 0f
-                    },
-                    onHorizontalDrag = { _, amount -> dragTotal += amount },
-                )
-            },
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().height(64.dp).background(palette.calendarSurface)) {
-            days.forEach { day ->
-                WeekDayHeader(
-                    date = day,
-                    selected = day == selectedDate,
-                    palette = palette,
-                    onClick = { onDateSelected(day) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        LazyColumn(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
-            items(24) { hour ->
-                ThreeDayHourRow(
-                    hour = hour,
-                    days = days,
-                    selectedDate = selectedDate,
-                    eventsByDayHour = rangeEventsByDayHour,
-                    palette = palette,
-                    onAddAtDate = onAddAtDate,
-                    onEventClick = onEventClick,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThreeDayHourRow(
-    hour: Int,
-    days: List<LocalDate>,
-    selectedDate: LocalDate,
-    eventsByDayHour: Map<Pair<LocalDate, Int>, List<CalendarEvent>>,
-    palette: DotCalPalette,
-    onAddAtDate: (LocalDate, LocalTime) -> Unit,
-    onEventClick: (CalendarEvent) -> Unit,
-) {
-    val now = LocalTime.now()
-    val showNow = selectedDate == LocalDate.now() && hour == now.hour
-    Row(modifier = Modifier.fillMaxWidth().height(68.dp).background(palette.calendarSurface)) {
-        Box(modifier = Modifier.width(52.dp).height(68.dp), contentAlignment = Alignment.TopCenter) {
-            Text("${hour.toString().padStart(2, '0')}:00", color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
-        }
-        days.forEach { day ->
-            val dayEvents = eventsByDayHour[day to hour].orEmpty()
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(68.dp)
-                    .background(palette.calendarSurface)
-                    .drawBehind {
-                        drawLine(palette.line, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-                        drawLine(palette.line, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-                    },
-            ) {
-                if (dayEvents.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable { onAddAtDate(day, LocalTime.of(hour, 0)) },
-                    )
-                }
-                if (showNow && day == selectedDate) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .offset(y = ((now.minute / 60f) * 68).dp)
-                            .background(palette.accent),
-                    )
-                }
-                dayEvents.take(2).forEachIndexed { index, event ->
-                    WeekEventBlock(
-                        event = event,
-                        palette = palette,
-                        onClick = { onEventClick(event) },
-                        modifier = Modifier.zIndex(1f).padding(start = 5.dp, end = 5.dp, top = (5 + index * 29).dp).height(24.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun YearView(
-    selectedDate: LocalDate,
-    eventsByDate: Map<LocalDate, List<CalendarEvent>>,
-    palette: DotCalPalette,
-    weekStart: DayOfWeek,
-    onPreviousYear: () -> Unit,
-    onNextYear: () -> Unit,
-    onJumpToday: () -> Unit,
-    onMonthSelected: (LocalDate) -> Unit,
-) {
-    var dragTotal by remember { mutableFloatStateOf(0f) }
-    val months = remember(selectedDate.year) { List(12) { selectedDate.withMonth(it + 1).withDayOfMonth(1) } }
-    val eventDates = remember(eventsByDate, selectedDate.year) {
-        eventsByDate.entries
-            .filter { (date, dayEvents) -> date.year == selectedDate.year && dayEvents.any { it.isTask == 0 } }
-            .map { it.key }
-            .toSet()
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(selectedDate.year) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        when {
-                            dragTotal < -50.dp.toPx() -> onNextYear()
-                            dragTotal > 50.dp.toPx() -> onPreviousYear()
-                        }
-                        dragTotal = 0f
-                    },
-                    onHorizontalDrag = { _, amount -> dragTotal += amount },
-                )
-            },
-    ) {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
-            contentPadding = PaddingValues(start = 8.dp, top = 0.dp, end = 8.dp, bottom = 150.dp),
-        ) {
-            items(months) { month ->
-                YearMonthCell(
-                    month = month,
-                    selected = month.year == selectedDate.year && month.monthValue == selectedDate.monthValue,
-                    eventDates = eventDates,
-                    palette = palette,
-                    weekStart = weekStart,
-                    onClick = { onMonthSelected(month) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun YearMonthCell(
-    month: LocalDate,
-    selected: Boolean,
-    eventDates: Set<LocalDate>,
-    palette: DotCalPalette,
-    weekStart: DayOfWeek,
-    onClick: () -> Unit,
-) {
-    val days = remember(month, weekStart) { monthGrid(month, weekStart) }
-    val today = LocalDate.now()
-    val isCurrentMonth = month.year == today.year && month.monthValue == today.monthValue
-    Column(
-        modifier = Modifier
-            .aspectRatio(0.82f)
-            .padding(3.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) palette.cell else Color.Transparent)
-            .noRippleClickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 7.dp),
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(month.month.name.take(3), color = if (isCurrentMonth) palette.accent else palette.yearMonthLabel, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-            Text(month.monthValue.toString().padStart(2, '0'), color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp)
-        }
-        Spacer(modifier = Modifier.height(5.dp))
-        MiniMonthGridCanvas(
-            month = month,
-            days = days,
-            today = today,
-            eventDates = eventDates,
-            palette = palette,
-            modifier = Modifier.fillMaxWidth().weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun MiniMonthGridCanvas(
-    month: LocalDate,
-    days: List<LocalDate>,
-    today: LocalDate,
-    eventDates: Set<LocalDate>,
-    palette: DotCalPalette,
-    modifier: Modifier = Modifier,
-) {
-    val weekdayColor = palette.yearWeekday.toArgb()
-    val secondaryColor = palette.secondaryText.toArgb()
-    val dimColor = palette.dimText.copy(alpha = 0.35f).toArgb()
-    val accentColor = palette.accent.toArgb()
-    val onAccentColor = palette.onAccent.toArgb()
-    Canvas(modifier = modifier) {
-        val nativeCanvas = drawContext.canvas.nativeCanvas
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = weekdayColor
-            textAlign = Paint.Align.CENTER
-            textSize = 7.sp.toPx()
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        }
-        val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textAlign = Paint.Align.CENTER
-            textSize = 7.sp.toPx()
-        }
-        val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = accentColor
-            style = Paint.Style.FILL
-        }
-        val columnWidth = size.width / 7f
-        val rowHeight = size.height / 7f
-        val labels = listOf("S", "M", "T", "W", "T", "F", "S")
-        labels.forEachIndexed { index, label ->
-            val x = columnWidth * index + columnWidth / 2f
-            val y = rowHeight * 0.58f
-            nativeCanvas.drawText(label, x, y, labelPaint)
-        }
-        days.forEachIndexed { index, day ->
-            val row = index / 7 + 1
-            val column = index % 7
-            val x = columnWidth * column + columnWidth / 2f
-            val y = rowHeight * row + rowHeight * 0.62f
-            val inMonth = day.monthValue == month.monthValue
-            val isToday = day == today
-            val hasEvent = day in eventDates
-            val isWeekdayDate = inMonth && day.dayOfWeek != DayOfWeek.SATURDAY && day.dayOfWeek != DayOfWeek.SUNDAY
-            if (isToday) {
-                nativeCanvas.drawCircle(x, rowHeight * row + rowHeight / 2f, 7.5.dp.toPx(), circlePaint)
-            }
-            datePaint.color = when {
-                isToday -> onAccentColor
-                !inMonth -> dimColor
-                hasEvent -> accentColor
-                else -> secondaryColor
-            }
-            datePaint.typeface = Typeface.create(Typeface.DEFAULT, if (isWeekdayDate) Typeface.BOLD else Typeface.NORMAL)
-            nativeCanvas.drawText(day.dayOfMonth.toString(), x, y, datePaint)
-        }
-    }
-}
-
-@Composable
 private fun SettingsPreview(
     themeMode: DotCalThemeMode,
     accentColor: AccentColor,
@@ -10291,73 +8899,6 @@ private fun PlaceholderScreen(label: String, palette: DotCalPalette) {
     }
 }
 
-private data class WeekEventLayout(
-    val column: Int,
-    val columnCount: Int,
-)
-
-private fun layoutTimedEvents(events: List<CalendarEvent>): Map<String, WeekEventLayout> {
-    val result = mutableMapOf<String, WeekEventLayout>()
-    events.groupBy { it.localDate() }.values.forEach { dayEvents ->
-        val sorted = dayEvents.sortedBy { it.startTimeMs }
-        val cluster = mutableListOf<CalendarEvent>()
-        var clusterEnd = Long.MIN_VALUE
-
-        fun flushCluster() {
-            if (cluster.isEmpty()) return
-            val columnEnds = mutableListOf<Long>()
-            val assignments = mutableListOf<Pair<CalendarEvent, Int>>()
-            cluster.sortedBy { it.startTimeMs }.forEach { event ->
-                val start = event.startTimeMs
-                val end = event.normalizedEndTimeMs()
-                val reusableColumn = columnEnds.indexOfFirst { it <= start }
-                val column = if (reusableColumn >= 0) reusableColumn else columnEnds.size
-                if (reusableColumn >= 0) {
-                    columnEnds[column] = end
-                } else {
-                    columnEnds.add(end)
-                }
-                assignments += event to column
-            }
-            val columnCount = columnEnds.size.coerceAtLeast(1)
-            assignments.forEach { (event, column) ->
-                result[event.id] = WeekEventLayout(column = column, columnCount = columnCount)
-            }
-            cluster.clear()
-        }
-
-        sorted.forEach { event ->
-            val end = event.normalizedEndTimeMs()
-            if (cluster.isNotEmpty() && event.startTimeMs >= clusterEnd) {
-                flushCluster()
-                clusterEnd = Long.MIN_VALUE
-            }
-            cluster += event
-            clusterEnd = maxOf(clusterEnd, end)
-        }
-        flushCluster()
-    }
-    return result
-}
-
-private fun monthGrid(month: LocalDate, weekStart: DayOfWeek): List<LocalDate> {
-    val first = month.withDayOfMonth(1)
-    val delta = (7 + first.dayOfWeek.value - weekStart.value) % 7
-    val start = first.minusDays(delta.toLong())
-    return List(42) { start.plusDays(it.toLong()) }
-}
-
-private fun weekDays(date: LocalDate, weekStart: DayOfWeek): List<LocalDate> {
-    val delta = (7 + date.dayOfWeek.value - weekStart.value) % 7
-    val start = date.minusDays(delta.toLong())
-    return List(7) { start.plusDays(it.toLong()) }
-}
-
-private fun weekDayLabels(weekStart: DayOfWeek): List<String> {
-    return List(7) { index ->
-        weekStart.plus(index.toLong()).name.take(3)
-    }
-}
 
 private fun parseWeekStartOption(value: String?): WeekStartOption {
     return WeekStartOption.entries.firstOrNull { it.storageKey == value || it.name == value } ?: WeekStartOption.RegionDefault
@@ -10367,7 +8908,7 @@ private fun resolveWeekStartDay(option: WeekStartOption): DayOfWeek {
     return option.fixedDay ?: WeekFields.of(Locale.getDefault()).firstDayOfWeek
 }
 
-private fun CalendarEvent.localDate(): LocalDate {
+internal fun CalendarEvent.localDate(): LocalDate {
     return Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault()).toLocalDate()
 }
 
@@ -10394,7 +8935,7 @@ private fun taskDateHeaderFormatter(): DateTimeFormatter {
     return DateTimeFormatter.ofPattern("EEE, dd MMM", Locale.US)
 }
 
-private fun CalendarEvent.startLocalTime(): LocalTime {
+internal fun CalendarEvent.startLocalTime(): LocalTime {
     return Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
 }
 
@@ -10536,11 +9077,11 @@ private fun nearestCircularIndex(currentIndex: Int, targetItemIndex: Int, itemCo
     return currentIndex + delta
 }
 
-private fun CalendarEvent.durationMinutes(): Int {
+internal fun CalendarEvent.durationMinutes(): Int {
     return ((normalizedEndTimeMs() - startTimeMs) / 60_000L).toInt().coerceAtLeast(15).coerceAtMost(24 * 60)
 }
 
-private fun CalendarEvent.normalizedEndTimeMs(): Long {
+internal fun CalendarEvent.normalizedEndTimeMs(): Long {
     return endTimeMs.coerceAtLeast(startTimeMs + 15 * 60 * 1000L)
 }
 
@@ -10674,286 +9215,10 @@ private fun parseColor(hex: String): Int {
     }
 }
 
-private fun CalendarEvent.displayColor(palette: DotCalPalette): Color {
+internal fun CalendarEvent.displayColor(palette: DotCalPalette): Color {
     return colorHex?.let { Color(parseColor(it)) } ?: palette.accent
 }
 
-private enum class CalendarTab(val label: String, val shortLabel: String) {
-    Year("Year view", "Year"),
-    Month("Month view", "Month"),
-    Week("Week view", "Week"),
-    Day("Day view", "Day"),
-    ThreeDay("Three-day view", "3 Days"),
-    Agenda("Agenda view", "Agenda");
-
-    companion object {
-        val pickerEntries = listOf(Year, Month, Week, Day, Agenda)
-
-        fun fromStorage(value: String?): CalendarTab {
-            val stored = entries.firstOrNull { it.name == value } ?: Month
-            return if (stored == ThreeDay) Month else stored
-        }
-    }
-}
-
-private enum class SettingsScreen {
-    Root,
-    Theme,
-    CalendarAccounts,
-    AddAccount,
-    GlobalHolidays,
-    AppPrivacy,
-    PrivacyPolicy,
-}
-
-private enum class WeekStartOption(val storageKey: String, val label: String, val fixedDay: DayOfWeek?) {
-    RegionDefault("REGION_DEFAULT", "Region default", null),
-    Saturday("SATURDAY", "Saturday", DayOfWeek.SATURDAY),
-    Sunday("SUNDAY", "Sunday", DayOfWeek.SUNDAY),
-    Monday("MONDAY", "Monday", DayOfWeek.MONDAY),
-}
-
-private enum class OnboardingPage {
-    Welcome,
-    CalendarPermission,
-    Notifications,
-    Contacts,
-    Ready,
-}
-
-private data class DotCalPalette(
-    val background: Color,
-    val primaryText: Color,
-    val secondaryText: Color,
-    val dimText: Color,
-    val line: Color,
-    val cell: Color,
-    val calendarSurface: Color,
-    val topBarSurface: Color,
-    val bottomNavSurface: Color,
-    val dialogSurface: Color,
-    val cancelSurface: Color,
-    val cancelBorder: Color,
-    val dragHandle: Color,
-    val eventCardSurface: Color,
-    val eventCardBorder: Color,
-    val eventCardChevron: Color,
-    val textFieldBorder: Color,
-    val segmentSelected: Color,
-    val disabledText: Color,
-    val switchOffTrack: Color,
-    val dot: Color,
-    val yearWeekday: Color,
-    val yearMonthLabel: Color,
-    val accent: Color,
-    val onAccent: Color,
-    val isDark: Boolean,
-)
-
-private enum class DotCalThemeMode(val label: String) {
-    Light("Light"),
-    Dark("Dark"),
-    System("System");
-
-    companion object {
-        fun fromStorage(value: String?): DotCalThemeMode {
-            return entries.firstOrNull { it.name == value } ?: System
-        }
-    }
-}
-
-/**
- * Accent color model. Free tier uses the 5 [Preset] swatches; Pro unlocks the extra curated
- * [proPresets] and a full [Custom] hex color picker.
- *
- * Storage format in [CalendarPreferences.KEY_ACCENT_COLOR] (and the boot SharedPreferences mirror):
- *  - a preset enum name, e.g. "BLUE" (backward compatible with existing installs), or
- *  - a "#RRGGBB" hex string for a Pro custom color.
- */
-private sealed interface AccentColor {
-    val color: Color
-    val label: String
-
-    /** Text/icon color that stays legible on top of [color]. */
-    val onColor: Color
-        get() = if (color.luminanceApprox() > 0.5f) Color(0xFF101010) else Color(0xFFFFFFFF)
-
-    /** Value persisted to DataStore + boot prefs. */
-    val storageValue: String
-
-    enum class Preset(val hex: String, override val label: String) : AccentColor {
-        // Free presets. Order/names are storage-stable; do not rename.
-        RED("#FF3B30", "Red"),
-        BLUE("#0A84FF", "Blue"),
-        GREEN("#30D158", "Green"),
-        PURPLE("#BF5AF2", "Purple"),
-        AMBER("#FF9F0A", "Amber"),
-        // Pro presets (extra curated palette).
-        TEAL("#2AB8B0", "Teal"),
-        PINK("#FF375F", "Pink"),
-        ORANGE("#FF6B00", "Orange"),
-        CYAN("#32ADE6", "Cyan"),
-        INDIGO("#5E5CE6", "Indigo"),
-        MINT("#66D4A0", "Mint"),
-        ROSE("#F06292", "Rose"),
-        LIME("#B0C948", "Lime");
-
-        override val color: Color get() = Color(android.graphics.Color.parseColor(hex))
-        override val storageValue: String get() = name
-        val isPro: Boolean get() = this in proPresets
-    }
-
-    /** Pro-only arbitrary hex color chosen from the color picker. */
-    data class Custom(val hex: String) : AccentColor {
-        override val color: Color get() = Color(android.graphics.Color.parseColor(hex))
-        override val label: String get() = hex.uppercase()
-        override val storageValue: String get() = hex.uppercase()
-    }
-
-    companion object {
-        val Default: Preset = Preset.RED
-
-        /** Free presets shown to everyone. */
-        val freePresets: List<Preset> = listOf(
-            Preset.RED, Preset.BLUE, Preset.GREEN, Preset.PURPLE, Preset.AMBER,
-        )
-
-        /** Extra presets unlocked by Pro. */
-        val proPresets: List<Preset> = listOf(
-            Preset.TEAL, Preset.PINK, Preset.ORANGE, Preset.CYAN,
-            Preset.INDIGO, Preset.MINT, Preset.ROSE, Preset.LIME,
-        )
-
-        fun fromStorage(value: String?): AccentColor {
-            if (value == null) return Default
-            Preset.entries.firstOrNull { it.name == value }?.let { return it }
-            return normalizeHex(value)?.let { Custom(it) } ?: Default
-        }
-
-        /** Returns a canonical "#RRGGBB" string if [raw] is a valid hex color, else null. */
-        fun normalizeHex(raw: String?): String? {
-            if (raw.isNullOrBlank()) return null
-            val trimmed = raw.trim().removePrefix("#")
-            val hex = when (trimmed.length) {
-                3 -> trimmed.map { "$it$it" }.joinToString("")
-                6 -> trimmed
-                8 -> trimmed.substring(2) // drop alpha, force opaque
-                else -> return null
-            }
-            if (!hex.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }) return null
-            return "#${hex.uppercase()}"
-        }
-    }
-}
-
-/** Cheap perceptual-ish luminance used to pick a legible on-accent text color. */
-private fun Color.luminanceApprox(): Float = 0.299f * red + 0.587f * green + 0.114f * blue
-
-private fun dotCalPalette(mode: DotCalThemeMode, accentColor: AccentColor = AccentColor.Default, systemDark: Boolean = false): DotCalPalette {
-    val resolved = if (mode == DotCalThemeMode.System) {
-        if (systemDark) DotCalThemeMode.Dark else DotCalThemeMode.Light
-    } else {
-        mode
-    }
-    val accent = accentColor.color
-    val onAccent = accentColor.onColor
-    return when (resolved) {
-        DotCalThemeMode.Dark -> DotCalPalette(
-            background = Color(0xFF000000),
-            primaryText = Color(0xFFFFFFFF),
-            secondaryText = Color(0xFFB3B3B3),
-            dimText = Color(0xFF6E6E6E),
-            line = Color(0xFF2A2A2A),
-            cell = NBlack,
-            calendarSurface = NBlack,
-            topBarSurface = Color(0xFF000000),
-            bottomNavSurface = Color(0xFF000000),
-            dialogSurface = Color(0xFF1E1E1E),
-            cancelSurface = Color(0xFF121212),
-            cancelBorder = Color(0xFF2A2A2A),
-            dragHandle = Color(0xFF707070),
-            eventCardSurface = Color(0xFF121212),
-            eventCardBorder = Color(0xFF2A2A2A),
-            eventCardChevron = Color(0xFF6E6E6E),
-            textFieldBorder = Color(0xFF4A4A4A),
-            segmentSelected = Color(0xFF1E1E1E),
-            disabledText = Color(0xFF6E6E6E),
-            switchOffTrack = Color(0xFF3A3A3A),
-            dot = Color(0xFFFFFFFF),
-            yearWeekday = Color(0xFFFFFFFF),
-            yearMonthLabel = Color(0xFFFFFFFF),
-            accent = accent,
-            onAccent = onAccent,
-            isDark = true,
-        )
-        DotCalThemeMode.Light -> DotCalPalette(
-            background = Color(0xFFFFFFFF),
-            primaryText = Color(0xFF101010),
-            secondaryText = Color(0xFF6B6B6B),
-            dimText = Color(0xFFBDBDBD),
-            line = Color(0xFFE8E8E8),
-            cell = Color(0xFFFFFFFF),
-            calendarSurface = Color(0xFFFFFFFF),
-            topBarSurface = Color(0xFFFFFFFF),
-            bottomNavSurface = Color(0xFFFFFFFF),
-            dialogSurface = Color(0xFFFFFFFF),
-            cancelSurface = Color(0xFFEFEFEF),
-            cancelBorder = Color(0xFFE0E0E0),
-            dragHandle = Color(0xFFC8C8C8),
-            eventCardSurface = Color(0xFFFFFFFF),
-            eventCardBorder = Color(0xFFE8E8E8),
-            eventCardChevron = Color(0xFFBDBDBD),
-            textFieldBorder = Color(0xFFDADADA),
-            segmentSelected = Color(0xFFEFEFEF),
-            disabledText = Color(0xFFBDBDBD),
-            switchOffTrack = Color(0xFFDADADA),
-            dot = Color(0xFF101010),
-            yearWeekday = Color(0xFF101010),
-            yearMonthLabel = Color(0xFF101010),
-            accent = accent,
-            onAccent = onAccent,
-            isDark = false,
-        )
-        DotCalThemeMode.System -> error("System must be resolved before palette creation")
-    }
-}
-
-private fun dotCalBootPalette(accentColor: AccentColor = AccentColor.Default): DotCalPalette {
-    return DotCalPalette(
-        background = Color(0xFF000000),
-        primaryText = Color(0xFFFFFFFF),
-        secondaryText = Color(0xFFB3B3B3),
-        dimText = Color(0xFF6E6E6E),
-        line = Color(0xFF2A2A2A),
-        cell = NBlack,
-        calendarSurface = NBlack,
-        topBarSurface = Color(0xFF000000),
-        bottomNavSurface = Color(0xFF000000),
-        dialogSurface = Color(0xFF1E1E1E),
-        cancelSurface = Color(0xFF121212),
-        cancelBorder = Color(0xFF2A2A2A),
-        dragHandle = Color(0xFF707070),
-        eventCardSurface = Color(0xFF121212),
-        eventCardBorder = Color(0xFF2A2A2A),
-        eventCardChevron = Color(0xFF6E6E6E),
-        textFieldBorder = Color(0xFF4A4A4A),
-        segmentSelected = Color(0xFF1E1E1E),
-        disabledText = Color(0xFF6E6E6E),
-        switchOffTrack = Color(0xFF3A3A3A),
-        dot = Color(0xFFFFFFFF),
-        yearWeekday = Color(0xFFFFFFFF),
-        yearMonthLabel = Color(0xFFFFFFFF),
-        accent = accentColor.color,
-        onAccent = accentColor.onColor,
-        isDark = true,
-    )
-}
-
-private enum class ScreenTab {
-    Calendar,
-    Tasks,
-    Settings,
-}
 
 private fun android.content.Context.findActivity(): android.app.Activity? {
     var ctx: android.content.Context? = this
@@ -11317,24 +9582,72 @@ private fun SearchScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Facet chips: type, then date preset, then calendar.
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SearchTypeFilter.values().forEach { t ->
-                    SearchFilterChip(label = t.label, selected = typeFilter == t, palette = palette) { typeFilter = t }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                SearchFilterDropdown(
+                    label = "Type",
+                    value = typeFilter.label,
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                ) { close ->
+                    SearchTypeFilter.values().forEach { type ->
+                        SearchDropdownItem(
+                            label = type.label,
+                            selected = typeFilter == type,
+                            palette = palette,
+                            onClick = {
+                                typeFilter = type
+                                close()
+                            },
+                        )
+                    }
                 }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SearchDatePreset.values().forEach { d ->
-                    SearchFilterChip(label = d.label, selected = datePreset == d, palette = palette) { datePreset = d }
+                SearchFilterDropdown(
+                    label = "Time",
+                    value = datePreset.label,
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                ) { close ->
+                    SearchDatePreset.values().forEach { preset ->
+                        SearchDropdownItem(
+                            label = preset.label,
+                            selected = datePreset == preset,
+                            palette = palette,
+                            onClick = {
+                                datePreset = preset
+                                close()
+                            },
+                        )
+                    }
                 }
-            }
-            if (accounts.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SearchFilterChip(label = "All calendars", selected = accountId == null, palette = palette) { accountId = null }
-                    accounts.forEach { acc ->
-                        SearchFilterChip(label = acc.displayName, selected = accountId == acc.id, palette = palette) { accountId = acc.id }
+                val calendarLabel = accounts.firstOrNull { it.id == accountId }?.displayName ?: "All calendars"
+                SearchFilterDropdown(
+                    label = "Calendar",
+                    value = calendarLabel,
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                ) { close ->
+                    SearchDropdownItem(
+                        label = "All calendars",
+                        selected = accountId == null,
+                        palette = palette,
+                        onClick = {
+                            accountId = null
+                            close()
+                        },
+                    )
+                    accounts.forEach { account ->
+                        SearchDropdownItem(
+                            label = account.displayName,
+                            selected = accountId == account.id,
+                            palette = palette,
+                            onClick = {
+                                accountId = account.id
+                                close()
+                            },
+                        )
                     }
                 }
             }
@@ -11360,6 +9673,82 @@ private fun SearchScreen(
             }
         }
     }
+}
+
+@Composable
+private fun SearchFilterDropdown(
+    label: String,
+    value: String,
+    palette: DotCalPalette,
+    modifier: Modifier = Modifier,
+    content: @Composable (close: () -> Unit) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(palette.eventCardSurface)
+                .drawBehind {
+                    drawRoundRect(
+                        color = if (expanded) palette.accent else palette.eventCardBorder,
+                        size = size,
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                        style = Stroke(width = 1.dp.toPx()),
+                    )
+                }
+                .noRippleClickable { expanded = true }
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+        ) {
+            Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, maxLines = 1)
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    value,
+                    color = palette.primaryText,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text("v", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = palette.dialogSurface,
+            shape = RoundedCornerShape(14.dp),
+        ) {
+            content { expanded = false }
+        }
+    }
+}
+
+@Composable
+private fun SearchDropdownItem(label: String, selected: Boolean, palette: DotCalPalette, onClick: () -> Unit) {
+    DropdownMenuItem(
+        onClick = onClick,
+        text = {
+            Text(
+                label,
+                color = if (selected) palette.accent else palette.primaryText,
+                fontFamily = mono,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        trailingIcon = {
+            if (selected) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = palette.accent, modifier = Modifier.size(18.dp))
+            }
+        },
+    )
 }
 
 @Composable
