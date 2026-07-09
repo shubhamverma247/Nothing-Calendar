@@ -99,7 +99,7 @@ Result:
 
 ### Step 3: Event Detail And Event Editor Split
 
-Status: NEXT.
+Status: DONE (2026-07-09).
 
 Move event detail/editor/media/date-time editor code into:
 
@@ -114,9 +114,17 @@ Rules:
 - No repository/ViewModel logic changes.
 - Build immediately after move.
 
+Result:
+
+- Created `app/src/main/java/com/dotfield/dotcal/ui/EventScreens.kt`.
+- Moved Event Detail, Event Editor, image/voice attachment/editor pieces, recurrence/date/reminder picker sheets, and shared bottom-sheet picker chrome out of `DotCalApp.kt`.
+- Kept behavior/UI unchanged; only package visibility changed where moved code is shared across files.
+- Verified: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed, BUILD SUCCESSFUL in 3m 2s.
+- Installed debug APK via full SDK adb path (`Success`).
+
 ### Step 4: Tasks Split
 
-Status: TODO.
+Status: DONE (2026-07-09).
 
 Move task UI into `ui/TaskScreens.kt`:
 
@@ -133,9 +141,17 @@ Rules:
 - Preserve original task on "Add to Calendar".
 - Build immediately after move.
 
+Result:
+
+- Created `app/src/main/java/com/dotfield/dotcal/ui/TaskScreens.kt`.
+- Moved Task Detail, Tasks list, task top chrome/filter rows, task row/metadata/empty state, Task Editor sheet, and Task Time picker sheet out of `DotCalApp.kt`.
+- Kept behavior/UI unchanged; only package visibility changed where moved code is shared across files.
+- Verified: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed, BUILD SUCCESSFUL in 2m 22s.
+- Installed debug APK via full SDK adb path (`Success`).
+
 ### Step 5: Settings And Pro Feature Screens Split
 
-Status: TODO.
+Status: DONE (2026-07-09).
 
 Move settings and feature management screens into focused files:
 
@@ -157,6 +173,15 @@ Rules:
 - Preserve Pro gates and paywall routing.
 - Preserve Settings row typography and current entries.
 - Build after each logical sub-split if one file move becomes too large.
+
+Result:
+
+- Created `app/src/main/java/com/dotfield/dotcal/ui/SettingsScreens.kt` for Settings root/preview, theme/accent UI, app lock/private vault settings, account/settings rows, sync rows, widget toggles, global holidays, and privacy policy.
+- Created `app/src/main/java/com/dotfield/dotcal/ui/ProFeatureScreens.kt` for Paywall, Search, Quick Add, Templates, Calendar Sets, Shift Patterns, Recently Deleted, and Date Calculator surfaces.
+- Kept behavior/UI unchanged; only package visibility changed for shared helpers reused across extracted files.
+- `DotCalApp.kt` reduced to 3,638 lines.
+- Verified: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed, BUILD SUCCESSFUL in 2m 48s.
+- Installed debug APK via full SDK adb path (`Success`).
 
 ### Step 6: Onboarding Split
 

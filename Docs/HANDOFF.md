@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-07-02
+Updated: 2026-07-09
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full history/archive lives in `Docs/HANDOFF.original.md`. Keep this file short: current rules, invariants, active status, latest work, next tests only.
 
@@ -81,7 +81,7 @@ Skipped:
 
 ## Pro / Billing
 
-Status: complete in code. Billing product active in Play Console; full purchase-flow verification blocked by Google-side Payments/Merchant review.
+Status: complete in code. Billing product active in Play Console; Google-side Payments/Merchant review clear as of 2026-07-09 per user. Full purchase-flow verification is the next Play/Internal-testing step.
 
 Important files:
 - `app/src/main/java/com/dotfield/dotcal/data/billing/ProManager.kt`
@@ -290,6 +290,11 @@ Refactor note:
 - 2026-07-09: Refactor/optimization plan created at `Docs/DOTCAL_REFACTOR_PLAN.md`. Status: planning done only; app code not changed. Next refactor step is the mechanical Calendar Views split, preserving behavior/UI exactly and building immediately after the app-code move.
 - 2026-07-09: **Refactor Step 1 complete: Calendar Views split.** New `ui/CalendarViews.kt` contains Month/Week/Day/ThreeDay/Year views, mini-month canvas, and shared timeline layout helpers. `DotCalApp.kt` reduced from 12,969 to 11,905 lines. Behavior/UI intended unchanged; package visibility only widened for shared helpers/types needed across files (`DotCalPalette`, `mono`, timeline constants, `CalendarEvent` date/time/color helpers, `noRippleClickable`). `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (BUILD SUCCESSFUL in 3m 32s). No phone/manual UI QA run. Next refactor step: shared UI shell/theme split.
 - 2026-07-08: **Refactor Step 2 complete: Shared UI shell/theme split.** New `ui/DotCalTheme.kt` contains palette/theme/accent types and helpers. New `ui/AppChrome.kt` contains system bar sync, calendar top bar, overflow menu, segmented calendar view control, bottom nav, tab enums, and `noRippleClickable`. `DotCalApp.kt` reduced from 11,905 to 11,211 lines. Behavior/UI intended unchanged; package visibility only widened for moved shared code. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed after theme split (BUILD SUCCESSFUL in 3m 10s) and after chrome split (BUILD SUCCESSFUL in 2m 46s). No phone/manual UI QA run. Next refactor step: Event Detail and Event Editor split.
+- 2026-07-09: **Refactor Step 3 complete: Event Detail and Event Editor split.** New `ui/EventScreens.kt` contains Event Detail, Event Editor, image/voice attachment/editor pieces, recurrence/date/reminder picker sheets, and shared bottom-sheet picker chrome. `DotCalApp.kt` reduced by roughly 2.2k lines. Behavior/UI intended unchanged; package visibility only widened to `internal` for helpers shared across the split and existing Task/Settings surfaces. No Room/schema/DataStore/manifest/permission change, no dependency, no version bump. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (BUILD SUCCESSFUL in 3m 2s), then installed via full SDK adb path (`Success`).
+- 2026-07-09: **Refactor Step 4 complete: Tasks split.** New `ui/TaskScreens.kt` contains Task Detail, Tasks list, task top chrome/filter rows, task row/metadata/empty state, Task Editor sheet, and Task Time picker sheet. Behavior/UI intended unchanged; Task Time Blocking still opens the normal Event editor from Task Detail and leaves the original task intact; task recurrence still uses the existing Pro-gated Repeat picker. Package visibility only widened for shared task/date/header helpers needed across the split. No Room/schema/DataStore/manifest/permission change, no dependency, no version bump. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (BUILD SUCCESSFUL in 2m 22s), then installed via full SDK adb path (`Success`).
+- 2026-07-09: **Refactor Step 5 complete: Settings and Pro feature screens split.** New `ui/SettingsScreens.kt` contains Settings root/preview, theme/accent UI, app lock/private vault settings, account/settings rows, sync rows, widget toggles, global holidays, and privacy policy. New `ui/ProFeatureScreens.kt` contains Paywall, Search, Quick Add, Templates, Calendar Sets, Shift Patterns, Recently Deleted, and Date Calculator surfaces. `DotCalApp.kt` reduced to 3,638 lines and now mostly holds root composition, state, launchers, overlays, and shared helpers. Behavior/UI intended unchanged; package visibility only widened for helpers reused across extracted files. No Room/schema/DataStore/manifest/permission change, no dependency, no version bump. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (BUILD SUCCESSFUL in 2m 48s), then installed via full SDK adb path (`Success`).
+- 2026-07-09: **Settings Theme row value polish.** Fixed the Settings > Additional > Theme right-side value text that showed an encoded separator after file moves. It now shows a clean ASCII label like `System / Red`, and `SettingsMenuRow` title/value text is constrained to one line with ellipsis so rows do not crowd or overflow. No behavior/storage/schema/dependency change. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (BUILD SUCCESSFUL in 2m 34s), then installed via full SDK adb path (`Success`).
+- 2026-07-09: **Mojibake sweep.** Scanned app source/resources for common mojibake signatures and cleaned user-facing strings in Privacy Policy, import/restore/purchase toasts, recurrence labels, voice permission text, agenda time ranges, and custom-repeat steppers. Replaced broken bullets/dashes/ellipsis/minus signs with ASCII-safe text. No behavior/storage/schema/dependency change. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (BUILD SUCCESSFUL in 3m 10s), then installed via full SDK adb path (`Success`).
 - 2026-07-08: **Search filter UI compacted after user feedback.** Search screen now shows three compact dropdown selectors below the search field (`Type`, `Time`, `Calendar`) instead of wrapping chip rows for all/events/tasks, date presets, and every calendar. Behavior/filter logic unchanged; only the filter controls changed. `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed (BUILD SUCCESSFUL in 3m 1s). No phone/manual UI QA run.
 - 2026-07-09: User preference update: after successful debug builds, install the debug APK on the connected phone unless the user explicitly says not to. Current debug APK installed via full SDK adb path (`C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk`) with result `Success`.
 
@@ -299,13 +304,9 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 DONE (2026-07-05): `1.1.3` / `versionCode 9` uploaded to Play Internal Testing by user.
 
-Now waiting on Google (blocked, no local action):
-1. Payments profile verification.
-2. Merchant Account review.
+Google billing/payment review is clear as of 2026-07-09 per user. Next local action is Play billing verification on an internal-testing install. Advanced Reminder Profiles (Next Feature Picks #5, PRO) remains NOT started; do not start without explicit confirmation. Offline OCR remains a possible later Pro Backlog pick if user asks.
 
-Meanwhile, continuing Pro builds on feature branches. Advanced Reminder Profiles (Next Feature Picks #5, PRO) remains NOT started; do not start without explicit confirmation. Offline OCR remains a possible later Pro Backlog pick if user asks.
-
-After Google clears:
+Play billing verification:
 1. Confirm test Gmail is in `pro-tester`.
 2. Log into that Google account on test device/emulator.
 3. Open Settings > DotCal Pro. Paywall should open and show live INR 149 from `ProductDetails`. If fallback appears, debug product-detail loading first.
@@ -315,6 +316,11 @@ After Google clears:
 7. Complete Content Rating + Data Safety, then Open Testing.
 
 ## What To Test Now
+
+Refactor Step 5 debug build:
+- Settings root and sub-screens: Theme, Calendar Accounts, Add Account, Global Holidays, App Lock & Private Vault, Privacy Policy.
+- Pro/full-screen surfaces: Paywall, Search, Quick Add, Templates, Calendar Sets, Shift Patterns, Recently Deleted, Date Calculator.
+- Regression spot-check from Step 4: Tasks tab, Task Detail, Task Editor, and Add to Calendar still behave as before.
 
 Play/Internal-testing build only, not debug sideload:
 - Settings > DotCal Pro opens Paywall; app must not close.
@@ -340,15 +346,15 @@ Workdir: `D:\Caveman\caveman\Nothing-Calendar`.
 
 Read `Docs/HANDOFF.md` first — it is source of truth. Respect Hard Rules, Pro/Billing status, schema invariants, and Current Next Step.
 
-**Latest status (2026-07-08):** Branch `pro-features`. Build `versionCode 9` / `versionName 1.1.3`, `:app:assembleDebug` passing. Latest local work **installed on device**: Shift Pattern Builder + Bulk Apply (PRO) plus Week/Day compact timeline polish.
+**Latest status (2026-07-09):** Branch `pro-features`. Build `versionCode 9` / `versionName 1.1.3`, `:app:assembleDebug` passing. Latest local work **installed on device**: Refactor Step 5 Settings and Pro feature screens split.
 
 Latest local feature: **Shift Pattern Builder + Bulk Apply (PRO)** plus phone-QA fixes. Files: `data/shifts/ShiftPatternStore.kt`, `DotCalRepository.kt`, `DotCalViewModel.kt`, `ui/DotCalApp.kt`. No Room/schema/DataStore/manifest/permission change, no new dependency, no version bump. Settings > Data > Shift Patterns opens the Pro-gated builder; shift type rows are editable; Shift type color swatch opens a color picker with no visible hex field; Pattern Start date and Generate from use the wheel date picker; Generate from defaults to today; Week/Day timed events now span their real duration; Week/Day time labels use compact `00` style; Week/Day use a fixed bottom boundary line after `23` with blank static clearance above the floating nav; Day view has a compact selected-date header, chevrons, and horizontal swipe for day switching; Day view hides the empty Tasks footer but shows actual selected-day tasks; Month long-press enters Pro-gated bulk date selection and stamps existing event templates as one-off events.
 
 Kept from prior sessions: App Lock ON_STOP leak fix; Global Search ("fine"); ICS Import/Export + Backup & Restore FREE. Month view is grid-only (Upcoming strip removed — if revisited, user wants card-based, no "UPCOMING" heading, no divider; day-tap `EventListSheet` retained).
 
-Done recently: **Calendar Sets / Focus Profiles (#4)** built, installed, committed/pushed earlier; **Shift Pattern Builder + Bulk Apply** built locally from shift-worker feedback. Advanced Reminder Profiles (#5) remains NOT started; do not start without confirmation.
+Done recently: **Calendar Sets / Focus Profiles (#4)** built, installed, committed/pushed earlier; **Shift Pattern Builder + Bulk Apply** built locally from shift-worker feedback; **Refactor Steps 1-5** split calendar views, shared chrome/theme, event detail/editor screens, task screens, settings, and Pro feature screens. Advanced Reminder Profiles (#5) remains NOT started; do not start without confirmation.
 
-Build/install: `versionCode 9`, `versionName 1.1.3`, `:app:assembleDebug` passed after Week/Day fixed bottom boundary polish (4m). Latest debug APK installed successfully on device via full SDK adb path.
+Build/install: `versionCode 9`, `versionName 1.1.3`, `:app:assembleDebug` passed after Refactor Step 5 (2m 48s). Latest debug APK installed successfully on device via full SDK adb path.
 
 STRICT:
 1. Do not touch working features unless required.
