@@ -126,7 +126,7 @@ internal fun MonthView(
         }
 
         LazyVerticalGrid(columns = GridCells.Fixed(7), userScrollEnabled = false, modifier = Modifier.fillMaxWidth()) {
-            items(days) { day ->
+            items(days, key = { it.toEpochDay() }) { day ->
                 DayCell(
                     date = day,
                     activeMonth = YearMonth.from(month),
@@ -559,7 +559,7 @@ internal fun DayView(
         )
         if (allDayEvents.isNotEmpty()) {
             LazyColumn(modifier = Modifier.fillMaxWidth().height(44.dp).background(palette.calendarSurface)) {
-                items(allDayEvents.size) { index ->
+                items(allDayEvents.size, key = { allDayEvents[it].id }) { index ->
                     Text(
                         allDayEvents[index].title,
                         color = NWhite,

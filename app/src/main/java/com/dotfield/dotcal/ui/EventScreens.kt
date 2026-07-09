@@ -17,7 +17,6 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.os.SystemClock
-import android.widget.Toast
 import android.util.Size
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -1125,7 +1124,7 @@ internal fun EventEditorScreen(
             val data = if (granted) pending.first else pending.first.copy(reminderMinutes = null)
             onSave(data, pending.second)
             pendingPermissionSave = null
-            if (!granted) Toast.makeText(context, "Event saved without reminder", Toast.LENGTH_SHORT).show()
+            if (!granted) showDotCalToast(context, palette, "Event saved without reminder")
         }
     }
     val imagePicker = rememberLauncherForActivityResult(
@@ -1469,7 +1468,7 @@ internal fun EventEditorScreen(
             onConfirm = { name ->
                 onSaveTemplate(buildTemplate(name))
                 showSaveTemplateDialog = false
-                Toast.makeText(context, "Template saved", Toast.LENGTH_SHORT).show()
+                showDotCalToast(context, palette, "Template saved")
             },
         )
     }

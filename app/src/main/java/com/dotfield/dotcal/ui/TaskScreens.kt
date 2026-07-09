@@ -3,7 +3,6 @@ package com.dotfield.dotcal.ui
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
@@ -294,6 +293,11 @@ internal fun TasksScreen(
     val groupedTasks = remember(filteredTasks) {
         filteredTasks.groupBy { task -> if (task.hasTaskDate()) task.localDate() else null }
     }
+    val remindersByEventId = remember(reminders) {
+        buildMap {
+            reminders.forEach { reminder -> putIfAbsent(reminder.eventId, reminder) }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(palette.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -332,7 +336,7 @@ internal fun TasksScreen(
                             lazyItems(group, key = { it.id }) { task ->
                                 TaskRow(
                                     task = task,
-                                    reminder = reminders.firstOrNull { it.eventId == task.baseEventId() },
+                                    reminder = remindersByEventId[task.baseEventId()],
                                     palette = palette,
                                     onClick = { onTaskClick(task) },
                                     onComplete = { onCompleteTask(task) },
@@ -659,7 +663,7 @@ internal fun TaskEditorSheet(
         pendingTaskPermissionSave?.let { pending ->
             onSave(if (granted) pending else pending.copy(reminderMinutes = null))
             pendingTaskPermissionSave = null
-            if (!granted) Toast.makeText(context, "Task saved without reminder", Toast.LENGTH_SHORT).show()
+            if (!granted) showDotCalToast(context, palette, "Task saved without reminder")
         }
     }
     val taskSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -900,7 +904,7 @@ internal fun TaskEditorSheet(
                 )
                 onSaveTemplate(template)
                 showSaveTemplateDialog = false
-                Toast.makeText(context, "Template saved", Toast.LENGTH_SHORT).show()
+                showDotCalToast(context, palette, "Template saved")
             },
         )
     }

@@ -17,7 +17,6 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.os.SystemClock
-import android.widget.Toast
 import android.util.Size
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -298,7 +297,7 @@ internal fun PaywallScreen(
             }
             is ProManager.PurchaseResult.Error -> {
                 purchasing = false
-                Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                showDotCalToast(context, palette, result.message)
                 viewModel.clearPurchaseResult()
             }
             null -> Unit
@@ -462,7 +461,7 @@ internal fun PaywallScreen(
                         } else {
                             "No previous purchase found on this account"
                         }
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        showDotCalToast(context, palette, message)
                     }
                 }
                 .padding(8.dp),
@@ -532,20 +531,22 @@ internal fun SearchScreen(
     val month = YearMonth.now()
     val monthStartMs = month.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
     val monthEndMs = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
-    val filtered = results.filter { item ->
-        val typeOk = when (typeFilter) {
-            SearchTypeFilter.All -> true
-            SearchTypeFilter.Events -> item.isTask == 0
-            SearchTypeFilter.Tasks -> item.isTask == 1
+    val filtered = remember(results, typeFilter, datePreset, accountId, todayStartMs, monthStartMs, monthEndMs) {
+        results.filter { item ->
+            val typeOk = when (typeFilter) {
+                SearchTypeFilter.All -> true
+                SearchTypeFilter.Events -> item.isTask == 0
+                SearchTypeFilter.Tasks -> item.isTask == 1
+            }
+            val dateOk = when (datePreset) {
+                SearchDatePreset.AnyTime -> true
+                SearchDatePreset.Upcoming -> item.startTimeMs >= todayStartMs
+                SearchDatePreset.Past -> item.startTimeMs < todayStartMs
+                SearchDatePreset.ThisMonth -> item.startTimeMs in monthStartMs until monthEndMs
+            }
+            val accountOk = accountId == null || item.accountId == accountId
+            typeOk && dateOk && accountOk
         }
-        val dateOk = when (datePreset) {
-            SearchDatePreset.AnyTime -> true
-            SearchDatePreset.Upcoming -> item.startTimeMs >= todayStartMs
-            SearchDatePreset.Past -> item.startTimeMs < todayStartMs
-            SearchDatePreset.ThisMonth -> item.startTimeMs in monthStartMs until monthEndMs
-        }
-        val accountOk = accountId == null || item.accountId == accountId
-        typeOk && dateOk && accountOk
     }
 
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
@@ -852,7 +853,9 @@ internal fun QuickAddScreen(
     // Re-parsed on every keystroke; pure and cheap.
     val parsed = remember(trimmed) { if (trimmed.isEmpty()) null else QuickAddParser.parse(trimmed) }
     val focusRequester = remember { FocusRequester() }
-    val examples = listOf("Gym every mon 7am", "Lunch tomorrow noon", "Pay rent on 1st", "Standup daily 9:30am")
+    val examples = remember {
+        listOf("Gym every mon 7am", "Lunch tomorrow noon", "Pay rent on 1st", "Standup daily 9:30am")
+    }
 
     fun submit() {
         parsed?.let(onContinue)

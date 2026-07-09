@@ -185,7 +185,7 @@ Result:
 
 ### Step 6: Onboarding Split
 
-Status: TODO.
+Status: DONE (2026-07-09).
 
 Move onboarding screen, copy/color models, and draw-scope helpers into `ui/OnboardingScreens.kt`.
 
@@ -195,9 +195,18 @@ Rules:
 - Keep deep-link onboarding skip behavior untouched in root app state.
 - Build immediately after move.
 
+Result:
+
+- Created `app/src/main/java/com/dotfield/dotcal/ui/OnboardingScreens.kt`.
+- Moved onboarding page model/list, onboarding screen/copy/color models, progress/hero UI, and onboarding draw-scope helpers out of `DotCalApp.kt`.
+- Kept behavior/UI unchanged; root onboarding state, permission requests, and deep-link skip behavior remain in `DotCalApp.kt`.
+- `DotCalApp.kt` reduced to 2,800 lines.
+- Verified: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed, BUILD SUCCESSFUL in 2m 44s.
+- Installed debug APK via full SDK adb path (`Success`).
+
 ### Step 7: Root App Cleanup
 
-Status: TODO.
+Status: DONE (2026-07-09).
 
 Reduce `DotCalApp.kt` to root composition, app-level state, launchers, overlay orchestration, and navigation between major surfaces.
 
@@ -214,9 +223,21 @@ Rules:
 - Do not alter overlay booleans or close order except compiler-required references.
 - Build immediately after cleanup.
 
+Result:
+
+- Created `app/src/main/java/com/dotfield/dotcal/ui/AgendaScreens.kt` for Agenda view preview cards, date headers, empty state, and day event-list sheet.
+- Created `app/src/main/java/com/dotfield/dotcal/ui/DialogScreens.kt` for shared delete/template/update dialogs.
+- Created `app/src/main/java/com/dotfield/dotcal/ui/UiModels.kt` for shared UI enums/constants/formatters.
+- Created `app/src/main/java/com/dotfield/dotcal/ui/UiHelpers.kt` for shared date/time, account-label, media, recurrence-label, color, and Android context helpers.
+- Kept `DotCalApp.kt` focused on root composition, state wiring, launchers, overlay orchestration, and major-surface routing.
+- Kept behavior/UI unchanged; no overlay boolean/close-order/navigation changes.
+- `DotCalApp.kt` reduced from 2,800 lines to 1,962 lines.
+- Verified: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed, BUILD SUCCESSFUL in 3m 10s.
+- Installed debug APK via full SDK adb path (`Success`).
+
 ### Step 8: Low-Risk Optimization Pass
 
-Status: TODO.
+Status: DONE (2026-07-09).
 
 Only after split is compiling:
 
@@ -230,6 +251,18 @@ Rules:
 - No visual redesign.
 - No behavior changes.
 - Build after changes.
+
+Result:
+
+- Added stable lazy keys for Month grid days and Day all-day event rows.
+- Cached Search facet filtering with `remember(...)`.
+- Cached Quick Add example chips as a static remembered list.
+- Cached Tasks reminder lookup by event id instead of scanning reminders for every task row.
+- Added a shared `showDotCalToast(...)` helper so toasts use DotCal palette colors: white toast in light theme, dark toast in dark theme.
+- Replaced visible UI `Toast.makeText(...)` call sites in root, paywall, event editor, and task editor surfaces with the themed helper.
+- No Room/schema/DataStore/manifest/permission change, no dependency, no version bump.
+- Verified: `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` passed, BUILD SUCCESSFUL in 2m 55s.
+- Installed debug APK via full SDK adb path (`Success`).
 
 ## Validation Checklist Per Step
 
