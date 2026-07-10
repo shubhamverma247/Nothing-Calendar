@@ -275,6 +275,9 @@ internal fun SettingsPreview(
     isSyncing: Boolean,
     birthdayEnabled: Boolean,
     defaultReminderMinutes: Int?,
+    defaultEventDurationMinutes: Int,
+    defaultCalendarTab: CalendarTab,
+    showWeekNumbers: Boolean,
     defaultAllDayReminderTime: LocalTime,
     weekStartOption: WeekStartOption,
     widgetTransparent: Boolean,
@@ -289,6 +292,9 @@ internal fun SettingsPreview(
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
     onDefaultReminderSelected: (Int?) -> Unit,
+    onDefaultEventDurationSelected: (Int) -> Unit,
+    onDefaultViewSelected: (CalendarTab) -> Unit,
+    onShowWeekNumbersChange: (Boolean) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
     onWidgetTransparentChange: (Boolean) -> Unit,
@@ -344,6 +350,9 @@ internal fun SettingsPreview(
             isSyncing = isSyncing,
             birthdayEnabled = birthdayEnabled,
             defaultReminderMinutes = defaultReminderMinutes,
+            defaultEventDurationMinutes = defaultEventDurationMinutes,
+            defaultCalendarTab = defaultCalendarTab,
+            showWeekNumbers = showWeekNumbers,
             defaultAllDayReminderTime = defaultAllDayReminderTime,
             weekStartOption = weekStartOption,
             widgetTransparent = widgetTransparent,
@@ -358,6 +367,9 @@ internal fun SettingsPreview(
             onSyncEnabledChange = onSyncEnabledChange,
             onSyncIntervalSelected = onSyncIntervalSelected,
             onDefaultReminderSelected = onDefaultReminderSelected,
+            onDefaultEventDurationSelected = onDefaultEventDurationSelected,
+            onDefaultViewSelected = onDefaultViewSelected,
+            onShowWeekNumbersChange = onShowWeekNumbersChange,
             onDefaultAllDayReminderTimeSelected = onDefaultAllDayReminderTimeSelected,
             onWeekStartSelected = onWeekStartSelected,
             onWidgetTransparentChange = onWidgetTransparentChange,
@@ -495,6 +507,9 @@ internal fun SettingsRoot(
     isSyncing: Boolean,
     birthdayEnabled: Boolean,
     defaultReminderMinutes: Int?,
+    defaultEventDurationMinutes: Int,
+    defaultCalendarTab: CalendarTab,
+    showWeekNumbers: Boolean,
     defaultAllDayReminderTime: LocalTime,
     weekStartOption: WeekStartOption,
     widgetTransparent: Boolean,
@@ -509,6 +524,9 @@ internal fun SettingsRoot(
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
     onDefaultReminderSelected: (Int?) -> Unit,
+    onDefaultEventDurationSelected: (Int) -> Unit,
+    onDefaultViewSelected: (CalendarTab) -> Unit,
+    onShowWeekNumbersChange: (Boolean) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
     onWidgetTransparentChange: (Boolean) -> Unit,
@@ -560,6 +578,18 @@ internal fun SettingsRoot(
                 palette = palette,
                 onWeekStartSelected = onWeekStartSelected,
             )
+            SettingsDefaultViewRow(
+                selectedTab = defaultCalendarTab,
+                palette = palette,
+                onViewSelected = onDefaultViewSelected,
+            )
+            SettingsToggleRow(
+                title = "Week numbers",
+                subtitle = "Show ISO week labels in Month and Week",
+                checked = showWeekNumbers,
+                palette = palette,
+                onCheckedChange = onShowWeekNumbersChange,
+            )
             SettingsMenuRow(
                 title = "Global Holidays",
                 value = selectedHolidayCountriesLabel(holidayCountries),
@@ -573,6 +603,11 @@ internal fun SettingsRoot(
                 selectedMinutes = defaultReminderMinutes,
                 palette = palette,
                 onReminderSelected = onDefaultReminderSelected,
+            )
+            SettingsDefaultEventDurationRow(
+                selectedMinutes = defaultEventDurationMinutes,
+                palette = palette,
+                onDurationSelected = onDefaultEventDurationSelected,
             )
             SettingsAllDayReminderTimeRow(
                 selectedTime = defaultAllDayReminderTime,
@@ -961,7 +996,7 @@ internal fun AppLockScreen(
                 Icon(Icons.Default.Lock, contentDescription = null, tint = palette.accent, modifier = Modifier.size(30.dp))
             }
             Spacer(modifier = Modifier.height(22.dp))
-            Text("DotCal Locked", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            Text("DotCal Locked", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 24.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Text("Enter your PIN to continue", color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
             Spacer(modifier = Modifier.height(24.dp))
@@ -1023,7 +1058,7 @@ private fun AppPinDialog(
         containerColor = palette.dialogSurface,
         titleContentColor = palette.primaryText,
         textContentColor = palette.secondaryText,
-        title = { Text(title, fontFamily = mono) },
+        title = { Text(title, fontFamily = LocalHeadingFont.current) },
         text = {
             Column {
                 OutlinedTextField(
@@ -1157,7 +1192,7 @@ private fun ThemeSettings(
             Text(
                 "Accent Color",
                 color = palette.primaryText,
-                fontFamily = mono,
+                fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 modifier = Modifier.padding(start = 4.dp, bottom = 14.dp),
@@ -1175,7 +1210,7 @@ private fun ThemeSettings(
                 Text(
                     "More Colors",
                     color = palette.primaryText,
-                    fontFamily = mono,
+                    fontFamily = LocalHeadingFont.current,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
                     modifier = Modifier.padding(start = 4.dp),
@@ -1458,7 +1493,7 @@ private fun PrivacyPolicySettings(
                     Text(
                         "Your data stays on your device.",
                         color = palette.primaryText,
-                        fontFamily = mono,
+                        fontFamily = LocalHeadingFont.current,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
                         lineHeight = 28.sp,
@@ -1706,6 +1741,114 @@ private fun CalendarAccountToggleRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun SettingsDefaultViewRow(
+    selectedTab: CalendarTab,
+    palette: DotCalPalette,
+    onViewSelected: (CalendarTab) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .noRippleClickable { expanded = true },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Default view", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(selectedTab.shortLabel, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                UpDownChevron(tint = palette.secondaryText)
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(palette.dialogSurface),
+        ) {
+            CalendarTab.pickerEntries.forEach { tab ->
+                DropdownMenuItem(
+                    modifier = Modifier.background(palette.dialogSurface),
+                    text = {
+                        Text(tab.shortLabel, color = palette.primaryText, fontFamily = mono, fontSize = 16.sp)
+                    },
+                    trailingIcon = {
+                        if (tab == selectedTab) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = palette.primaryText)
+                        }
+                    },
+                    onClick = {
+                        onViewSelected(tab)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsDefaultEventDurationRow(
+    selectedMinutes: Int,
+    palette: DotCalPalette,
+    onDurationSelected: (Int) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .noRippleClickable { expanded = true },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Default event duration", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(eventDurationLabel(selectedMinutes), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                UpDownChevron(tint = palette.secondaryText)
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(palette.dialogSurface),
+        ) {
+            defaultEventDurationOptions.forEach { option ->
+                DropdownMenuItem(
+                    modifier = Modifier.background(palette.dialogSurface),
+                    text = {
+                        Text(eventDurationLabel(option), color = palette.primaryText, fontFamily = mono, fontSize = 16.sp)
+                    },
+                    trailingIcon = {
+                        if (option == selectedMinutes) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = palette.primaryText)
+                        }
+                    },
+                    onClick = {
+                        onDurationSelected(option)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun eventDurationLabel(minutes: Int): String {
+    return when (minutes) {
+        60 -> "1 hour"
+        120 -> "2 hours"
+        else -> "$minutes min"
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun SettingsWeekStartRow(
     selectedOption: WeekStartOption,
     palette: DotCalPalette,
@@ -1884,7 +2027,7 @@ private fun AllDayReminderTimeSheet(
                 .padding(top = 4.dp, bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Default all-day reminder time", color = palette.primaryText, fontFamily = mono, fontSize = 20.sp)
+            Text("Default all-day reminder time", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontSize = 20.sp)
             Text(
                 allDayReminderTimeLabel(pickedTime),
                 color = palette.secondaryText,
@@ -2651,7 +2794,7 @@ internal fun CustomAccentPickerDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
         title = {
-            Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(title, color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 18.sp)
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {

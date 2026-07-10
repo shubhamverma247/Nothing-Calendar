@@ -287,6 +287,7 @@ internal fun EventDetailScreen(
                     "Event Details",
                     modifier = Modifier.weight(1f),
                     color = palette.primaryText,
+                    fontFamily = LocalHeadingFont.current,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp,
                     textAlign = TextAlign.Center,
@@ -313,6 +314,7 @@ internal fun EventDetailScreen(
                     Text(
                         event.title,
                         color = palette.primaryText,
+                        fontFamily = LocalHeadingFont.current,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 32.sp,
                         lineHeight = 38.sp,
@@ -1054,10 +1056,14 @@ internal fun EventEditorScreen(
     selectedDate: LocalDate,
     selectedTime: LocalTime,
     initialReminderMinutes: Int?,
+    defaultEventDurationMinutes: Int = 60,
     accounts: List<CalendarAccount>,
     lastSelectedAccountId: String?,
     palette: DotCalPalette,
     isPro: Boolean,
+    conflictWarnings: List<CalendarEvent> = emptyList(),
+    use24HourFormat: Boolean = true,
+    onConflictRangeChanged: (CalendarEvent?, LocalDate, LocalDate, LocalTime, LocalTime, Boolean) -> Unit = { _, _, _, _, _, _ -> },
     onRequestPro: () -> Unit,
     onDismiss: () -> Unit,
     onSave: (EventEditorData, RecurringEditScope) -> Unit,
@@ -1079,8 +1085,9 @@ internal fun EventEditorScreen(
     val tplEndDate: LocalDate? = if (tpl != null && tpl.startMinuteOfDay != null) {
         editorDate.plusDays(((tpl.startMinuteOfDay + tpl.durationMinutes) / (24 * 60)).toLong())
     } else null
-    val initialEnd = event?.endLocalTime() ?: seed?.endTime ?: tplEndTime ?: initialStart.plusHours(1)
-    val initialEndDate = event?.endLocalDateForEditor() ?: seed?.endDate ?: tplEndDate ?: editorDate
+    val defaultEndDateTime = editorDate.atTime(initialStart).plusMinutes(defaultEventDurationMinutes.toLong())
+    val initialEnd = event?.endLocalTime() ?: seed?.endTime ?: tplEndTime ?: defaultEndDateTime.toLocalTime()
+    val initialEndDate = event?.endLocalDateForEditor() ?: seed?.endDate ?: tplEndDate ?: defaultEndDateTime.toLocalDate()
     val editorStateKey = event?.id ?: editorSessionKey
     val draftEventId = remember(editorStateKey) {
         if (event == null || event.isRecurrenceOccurrence()) UUID.randomUUID().toString() else event.baseEventId()
@@ -1091,7 +1098,9 @@ internal fun EventEditorScreen(
     var startDate by remember(editorStateKey) { mutableStateOf(editorDate) }
     var endDate by remember(editorStateKey) { mutableStateOf(maxOf(editorDate, initialEndDate)) }
     var startTime by remember(editorStateKey) { mutableStateOf(initialStart) }
-    var endTime by remember(editorStateKey) { mutableStateOf(coerceEndAfterStart(initialStart, initialEnd)) }
+    var endTime by remember(editorStateKey) {
+        mutableStateOf(if (initialEndDate > editorDate) initialEnd else coerceEndAfterStart(initialStart, initialEnd))
+    }
     var allDay by remember(editorStateKey) { mutableStateOf(event?.let { it.isAllDay == 1 } ?: seed?.isAllDay ?: tpl?.isAllDay ?: false) }
     var reminderMinutes by remember(editorStateKey, initialReminderMinutes) { mutableStateOf(if (tpl != null) tpl.reminderMinutes else initialReminderMinutes) }
     var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule ?: seed?.rrule ?: tpl?.rrule) }
@@ -1219,6 +1228,9 @@ internal fun EventEditorScreen(
             }
         }
     }
+    LaunchedEffect(event?.id, startDate, endDate, startTime, endTime, allDay) {
+        onConflictRangeChanged(event, startDate, endDate, startTime, endTime, allDay)
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1238,7 +1250,7 @@ internal fun EventEditorScreen(
             Text(
                 if (event == null) "Add event" else "Edit event",
                 color = palette.primaryText,
-                fontFamily = mono,
+                fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 18.sp,
                 modifier = Modifier.weight(1f),
@@ -1398,6 +1410,11 @@ internal fun EventEditorScreen(
                     dateTimePicker = DateTimeField.End
                 },
             )
+            ConflictWarningSection(
+                conflicts = conflictWarnings,
+                use24HourFormat = use24HourFormat,
+                palette = palette,
+            )
             Spacer(modifier = Modifier.height(12.dp))
             EditorValueRow(
                 title = "Reminder",
@@ -1551,6 +1568,60 @@ internal fun EventEditorScreen(
             },
         )
     }
+}
+
+@Composable
+private fun ConflictWarningSection(
+    conflicts: List<CalendarEvent>,
+    use24HourFormat: Boolean,
+    palette: DotCalPalette,
+) {
+    if (conflicts.isEmpty()) return
+    val visibleConflicts = conflicts.take(3)
+    val extraCount = (conflicts.size - visibleConflicts.size).coerceAtLeast(0)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(palette.accent.copy(alpha = if (palette.isDark) 0.14f else 0.08f))
+            .drawBehind {
+                drawRoundRect(
+                    color = palette.accent.copy(alpha = 0.45f),
+                    cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        visibleConflicts.forEach { conflict ->
+            Text(
+                text = "Overlaps with ${conflict.title.ifBlank { "Untitled" }} ${conflict.conflictTimeRangeLabel(use24HourFormat)}",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+            )
+        }
+        if (extraCount > 0) {
+            Text(
+                text = "+$extraCount more",
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+            )
+        }
+    }
+}
+
+private fun CalendarEvent.conflictTimeRangeLabel(use24HourFormat: Boolean): String {
+    val formatter = if (use24HourFormat) timeFormatter else editorTimeFormatter
+    val start = Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault())
+    val end = Instant.ofEpochMilli(normalizedEndTimeMs()).atZone(ZoneId.systemDefault())
+    val startLabel = start.toLocalTime().format(formatter)
+    val endLabel = end.toLocalTime().format(formatter)
+    return if (use24HourFormat) "$startLabel-$endLabel" else "$startLabel-$endLabel".lowercase(Locale.US)
 }
 
 @Composable
@@ -1768,7 +1839,7 @@ internal fun DateTimeChoiceSheet(
                 .padding(top = 4.dp, bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(title, color = palette.primaryText, fontFamily = mono, fontSize = 20.sp)
+            Text(title, color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontSize = 20.sp)
             Text(
                 if (includeTime) dateTimeLabel(pickedDate, LocalTime.of(pickedHour, pickedMinute)) else pickedDate.format(editorDateFormatter),
                 color = palette.secondaryText,
@@ -2019,7 +2090,7 @@ internal fun RepeatChoiceSheet(
     ) {
         Column(modifier = Modifier.fillMaxWidth().background(palette.dialogSurface).padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
             Spacer(modifier = Modifier.height(12.dp))
-            Text("Repeat", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+            Text("Repeat", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(4.dp))
             recurrenceOptions.forEach { option ->
                 RepeatOptionRow(
@@ -2166,7 +2237,7 @@ private fun CustomRecurrenceSheet(
                     .padding(bottom = 96.dp),
             ) {
             Spacer(modifier = Modifier.height(4.dp))
-            Text("Custom Repeat", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+            Text("Custom Repeat", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(6.dp))
             Text(buildRule().humanLabel(), color = palette.accent, fontFamily = mono, fontSize = 14.sp)
 
@@ -2416,7 +2487,7 @@ internal fun <T> ChoiceSheetContent(
 ) {
     Column(modifier = Modifier.fillMaxWidth().background(palette.dialogSurface).padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
         Spacer(modifier = Modifier.height(12.dp))
-        Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+        Text(title, color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
         Spacer(modifier = Modifier.height(12.dp))
         LazyColumn(modifier = Modifier.fillMaxWidth().height(320.dp)) {
             lazyItems(items, key = { label(it) }) { item ->

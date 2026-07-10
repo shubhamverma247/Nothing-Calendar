@@ -260,6 +260,7 @@ internal val mono = FontFamily.SansSerif
 private const val BOOT_PREFS = "dotcal_boot"
 private const val BOOT_THEME_KEY = "theme_mode"
 private const val BOOT_ACCENT_KEY = "accent_color"
+private const val BOOT_DEFAULT_VIEW_KEY = "default_view"
 private enum class DeleteSource { Editor, Detail }
 private data class PendingDelete(
     val event: CalendarEvent,
@@ -288,6 +289,7 @@ fun DotCalApp(
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val assignableAccounts by viewModel.assignableAccounts.collectAsStateWithLifecycle()
     val lastSelectedEventAccountId by viewModel.lastSelectedEventAccountId.collectAsStateWithLifecycle()
+    val conflictWarnings by viewModel.conflictWarnings.collectAsStateWithLifecycle()
     val holidayCountries by viewModel.holidayCountries.collectAsStateWithLifecycle()
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val syncMetadata by viewModel.syncMetadata.collectAsStateWithLifecycle()
@@ -339,6 +341,9 @@ fun DotCalApp(
     }
     val bootAccentColor = remember(bootPreferences) {
         AccentColor.fromStorage(bootPreferences.getString(BOOT_ACCENT_KEY, null))
+    }
+    val bootDefaultView = remember(bootPreferences) {
+        CalendarTab.fromStorage(bootPreferences.getString(BOOT_DEFAULT_VIEW_KEY, null))
     }
     val bootPalette = remember(bootAccentColor) {
         dotCalBootPalette(bootAccentColor)
@@ -454,7 +459,7 @@ fun DotCalApp(
         context.calendarPreferencesDataStore.data.map { preferences ->
             CalendarTab.fromStorage(preferences[CalendarPreferences.KEY_DEFAULT_VIEW])
         }
-    }.collectAsStateWithLifecycle(initialValue = CalendarTab.Month)
+    }.collectAsStateWithLifecycle(initialValue = bootDefaultView)
     val storedSelectedDateValue by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_LAST_SELECTED_DATE].orEmpty()
@@ -481,16 +486,32 @@ fun DotCalApp(
             stored.takeIf { it >= 0 }
         }
     }.collectAsStateWithLifecycle(initialValue = 5)
+    val defaultEventDurationMinutes by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            val stored = preferences[CalendarPreferences.KEY_DEFAULT_EVENT_DURATION] ?: 60
+            stored.takeIf { it in defaultEventDurationOptions } ?: 60
+        }
+    }.collectAsStateWithLifecycle(initialValue = 60)
     val defaultAllDayReminderTime by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             parseStoredTime(preferences[CalendarPreferences.KEY_DEFAULT_ALL_DAY_REMINDER_TIME]) ?: LocalTime.of(8, 0)
         }
     }.collectAsStateWithLifecycle(initialValue = LocalTime.of(8, 0))
+    val use24HourFormat by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_24_HOUR_FORMAT] ?: true
+        }
+    }.collectAsStateWithLifecycle(initialValue = true)
     val weekStartOption by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             parseWeekStartOption(preferences[CalendarPreferences.KEY_WEEK_START])
         }
     }.collectAsStateWithLifecycle(initialValue = WeekStartOption.RegionDefault)
+    val showWeekNumbers by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_SHOW_WEEK_NUMBERS] ?: false
+        }
+    }.collectAsStateWithLifecycle(initialValue = false)
     val widgetTransparent by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_WIDGET_TRANSPARENT] ?: false
@@ -676,16 +697,17 @@ fun DotCalApp(
             }
         }
     }
-    var calendarTab by remember { mutableStateOf<CalendarTab?>(null) }
+    var calendarTab by remember { mutableStateOf(storedCalendarTab) }
     LaunchedEffect(storedCalendarTab) {
-        if (calendarTab == null) calendarTab = storedCalendarTab
+        calendarTab = storedCalendarTab
     }
-    val activeCalendarTab = calendarTab ?: storedCalendarTab
+    val activeCalendarTab = calendarTab
     SystemBarColorSync(palette)
-    LaunchedEffect(resolvedThemeMode, resolvedAccentColor, systemDark) {
+    LaunchedEffect(resolvedThemeMode, resolvedAccentColor, storedCalendarTab, systemDark) {
         bootPreferences.edit()
             .putString(BOOT_THEME_KEY, resolvedThemeMode.name)
             .putString(BOOT_ACCENT_KEY, resolvedAccentColor.storageValue)
+            .putString(BOOT_DEFAULT_VIEW_KEY, storedCalendarTab.name)
             .apply()
         WidgetUpdateWorker.enqueue(context)
     }
@@ -767,6 +789,7 @@ fun DotCalApp(
     }
     fun selectCalendarTab(tab: CalendarTab) {
         calendarTab = tab
+        bootPreferences.edit().putString(BOOT_DEFAULT_VIEW_KEY, tab.name).apply()
         scope.launch {
             context.calendarPreferencesDataStore.edit { preferences ->
                 preferences[CalendarPreferences.KEY_DEFAULT_VIEW] = tab.name
@@ -1051,6 +1074,7 @@ fun DotCalApp(
                                         eventsByDate = eventsByDate,
                                         palette = palette,
                                         weekStart = weekStartDay,
+                                        showWeekNumbers = showWeekNumbers,
                                         onPrevious = viewModel::previousMonth,
                                         onNext = viewModel::nextMonth,
                                         onJumpToday = { viewModel.selectDate(LocalDate.now()) },
@@ -1085,6 +1109,7 @@ fun DotCalApp(
                                         eventsByDate = eventsByDate,
                                         palette = palette,
                                         weekStart = weekStartDay,
+                                        showWeekNumbers = showWeekNumbers,
                                         onPreviousWeek = { viewModel.selectDate(selectedDate.minusWeeks(1)) },
                                         onNextWeek = { viewModel.selectDate(selectedDate.plusWeeks(1)) },
                                         onJumpToday = { viewModel.selectDate(LocalDate.now()) },
@@ -1237,6 +1262,9 @@ fun DotCalApp(
                 isSyncing = isSyncing,
                 birthdayEnabled = birthdayEnabled,
                 defaultReminderMinutes = defaultReminderMinutes,
+                defaultEventDurationMinutes = defaultEventDurationMinutes,
+                defaultCalendarTab = storedCalendarTab,
+                showWeekNumbers = showWeekNumbers,
                 defaultAllDayReminderTime = defaultAllDayReminderTime,
                 weekStartOption = weekStartOption,
                 widgetTransparent = widgetTransparent,
@@ -1285,6 +1313,23 @@ fun DotCalApp(
                             } else {
                                 preferences[CalendarPreferences.KEY_DEFAULT_REMINDER] = minutes
                             }
+                        }
+                    }
+                },
+                onDefaultEventDurationSelected = { minutes ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_DEFAULT_EVENT_DURATION] = minutes
+                        }
+                    }
+                },
+                onDefaultViewSelected = { tab ->
+                    selectCalendarTab(tab)
+                },
+                onShowWeekNumbersChange = { enabled ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_SHOW_WEEK_NUMBERS] = enabled
                         }
                     }
                 },
@@ -1679,10 +1724,14 @@ fun DotCalApp(
                 } else {
                     reminders.firstOrNull { it.eventId == editingEvent?.baseEventId() }?.minutesBefore
                 },
+                defaultEventDurationMinutes = defaultEventDurationMinutes,
                 accounts = assignableAccounts,
                 lastSelectedAccountId = lastSelectedEventAccountId,
                 palette = palette,
                 isPro = isPro,
+                conflictWarnings = conflictWarnings,
+                use24HourFormat = use24HourFormat,
+                onConflictRangeChanged = viewModel::refreshConflictWarnings,
                 prefill = quickAddPrefill,
                 templatePrefill = templatePrefill,
                 onSaveTemplate = { template -> viewModel.saveTemplate(template) },
@@ -1692,6 +1741,7 @@ fun DotCalApp(
                     addEditorDateOverride = null
                     quickAddPrefill = null
                     templatePrefill = null
+                    viewModel.clearConflictWarnings()
                     addSheet = false
                 },
                 onSave = { data, scope ->
@@ -1701,6 +1751,7 @@ fun DotCalApp(
                         addEditorDateOverride = null
                         quickAddPrefill = null
                         templatePrefill = null
+                        viewModel.clearConflictWarnings()
                         addSheet = false
                     }
                 },

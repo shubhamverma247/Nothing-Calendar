@@ -264,7 +264,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Widget Pack Config", "Transparent widgets plus DotCal dot texture"),
     ProFeature("Date Calculator", "Calculate days between dates instantly"),
     ProFeature("Custom Accent Colors", "Extra palettes plus any custom hex color"),
-    ProFeature("Quick Add", "Type 'gym every mon 7am' â€” we build the event"),
+    ProFeature("Quick Add", "Type 'gym every mon 7am' - we build the event"),
     ProFeature("Advanced Recurrence", "Every N weeks, nth weekday, end date or count"),
     ProFeature("App Lock & Private Vault", "PIN lock plus hidden events and tasks"),
     ProFeature("Event & Task Templates", "Save presets and reuse them from the + button"),
@@ -324,7 +324,7 @@ internal fun PaywallScreen(
                 modifier = Modifier.size(64.dp),
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Text("You're Pro!", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            Text("You're Pro!", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 24.sp)
         }
         return
     }
@@ -346,7 +346,7 @@ internal fun PaywallScreen(
             }
         }
 
-        // ? Header â€” icon + title side by side, no vertical gap.
+        // ? Header - icon + title side by side, no vertical gap.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -363,7 +363,7 @@ internal fun PaywallScreen(
             Text(
                 "DotCal Pro",
                 color = palette.primaryText,
-                fontFamily = mono,
+                fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
                 fontSize = 24.sp,
                 textAlign = TextAlign.Center,
@@ -377,7 +377,7 @@ internal fun PaywallScreen(
                 .weight(1f),
         ) {
 
-        // ? Feature list â€” bordered card.
+        // ? Feature list - bordered card.
         Column(
             modifier = Modifier
                 .padding(horizontal = 28.dp)
@@ -420,7 +420,7 @@ internal fun PaywallScreen(
         }
         Spacer(modifier = Modifier.height(10.dp))
 
-        // ? Buy button â€” accent bg, rounded, full width.
+        // ? Buy button - accent bg, rounded, full width.
         val buyEnabled = connected && !purchasing
         Box(
             modifier = Modifier
@@ -457,7 +457,7 @@ internal fun PaywallScreen(
                 .noRippleClickable {
                     viewModel.restorePro { restored ->
                         val message = if (restored) {
-                            "Purchase restored â€” enjoy DotCal Pro!"
+                            "Purchase restored - enjoy DotCal Pro!"
                         } else {
                             "No previous purchase found on this account"
                         }
@@ -519,7 +519,7 @@ internal fun SearchScreen(
     val trimmed = query.trim()
 
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
-    // Debounced query â€” re-run the DAO search a beat after typing stops.
+    // Debounced query - re-run the DAO search a beat after typing stops.
     LaunchedEffect(query) {
         delay(220)
         onQueryChange(query)
@@ -558,7 +558,7 @@ internal fun SearchScreen(
             Text(
                 "Search",
                 color = palette.primaryText,
-                fontFamily = mono,
+                fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 modifier = Modifier.align(Alignment.Center),
@@ -590,7 +590,7 @@ internal fun SearchScreen(
                         decorationBox = { inner ->
                             if (query.isEmpty()) {
                                 Text(
-                                    "Title, location, notesâ€¦",
+                                    "Title, location, notes...",
                                     color = palette.disabledText,
                                     fontFamily = mono,
                                     fontWeight = FontWeight.Bold,
@@ -825,7 +825,7 @@ private fun SearchTaskResultRow(task: CalendarEvent, palette: DotCalPalette, onC
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("TASK â€¢ $whenLabel", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 1)
+            Text("TASK / $whenLabel", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 1)
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 task.title,
@@ -872,7 +872,7 @@ internal fun QuickAddScreen(
             Text(
                 "Quick Add",
                 color = palette.primaryText,
-                fontFamily = mono,
+                fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 modifier = Modifier.align(Alignment.Center),
@@ -928,7 +928,7 @@ internal fun QuickAddScreen(
                 CalcSectionLabel("Preview", palette)
                 Spacer(modifier = Modifier.height(10.dp))
                 CalcFieldGroup(palette) {
-                    QuickAddPreviewRow("Title", parsed.title.ifBlank { "(none â€” add in next step)" }, palette)
+                    QuickAddPreviewRow("Title", parsed.title.ifBlank { "(none - add in next step)" }, palette)
                     HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
                     QuickAddPreviewRow("When", quickAddWhenLabel(parsed), palette)
                     parsed.rrule?.let { rule ->
@@ -1009,9 +1009,9 @@ private fun quickAddWhenLabel(result: QuickAddResult): String {
     val date = result.date.format(editorDateFormatter)
     val time = result.startTime
     return if (result.isAllDay || time == null) {
-        "$date Â· All-day"
+        "$date / All-day"
     } else {
-        "$date Â· ${time.format(editorTimeFormatter)}"
+        "$date / ${time.format(editorTimeFormatter)}"
     }
 }
 
@@ -1033,7 +1033,7 @@ internal fun BulkTemplatePickerSheet(
         dragHandle = null,
     ) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 22.dp, vertical = 18.dp)) {
-            Text("Apply Template", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Apply Template", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(6.dp))
             Text("Choose an event template to stamp onto selected dates.", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(14.dp))
@@ -1077,7 +1077,7 @@ internal fun TemplatesScreen(
             Text(
                 "Templates",
                 color = palette.primaryText,
-                fontFamily = mono,
+                fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 modifier = Modifier.align(Alignment.Center),
@@ -1090,7 +1090,7 @@ internal fun TemplatesScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("No templates yet", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text("No templates yet", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     "Open any event or task, then tap \"Save as template\" to reuse it any time.",
@@ -1184,7 +1184,7 @@ private fun templateSummaryLabel(t: EventTemplate): String {
         parts.add(formatDurationShort(t.durationMinutes))
     }
     t.rrule?.let { parts.add(RecurrenceRule.parse(it)?.humanLabel() ?: "Repeats") }
-    return parts.joinToString(" Â· ")
+    return parts.joinToString(" / ")
 }
 
 private fun formatDurationShort(minutes: Int): String {
@@ -1217,7 +1217,7 @@ internal fun FocusProfilesScreen(
             Text(
                 "Calendar Sets",
                 color = palette.primaryText,
-                fontFamily = mono,
+                fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 modifier = Modifier.align(Alignment.Center),
@@ -1230,10 +1230,10 @@ internal fun FocusProfilesScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("No calendar sets yet", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text("No calendar sets yet", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    "Show or hide calendars the way you want, then save that view as a set â€” Work, Personal, Family â€” and switch between them any time.",
+                    "Show or hide calendars the way you want, then save that view as a set - Work, Personal, Family - and switch between them any time.",
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 13.sp,
@@ -1358,7 +1358,7 @@ internal fun ShiftPatternsScreen(
             IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
-            Text("Shift Patterns", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center))
+            Text("Shift Patterns", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center))
             HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.align(Alignment.BottomCenter))
         }
         LazyColumn(
@@ -1536,7 +1536,7 @@ private fun ShiftTypeEditorDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
-        title = { Text(if (existing == null) "Shift type" else "Edit shift type", color = palette.primaryText, fontFamily = mono) },
+        title = { Text(if (existing == null) "Shift type" else "Edit shift type", color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
@@ -1599,7 +1599,7 @@ private fun ShiftPatternEditorDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
-        title = { Text("Build pattern", color = palette.primaryText, fontFamily = mono) },
+        title = { Text("Build pattern", color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
@@ -1665,7 +1665,7 @@ private fun ShiftGenerateDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
-        title = { Text("Generate shifts", color = palette.primaryText, fontFamily = mono) },
+        title = { Text("Generate shifts", color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(pattern.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold)
@@ -1792,7 +1792,7 @@ internal fun RecentlyDeletedScreen(
             Text(
                 "Recently Deleted",
                 color = palette.primaryText,
-                fontFamily = mono,
+                fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 modifier = Modifier.align(Alignment.Center),
@@ -1820,7 +1820,7 @@ internal fun RecentlyDeletedScreen(
                     Text(
                         "Nothing here",
                         color = palette.secondaryText,
-                        fontFamily = mono,
+                        fontFamily = LocalHeadingFont.current,
                         fontSize = 16.sp,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1945,7 +1945,7 @@ private fun SwipeableDeletedRow(
                 Text("Delete", color = Color.White, fontFamily = mono, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             }
         }
-        // Foreground content â€” drag left to reveal actions, tap to close when open.
+        // Foreground content - drag left to reveal actions, tap to close when open.
         Row(
             modifier = Modifier
                 .offset { IntOffset(offsetX.value.roundToInt(), 0) }
@@ -1978,7 +1978,7 @@ private fun SwipeableDeletedRow(
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = "${deletedWhenLabel(event)} Â· deleted ${deletedAgoLabel(snapshot.deletedAtMs, nowMs)}",
+                    text = "${deletedWhenLabel(event)} / deleted ${deletedAgoLabel(snapshot.deletedAtMs, nowMs)}",
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 12.sp,
@@ -1994,13 +1994,13 @@ private fun SwipeableDeletedRow(
 private fun deletedWhenLabel(event: CalendarEvent): String {
     val prefix = if (event.isTask == 1) "Task" else "Event"
     // Tasks with no due date store startTimeMs = 0.
-    if (event.isTask == 1 && event.startTimeMs <= 0L) return "$prefix â€¢ No due date"
+    if (event.isTask == 1 && event.startTimeMs <= 0L) return "$prefix / No due date"
     val zone = runCatching { java.time.ZoneId.of(event.timeZone) }.getOrDefault(java.time.ZoneId.systemDefault())
     val start = java.time.Instant.ofEpochMilli(event.startTimeMs).atZone(zone)
     val dateFmt = java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault())
     val timeFmt = java.time.format.DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
     val date = start.format(dateFmt)
-    return if (event.isAllDay == 1) "$prefix â€¢ $date" else "$prefix â€¢ $date, ${start.format(timeFmt)}"
+    return if (event.isAllDay == 1) "$prefix / $date" else "$prefix / $date, ${start.format(timeFmt)}"
 }
 
 /** Relative "deleted X ago" phrasing from a deletion timestamp. */
@@ -2043,7 +2043,7 @@ internal fun DateCalculatorScreen(
             Text(
                 "Date Calculator",
                 color = palette.primaryText,
-                fontFamily = mono,
+                fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 modifier = Modifier.align(Alignment.Center),
@@ -2386,3 +2386,4 @@ internal fun TwoOptionSegmentedControl(
         }
     }
 }
+

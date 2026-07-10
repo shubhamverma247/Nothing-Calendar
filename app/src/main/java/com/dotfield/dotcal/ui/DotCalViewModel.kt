@@ -11,6 +11,7 @@ import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
+import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.billing.ProManager
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.profiles.FocusProfile
@@ -23,6 +24,8 @@ import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.sync.CalendarSyncResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -74,6 +77,10 @@ class DotCalViewModel(
 
     private val _lastSelectedEventAccountId = MutableStateFlow<String?>(null)
     val lastSelectedEventAccountId: StateFlow<String?> = _lastSelectedEventAccountId
+
+    private var conflictWarningJob: Job? = null
+    private val _conflictWarnings = MutableStateFlow<List<CalendarEvent>>(emptyList())
+    val conflictWarnings: StateFlow<List<CalendarEvent>> = _conflictWarnings
 
     val syncMetadata: StateFlow<List<SyncMetadata>> = repository.observeSyncMetadata()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -170,6 +177,36 @@ class DotCalViewModel(
 
     fun closeEventDetail() {
         _detailEvent.value = null
+    }
+
+    fun refreshConflictWarnings(
+        existing: CalendarEvent?,
+        startDate: LocalDate,
+        endDate: LocalDate,
+        startTime: LocalTime,
+        endTime: LocalTime,
+        isAllDay: Boolean,
+    ) {
+        conflictWarningJob?.cancel()
+        if (isAllDay || !endDate.atTime(endTime).isAfter(startDate.atTime(startTime))) {
+            _conflictWarnings.value = emptyList()
+            return
+        }
+        conflictWarningJob = viewModelScope.launch {
+            delay(300)
+            _conflictWarnings.value = repository.findConflictWarnings(
+                startDate = startDate,
+                endDate = endDate,
+                startTime = startTime,
+                endTime = endTime,
+                excludedEventId = existing?.baseEventId(),
+            )
+        }
+    }
+
+    fun clearConflictWarnings() {
+        conflictWarningJob?.cancel()
+        _conflictWarnings.value = emptyList()
     }
 
     fun saveEvent(

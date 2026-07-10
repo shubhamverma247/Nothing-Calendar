@@ -33,6 +33,24 @@ interface CalendarDao {
     )
     fun observeEvents(rangeStartMs: Long, rangeEndMs: Long): Flow<List<CalendarEvent>>
 
+    @Query(
+        """
+        SELECT calendar_events.* FROM calendar_events
+        INNER JOIN calendar_accounts ON calendar_accounts.id = calendar_events.accountId
+        WHERE calendar_events.isTask = 0
+        AND calendar_events.isAllDay = 0
+        AND calendar_events.isCompleted = 0
+        AND calendar_events.source != 'BIRTHDAY'
+        AND calendar_accounts.isVisible = 1
+        AND (
+            (startTimeMs < :rangeEndMs AND endTimeMs > :rangeStartMs)
+            OR (rrule IS NOT NULL AND rrule != '' AND startTimeMs < :rangeEndMs)
+        )
+        ORDER BY calendar_events.startTimeMs ASC
+        """,
+    )
+    suspend fun getVisibleTimedEventsForConflictWarning(rangeStartMs: Long, rangeEndMs: Long): List<CalendarEvent>
+
     @Query("SELECT * FROM calendar_accounts WHERE id = :accountId LIMIT 1")
     suspend fun getAccount(accountId: String): CalendarAccount?
 

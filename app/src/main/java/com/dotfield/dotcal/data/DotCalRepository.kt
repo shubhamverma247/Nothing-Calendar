@@ -369,6 +369,35 @@ class DotCalRepository(
             }
     }
 
+    suspend fun findConflictWarnings(
+        startDate: LocalDate,
+        endDate: LocalDate,
+        startTime: LocalTime,
+        endTime: LocalTime,
+        excludedEventId: String?,
+    ): List<CalendarEvent> {
+        val zoneId = ZoneId.systemDefault()
+        val startMs = startDate.atTime(startTime).atZone(zoneId).toInstant().toEpochMilli()
+        val endMs = endDate.atTime(endTime).atZone(zoneId).toInstant().toEpochMilli()
+        if (endMs <= startMs) return emptyList()
+        val queryStartDate = startDate.minusDays(1)
+        val queryEndDate = endDate.plusDays(2)
+        return withContext(Dispatchers.IO) {
+            val privateIds = privacyManager.observePrivateVaultIds().first()
+            val rawEvents = dao.getVisibleTimedEventsForConflictWarning(startMs, endMs)
+                .filterOutPrivate(privateIds)
+            withContext(Dispatchers.Default) {
+                expandRecurringEvents(rawEvents, queryStartDate, queryEndDate)
+                    .asSequence()
+                    .filter { event -> excludedEventId == null || event.baseEventId() != excludedEventId }
+                    .filter { event -> event.isAllDay == 0 && event.isCompleted == 0 && event.source != "BIRTHDAY" }
+                    .filter { event -> event.startTimeMs < endMs && event.conflictEndTimeMs() > startMs }
+                    .sortedBy { event -> event.startTimeMs }
+                    .toList()
+            }
+        }
+    }
+
     fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks()
         .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
         .map { tasks ->
@@ -1018,6 +1047,10 @@ class DotCalRepository(
 
     private fun LocalDate.atStartMs(): Long {
         return atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }
+
+    private fun CalendarEvent.conflictEndTimeMs(): Long {
+        return endTimeMs.coerceAtLeast(startTimeMs + 15 * 60 * 1000L)
     }
 
     private suspend fun saveDetachedOccurrence(existing: CalendarEvent, data: EventEditorData, zoneId: ZoneId) {

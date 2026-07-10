@@ -282,7 +282,7 @@ internal fun AgendaDateHeader(date: LocalDate, isFirst: Boolean, palette: DotCal
         Text(
             date.dayOfMonth.toString().padStart(2, '0'),
             color = palette.primaryText,
-            fontFamily = mono,
+            fontFamily = LocalHeadingFont.current,
             fontWeight = FontWeight.Bold,
             fontSize = 26.sp,
             lineHeight = 26.sp,

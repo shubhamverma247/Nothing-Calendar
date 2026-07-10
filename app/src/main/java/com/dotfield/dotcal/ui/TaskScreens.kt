@@ -148,6 +148,7 @@ internal fun TaskDetailScreen(
                 "Task Details",
                 modifier = Modifier.weight(1f),
                 color = palette.primaryText,
+                fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 16.sp,
                 textAlign = TextAlign.Center,
@@ -168,6 +169,7 @@ internal fun TaskDetailScreen(
                 Text(
                     task.title,
                     color = palette.primaryText,
+                    fontFamily = LocalHeadingFont.current,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 32.sp,
                     lineHeight = 38.sp,
@@ -718,7 +720,7 @@ internal fun TaskEditorSheet(
                 Text(
                     if (task == null) "Add Task" else "Edit Task",
                     color = palette.primaryText,
-                    fontFamily = mono,
+                    fontFamily = LocalHeadingFont.current,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 22.sp,
                     modifier = Modifier.weight(1f),
@@ -1002,7 +1004,7 @@ private fun TaskTimeChoiceSheet(
                 .padding(top = 4.dp, bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(title, color = palette.primaryText, fontFamily = mono, fontSize = 20.sp)
+            Text(title, color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontSize = 20.sp)
             Text(
                 LocalTime.of(pickedHour, pickedMinute).format(timeFormatter),
                 color = palette.secondaryText,

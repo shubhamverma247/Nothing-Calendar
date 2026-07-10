@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -74,6 +75,7 @@ import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.WeekFields
 import java.util.Locale
 
 @Composable
@@ -83,6 +85,7 @@ internal fun MonthView(
     eventsByDate: Map<LocalDate, List<CalendarEvent>>,
     palette: DotCalPalette,
     weekStart: DayOfWeek,
+    showWeekNumbers: Boolean,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onJumpToday: () -> Unit,
@@ -113,6 +116,9 @@ internal fun MonthView(
             },
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(32.dp).background(palette.calendarSurface)) {
+            if (showWeekNumbers) {
+                WeekNumberCell(label = "", palette = palette, modifier = Modifier.width(36.dp).fillMaxHeight())
+            }
             weekDayLabels.forEach {
                 Text(
                     it,
@@ -125,18 +131,34 @@ internal fun MonthView(
             }
         }
 
-        LazyVerticalGrid(columns = GridCells.Fixed(7), userScrollEnabled = false, modifier = Modifier.fillMaxWidth()) {
-            items(days, key = { it.toEpochDay() }) { day ->
-                DayCell(
-                    date = day,
-                    activeMonth = YearMonth.from(month),
-                    isSelected = day == selectedDate,
-                    isBulkSelected = day in selectedBulkDates,
-                    events = eventsByDate[day].orEmpty(),
-                    palette = palette,
-                    onClick = { onDateSelected(day) },
-                    onLongPress = { onBulkSelectionStart(day) },
-                )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val weekNumberWidth = if (showWeekNumbers) 36.dp else 0.dp
+            val dayCellSize = (maxWidth - weekNumberWidth) / 7f
+            Column(modifier = Modifier.fillMaxWidth()) {
+                days.chunked(7).forEach { week ->
+                    Row(modifier = Modifier.fillMaxWidth().height(dayCellSize)) {
+                        if (showWeekNumbers) {
+                            WeekNumberCell(
+                                label = isoWeekNumberLabel(week.first()),
+                                palette = palette,
+                                modifier = Modifier.width(36.dp).fillMaxHeight(),
+                            )
+                        }
+                        week.forEach { day ->
+                            DayCell(
+                                date = day,
+                                activeMonth = YearMonth.from(month),
+                                isSelected = day == selectedDate,
+                                isBulkSelected = day in selectedBulkDates,
+                                events = eventsByDate[day].orEmpty(),
+                                palette = palette,
+                                onClick = { onDateSelected(day) },
+                                onLongPress = { onBulkSelectionStart(day) },
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                            )
+                        }
+                    }
+                }
             }
         }
         if (selectedBulkDates.isNotEmpty()) {
@@ -168,12 +190,13 @@ private fun DayCell(
     palette: DotCalPalette,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val isToday = date == LocalDate.now()
     val inMonth = YearMonth.from(date) == activeMonth
     val haptic = LocalHapticFeedback.current
     Box(
-        modifier = Modifier
+        modifier = modifier
             .aspectRatio(1f)
             .background(palette.calendarSurface)
             .pointerInput(date) {
@@ -240,6 +263,7 @@ internal fun WeekView(
     eventsByDate: Map<LocalDate, List<CalendarEvent>>,
     palette: DotCalPalette,
     weekStart: DayOfWeek,
+    showWeekNumbers: Boolean,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     onJumpToday: () -> Unit,
@@ -272,7 +296,11 @@ internal fun WeekView(
             },
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(64.dp).background(palette.calendarSurface)) {
-            Spacer(modifier = Modifier.width(32.dp))
+            if (showWeekNumbers) {
+                WeekNumberCell(label = isoWeekNumberLabel(days.first()), palette = palette, modifier = Modifier.width(36.dp).fillMaxHeight())
+            } else {
+                Spacer(modifier = Modifier.width(32.dp))
+            }
             days.forEach { day ->
                 WeekDayHeader(
                     date = day,
@@ -286,7 +314,7 @@ internal fun WeekView(
 
         if (allDayEvents.isNotEmpty()) {
             Row(modifier = Modifier.fillMaxWidth().height(32.dp).background(palette.calendarSurface)) {
-                Spacer(modifier = Modifier.width(32.dp))
+                Spacer(modifier = Modifier.width(if (showWeekNumbers) 36.dp else 32.dp))
                 days.forEach { day ->
                     val event = allDayEvents.firstOrNull { it.localDate() == day }
                     Box(
@@ -312,7 +340,7 @@ internal fun WeekView(
                     .verticalScroll(rememberScrollState()),
             ) {
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    WeekTimeColumn(selectedDate = selectedDate, days = days, palette = palette)
+                    WeekTimeColumn(selectedDate = selectedDate, days = days, palette = palette, width = if (showWeekNumbers) 36.dp else 32.dp)
                     days.forEach { day ->
                         WeekDayColumn(
                             day = day,
@@ -331,6 +359,33 @@ internal fun WeekView(
             TimelineBottomBoundary(palette = palette, modifier = Modifier.align(Alignment.BottomCenter))
         }
     }
+}
+
+@Composable
+private fun WeekNumberCell(
+    label: String,
+    palette: DotCalPalette,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .width(28.dp)
+            .background(palette.calendarSurface),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = palette.secondaryText.copy(alpha = 0.72f),
+            fontFamily = mono,
+            fontSize = 9.sp,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+private fun isoWeekNumberLabel(date: LocalDate): String {
+    return "W${date.get(WeekFields.ISO.weekOfWeekBasedYear()).toString().padStart(2, '0')}"
 }
 
 @Composable
@@ -379,12 +434,13 @@ private fun WeekTimeColumn(
     selectedDate: LocalDate,
     days: List<LocalDate>,
     palette: DotCalPalette,
+    width: androidx.compose.ui.unit.Dp = 32.dp,
 ) {
     val now = LocalTime.now()
     val showNow = selectedDate in days && selectedDate == LocalDate.now()
     Box(
         modifier = Modifier
-            .width(32.dp)
+            .width(width)
             .height((24 * WEEK_HOUR_HEIGHT_DP).dp)
             .drawBehind {
                 repeat(23) { hour ->

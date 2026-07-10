@@ -17,6 +17,7 @@ internal const val DAY_HOUR_HEIGHT_DP = 72f
 internal const val TIMELINE_BOTTOM_CLEARANCE_DP = 104f
 internal val reminderOptions = listOf(null, 5, 10, 30, 60, 1440)
 internal val taskReminderOptions = listOf(null, 5, 10, 30, 1440)
+internal val defaultEventDurationOptions = listOf(15, 30, 60, 90, 120)
 
 internal data class RecurrenceOption(val label: String, val rrule: String?)
 
