@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items as lazyItems
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -156,8 +158,10 @@ internal fun EventCardChevron(tint: Color) {
 internal fun AgendaPreview(
     selectedDate: LocalDate,
     events: List<CalendarEvent>,
+    forecast: List<DayDensityForecastItem>,
     palette: DotCalPalette,
     onAdd: () -> Unit,
+    onDateSelected: (LocalDate) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
 ) {
     val agendaStartDate = LocalDate.now()
@@ -167,13 +171,36 @@ internal fun AgendaPreview(
             .sortedBy { it.startTimeMs }
     }
     val eventsByDate = remember(upcomingEvents) { upcomingEvents.groupBy { it.localDate() } }
+    val dateIndex = remember(eventsByDate) {
+        buildMap {
+            var index = 1
+            eventsByDate.forEach { (date, dateEvents) ->
+                put(date, index)
+                index += 1 + dateEvents.size
+            }
+        }
+    }
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedDate, dateIndex) {
+        val targetIndex = dateIndex[selectedDate] ?: 0
+        listState.animateScrollToItem(targetIndex)
+    }
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .background(palette.calendarSurface),
         contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 0.dp, bottom = 90.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        item(key = "agenda-density-forecast") {
+            DayDensityForecastStrip(
+                forecast = forecast,
+                selectedDate = selectedDate,
+                palette = palette,
+                onDateSelected = onDateSelected,
+            )
+        }
         if (upcomingEvents.isEmpty()) {
             item {
                 AgendaEndOfDayState(
@@ -200,6 +227,87 @@ internal fun AgendaPreview(
                     onAdd = onAdd,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DayDensityForecastStrip(
+    forecast: List<DayDensityForecastItem>,
+    selectedDate: LocalDate,
+    palette: DotCalPalette,
+    onDateSelected: (LocalDate) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        forecast.forEach { item ->
+            DayDensityDot(
+                item = item,
+                selected = item.date == selectedDate,
+                palette = palette,
+                modifier = Modifier.weight(1f),
+                onClick = { onDateSelected(item.date) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DayDensityDot(
+    item: DayDensityForecastItem,
+    selected: Boolean,
+    palette: DotCalPalette,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val dotSize = when (item.intensity) {
+        0 -> 7.dp
+        1 -> 11.dp
+        2 -> 15.dp
+        else -> 19.dp
+    }
+    val fillColor = when (item.intensity) {
+        0 -> Color.Transparent
+        1 -> palette.accent.copy(alpha = 0.32f)
+        2 -> palette.accent.copy(alpha = 0.62f)
+        else -> palette.accent
+    }
+    val outlineColor = if (selected) palette.primaryText else palette.line
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            item.date.dayOfWeek.name.take(1),
+            color = if (selected) palette.primaryText else palette.secondaryText,
+            fontFamily = mono,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 10.sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .border(if (selected) 1.5.dp else 0.dp, outlineColor, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(dotSize)
+                    .clip(CircleShape)
+                    .background(fillColor)
+                    .border(1.dp, if (item.intensity == 0) palette.line else Color.Transparent, CircleShape),
+            )
         }
     }
 }

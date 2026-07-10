@@ -286,6 +286,7 @@ fun DotCalApp(
     val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
     val events by viewModel.events.collectAsStateWithLifecycle()
     val agendaEvents by viewModel.agendaEvents.collectAsStateWithLifecycle()
+    val dayDensityForecast by viewModel.dayDensityForecast.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val assignableAccounts by viewModel.assignableAccounts.collectAsStateWithLifecycle()
@@ -1205,8 +1206,10 @@ fun DotCalApp(
                                     CalendarTab.Agenda -> AgendaPreview(
                                         selectedDate = selectedDate,
                                         events = agendaEvents,
+                                        forecast = dayDensityForecast,
                                         palette = palette,
                                         onAdd = { openAddEditor() },
+                                        onDateSelected = viewModel::selectDate,
                                         onEventClick = viewModel::openEventDetail,
                                     )
                                     CalendarTab.Year -> YearView(

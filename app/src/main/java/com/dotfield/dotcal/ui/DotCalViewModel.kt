@@ -36,11 +36,18 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 
 data class HolidayCountryUiItem(
     val code: String,
     val name: String,
     val isSelected: Boolean,
+)
+
+data class DayDensityForecastItem(
+    val date: LocalDate,
+    val scheduledMinutes: Int,
+    val intensity: Int,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -65,6 +72,10 @@ class DotCalViewModel(
 
     val agendaEvents: StateFlow<List<CalendarEvent>> = repository.observeUpcomingAgendaEvents(LocalDate.now())
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val dayDensityForecast: StateFlow<List<DayDensityForecastItem>> = agendaEvents
+        .map(::buildDayDensityForecast)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), buildDayDensityForecast(emptyList()))
 
     val tasks: StateFlow<List<CalendarEvent>> = repository.observeTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -575,5 +586,34 @@ class DotCalViewModel(
         return java.time.Instant.ofEpochMilli(startTimeMs)
             .atZone(java.time.ZoneId.of(timeZone))
             .toLocalDate()
+    }
+
+    private fun buildDayDensityForecast(events: List<CalendarEvent>): List<DayDensityForecastItem> {
+        val zoneId = ZoneId.systemDefault()
+        val today = LocalDate.now()
+        return List(7) { index ->
+            val date = today.plusDays(index.toLong())
+            val dayStart = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
+            val dayEnd = date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+            val minutes = events
+                .asSequence()
+                .filter { it.isTask == 0 && it.isAllDay == 0 && it.source != "BIRTHDAY" }
+                .map { event ->
+                    val start = event.startTimeMs.coerceAtLeast(dayStart)
+                    val end = event.endTimeMs.coerceAtMost(dayEnd)
+                    ((end - start).coerceAtLeast(0L) / 60_000L).toInt()
+                }
+                .sum()
+            DayDensityForecastItem(
+                date = date,
+                scheduledMinutes = minutes,
+                intensity = when {
+                    minutes == 0 -> 0
+                    minutes <= 120 -> 1
+                    minutes <= 300 -> 2
+                    else -> 3
+                },
+            )
+        }
     }
 }

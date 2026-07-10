@@ -78,6 +78,7 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 - A5 Scheduling Defaults + ISO Week Numbers built and locally verified.
 - A1 Duplicate Event / Copy to Date built and locally verified by debug build/install.
 - A3 Share Event built and locally verified by debug build/install.
+- C2 Day Density Forecast Strip built and locally verified by debug build. APK install was attempted but blocked because no adb device/emulator was connected.
 
 ## Pro / Billing
 
@@ -94,6 +95,7 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 
 ## Latest Work
 
+- 2026-07-10: C2 Day Density Forecast Strip completed. Agenda now renders a slim next-7-days density strip above the agenda list. Each day is labeled by weekday initial and uses four dot intensity/size levels based on total scheduled timed event minutes, excluding all-day events, tasks, and BIRTHDAY-source rows. Tapping a dot selects that date and scrolls Agenda to the matching date header when present. Computation derives from the existing expanded agenda stream in `DotCalViewModel`; no storage, DataStore key, Room schema, package/deep-link, sync, holiday, onboarding, or task changes. `:app:assembleDebug` passed in 2m 42s. Debug APK install was attempted via the SDK adb path, but `adb devices` returned no connected devices/emulators, so install could not be completed. No manual phone UI QA run.
 - 2026-07-10: Task Detail action layout and Event Edit back behavior follow-up completed after device feedback. Task Detail top-right Edit text was replaced with a three-dot More button. More opens a compact bottom sheet with Edit, Add to Calendar, and Move/Restore Private Vault as applicable. Task Detail body now only shows Mark Complete/Reopen Task and Delete Task. Event Detail -> More -> Edit no longer closes Event Detail before opening the editor, so Android back gesture from the event editor returns to Event Detail instead of Month view; saving from that path refreshes the detail row. No Room schema/package/deep-link/DB changes. `:app:assembleDebug` passed in 1m 32s, debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-10: Event Detail action layout polish completed after device feedback. Top-right Edit text was replaced with a three-dot More button. More opens a compact bottom sheet with Edit, Share, Duplicate, Copy to date, and Move/Restore Private Vault actions as applicable. Event Detail body now only shows the destructive Delete Event action for writable events, fixing the clipped `Copy to date...` label and the oversized two-option Share sheet by reusing a compact action-sheet layout. No Room schema/package/deep-link/DB changes. `:app:assembleDebug` passed in 2m 13s, debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-10: A3 Share Event completed. Event Detail now shows Share for all events. Share opens a bottom sheet with Share as text and Share as .ics. Text payload includes title, date/time respecting `KEY_24_HOUR_FORMAT`, location, and notes. `.ics` payload reuses `IcsExporter` for a single event with reminders and `rrule`, writes only to cache through a new `FileProvider`, shares mime `text/calendar`, and excludes images/voice notes. No Room schema/package/deep-link/DB changes. `:app:assembleDebug` passed in 2m 35s, debug APK installed successfully. No manual phone UI QA run.
@@ -113,7 +115,7 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## Current Next Step
 
-- For app feature work, read `Docs/fable-suggested-feature.md`; A2, A5, A1, and A3 are complete. Suggested next implementation from the user's current ranked list is C2 Day Density Forecast Strip unless the user picks another feature. A4 Jump to Date remains available from the original suggested build order.
+- For app feature work, read `Docs/fable-suggested-feature.md`; A2, A5, A1, A3, and C2 are complete. Suggested next implementation from the user's current ranked list is B5 Year-in-Pixels Heatmap unless the user picks another feature. A4 Jump to Date remains available from the original suggested build order.
 - Play/Internal-testing billing verification remains the next product check.
 - Advanced Reminder Profiles remains NOT started; do not start without explicit confirmation.
 - Offline OCR remains possible later; do not start unless user asks.
@@ -134,6 +136,6 @@ First read `Docs/HANDOFF.md`; it is source of truth. Respect Hard Rules, schema 
 
 For new feature work, also read `Docs/fable-suggested-feature.md`; it contains the current feature-batch instructions/specs. Suggested first feature is A2 Conflict Warning unless the user picks another item.
 
-Latest status: `versionCode 9` / `versionName 1.1.3`; `:app:assembleDebug` passing. Latest app-code change completed Task Detail action layout and Event Edit back behavior follow-up: Task Detail More opens compact actions while body only shows Mark Complete/Reopen and Delete Task; Event editor back gesture from Event Detail returns to Event Detail; debug APK installed successfully. No manual phone UI QA run.
+Latest status: `versionCode 9` / `versionName 1.1.3`; `:app:assembleDebug` passing. Latest app-code change completed C2 Day Density Forecast Strip in Agenda. Debug APK install was attempted, but no adb device/emulator was connected, so install could not complete. No manual phone UI QA run.
 
 Strict: do not change Room schema, package id, deep links, DB filename, onboarding/calendar/sync/holidays/tasks unless required by the task. No Hilt, no Compose Nav graph. Build after app-code changes with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`, then install debug APK on the connected phone unless user says not to. Do not run manual phone UI QA unless explicitly asked. Do not start Advanced Reminder Profiles or Offline OCR without confirmation.
