@@ -209,13 +209,14 @@ import com.dotfield.dotcal.data.billing.ProManager
 import com.dotfield.dotcal.presentation.datecalculator.DateCalculatorViewModel
 import androidx.datastore.preferences.core.edit
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
-import com.dotfield.dotcal.BuildConfig
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
+import com.dotfield.dotcal.data.ics.IcsExporter
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
 import com.dotfield.dotcal.data.privacy.AppLockState
@@ -318,6 +319,9 @@ fun DotCalApp(
     var selectedBulkDates by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
     var showBulkTemplatePicker by remember { mutableStateOf(false) }
     var quickAddPrefill by remember { mutableStateOf<QuickAddResult?>(null) }
+    var duplicateDraftPrefill by remember { mutableStateOf<EventEditorData?>(null) }
+    var pendingCopyToDateEvent by remember { mutableStateOf<CalendarEvent?>(null) }
+    var pendingShareEvent by remember { mutableStateOf<CalendarEvent?>(null) }
     var templatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     var taskTemplatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
@@ -799,6 +803,7 @@ fun DotCalApp(
     fun openAddEditor(startTime: LocalTime = LocalTime.of(9, 0), date: LocalDate? = null) {
         editorSessionKey = UUID.randomUUID().toString()
         quickAddPrefill = null
+        duplicateDraftPrefill = null
         templatePrefill = null
         addStartTime = startTime
         addEditorDateOverride = date
@@ -808,6 +813,7 @@ fun DotCalApp(
     fun openQuickAddResult(result: QuickAddResult) {
         editorSessionKey = UUID.randomUUID().toString()
         quickAddPrefill = result
+        duplicateDraftPrefill = null
         templatePrefill = null
         addStartTime = result.startTime ?: LocalTime.of(9, 0)
         addEditorDateOverride = result.date
@@ -845,6 +851,7 @@ fun DotCalApp(
         } else {
             editorSessionKey = UUID.randomUUID().toString()
             quickAddPrefill = null
+            duplicateDraftPrefill = null
             templatePrefill = template
             addStartTime = template.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60) } ?: LocalTime.of(9, 0)
             addEditorDateOverride = selectedDate
@@ -881,14 +888,61 @@ fun DotCalApp(
     fun openEditEditor(event: CalendarEvent) {
         editorSessionKey = UUID.randomUUID().toString()
         quickAddPrefill = null
+        duplicateDraftPrefill = null
         templatePrefill = null
         addEditorDateOverride = null
         editingEvent = event
         addSheet = true
     }
+    fun duplicateDraftFor(event: CalendarEvent, targetDate: LocalDate? = null): EventEditorData {
+        val originalStartDate = event.localDate()
+        val copyDate = targetDate ?: originalStartDate
+        val originalEndDate = event.endLocalDateForEditor()
+        val endDate = copyDate.plusDays(
+            java.time.temporal.ChronoUnit.DAYS.between(originalStartDate, originalEndDate).coerceAtLeast(0),
+        )
+        val reminderMinutes = reminders
+            .filter { it.eventId == event.baseEventId() }
+            .map { it.minutesBefore }
+            .distinct()
+            .sorted()
+        return EventEditorData(
+            eventId = UUID.randomUUID().toString(),
+            accountId = event.accountId,
+            title = event.title,
+            description = event.description,
+            location = event.location,
+            date = copyDate,
+            endDate = endDate,
+            startTime = event.startLocalTime(),
+            endTime = event.endLocalTime(),
+            isAllDay = event.isAllDay == 1,
+            reminderMinutes = reminderMinutes.firstOrNull(),
+            reminderMinutesList = reminderMinutes.takeIf { it.isNotEmpty() },
+            rrule = event.rrule,
+            imageUris = "[]",
+            voiceNotePath = null,
+            colorHex = event.colorHex,
+        )
+    }
+    fun openDuplicateEditor(event: CalendarEvent, targetDate: LocalDate? = null) {
+        val draft = duplicateDraftFor(event, targetDate)
+        editorSessionKey = UUID.randomUUID().toString()
+        quickAddPrefill = null
+        duplicateDraftPrefill = draft
+        templatePrefill = null
+        addStartTime = draft.startTime
+        addEditorDateOverride = draft.date
+        editingEvent = null
+        pendingCopyToDateEvent = null
+        viewModel.closeEventDetail()
+        addSheet = true
+    }
     fun closeTopSurface() {
         when {
             showPaywall -> showPaywall = false
+            pendingShareEvent != null -> pendingShareEvent = null
+            pendingCopyToDateEvent != null -> pendingCopyToDateEvent = null
             showBulkTemplatePicker -> showBulkTemplatePicker = false
             showTemplates -> showTemplates = false
             showFocusProfiles -> showFocusProfiles = false
@@ -901,6 +955,7 @@ fun DotCalApp(
                 editingEvent = null
                 addEditorDateOverride = null
                 quickAddPrefill = null
+                duplicateDraftPrefill = null
                 templatePrefill = null
                 addSheet = false
             }
@@ -992,7 +1047,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || showTemplates || showFocusProfiles || showSearch || showRecentlyDeleted || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showSearch || showRecentlyDeleted || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -1609,8 +1664,10 @@ fun DotCalApp(
                     onBack = viewModel::closeEventDetail,
                     onEdit = {
                         openEditEditor(event)
-                        viewModel.closeEventDetail()
                     },
+                    onShare = { pendingShareEvent = event },
+                    onDuplicate = { openDuplicateEditor(event) },
+                    onCopyToDate = { pendingCopyToDateEvent = event },
                     onMoveToPrivate = {
                         if (!isPro) {
                             showPaywall = true
@@ -1631,6 +1688,48 @@ fun DotCalApp(
                     },
                 )
             }
+        }
+        pendingShareEvent?.let { event ->
+            ModalBottomSheet(
+                onDismissRequest = { pendingShareEvent = null },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = palette.dialogSurface,
+                dragHandle = { BottomSheetDragHandle(palette) },
+            ) {
+                CompactActionSheetContent(
+                    title = "Share Event",
+                    actions = ShareEventOption.entries.map { option ->
+                        CompactActionItem(option.label) {
+                            val eventReminders = reminders.filter { it.eventId == event.baseEventId() }
+                            pendingShareEvent = null
+                            when (option) {
+                                ShareEventOption.Text -> shareEventText(context, event, use24HourFormat, palette)
+                                ShareEventOption.Ics -> scope.launch {
+                                    val result = withContext(Dispatchers.IO) {
+                                        runCatching { createSingleEventIcsUri(context, event, eventReminders) }
+                                    }
+                                    result
+                                        .onSuccess { uri -> shareEventIcs(context, event, uri, palette) }
+                                        .onFailure { showDotCalToast(context, palette, "Could not share event") }
+                                }
+                            }
+                        }
+                    },
+                    palette = palette,
+                )
+            }
+        }
+        pendingCopyToDateEvent?.let { event ->
+            DateTimeChoiceSheet(
+                title = "Copy to date",
+                selectedDate = event.localDate(),
+                selectedTime = event.startLocalTime(),
+                minDate = null,
+                includeTime = false,
+                palette = palette,
+                onDismiss = { pendingCopyToDateEvent = null },
+                onSelected = { pickedDate, _ -> openDuplicateEditor(event, pickedDate) },
+            )
         }
         AnimatedVisibility(
             visible = taskDetail != null,
@@ -1720,7 +1819,7 @@ fun DotCalApp(
                 selectedDate = addEditorDateOverride ?: selectedDate,
                 selectedTime = addStartTime,
                 initialReminderMinutes = if (editingEvent == null) {
-                    defaultReminderMinutes
+                    duplicateDraftPrefill?.reminderMinutes ?: defaultReminderMinutes
                 } else {
                     reminders.firstOrNull { it.eventId == editingEvent?.baseEventId() }?.minutesBefore
                 },
@@ -1733,6 +1832,7 @@ fun DotCalApp(
                 use24HourFormat = use24HourFormat,
                 onConflictRangeChanged = viewModel::refreshConflictWarnings,
                 prefill = quickAddPrefill,
+                draftPrefill = duplicateDraftPrefill,
                 templatePrefill = templatePrefill,
                 onSaveTemplate = { template -> viewModel.saveTemplate(template) },
                 onRequestPro = { showPaywall = true },
@@ -1740,19 +1840,26 @@ fun DotCalApp(
                     editingEvent = null
                     addEditorDateOverride = null
                     quickAddPrefill = null
+                    duplicateDraftPrefill = null
                     templatePrefill = null
                     viewModel.clearConflictWarnings()
                     addSheet = false
                 },
                 onSave = { data, scope ->
+                    val shouldReturnToDetail = detailEvent != null && editingEvent != null
+                    val savedEventId = data.eventId ?: editingEvent?.baseEventId()
                     viewModel.saveEvent(editingEvent, data, scope) {
                         viewModel.selectDate(data.date)
                         editingEvent = null
                         addEditorDateOverride = null
                         quickAddPrefill = null
+                        duplicateDraftPrefill = null
                         templatePrefill = null
                         viewModel.clearConflictWarnings()
                         addSheet = false
+                        if (shouldReturnToDetail && savedEventId != null) {
+                            viewModel.openEventDetailById(savedEventId)
+                        }
                     }
                 },
                 onDelete = editingEvent?.let { eventToDelete ->
@@ -2033,3 +2140,95 @@ fun DotCalApp(
 
 }
 
+private enum class ShareEventOption(val label: String) {
+    Text("Share as text"),
+    Ics("Share as .ics"),
+}
+
+private fun shareEventText(
+    context: Context,
+    event: CalendarEvent,
+    use24HourFormat: Boolean,
+    palette: DotCalPalette,
+) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, event.title)
+        putExtra(Intent.EXTRA_TEXT, event.shareText(use24HourFormat))
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "Share Event"))
+    }.onFailure {
+        showDotCalToast(context, palette, "No share target found")
+    }
+}
+
+private fun shareEventIcs(
+    context: Context,
+    event: CalendarEvent,
+    uri: Uri,
+    palette: DotCalPalette,
+) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/calendar"
+        putExtra(Intent.EXTRA_SUBJECT, event.title)
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "Share Event"))
+    }.onFailure {
+        showDotCalToast(context, palette, "No share target found")
+    }
+}
+
+private fun createSingleEventIcsUri(
+    context: Context,
+    event: CalendarEvent,
+    reminders: List<EventReminder>,
+): Uri {
+    val shareDir = File(context.cacheDir, "shared_events").apply { mkdirs() }
+    val file = File(shareDir, "${event.title.safeShareFilename()}-${event.baseEventId().safeShareFilename()}.ics")
+    val remindersById = mapOf(event.id to reminders, event.baseEventId() to reminders)
+    file.writeText(IcsExporter.export(listOf(event), remindersById), Charsets.UTF_8)
+    return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+}
+
+private fun CalendarEvent.shareText(use24HourFormat: Boolean): String {
+    val lines = mutableListOf(title)
+    lines += "Date: ${shareDateTimeLine(use24HourFormat)}"
+    if (location.isNotBlank()) lines += "Location: $location"
+    if (description.isNotBlank()) lines += "Notes: $description"
+    return lines.joinToString("\n")
+}
+
+private fun CalendarEvent.shareDateTimeLine(use24HourFormat: Boolean): String {
+    val start = Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault())
+    val end = Instant.ofEpochMilli(endTimeMs).atZone(ZoneId.systemDefault())
+    val dateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.getDefault())
+    if (isAllDay == 1) {
+        val startDate = start.toLocalDate()
+        val endDate = end.minusNanos(1).toLocalDate()
+        return if (startDate == endDate) {
+            "${startDate.format(dateFormatter)} (All-day)"
+        } else {
+            "${startDate.format(dateFormatter)} - ${endDate.format(dateFormatter)} (All-day)"
+        }
+    }
+    val timeFormatter = DateTimeFormatter.ofPattern(if (use24HourFormat) "HH:mm" else "h:mm a", Locale.getDefault())
+    val startText = "${start.toLocalDate().format(dateFormatter)} ${start.toLocalTime().format(timeFormatter)}"
+    val endText = if (start.toLocalDate() == end.toLocalDate()) {
+        end.toLocalTime().format(timeFormatter)
+    } else {
+        "${end.toLocalDate().format(dateFormatter)} ${end.toLocalTime().format(timeFormatter)}"
+    }
+    return "$startText - $endText"
+}
+
+private fun String.safeShareFilename(): String {
+    val cleaned = lowercase(Locale.US)
+        .replace(Regex("[^a-z0-9]+"), "-")
+        .trim('-')
+        .take(48)
+    return cleaned.ifBlank { "event" }
+}

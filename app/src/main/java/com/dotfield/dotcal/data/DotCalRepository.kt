@@ -57,6 +57,7 @@ data class EventEditorData(
     val endTime: LocalTime,
     val isAllDay: Boolean,
     val reminderMinutes: Int?,
+    val reminderMinutesList: List<Int>? = null,
     val rrule: String?,
     val imageUris: String = "[]",
     val voiceNotePath: String? = null,
@@ -659,7 +660,12 @@ class DotCalRepository(
         dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
         dao.upsertEvent(event)
         dao.deleteRemindersForEvent(eventId)
-        data.reminderMinutes?.let { minutes ->
+        val reminderMinutes = data.reminderMinutesList
+            ?.distinct()
+            ?.sorted()
+            ?: data.reminderMinutes?.let { listOf(it) }
+            ?: emptyList()
+        reminderMinutes.forEach { minutes ->
             val reminder = EventReminder(
                 eventId = eventId,
                 minutesBefore = minutes,

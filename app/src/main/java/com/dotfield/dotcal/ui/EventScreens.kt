@@ -254,6 +254,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun EventDetailScreen(
     event: CalendarEvent,
@@ -263,6 +264,9 @@ internal fun EventDetailScreen(
     isPrivate: Boolean,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onShare: () -> Unit,
+    onDuplicate: () -> Unit,
+    onCopyToDate: () -> Unit,
     onMoveToPrivate: () -> Unit,
     onRestoreFromPrivate: () -> Unit,
     onDelete: () -> Unit,
@@ -270,6 +274,7 @@ internal fun EventDetailScreen(
     val isReadOnly = event.source == "BIRTHDAY" || event.source == "HOLIDAY"
     val imageUris = remember(event.imageUris) { parseJsonStringArray(event.imageUris) }
     var previewImageUri by remember { mutableStateOf<String?>(null) }
+    var showActions by remember { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxSize().background(palette.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
@@ -293,14 +298,9 @@ internal fun EventDetailScreen(
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                 )
-                Box(modifier = Modifier.width(64.dp).height(48.dp), contentAlignment = Alignment.Center) {
-                    if (!isReadOnly) {
-                        Text(
-                            "Edit",
-                            color = palette.primaryText,
-                            fontSize = 15.sp,
-                            modifier = Modifier.clickable(onClick = onEdit).padding(horizontal = 12.dp, vertical = 10.dp),
-                        )
+                Box(modifier = Modifier.width(48.dp).height(48.dp), contentAlignment = Alignment.Center) {
+                    IconButton(onClick = { showActions = true }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = palette.primaryText)
                     }
                 }
             }
@@ -412,18 +412,6 @@ internal fun EventDetailScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                     if (!isReadOnly) {
                         Text(
-                            if (isPrivate) "Restore From Private Vault" else "Move to Private Vault",
-                            color = palette.primaryText,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 15.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(onClick = if (isPrivate) onRestoreFromPrivate else onMoveToPrivate)
-                                .padding(vertical = 12.dp),
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
                             "Delete Event",
                             color = palette.accent,
                             fontWeight = FontWeight.Medium,
@@ -440,6 +428,88 @@ internal fun EventDetailScreen(
         }
         previewImageUri?.let { uri ->
             FullscreenImagePreview(uri = uri, palette = palette, onDismiss = { previewImageUri = null })
+        }
+        if (showActions) {
+            val actions = buildList {
+                if (!isReadOnly) {
+                    add(CompactActionItem("Edit") {
+                        showActions = false
+                        onEdit()
+                    })
+                }
+                add(CompactActionItem("Share") {
+                    showActions = false
+                    onShare()
+                })
+                if (!isReadOnly) {
+                    add(CompactActionItem("Duplicate") {
+                        showActions = false
+                        onDuplicate()
+                    })
+                    add(CompactActionItem("Copy to date") {
+                        showActions = false
+                        onCopyToDate()
+                    })
+                    add(CompactActionItem(if (isPrivate) "Restore From Private Vault" else "Move to Private Vault") {
+                        showActions = false
+                        if (isPrivate) onRestoreFromPrivate() else onMoveToPrivate()
+                    })
+                }
+            }
+            ModalBottomSheet(
+                onDismissRequest = { showActions = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = palette.dialogSurface,
+                dragHandle = { BottomSheetDragHandle(palette) },
+            ) {
+                CompactActionSheetContent(
+                    title = "Event Options",
+                    actions = actions,
+                    palette = palette,
+                )
+            }
+        }
+    }
+}
+
+internal data class CompactActionItem(
+    val label: String,
+    val onClick: () -> Unit,
+)
+
+@Composable
+internal fun CompactActionSheetContent(
+    title: String,
+    actions: List<CompactActionItem>,
+    palette: DotCalPalette,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(palette.dialogSurface)
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 22.dp),
+    ) {
+        Text(
+            title,
+            color = palette.primaryText,
+            fontFamily = LocalHeadingFont.current,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 18.sp,
+            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+        )
+        actions.forEach { action ->
+            Text(
+                action.label,
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontSize = 16.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = action.onClick)
+                    .padding(vertical = 16.dp),
+            )
+            HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
         }
     }
 }
@@ -1069,16 +1139,18 @@ internal fun EventEditorScreen(
     onSave: (EventEditorData, RecurringEditScope) -> Unit,
     onDelete: ((RecurringEditScope) -> Unit)?,
     prefill: QuickAddResult? = null,
+    draftPrefill: EventEditorData? = null,
     templatePrefill: EventTemplate? = null,
     onSaveTemplate: ((EventTemplate) -> Unit)? = null,
 ) {
     // Quick-add prefill only seeds a brand-new event, never an existing one being edited.
-    val seed = if (event == null) prefill else null
+    val draft = if (event == null) draftPrefill else null
+    val seed = if (event == null && draft == null) prefill else null
     // Template prefill likewise only seeds a brand-new event. Applied to the current date.
-    val tpl = if (event == null) templatePrefill else null
+    val tpl = if (event == null && draft == null) templatePrefill else null
     val tplStartTime: LocalTime? = tpl?.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60) }
-    val editorDate = event?.localDate() ?: seed?.date ?: selectedDate
-    val initialStart = event?.startLocalTime() ?: seed?.startTime ?: tplStartTime ?: selectedTime
+    val editorDate = event?.localDate() ?: draft?.date ?: seed?.date ?: selectedDate
+    val initialStart = event?.startLocalTime() ?: draft?.startTime ?: seed?.startTime ?: tplStartTime ?: selectedTime
     val tplEndTime: LocalTime? = if (tpl != null && tplStartTime != null) {
         tplStartTime.plusMinutes(tpl.durationMinutes.toLong())
     } else null
@@ -1086,29 +1158,34 @@ internal fun EventEditorScreen(
         editorDate.plusDays(((tpl.startMinuteOfDay + tpl.durationMinutes) / (24 * 60)).toLong())
     } else null
     val defaultEndDateTime = editorDate.atTime(initialStart).plusMinutes(defaultEventDurationMinutes.toLong())
-    val initialEnd = event?.endLocalTime() ?: seed?.endTime ?: tplEndTime ?: defaultEndDateTime.toLocalTime()
-    val initialEndDate = event?.endLocalDateForEditor() ?: seed?.endDate ?: tplEndDate ?: defaultEndDateTime.toLocalDate()
+    val initialEnd = event?.endLocalTime() ?: draft?.endTime ?: seed?.endTime ?: tplEndTime ?: defaultEndDateTime.toLocalTime()
+    val initialEndDate = event?.endLocalDateForEditor() ?: draft?.endDate ?: seed?.endDate ?: tplEndDate ?: defaultEndDateTime.toLocalDate()
     val editorStateKey = event?.id ?: editorSessionKey
     val draftEventId = remember(editorStateKey) {
         if (event == null || event.isRecurrenceOccurrence()) UUID.randomUUID().toString() else event.baseEventId()
     }
-    var title by remember(editorStateKey) { mutableStateOf(event?.title ?: seed?.title ?: tpl?.title ?: "") }
-    var description by remember(editorStateKey) { mutableStateOf(event?.description ?: tpl?.description ?: "") }
-    var location by remember(editorStateKey) { mutableStateOf(event?.location ?: tpl?.location ?: "") }
+    var title by remember(editorStateKey) { mutableStateOf(event?.title ?: draft?.title ?: seed?.title ?: tpl?.title ?: "") }
+    var description by remember(editorStateKey) { mutableStateOf(event?.description ?: draft?.description ?: tpl?.description ?: "") }
+    var location by remember(editorStateKey) { mutableStateOf(event?.location ?: draft?.location ?: tpl?.location ?: "") }
     var startDate by remember(editorStateKey) { mutableStateOf(editorDate) }
     var endDate by remember(editorStateKey) { mutableStateOf(maxOf(editorDate, initialEndDate)) }
     var startTime by remember(editorStateKey) { mutableStateOf(initialStart) }
     var endTime by remember(editorStateKey) {
         mutableStateOf(if (initialEndDate > editorDate) initialEnd else coerceEndAfterStart(initialStart, initialEnd))
     }
-    var allDay by remember(editorStateKey) { mutableStateOf(event?.let { it.isAllDay == 1 } ?: seed?.isAllDay ?: tpl?.isAllDay ?: false) }
-    var reminderMinutes by remember(editorStateKey, initialReminderMinutes) { mutableStateOf(if (tpl != null) tpl.reminderMinutes else initialReminderMinutes) }
-    var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule ?: seed?.rrule ?: tpl?.rrule) }
+    var allDay by remember(editorStateKey) { mutableStateOf(event?.let { it.isAllDay == 1 } ?: draft?.isAllDay ?: seed?.isAllDay ?: tpl?.isAllDay ?: false) }
+    val draftReminderMinutes = remember(editorStateKey) { draft?.reminderMinutesList?.distinct()?.sorted() }
+    var reminderEdited by remember(editorStateKey) { mutableStateOf(false) }
+    var reminderMinutes by remember(editorStateKey, initialReminderMinutes) {
+        mutableStateOf(if (tpl != null) tpl.reminderMinutes else draft?.reminderMinutes ?: draftReminderMinutes?.firstOrNull() ?: initialReminderMinutes)
+    }
+    var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule ?: draft?.rrule ?: seed?.rrule ?: tpl?.rrule) }
     var imageUris by remember(editorStateKey) { mutableStateOf(parseJsonStringArray(event?.imageUris ?: "[]")) }
     var voiceNotePath by remember(editorStateKey) { mutableStateOf(event?.voiceNotePath) }
     val writableAccounts = accounts
     var selectedAccountId by remember(editorStateKey, writableAccounts, lastSelectedAccountId) {
         mutableStateOf(event?.accountId?.takeIf { id -> writableAccounts.any { it.id == id } }
+            ?: draft?.accountId?.takeIf { id -> writableAccounts.any { it.id == id } }
             ?: tpl?.accountId?.takeIf { id -> writableAccounts.any { it.id == id } }
             ?: lastSelectedAccountId?.takeIf { id -> event == null && writableAccounts.any { it.id == id } }
             ?: writableAccounts.firstOrNull { it.isPrimary == 1 }?.id
@@ -1130,7 +1207,7 @@ internal fun EventEditorScreen(
     val context = LocalContext.current
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         pendingPermissionSave?.let { pending ->
-            val data = if (granted) pending.first else pending.first.copy(reminderMinutes = null)
+            val data = if (granted) pending.first else pending.first.copy(reminderMinutes = null, reminderMinutesList = null)
             onSave(data, pending.second)
             pendingPermissionSave = null
             if (!granted) showDotCalToast(context, palette, "Event saved without reminder")
@@ -1185,9 +1262,11 @@ internal fun EventEditorScreen(
             endTime = endTime,
             isAllDay = allDay,
             reminderMinutes = reminderMinutes,
+            reminderMinutesList = if (!reminderEdited) draftReminderMinutes else null,
             rrule = recurrenceRule,
             imageUris = imageUris.toJsonStringArray(),
             voiceNotePath = voiceNotePath,
+            colorHex = draft?.colorHex ?: event?.colorHex,
         )
     }
     fun buildTemplate(name: String): EventTemplate {
@@ -1525,6 +1604,7 @@ internal fun EventEditorScreen(
             palette = palette,
             onDismiss = { showReminderPicker = false },
             onSelected = {
+                reminderEdited = true
                 reminderMinutes = it
                 if (it != null) requestNotificationPermissionForReminder()
                 showReminderPicker = false

@@ -118,6 +118,7 @@ private fun TaskNoDueDateHeader(isFirst: Boolean, palette: DotCalPalette) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TaskDetailScreen(
     task: CalendarEvent,
@@ -132,6 +133,7 @@ internal fun TaskDetailScreen(
     onComplete: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var showActions by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
         Row(
             modifier = Modifier
@@ -154,12 +156,11 @@ internal fun TaskDetailScreen(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )
-            Text(
-                "Edit",
-                color = palette.primaryText,
-                fontSize = 15.sp,
-                modifier = Modifier.clickable(onClick = onEdit).padding(horizontal = 12.dp, vertical = 10.dp),
-            )
+            Box(modifier = Modifier.width(48.dp).height(48.dp), contentAlignment = Alignment.Center) {
+                IconButton(onClick = { showActions = true }, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = palette.primaryText)
+                }
+            }
         }
         LazyColumn(
             modifier = Modifier.fillMaxSize().background(palette.background),
@@ -211,40 +212,16 @@ internal fun TaskDetailScreen(
                         .padding(top = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    if (task.isCompleted != 1) {
-                        Text(
-                            "Add to Calendar",
-                            color = palette.primaryText,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 16.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .clickable(onClick = onTimeBlock)
-                                .padding(vertical = 12.dp),
-                        )
-                    }
                     Text(
-                        if (isPrivate) "Restore From Private Vault" else "Move to Private Vault",
-                        color = palette.primaryText,
+                        if (task.isCompleted == 1) "Reopen Task" else "Mark Complete",
+                        color = palette.accent,
                         fontWeight = FontWeight.Medium,
                         fontSize = 16.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
-                            .clickable(onClick = if (isPrivate) onRestoreFromPrivate else onMoveToPrivate)
+                            .clickable(onClick = onComplete)
                             .padding(vertical = 12.dp),
                     )
-                    if (task.isCompleted != 1) {
-                        Text(
-                            "Mark Complete",
-                            color = palette.accent,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 16.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .clickable(onClick = onComplete)
-                                .padding(vertical = 12.dp),
-                        )
-                    }
                     Text(
                         "Delete Task",
                         color = palette.accent,
@@ -256,6 +233,36 @@ internal fun TaskDetailScreen(
                             .padding(vertical = 12.dp),
                     )
                 }
+            }
+        }
+        if (showActions) {
+            val actions = buildList {
+                add(CompactActionItem("Edit") {
+                    showActions = false
+                    onEdit()
+                })
+                if (task.isCompleted != 1) {
+                    add(CompactActionItem("Add to Calendar") {
+                        showActions = false
+                        onTimeBlock()
+                    })
+                }
+                add(CompactActionItem(if (isPrivate) "Restore From Private Vault" else "Move to Private Vault") {
+                    showActions = false
+                    if (isPrivate) onRestoreFromPrivate() else onMoveToPrivate()
+                })
+            }
+            ModalBottomSheet(
+                onDismissRequest = { showActions = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = palette.dialogSurface,
+                dragHandle = { BottomSheetDragHandle(palette) },
+            ) {
+                CompactActionSheetContent(
+                    title = "Task Options",
+                    actions = actions,
+                    palette = palette,
+                )
             }
         }
     }
