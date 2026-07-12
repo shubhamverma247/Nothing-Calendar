@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -68,6 +69,12 @@ class DotCalViewModel(
     val month: StateFlow<LocalDate> = currentMonth
     val events: StateFlow<List<CalendarEvent>> = currentMonth
         .flatMapLatest(repository::observeEventsForMonth)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val yearEvents: StateFlow<List<CalendarEvent>> = selectedDate
+        .map { it.year }
+        .distinctUntilChanged()
+        .flatMapLatest(repository::observeEventsForYear)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val agendaEvents: StateFlow<List<CalendarEvent>> = repository.observeUpcomingAgendaEvents(LocalDate.now())

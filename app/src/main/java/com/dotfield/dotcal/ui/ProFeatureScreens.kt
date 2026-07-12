@@ -112,6 +112,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
@@ -270,7 +271,35 @@ private val PRO_FEATURES = listOf(
     ProFeature("Event & Task Templates", "Save presets and reuse them from the + button"),
     ProFeature("Calendar Sets", "Save Work/Personal/Family visibility and switch instantly"),
     ProFeature("Shift Patterns", "Build rotating shift cycles and generate them in bulk"),
+    ProFeature("Time Insights", "See hours, busiest days, and task completion"),
 )
+
+private enum class TimeInsightRange(val label: String) {
+    Week("This week"),
+    Month("This month"),
+    Custom("Custom"),
+}
+
+private data class CalendarHourStat(
+    val account: CalendarAccount,
+    val hours: Double,
+)
+
+private data class TimeInsightsStats(
+    val rangeStart: LocalDate,
+    val rangeEnd: LocalDate,
+    val totalHours: Double,
+    val eventCount: Int,
+    val busiestDay: LocalDate?,
+    val busiestDayHours: Double,
+    val taskCompletionRate: Int?,
+    val completedTasks: Int,
+    val totalTasks: Int,
+    val accountHours: List<CalendarHourStat>,
+    val weekdayHours: List<Double>,
+)
+
+private val timeInsightDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
 
 @Composable
 internal fun PaywallScreen(
@@ -742,7 +771,12 @@ private fun SearchFilterDropdown(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Text("v", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = palette.secondaryText,
+                    modifier = Modifier.size(16.dp),
+                )
             }
         }
         DropdownMenu(
@@ -1332,6 +1366,288 @@ private fun FocusProfileCard(
         IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
             Icon(Icons.Default.DeleteOutline, contentDescription = "Delete calendar set", tint = palette.secondaryText, modifier = Modifier.size(20.dp))
         }
+    }
+}
+
+@Composable
+internal fun TimeInsightsScreen(
+    palette: DotCalPalette,
+    events: List<CalendarEvent>,
+    accounts: List<CalendarAccount>,
+    onBack: () -> Unit,
+) {
+    val today = LocalDate.now()
+    val weekStart = remember(today) { today.with(WeekFields.ISO.dayOfWeek(), 1) }
+    var range by remember { mutableStateOf(TimeInsightRange.Week) }
+    var customStart by remember { mutableStateOf(today.minusDays(29)) }
+    var customEnd by remember { mutableStateOf(today) }
+    var pickingStart by remember { mutableStateOf(false) }
+    var pickingEnd by remember { mutableStateOf(false) }
+    val rangeStart = when (range) {
+        TimeInsightRange.Week -> weekStart
+        TimeInsightRange.Month -> today.withDayOfMonth(1)
+        TimeInsightRange.Custom -> minOf(customStart, customEnd)
+    }
+    val rangeEnd = when (range) {
+        TimeInsightRange.Week -> weekStart.plusDays(6)
+        TimeInsightRange.Month -> today.withDayOfMonth(today.lengthOfMonth())
+        TimeInsightRange.Custom -> maxOf(customStart, customEnd)
+    }
+    val stats = remember(events, accounts, rangeStart, rangeEnd) {
+        buildTimeInsightsStats(events, accounts, rangeStart, rangeEnd)
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
+        Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
+            }
+            Text("Time Insights", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center))
+            HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 22.dp),
+            contentPadding = PaddingValues(start = 0.dp, top = 18.dp, end = 0.dp, bottom = 140.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    TimeInsightRange.entries.forEach { option ->
+                        TimeInsightRangeChip(
+                            label = option.label,
+                            selected = range == option,
+                            palette = palette,
+                            modifier = Modifier.weight(1f),
+                            onClick = { range = option },
+                        )
+                    }
+                }
+            }
+            if (range == TimeInsightRange.Custom) {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        TimeInsightDateRow("From", rangeStart, palette, Modifier.weight(1f)) { pickingStart = true }
+                        TimeInsightDateRow("To", rangeEnd, palette, Modifier.weight(1f)) { pickingEnd = true }
+                    }
+                }
+            }
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(palette.eventCardSurface).border(1.dp, palette.eventCardBorder, RoundedCornerShape(24.dp)).padding(18.dp),
+                ) {
+                    Text("${rangeStart.format(timeInsightDateFormatter)} - ${rangeEnd.format(timeInsightDateFormatter)}", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text(formatInsightHours(stats.totalHours), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 34.sp)
+                    Text("scheduled hours", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    TimeInsightMetricCard("Events", stats.eventCount.toString(), palette, Modifier.weight(1f))
+                    TimeInsightMetricCard("Busiest", stats.busiestDay?.dayOfWeek?.name?.take(3) ?: "None", palette, Modifier.weight(1f), footer = if (stats.busiestDayHours > 0.0) formatInsightHours(stats.busiestDayHours) else "")
+                    TimeInsightMetricCard("Tasks", stats.taskCompletionRate?.let { "$it%" } ?: "None", palette, Modifier.weight(1f), footer = if (stats.totalTasks > 0) "${stats.completedTasks}/${stats.totalTasks}" else "")
+                }
+            }
+            item {
+                SettingsSectionTitle("WEEKDAY LOAD", palette)
+                WeekdayHoursChart(hours = stats.weekdayHours, palette = palette)
+            }
+            item {
+                SettingsSectionTitle("CALENDARS", palette)
+                if (stats.accountHours.isEmpty()) {
+                    ShiftEmptyText("No scheduled timed events in this range.", palette)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        val maxHours = stats.accountHours.maxOfOrNull { it.hours }?.coerceAtLeast(0.1) ?: 0.1
+                        stats.accountHours.forEach { item ->
+                            CalendarHoursRow(item = item, maxHours = maxHours, palette = palette)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (pickingStart) {
+        DateTimeChoiceSheet(
+            title = "Start date",
+            selectedDate = customStart,
+            selectedTime = LocalTime.NOON,
+            minDate = null,
+            includeTime = false,
+            palette = palette,
+            onDismiss = { pickingStart = false },
+            onSelected = { date, _ ->
+                customStart = date
+                pickingStart = false
+            },
+        )
+    }
+    if (pickingEnd) {
+        DateTimeChoiceSheet(
+            title = "End date",
+            selectedDate = customEnd,
+            selectedTime = LocalTime.NOON,
+            minDate = null,
+            includeTime = false,
+            palette = palette,
+            onDismiss = { pickingEnd = false },
+            onSelected = { date, _ ->
+                customEnd = date
+                pickingEnd = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun TimeInsightRangeChip(label: String, selected: Boolean, palette: DotCalPalette, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) palette.accent else palette.cell)
+            .noRippleClickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = if (selected) palette.onAccent else palette.secondaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 1)
+    }
+}
+
+@Composable
+private fun TimeInsightDateRow(label: String, date: LocalDate, palette: DotCalPalette, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(
+        modifier = modifier.clip(RoundedCornerShape(16.dp)).background(palette.cell).noRippleClickable(onClick = onClick).padding(12.dp),
+    ) {
+        Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+        Spacer(Modifier.height(4.dp))
+        Text(date.format(timeInsightDateFormatter), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun TimeInsightMetricCard(label: String, value: String, palette: DotCalPalette, modifier: Modifier = Modifier, footer: String = "") {
+    Column(
+        modifier = modifier.height(96.dp).clip(RoundedCornerShape(20.dp)).background(palette.eventCardSurface).border(1.dp, palette.eventCardBorder, RoundedCornerShape(20.dp)).padding(12.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp, maxLines = 1)
+        Column {
+            Text(value, color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 20.sp, maxLines = 1)
+            Text(footer, color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun WeekdayHoursChart(hours: List<Double>, palette: DotCalPalette) {
+    val maxHours = hours.maxOrNull()?.coerceAtLeast(0.1) ?: 0.1
+    Row(
+        modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(22.dp)).background(palette.eventCardSurface).border(1.dp, palette.eventCardBorder, RoundedCornerShape(22.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        val labels = listOf("M", "T", "W", "T", "F", "S", "S")
+        hours.forEachIndexed { index, value ->
+            Column(modifier = Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.58f)
+                            .height(((value / maxHours) * 92).coerceAtLeast(if (value > 0.0) 8.0 else 2.0).dp)
+                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                            .background(if (value > 0.0) palette.accent else palette.line),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(labels[index], color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarHoursRow(item: CalendarHourStat, maxHours: Double, palette: DotCalPalette) {
+    val accountColor = remember(item.account.color) {
+        runCatching { Color(android.graphics.Color.parseColor(item.account.color)) }.getOrDefault(palette.accent)
+    }
+    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.eventCardSurface).border(1.dp, palette.eventCardBorder, RoundedCornerShape(16.dp)).padding(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(9.dp).clip(CircleShape).background(accountColor))
+            Spacer(Modifier.width(8.dp))
+            Text(item.account.displayName, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(formatInsightHours(item.hours), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(10.dp))
+        Box(modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(palette.line)) {
+            Box(modifier = Modifier.fillMaxWidth((item.hours / maxHours).toFloat().coerceIn(0.04f, 1f)).height(6.dp).clip(RoundedCornerShape(3.dp)).background(accountColor))
+        }
+    }
+}
+
+private fun buildTimeInsightsStats(
+    events: List<CalendarEvent>,
+    accounts: List<CalendarAccount>,
+    rangeStart: LocalDate,
+    rangeEnd: LocalDate,
+): TimeInsightsStats {
+    val zone = ZoneId.systemDefault()
+    val startMs = rangeStart.atStartOfDay(zone).toInstant().toEpochMilli()
+    val endMs = rangeEnd.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    val accountMap = accounts.associateBy { it.id }
+    val timedEvents = events.filter { event ->
+        event.isTask == 0 &&
+            event.isAllDay == 0 &&
+            event.source != "BIRTHDAY" &&
+            event.endTimeMs > startMs &&
+            event.startTimeMs < endMs
+    }
+    val tasks = events.filter { event ->
+        event.isTask == 1 &&
+            event.startTimeMs >= startMs &&
+            event.startTimeMs < endMs
+    }
+    val hoursByAccount = mutableMapOf<String, Double>()
+    val hoursByDay = mutableMapOf<LocalDate, Double>()
+    val weekdayHours = MutableList(7) { 0.0 }
+    timedEvents.forEach { event ->
+        val clippedStart = maxOf(event.startTimeMs, startMs)
+        val clippedEnd = minOf(event.endTimeMs, endMs)
+        val hours = ((clippedEnd - clippedStart).coerceAtLeast(0L) / 3_600_000.0)
+        if (hours > 0.0) {
+            hoursByAccount[event.accountId] = (hoursByAccount[event.accountId] ?: 0.0) + hours
+            val date = Instant.ofEpochMilli(clippedStart).atZone(zone).toLocalDate()
+            hoursByDay[date] = (hoursByDay[date] ?: 0.0) + hours
+            val weekdayIndex = date.dayOfWeek.value - 1
+            weekdayHours[weekdayIndex] = weekdayHours[weekdayIndex] + hours
+        }
+    }
+    val accountHours = hoursByAccount.mapNotNull { (accountId, hours) ->
+        accountMap[accountId]?.let { CalendarHourStat(it, hours) }
+    }.sortedByDescending { it.hours }
+    val busiest = hoursByDay.maxByOrNull { it.value }
+    val completedTasks = tasks.count { it.isCompleted == 1 }
+    val completionRate = if (tasks.isEmpty()) null else ((completedTasks * 100.0) / tasks.size).roundToInt()
+    return TimeInsightsStats(
+        rangeStart = rangeStart,
+        rangeEnd = rangeEnd,
+        totalHours = hoursByAccount.values.sum(),
+        eventCount = timedEvents.size,
+        busiestDay = busiest?.key,
+        busiestDayHours = busiest?.value ?: 0.0,
+        taskCompletionRate = completionRate,
+        completedTasks = completedTasks,
+        totalTasks = tasks.size,
+        accountHours = accountHours,
+        weekdayHours = weekdayHours,
+    )
+}
+
+private fun formatInsightHours(hours: Double): String {
+    return if (hours < 10.0) {
+        "${(hours * 10).roundToInt() / 10.0}h"
+    } else {
+        "${hours.roundToInt()}h"
     }
 }
 

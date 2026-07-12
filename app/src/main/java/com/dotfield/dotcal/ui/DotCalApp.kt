@@ -285,6 +285,7 @@ fun DotCalApp(
     val month by viewModel.month.collectAsStateWithLifecycle()
     val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
     val events by viewModel.events.collectAsStateWithLifecycle()
+    val yearEvents by viewModel.yearEvents.collectAsStateWithLifecycle()
     val agendaEvents by viewModel.agendaEvents.collectAsStateWithLifecycle()
     val dayDensityForecast by viewModel.dayDensityForecast.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
@@ -311,6 +312,7 @@ fun DotCalApp(
     var settingsScreen by remember { mutableStateOf(SettingsScreen.Root) }
     var showPaywall by remember { mutableStateOf(false) }
     var showDateCalculator by remember { mutableStateOf(false) }
+    var showTimeInsights by remember { mutableStateOf(false) }
     var showQuickAdd by remember { mutableStateOf(false) }
     var showRecentlyDeleted by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -515,6 +517,11 @@ fun DotCalApp(
     val showWeekNumbers by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_SHOW_WEEK_NUMBERS] ?: false
+        }
+    }.collectAsStateWithLifecycle(initialValue = false)
+    val yearHeatmapEnabled by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_YEAR_HEATMAP] ?: false
         }
     }.collectAsStateWithLifecycle(initialValue = false)
     val widgetTransparent by remember(context) {
@@ -951,6 +958,7 @@ fun DotCalApp(
             showSearch -> showSearch = false
             showRecentlyDeleted -> showRecentlyDeleted = false
             showDateCalculator -> showDateCalculator = false
+            showTimeInsights -> showTimeInsights = false
             showQuickAdd -> showQuickAdd = false
             addSheet -> {
                 editingEvent = null
@@ -1048,7 +1056,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showSearch || showRecentlyDeleted || showDateCalculator || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -1112,6 +1120,28 @@ fun DotCalApp(
                             },
                             onQuickAdd = { if (isPro) showQuickAdd = true else showPaywall = true },
                             onSearch = { showSearch = true },
+                            onCalendarSets = {
+                                if (isPro) {
+                                    viewModel.refreshFocusProfiles()
+                                    showFocusProfiles = true
+                                } else {
+                                    showPaywall = true
+                                }
+                            },
+                            onTimeInsights = {
+                                if (isPro) showTimeInsights = true else showPaywall = true
+                            },
+                            onDateCalculator = {
+                                if (isPro) showDateCalculator = true else showPaywall = true
+                            },
+                            onShiftPatterns = {
+                                if (isPro) {
+                                    viewModel.refreshShiftPatterns()
+                                    showShiftPatterns = true
+                                } else {
+                                    showPaywall = true
+                                }
+                            },
                             onCalendarTabSelected = {
                                 screenTab = ScreenTab.Calendar
                                 previousScreenTab = ScreenTab.Calendar
@@ -1214,9 +1244,21 @@ fun DotCalApp(
                                     )
                                     CalendarTab.Year -> YearView(
                                         selectedDate = selectedDate,
-                                        eventsByDate = eventsByDate,
+                                        eventsByDate = yearEvents.groupBy { it.localDate() },
                                         palette = palette,
                                         weekStart = weekStartDay,
+                                        heatmapEnabled = yearHeatmapEnabled,
+                                        onHeatmapToggle = { enabled ->
+                                            if (!isPro) {
+                                                showPaywall = true
+                                            } else {
+                                                scope.launch {
+                                                    context.calendarPreferencesDataStore.edit { preferences ->
+                                                        preferences[CalendarPreferences.KEY_YEAR_HEATMAP] = enabled
+                                                    }
+                                                }
+                                            }
+                                        },
                                         onPreviousYear = { viewModel.selectDate(selectedDate.minusYears(1)) },
                                         onNextYear = { viewModel.selectDate(selectedDate.plusYears(1)) },
                                         onJumpToday = { viewModel.selectDate(LocalDate.now()) },
@@ -1526,6 +1568,9 @@ fun DotCalApp(
                 },
                 onDateCalculator = {
                     if (isPro) showDateCalculator = true else showPaywall = true
+                },
+                onTimeInsights = {
+                    if (isPro) showTimeInsights = true else showPaywall = true
                 },
                 onAppPrivacy = {
                     if (!isPro) {
@@ -1893,6 +1938,19 @@ fun DotCalApp(
             DateCalculatorScreen(
                 palette = palette,
                 onBack = { showDateCalculator = false },
+            )
+        }
+        AnimatedVisibility(
+            visible = showTimeInsights,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            TimeInsightsScreen(
+                palette = palette,
+                events = events,
+                accounts = accounts,
+                onBack = { showTimeInsights = false },
             )
         }
         AnimatedVisibility(

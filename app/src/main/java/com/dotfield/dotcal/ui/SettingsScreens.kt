@@ -132,8 +132,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -153,7 +151,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
@@ -237,7 +234,6 @@ import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import com.dotfield.dotcal.ui.theme.NBlack
-import com.dotfield.dotcal.ui.theme.NWhite
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -310,6 +306,7 @@ internal fun SettingsPreview(
     onDotCalPro: () -> Unit,
     onRestorePurchase: () -> Unit,
     onDateCalculator: () -> Unit,
+    onTimeInsights: () -> Unit,
     onAppPrivacy: () -> Unit,
     onSetAppLockPin: (String, (Result<Unit>) -> Unit) -> Unit,
     onVerifyAppLockPin: (String, (Boolean) -> Unit) -> Unit,
@@ -344,6 +341,11 @@ internal fun SettingsPreview(
             onAccentSelected = onAccentSelected,
             onAppFontSelected = onAppFontSelected,
             onThemeSettings = { onScreenChange(SettingsScreen.Theme) },
+            onSyncSettings = { onScreenChange(SettingsScreen.Sync) },
+            onCalendarPreferencesSettings = { onScreenChange(SettingsScreen.CalendarPreferences) },
+            onReminderDefaultsSettings = { onScreenChange(SettingsScreen.ReminderDefaults) },
+            onWidgetSettings = { onScreenChange(SettingsScreen.Widgets) },
+            onDataSettings = { onScreenChange(SettingsScreen.DataRestore) },
             syncEnabled = syncEnabled,
             syncIntervalMins = syncIntervalMins,
             syncMetadata = syncMetadata,
@@ -385,6 +387,7 @@ internal fun SettingsPreview(
             onDotCalPro = onDotCalPro,
             onRestorePurchase = onRestorePurchase,
             onDateCalculator = onDateCalculator,
+            onTimeInsights = onTimeInsights,
             onAppPrivacy = onAppPrivacy,
             onRecentlyDeleted = onRecentlyDeleted,
             onTemplates = onTemplates,
@@ -402,14 +405,104 @@ internal fun SettingsPreview(
             modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
         ) {
             ThemeSettings(
-            themeMode = themeMode,
-            accentColor = accentColor,
-            palette = palette,
-            isPro = isPro,
-            onBack = { onScreenChange(SettingsScreen.Root) },
-            onThemeSelected = onThemeSelected,
-            onAccentSelected = onAccentSelected,
-            onRequestPro = onDotCalPro,
+                themeMode = themeMode,
+                accentColor = accentColor,
+                appFont = appFont,
+                palette = palette,
+                isPro = isPro,
+                onBack = { onScreenChange(SettingsScreen.Root) },
+                onThemeSelected = onThemeSelected,
+                onAccentSelected = onAccentSelected,
+                onAppFontSelected = onAppFontSelected,
+                onRequestPro = onDotCalPro,
+            )
+        }
+        AnimatedVisibility(
+            visible = screen == SettingsScreen.CalendarPreferences,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+        ) {
+            CalendarPreferencesSettings(
+                defaultCalendarTab = defaultCalendarTab,
+                showWeekNumbers = showWeekNumbers,
+                birthdayEnabled = birthdayEnabled,
+                weekStartOption = weekStartOption,
+                holidayCountries = holidayCountries,
+                palette = palette,
+                onBack = { onScreenChange(SettingsScreen.Root) },
+                onDefaultViewSelected = onDefaultViewSelected,
+                onShowWeekNumbersChange = onShowWeekNumbersChange,
+                onBirthdayEnabledChange = onBirthdayEnabledChange,
+                onWeekStartSelected = onWeekStartSelected,
+                onGlobalHolidays = { onScreenChange(SettingsScreen.GlobalHolidays) },
+            )
+        }
+        AnimatedVisibility(
+            visible = screen == SettingsScreen.ReminderDefaults,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+        ) {
+            ReminderDefaultsSettings(
+                defaultReminderMinutes = defaultReminderMinutes,
+                defaultEventDurationMinutes = defaultEventDurationMinutes,
+                defaultAllDayReminderTime = defaultAllDayReminderTime,
+                palette = palette,
+                onBack = { onScreenChange(SettingsScreen.Root) },
+                onDefaultReminderSelected = onDefaultReminderSelected,
+                onDefaultEventDurationSelected = onDefaultEventDurationSelected,
+                onDefaultAllDayReminderTimeSelected = onDefaultAllDayReminderTimeSelected,
+            )
+        }
+        AnimatedVisibility(
+            visible = screen == SettingsScreen.Widgets,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+        ) {
+            WidgetSettings(
+                widgetTransparent = widgetTransparent,
+                widgetDotTexture = widgetDotTexture,
+                isPro = isPro,
+                palette = palette,
+                onBack = { onScreenChange(SettingsScreen.Root) },
+                onWidgetTransparentChange = onWidgetTransparentChange,
+                onWidgetDotTextureChange = onWidgetDotTextureChange,
+            )
+        }
+        AnimatedVisibility(
+            visible = screen == SettingsScreen.DataRestore,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+        ) {
+            DataRestoreSettings(
+                palette = palette,
+                onBack = { onScreenChange(SettingsScreen.Root) },
+                onExportIcs = onExportIcs,
+                onImportIcs = onImportIcs,
+                onBackup = onBackup,
+                onRestore = onRestore,
+                onRecentlyDeleted = onRecentlyDeleted,
+            )
+        }
+        AnimatedVisibility(
+            visible = screen == SettingsScreen.Sync,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+        ) {
+            SyncSettings(
+                syncEnabled = syncEnabled,
+                syncIntervalMins = syncIntervalMins,
+                syncMetadata = syncMetadata,
+                isSyncing = isSyncing,
+                palette = palette,
+                onBack = { onScreenChange(SettingsScreen.Root) },
+                onSyncEnabledChange = onSyncEnabledChange,
+                onSyncIntervalSelected = onSyncIntervalSelected,
+                onSyncNow = onSyncNow,
             )
         }
         AnimatedVisibility(
@@ -501,6 +594,11 @@ internal fun SettingsRoot(
     onAccentSelected: (AccentColor) -> Unit,
     onAppFontSelected: (AppFont) -> Unit,
     onThemeSettings: () -> Unit,
+    onSyncSettings: () -> Unit,
+    onCalendarPreferencesSettings: () -> Unit,
+    onReminderDefaultsSettings: () -> Unit,
+    onWidgetSettings: () -> Unit,
+    onDataSettings: () -> Unit,
     syncEnabled: Boolean,
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
@@ -542,6 +640,7 @@ internal fun SettingsRoot(
     onDotCalPro: () -> Unit,
     onRestorePurchase: () -> Unit,
     onDateCalculator: () -> Unit,
+    onTimeInsights: () -> Unit,
     onAppPrivacy: () -> Unit,
     onRecentlyDeleted: () -> Unit,
     onTemplates: () -> Unit,
@@ -555,7 +654,6 @@ internal fun SettingsRoot(
     val context = LocalContext.current
     val listState = rememberLazyListState()
     val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
-    var showFontSheet by remember { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 150.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
             item {
@@ -572,74 +670,30 @@ internal fun SettingsRoot(
             )
             SettingsDivider(palette)
 
-            SettingsSectionTitle("General", palette)
-            SettingsWeekStartRow(
-                selectedOption = weekStartOption,
+            SettingsSectionTitle("Settings", palette)
+            SettingsMenuRow(
+                title = "Calendar Preferences",
+                value = defaultCalendarTab.label,
                 palette = palette,
-                onWeekStartSelected = onWeekStartSelected,
-            )
-            SettingsDefaultViewRow(
-                selectedTab = defaultCalendarTab,
-                palette = palette,
-                onViewSelected = onDefaultViewSelected,
-            )
-            SettingsToggleRow(
-                title = "Week numbers",
-                subtitle = "Show ISO week labels in Month and Week",
-                checked = showWeekNumbers,
-                palette = palette,
-                onCheckedChange = onShowWeekNumbersChange,
+                onClick = onCalendarPreferencesSettings,
             )
             SettingsMenuRow(
-                title = "Global Holidays",
-                value = selectedHolidayCountriesLabel(holidayCountries),
+                title = "Reminder Defaults",
+                value = reminderLabel(defaultReminderMinutes),
                 palette = palette,
-                onClick = onGlobalHolidays,
+                onClick = onReminderDefaultsSettings,
             )
-            SettingsDivider(palette)
-
-            SettingsSectionTitle("Reminders", palette)
-            SettingsDefaultReminderRow(
-                selectedMinutes = defaultReminderMinutes,
-                palette = palette,
-                onReminderSelected = onDefaultReminderSelected,
-            )
-            SettingsDefaultEventDurationRow(
-                selectedMinutes = defaultEventDurationMinutes,
-                palette = palette,
-                onDurationSelected = onDefaultEventDurationSelected,
-            )
-            SettingsAllDayReminderTimeRow(
-                selectedTime = defaultAllDayReminderTime,
-                palette = palette,
-                onTimeSelected = onDefaultAllDayReminderTimeSelected,
-            )
-            SettingsDivider(palette)
-
-            SettingsSectionTitle("Additional", palette)
             SettingsMenuRow(
-                title = "Theme",
+                title = "Appearance",
                 value = "${themeMode.label} / ${accentColor.label}",
                 palette = palette,
                 onClick = onThemeSettings,
             )
-            SettingsFontRow(
-                font = appFont,
+            SettingsMenuRow(
+                title = "Widgets",
+                value = if (widgetTransparent) "Transparent" else "Default",
                 palette = palette,
-                onClick = { showFontSheet = true },
-            )
-            SettingsToggleRow(
-                title = "Birthday calendar",
-                subtitle = "Import contacts' birthdays",
-                checked = birthdayEnabled,
-                palette = palette,
-                onCheckedChange = onBirthdayEnabledChange,
-            )
-            SettingsProBadgeRow(
-                title = "Date Calculator",
-                isPro = isPro,
-                palette = palette,
-                onClick = onDateCalculator,
+                onClick = onWidgetSettings,
             )
             SettingsProBadgeRow(
                 title = "App Lock & Private Vault",
@@ -647,87 +701,17 @@ internal fun SettingsRoot(
                 palette = palette,
                 onClick = onAppPrivacy,
             )
-            SettingsWidgetToggleRow(
-                title = "Transparent Widgets",
-                subtitle = "Let wallpaper show through all DotCal widgets",
-                checked = widgetTransparent,
-                isPro = isPro,
+            SettingsMenuRow(
+                title = "Sync",
+                value = if (syncEnabled) syncIntervalLabel(syncIntervalMins) else "Off",
                 palette = palette,
-                onCheckedChange = onWidgetTransparentChange,
-            )
-            SettingsWidgetToggleRow(
-                title = "Widget Dot Texture",
-                subtitle = if (widgetTransparent) "Only applies when transparent widgets are off" else "Show the subtle DotCal dotted surface",
-                checked = !widgetTransparent && widgetDotTexture,
-                enabled = !widgetTransparent,
-                isPro = isPro,
-                palette = palette,
-                onCheckedChange = onWidgetDotTextureChange,
-            )
-            SettingsToggleRow(title = "Sync enabled", checked = syncEnabled, palette = palette, onCheckedChange = onSyncEnabledChange)
-            SettingsSyncIntervalRow(intervalMins = syncIntervalMins, palette = palette, onIntervalSelected = onSyncIntervalSelected)
-            SettingsSyncNowRow(
-                syncMetadata = syncMetadata,
-                isSyncing = isSyncing,
-                palette = palette,
-                onClick = onSyncNow,
-            )
-            SettingsDivider(palette)
-
-            SettingsSectionTitle("Data", palette)
-            // Import/Export + Backup/Restore are FREE (data portability & safety).
-            // isPro = true forces the unlocked chevron and suppresses the Pro tag/lock.
-            SettingsImportExportRow(
-                title = "Export Calendar",
-                subtitle = "Save all events & tasks to an .ics file",
-                isPro = true,
-                palette = palette,
-                onClick = onExportIcs,
-            )
-            SettingsImportExportRow(
-                title = "Import Calendar",
-                subtitle = "Load events & tasks from an .ics file",
-                isPro = true,
-                palette = palette,
-                onClick = onImportIcs,
-            )
-            SettingsImportExportRow(
-                title = "Back Up Data",
-                subtitle = "Save all events, tasks & reminders to a file",
-                isPro = true,
-                palette = palette,
-                onClick = onBackup,
-            )
-            SettingsImportExportRow(
-                title = "Restore Data",
-                subtitle = "Merge a backup file into this device",
-                isPro = true,
-                palette = palette,
-                onClick = onRestore,
+                onClick = onSyncSettings,
             )
             SettingsMenuRow(
-                title = "Recently Deleted",
+                title = "Data & Restore",
                 value = "",
                 palette = palette,
-                onClick = onRecentlyDeleted,
-            )
-            SettingsProBadgeRow(
-                title = "Templates",
-                isPro = isPro,
-                palette = palette,
-                onClick = onTemplates,
-            )
-            SettingsProBadgeRow(
-                title = "Calendar Sets",
-                isPro = isPro,
-                palette = palette,
-                onClick = onCalendarSets,
-            )
-            SettingsProBadgeRow(
-                title = "Shift Patterns",
-                isPro = isPro,
-                palette = palette,
-                onClick = onShiftPatterns,
+                onClick = onDataSettings,
             )
             SettingsDivider(palette)
 
@@ -757,16 +741,255 @@ internal fun SettingsRoot(
         if (showCompactHeader) {
             SettingsCompactHeader(palette = palette, onBack = onBack, showBack = false)
         }
-        if (showFontSheet) {
-            FontPickerSheet(
-                current = appFont,
+    }
+}
+
+@Composable
+private fun CalendarPreferencesSettings(
+    defaultCalendarTab: CalendarTab,
+    showWeekNumbers: Boolean,
+    birthdayEnabled: Boolean,
+    weekStartOption: WeekStartOption,
+    holidayCountries: List<HolidayCountryUiItem>,
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onDefaultViewSelected: (CalendarTab) -> Unit,
+    onShowWeekNumbersChange: (Boolean) -> Unit,
+    onBirthdayEnabledChange: (Boolean) -> Unit,
+    onWeekStartSelected: (WeekStartOption) -> Unit,
+    onGlobalHolidays: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        contentPadding = PaddingValues(bottom = 120.dp),
+    ) {
+        item {
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Calendar Preferences")
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+        item {
+            SettingsSectionTitle("Calendar", palette)
+            SettingsWeekStartRow(
+                selectedOption = weekStartOption,
                 palette = palette,
-                onDismiss = { showFontSheet = false },
-                onSelect = { font ->
-                    showFontSheet = false
-                    onAppFontSelected(font)
-                },
+                onWeekStartSelected = onWeekStartSelected,
             )
+            SettingsDefaultViewRow(
+                selectedTab = defaultCalendarTab,
+                palette = palette,
+                onViewSelected = onDefaultViewSelected,
+            )
+            SettingsToggleRow(
+                title = "Week numbers",
+                subtitle = "Show ISO week labels in Month and Week",
+                checked = showWeekNumbers,
+                palette = palette,
+                onCheckedChange = onShowWeekNumbersChange,
+            )
+            SettingsToggleRow(
+                title = "Birthday calendar",
+                subtitle = "Import contacts' birthdays",
+                checked = birthdayEnabled,
+                palette = palette,
+                onCheckedChange = onBirthdayEnabledChange,
+            )
+            SettingsMenuRow(
+                title = "Global Holidays",
+                value = selectedHolidayCountriesLabel(holidayCountries),
+                palette = palette,
+                onClick = onGlobalHolidays,
+            )
+            SettingsDivider(palette)
+        }
+    }
+}
+
+@Composable
+private fun ReminderDefaultsSettings(
+    defaultReminderMinutes: Int?,
+    defaultEventDurationMinutes: Int,
+    defaultAllDayReminderTime: LocalTime,
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onDefaultReminderSelected: (Int?) -> Unit,
+    onDefaultEventDurationSelected: (Int) -> Unit,
+    onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        contentPadding = PaddingValues(bottom = 120.dp),
+    ) {
+        item {
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Reminder Defaults")
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+        item {
+            SettingsSectionTitle("Defaults", palette)
+            SettingsDefaultReminderRow(
+                selectedMinutes = defaultReminderMinutes,
+                palette = palette,
+                onReminderSelected = onDefaultReminderSelected,
+            )
+            SettingsDefaultEventDurationRow(
+                selectedMinutes = defaultEventDurationMinutes,
+                palette = palette,
+                onDurationSelected = onDefaultEventDurationSelected,
+            )
+            SettingsAllDayReminderTimeRow(
+                selectedTime = defaultAllDayReminderTime,
+                palette = palette,
+                onTimeSelected = onDefaultAllDayReminderTimeSelected,
+            )
+            SettingsDivider(palette)
+        }
+    }
+}
+
+@Composable
+private fun WidgetSettings(
+    widgetTransparent: Boolean,
+    widgetDotTexture: Boolean,
+    isPro: Boolean,
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onWidgetTransparentChange: (Boolean) -> Unit,
+    onWidgetDotTextureChange: (Boolean) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        contentPadding = PaddingValues(bottom = 120.dp),
+    ) {
+        item {
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Widgets")
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+        item {
+            SettingsSectionTitle("Widget Style", palette)
+            SettingsWidgetToggleRow(
+                title = "Transparent Widgets",
+                subtitle = "Let wallpaper show through all DotCal widgets",
+                checked = widgetTransparent,
+                isPro = isPro,
+                palette = palette,
+                onCheckedChange = onWidgetTransparentChange,
+            )
+            SettingsWidgetToggleRow(
+                title = "Widget Dot Texture",
+                subtitle = if (widgetTransparent) "Only applies when transparent widgets are off" else "Show the subtle DotCal dotted surface",
+                checked = !widgetTransparent && widgetDotTexture,
+                enabled = !widgetTransparent,
+                isPro = isPro,
+                palette = palette,
+                onCheckedChange = onWidgetDotTextureChange,
+            )
+            SettingsDivider(palette)
+        }
+    }
+}
+
+@Composable
+private fun DataRestoreSettings(
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onExportIcs: () -> Unit,
+    onImportIcs: () -> Unit,
+    onBackup: () -> Unit,
+    onRestore: () -> Unit,
+    onRecentlyDeleted: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        contentPadding = PaddingValues(bottom = 120.dp),
+    ) {
+        item {
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Data & Restore")
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+        item {
+            SettingsSectionTitle("Calendar Files", palette)
+            SettingsImportExportRow(
+                title = "Export Calendar",
+                subtitle = "Save all events & tasks to an .ics file",
+                isPro = true,
+                palette = palette,
+                onClick = onExportIcs,
+            )
+            SettingsImportExportRow(
+                title = "Import Calendar",
+                subtitle = "Load events & tasks from an .ics file",
+                isPro = true,
+                palette = palette,
+                onClick = onImportIcs,
+            )
+            SettingsDivider(palette)
+
+            SettingsSectionTitle("Backup & Restore", palette)
+            SettingsImportExportRow(
+                title = "Back Up Data",
+                subtitle = "Save all events, tasks & reminders to a file",
+                isPro = true,
+                palette = palette,
+                onClick = onBackup,
+            )
+            SettingsImportExportRow(
+                title = "Restore Data",
+                subtitle = "Merge a backup file into this device",
+                isPro = true,
+                palette = palette,
+                onClick = onRestore,
+            )
+            SettingsMenuRow(
+                title = "Recently Deleted",
+                value = "",
+                palette = palette,
+                onClick = onRecentlyDeleted,
+            )
+            SettingsDivider(palette)
+        }
+    }
+}
+
+@Composable
+private fun SyncSettings(
+    syncEnabled: Boolean,
+    syncIntervalMins: Int,
+    syncMetadata: List<SyncMetadata>,
+    isSyncing: Boolean,
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onSyncEnabledChange: (Boolean) -> Unit,
+    onSyncIntervalSelected: (Int) -> Unit,
+    onSyncNow: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        contentPadding = PaddingValues(bottom = 120.dp),
+    ) {
+        item {
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Sync")
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+        item {
+            SettingsSectionTitle("Calendar Sync", palette)
+            SettingsToggleRow(
+                title = "Sync enabled",
+                subtitle = "Keep DotCal updated from device calendars",
+                checked = syncEnabled,
+                palette = palette,
+                onCheckedChange = onSyncEnabledChange,
+            )
+            SettingsSyncIntervalRow(
+                intervalMins = syncIntervalMins,
+                palette = palette,
+                onIntervalSelected = onSyncIntervalSelected,
+            )
+            SettingsSyncNowRow(
+                syncMetadata = syncMetadata,
+                isSyncing = isSyncing,
+                palette = palette,
+                onClick = onSyncNow,
+            )
+            SettingsDivider(palette)
         }
     }
 }
@@ -1161,24 +1384,34 @@ private fun SettingsCompactHeader(
 private fun ThemeSettings(
     themeMode: DotCalThemeMode,
     accentColor: AccentColor,
+    appFont: AppFont,
     palette: DotCalPalette,
     isPro: Boolean,
     onBack: () -> Unit,
     onThemeSelected: (DotCalThemeMode) -> Unit,
     onAccentSelected: (AccentColor) -> Unit,
+    onAppFontSelected: (AppFont) -> Unit,
     onRequestPro: () -> Unit,
 ) {
     var showCustomPicker by remember { mutableStateOf(false) }
+    var showFontSheet by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 150.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
             item {
-                SettingsLargeHeader(palette = palette, onBack = onBack, title = "Theme")
+                SettingsLargeHeader(palette = palette, onBack = onBack, title = "Appearance")
                 Spacer(modifier = Modifier.height(10.dp))
                 Text("Choose app appearance", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(bottom = 16.dp))
             }
             item {
+            SettingsFontRow(
+                font = appFont,
+                palette = palette,
+                onClick = { showFontSheet = true },
+            )
+            SettingsDivider(palette)
+            SettingsSectionTitle("Theme", palette)
             DotCalThemeMode.entries.forEach { mode ->
                 ThemeOptionRow(
                     mode = mode,
@@ -1240,8 +1473,19 @@ private fun ThemeSettings(
             }
         }
         if (showCompactHeader) {
-            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Theme")
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Appearance")
         }
+    }
+    if (showFontSheet) {
+        FontPickerSheet(
+            current = appFont,
+            palette = palette,
+            onDismiss = { showFontSheet = false },
+            onSelect = { font ->
+                showFontSheet = false
+                onAppFontSelected(font)
+            },
+        )
     }
     if (showCustomPicker) {
         CustomAccentPickerDialog(
@@ -2426,42 +2670,6 @@ private fun SettingsSyncNowRow(
             )
         } else {
             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
-        }
-    }
-}
-
-@Composable
-private fun DotCalSwitch(
-    checked: Boolean,
-    palette: DotCalPalette,
-    enabled: Boolean = true,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    val trackColor = when {
-        checked && enabled -> palette.accent
-        checked -> palette.accent.copy(alpha = 0.55f)
-        else -> palette.switchOffTrack
-    }
-    Box(
-        modifier = Modifier
-            .size(width = 52.dp, height = 48.dp)
-            .noRippleClickable(enabled = enabled) { onCheckedChange(!checked) },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(width = 52.dp, height = 32.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(trackColor)
-                .padding(4.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .align(if (checked) Alignment.CenterEnd else Alignment.CenterStart)
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(NWhite),
-            )
         }
     }
 }

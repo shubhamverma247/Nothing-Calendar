@@ -173,7 +173,7 @@ internal fun AgendaPreview(
     val eventsByDate = remember(upcomingEvents) { upcomingEvents.groupBy { it.localDate() } }
     val dateIndex = remember(eventsByDate) {
         buildMap {
-            var index = 1
+            var index = 0
             eventsByDate.forEach { (date, dateEvents) ->
                 put(date, index)
                 index += 1 + dateEvents.size
@@ -185,47 +185,49 @@ internal fun AgendaPreview(
         val targetIndex = dateIndex[selectedDate] ?: 0
         listState.animateScrollToItem(targetIndex)
     }
-    LazyColumn(
-        state = listState,
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(palette.calendarSurface),
-        contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 0.dp, bottom = 90.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item(key = "agenda-density-forecast") {
-            DayDensityForecastStrip(
-                forecast = forecast,
-                selectedDate = selectedDate,
-                palette = palette,
-                onDateSelected = onDateSelected,
-            )
-        }
-        if (upcomingEvents.isEmpty()) {
-            item {
-                AgendaEndOfDayState(
-                    palette = palette,
-                    modifier = Modifier.fillParentMaxHeight(0.82f),
-                    onAdd = onAdd,
-                )
-            }
-        } else {
-            eventsByDate.forEach { (date, dateEvents) ->
-                item(key = "agenda-header-$date") {
-                    AgendaDateHeader(date = date, isFirst = date == agendaStartDate, palette = palette)
+        DayDensityForecastStrip(
+            forecast = forecast,
+            selectedDate = selectedDate,
+            palette = palette,
+            onDateSelected = onDateSelected,
+        )
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 0.dp, bottom = 90.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (upcomingEvents.isEmpty()) {
+                item {
+                    AgendaEndOfDayState(
+                        palette = palette,
+                        modifier = Modifier.fillParentMaxHeight(0.82f),
+                        onAdd = onAdd,
+                    )
                 }
-                lazyItems(dateEvents, key = { it.id }) { event ->
-                    AgendaEventCard(event = event, palette = palette, onClick = { onEventClick(event) }, modifier = Modifier.animateItem())
+            } else {
+                eventsByDate.forEach { (date, dateEvents) ->
+                    item(key = "agenda-header-$date") {
+                        AgendaDateHeader(date = date, isFirst = date == agendaStartDate, palette = palette)
+                    }
+                    lazyItems(dateEvents, key = { it.id }) { event ->
+                        AgendaEventCard(event = event, palette = palette, onClick = { onEventClick(event) }, modifier = Modifier.animateItem())
+                    }
                 }
-            }
-            item {
-                AgendaEndOfDayState(
-                    palette = palette,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 32.dp),
-                    onAdd = onAdd,
-                )
+                item {
+                    AgendaEndOfDayState(
+                        palette = palette,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 32.dp),
+                        onAdd = onAdd,
+                    )
+                }
             }
         }
     }
@@ -241,7 +243,8 @@ private fun DayDensityForecastStrip(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 4.dp, bottom = 10.dp),
+            .background(palette.calendarSurface)
+            .padding(start = 13.dp, end = 13.dp, top = 4.dp, bottom = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

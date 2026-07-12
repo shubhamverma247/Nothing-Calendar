@@ -32,6 +32,11 @@ internal val recurrenceOptions = listOf(
 internal enum class SettingsScreen {
     Root,
     Theme,
+    Sync,
+    CalendarPreferences,
+    ReminderDefaults,
+    Widgets,
+    DataRestore,
     CalendarAccounts,
     AddAccount,
     GlobalHolidays,

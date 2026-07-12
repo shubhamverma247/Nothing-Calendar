@@ -29,7 +29,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings as SettingsGearIcon
@@ -95,6 +98,10 @@ internal fun CalendarTabContainer(
     onTemplates: (() -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
+    onCalendarSets: (() -> Unit)? = null,
+    onTimeInsights: (() -> Unit)? = null,
+    onDateCalculator: (() -> Unit)? = null,
+    onShiftPatterns: (() -> Unit)? = null,
     onCalendarTabSelected: (CalendarTab) -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -116,6 +123,10 @@ internal fun CalendarTabContainer(
                 onTemplates = onTemplates,
                 onQuickAdd = onQuickAdd,
                 onSearch = onSearch,
+                onCalendarSets = onCalendarSets,
+                onTimeInsights = onTimeInsights,
+                onDateCalculator = onDateCalculator,
+                onShiftPatterns = onShiftPatterns,
             )
         }
         Spacer(
@@ -154,9 +165,20 @@ internal fun CalendarActionBar(
     onTemplates: (() -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
+    onCalendarSets: (() -> Unit)? = null,
+    onTimeInsights: (() -> Unit)? = null,
+    onDateCalculator: (() -> Unit)? = null,
+    onShiftPatterns: (() -> Unit)? = null,
 ) {
     val topIconTint = if (palette.isDark) NWhite else palette.accent
     var showOverflow by remember { mutableStateOf(false) }
+    val hasOverflow = onSearch != null ||
+        onQuickAdd != null ||
+        onTemplates != null ||
+        onCalendarSets != null ||
+        onTimeInsights != null ||
+        onDateCalculator != null ||
+        onShiftPatterns != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -176,22 +198,13 @@ internal fun CalendarActionBar(
             maxLines = 1,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (onSearch != null) {
-                IconButton(
-                    onClick = onSearch,
-                    modifier = Modifier.size(44.dp),
-                ) {
-                    Icon(Icons.Default.Search, contentDescription = "Search", tint = topIconTint)
-                }
-            }
             IconButton(
                 onClick = onAdd,
                 modifier = Modifier.size(44.dp),
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add event", tint = topIconTint)
             }
-            // Quick Add and Templates live together in the overflow menu.
-            if (onQuickAdd != null || onTemplates != null) {
+            if (hasOverflow) {
                 Box {
                     IconButton(
                         onClick = { showOverflow = true },
@@ -205,8 +218,20 @@ internal fun CalendarActionBar(
                         containerColor = palette.dialogSurface,
                         shape = RoundedCornerShape(16.dp),
                         tonalElevation = 0.dp,
-                        modifier = Modifier.width(216.dp),
+                        modifier = Modifier.width(244.dp),
                     ) {
+                        if (onSearch != null) {
+                            ActionBarMenuItem(
+                                label = "Search",
+                                subtitle = "Find events and tasks",
+                                icon = Icons.Default.Search,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onSearch()
+                                },
+                            )
+                        }
                         if (onQuickAdd != null) {
                             ActionBarMenuItem(
                                 label = "Quick Add",
@@ -228,6 +253,54 @@ internal fun CalendarActionBar(
                                 onClick = {
                                     showOverflow = false
                                     onTemplates()
+                                },
+                            )
+                        }
+                        if (onCalendarSets != null) {
+                            ActionBarMenuItem(
+                                label = "Calendar Sets",
+                                subtitle = "Switch saved visibility sets",
+                                icon = Icons.Default.CalendarMonth,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onCalendarSets()
+                                },
+                            )
+                        }
+                        if (onTimeInsights != null) {
+                            ActionBarMenuItem(
+                                label = "Time Insights",
+                                subtitle = "Hours, load, and task stats",
+                                icon = Icons.Default.BarChart,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onTimeInsights()
+                                },
+                            )
+                        }
+                        if (onDateCalculator != null) {
+                            ActionBarMenuItem(
+                                label = "Date Calculator",
+                                subtitle = "Add days and compare dates",
+                                icon = Icons.Default.EventRepeat,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onDateCalculator()
+                                },
+                            )
+                        }
+                        if (onShiftPatterns != null) {
+                            ActionBarMenuItem(
+                                label = "Shift Patterns",
+                                subtitle = "Build rotating schedules",
+                                icon = Icons.Default.EventRepeat,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onShiftPatterns()
                                 },
                             )
                         }

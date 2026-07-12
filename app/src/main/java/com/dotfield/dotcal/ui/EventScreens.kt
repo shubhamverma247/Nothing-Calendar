@@ -131,8 +131,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -152,7 +150,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
@@ -235,7 +232,6 @@ import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import com.dotfield.dotcal.ui.theme.NBlack
-import com.dotfield.dotcal.ui.theme.NWhite
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -1455,20 +1451,13 @@ internal fun EventEditorScreen(
             Spacer(modifier = Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("All-day", color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
-                Switch(
-                checked = allDay,
-                onCheckedChange = {
+                DotCalSwitch(
+                    checked = allDay,
+                    palette = palette,
+                    onCheckedChange = {
                         clearEditorFocus()
                         allDay = it
                     },
-                    modifier = Modifier.scale(0.86f),
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = NWhite,
-                        checkedTrackColor = palette.accent,
-                        uncheckedThumbColor = NWhite,
-                        uncheckedTrackColor = Color(0xFFE5E5E5),
-                        uncheckedBorderColor = Color.Transparent,
-                    ),
                 )
             }
             EditorValueRow(

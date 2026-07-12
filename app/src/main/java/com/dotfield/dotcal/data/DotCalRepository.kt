@@ -356,6 +356,16 @@ class DotCalRepository(
             }
     }
 
+    fun observeEventsForYear(year: Int): Flow<List<CalendarEvent>> {
+        val start = LocalDate.of(year, 1, 1)
+        val end = start.plusYears(1)
+        return dao.observeEvents(start.atStartMs(), end.atStartMs())
+            .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
+            .map { events ->
+                withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
+            }
+    }
+
     fun observeUpcomingAgendaEvents(startDate: LocalDate): Flow<List<CalendarEvent>> {
         val start = startDate
         val end = start.plusMonths(6)

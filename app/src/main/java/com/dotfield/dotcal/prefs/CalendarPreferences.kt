@@ -15,6 +15,7 @@ object CalendarPreferences {
     val KEY_DEFAULT_REMINDER = intPreferencesKey("default_reminder")
     val KEY_DEFAULT_EVENT_DURATION = intPreferencesKey("default_event_duration")
     val KEY_SHOW_WEEK_NUMBERS = booleanPreferencesKey("show_week_numbers")
+    val KEY_YEAR_HEATMAP = booleanPreferencesKey("year_heatmap")
     val KEY_DEFAULT_ALL_DAY_REMINDER_TIME = stringPreferencesKey("default_all_day_reminder_time")
     val KEY_SYNC_ENABLED = booleanPreferencesKey("sync_enabled")
     val KEY_SYNC_INTERVAL_MINS = intPreferencesKey("sync_interval_mins")

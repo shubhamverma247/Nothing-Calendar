@@ -10,8 +10,11 @@ import android.util.Size
 import android.view.Gravity
 import android.widget.TextView
 import android.widget.Toast
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventReminder
@@ -60,6 +63,30 @@ internal fun showDotCalToast(
         }
     }
     toast.show()
+}
+
+@Composable
+internal fun DotCalSwitch(
+    checked: Boolean,
+    palette: DotCalPalette,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        enabled = enabled,
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = palette.onAccent,
+            checkedTrackColor = palette.accent,
+            uncheckedThumbColor = palette.secondaryText,
+            uncheckedTrackColor = palette.cell,
+            disabledCheckedThumbColor = palette.onAccent.copy(alpha = 0.8f),
+            disabledCheckedTrackColor = palette.accent.copy(alpha = 0.45f),
+            disabledUncheckedThumbColor = palette.secondaryText.copy(alpha = 0.55f),
+            disabledUncheckedTrackColor = palette.cell.copy(alpha = 0.55f),
+        ),
+    )
 }
 
 internal fun parseWeekStartOption(value: String?): WeekStartOption {

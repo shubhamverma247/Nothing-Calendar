@@ -983,6 +983,8 @@ internal fun YearView(
     eventsByDate: Map<LocalDate, List<CalendarEvent>>,
     palette: DotCalPalette,
     weekStart: DayOfWeek,
+    heatmapEnabled: Boolean,
+    onHeatmapToggle: (Boolean) -> Unit,
     onPreviousYear: () -> Unit,
     onNextYear: () -> Unit,
     onJumpToday: () -> Unit,
@@ -990,11 +992,18 @@ internal fun YearView(
 ) {
     var dragTotal by remember { mutableFloatStateOf(0f) }
     val months = remember(selectedDate.year) { List(12) { selectedDate.withMonth(it + 1).withDayOfMonth(1) } }
-    val eventDates = remember(eventsByDate, selectedDate.year) {
-        eventsByDate.entries
-            .filter { (date, dayEvents) -> date.year == selectedDate.year && dayEvents.any { it.isTask == 0 } }
-            .map { it.key }
-            .toSet()
+    val eventDensity = remember(eventsByDate, selectedDate.year) {
+        val density = mutableMapOf<LocalDate, Int>()
+        eventsByDate.forEach { entry ->
+            val date = entry.key
+            if (date.year == selectedDate.year) {
+                val count = entry.value.count { event ->
+                    event.isTask == 0 && event.isAllDay == 0 && event.source != "BIRTHDAY"
+                }
+                if (count > 0) density[date] = count
+            }
+        }
+        density
     }
 
     Column(
@@ -1013,16 +1022,22 @@ internal fun YearView(
                 )
             },
     ) {
+        YearHeatmapBar(
+            enabled = heatmapEnabled,
+            palette = palette,
+            onToggle = onHeatmapToggle,
+        )
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
-            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+            modifier = Modifier.weight(1f).fillMaxWidth().background(palette.calendarSurface),
             contentPadding = PaddingValues(start = 8.dp, top = 0.dp, end = 8.dp, bottom = 150.dp),
         ) {
             items(months) { month ->
                 YearMonthCell(
                     month = month,
                     selected = month.year == selectedDate.year && month.monthValue == selectedDate.monthValue,
-                    eventDates = eventDates,
+                    eventDensity = eventDensity,
+                    heatmapEnabled = heatmapEnabled,
                     palette = palette,
                     weekStart = weekStart,
                     onClick = { onMonthSelected(month) },
@@ -1033,10 +1048,53 @@ internal fun YearView(
 }
 
 @Composable
+private fun YearHeatmapBar(
+    enabled: Boolean,
+    palette: DotCalPalette,
+    onToggle: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .background(palette.calendarSurface)
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Heatmap", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                listOf(0, 1, 2, 3).forEach { intensity ->
+                    Box(
+                        modifier = Modifier
+                            .size((5 + intensity * 2).dp)
+                            .clip(CircleShape)
+                            .then(
+                                if (intensity == 0) {
+                                    Modifier.border(1.dp, palette.secondaryText.copy(alpha = 0.45f), CircleShape)
+                                } else {
+                                    Modifier.background(yearHeatmapColor(intensity, palette))
+                                },
+                            ),
+                    )
+                }
+                Text("0 / 1 / 2 / 3+", color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp)
+            }
+        }
+        DotCalSwitch(
+            checked = enabled,
+            palette = palette,
+            onCheckedChange = onToggle,
+        )
+    }
+}
+
+@Composable
 private fun YearMonthCell(
     month: LocalDate,
     selected: Boolean,
-    eventDates: Set<LocalDate>,
+    eventDensity: Map<LocalDate, Int>,
+    heatmapEnabled: Boolean,
     palette: DotCalPalette,
     weekStart: DayOfWeek,
     onClick: () -> Unit,
@@ -1062,7 +1120,8 @@ private fun YearMonthCell(
             month = month,
             days = days,
             today = today,
-            eventDates = eventDates,
+            eventDensity = eventDensity,
+            heatmapEnabled = heatmapEnabled,
             palette = palette,
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
@@ -1074,13 +1133,13 @@ private fun MiniMonthGridCanvas(
     month: LocalDate,
     days: List<LocalDate>,
     today: LocalDate,
-    eventDates: Set<LocalDate>,
+    eventDensity: Map<LocalDate, Int>,
+    heatmapEnabled: Boolean,
     palette: DotCalPalette,
     modifier: Modifier = Modifier,
 ) {
     val weekdayColor = palette.yearWeekday.toArgb()
     val secondaryColor = palette.secondaryText.toArgb()
-    val dimColor = palette.dimText.copy(alpha = 0.35f).toArgb()
     val accentColor = palette.accent.toArgb()
     val onAccentColor = palette.onAccent.toArgb()
     Canvas(modifier = modifier) {
@@ -1099,6 +1158,11 @@ private fun MiniMonthGridCanvas(
             color = accentColor
             style = Paint.Style.FILL
         }
+        val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.secondaryText.copy(alpha = 0.45f).toArgb()
+            style = Paint.Style.STROKE
+            strokeWidth = 1.dp.toPx()
+        }
         val columnWidth = size.width / 7f
         val rowHeight = size.height / 7f
         val labels = listOf("S", "M", "T", "W", "T", "F", "S")
@@ -1113,21 +1177,41 @@ private fun MiniMonthGridCanvas(
             val x = columnWidth * column + columnWidth / 2f
             val y = rowHeight * row + rowHeight * 0.62f
             val inMonth = day.monthValue == month.monthValue
+            if (!inMonth) return@forEachIndexed
             val isToday = day == today
-            val hasEvent = day in eventDates
-            val isWeekdayDate = inMonth && day.dayOfWeek != DayOfWeek.SATURDAY && day.dayOfWeek != DayOfWeek.SUNDAY
+            val density = eventDensity[day] ?: 0
+            val hasEvent = density > 0
+            val isWeekdayDate = day.dayOfWeek != DayOfWeek.SATURDAY && day.dayOfWeek != DayOfWeek.SUNDAY
+            if (heatmapEnabled && !isToday) {
+                val centerY = rowHeight * row + rowHeight / 2f
+                if (density == 0) {
+                    nativeCanvas.drawCircle(x, centerY, 5.1.dp.toPx(), outlinePaint)
+                } else {
+                    circlePaint.color = yearHeatmapColor(density, palette).toArgb()
+                    nativeCanvas.drawCircle(x, centerY, (4.8f + density.coerceAtMost(3) * 0.9f).dp.toPx(), circlePaint)
+                    circlePaint.color = accentColor
+                }
+            }
             if (isToday) {
                 nativeCanvas.drawCircle(x, rowHeight * row + rowHeight / 2f, 7.5.dp.toPx(), circlePaint)
             }
             datePaint.color = when {
                 isToday -> onAccentColor
-                !inMonth -> dimColor
+                heatmapEnabled && density >= 2 -> onAccentColor
                 hasEvent -> accentColor
                 else -> secondaryColor
             }
             datePaint.typeface = Typeface.create(Typeface.DEFAULT, if (isWeekdayDate) Typeface.BOLD else Typeface.NORMAL)
             nativeCanvas.drawText(day.dayOfMonth.toString(), x, y, datePaint)
         }
+    }
+}
+
+private fun yearHeatmapColor(density: Int, palette: DotCalPalette): Color {
+    return when (density.coerceAtMost(3)) {
+        1 -> palette.accent.copy(alpha = 0.34f)
+        2 -> palette.accent.copy(alpha = 0.62f)
+        else -> palette.accent
     }
 }
 
