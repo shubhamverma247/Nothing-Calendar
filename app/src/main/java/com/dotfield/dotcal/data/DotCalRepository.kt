@@ -2,10 +2,28 @@ package com.dotfield.dotcal.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import com.dotfield.dotcal.data.backup.BackupData
+import com.dotfield.dotcal.data.backup.BackupSerializer
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
+import com.dotfield.dotcal.data.privacy.AppLockState
+import com.dotfield.dotcal.data.privacy.AppPrivacyManager
+import com.dotfield.dotcal.data.recurrence.RecurrenceRule
+import com.dotfield.dotcal.data.profiles.FocusProfile
+import com.dotfield.dotcal.data.profiles.FocusProfileStore
+import com.dotfield.dotcal.data.shifts.GeneratedShiftOccurrence
+import com.dotfield.dotcal.data.shifts.ShiftApplyResult
+import com.dotfield.dotcal.data.shifts.ShiftGenerationRecord
+import com.dotfield.dotcal.data.shifts.ShiftPattern
+import com.dotfield.dotcal.data.shifts.ShiftPatternStore
+import com.dotfield.dotcal.data.shifts.ShiftType
+import com.dotfield.dotcal.data.shifts.expandShiftPattern
+import com.dotfield.dotcal.data.templates.EventTemplate
+import com.dotfield.dotcal.data.templates.EventTemplateStore
+import com.dotfield.dotcal.data.trash.DeletedSnapshot
+import com.dotfield.dotcal.data.trash.RecentlyDeletedStore
 import com.dotfield.dotcal.reminders.ReminderScheduler
 import com.dotfield.dotcal.sync.CalendarSyncRepository
 import com.dotfield.dotcal.sync.CalendarSyncResult
@@ -14,20 +32,22 @@ import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.YearMonth
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 import java.util.UUID
 import kotlin.math.absoluteValue
 
 data class EventEditorData(
     val eventId: String? = null,
+    val accountId: String? = null,
     val title: String,
     val description: String,
     val location: String,
@@ -37,9 +57,11 @@ data class EventEditorData(
     val endTime: LocalTime,
     val isAllDay: Boolean,
     val reminderMinutes: Int?,
+    val reminderMinutesList: List<Int>? = null,
     val rrule: String?,
     val imageUris: String = "[]",
     val voiceNotePath: String? = null,
+    val colorHex: String? = null,
 )
 
 data class TaskEditorData(
@@ -65,6 +87,11 @@ class DotCalRepository(
     private val context: Context,
 ) {
     private val reminderScheduler = ReminderScheduler(context)
+    private val privacyManager = AppPrivacyManager(context.applicationContext)
+    private val recentlyDeletedStore = RecentlyDeletedStore(context)
+    private val eventTemplateStore = EventTemplateStore(context)
+    private val focusProfileStore = FocusProfileStore(context)
+    private val shiftPatternStore = ShiftPatternStore(context)
     private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
     private val holidayDataSource = HolidayDataSource(context.applicationContext)
     private val syncRepository = CalendarSyncRepository(
@@ -87,7 +114,55 @@ class DotCalRepository(
         }
     }
 
+    fun observeAppLockState(): Flow<AppLockState> = privacyManager.observeAppLockState()
+
+    fun observePrivateVaultIds(): Flow<Set<String>> = privacyManager.observePrivateVaultIds()
+
+    suspend fun setAppLockPin(pin: String) = privacyManager.setPin(pin)
+
+    suspend fun verifyAppLockPin(pin: String): Boolean = privacyManager.verifyPin(pin)
+
+    suspend fun setAppLockEnabled(enabled: Boolean) = privacyManager.setAppLockEnabled(enabled)
+
+    suspend fun disableAppLock() = privacyManager.disableAppLock()
+
+    suspend fun clearAppLockPin() = privacyManager.clearPin()
+
+    suspend fun listPrivateVaultEvents(): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        privacyManager.observePrivateVaultIds().first()
+            .mapNotNull { eventId -> dao.getEvent(eventId) }
+            .sortedWith(compareBy<CalendarEvent> { it.isTask }.thenBy { it.startTimeMs }.thenBy { it.title })
+    }
+
+    suspend fun moveToPrivateVault(event: CalendarEvent) = withContext(Dispatchers.IO) {
+        val eventId = event.baseEventId()
+        dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        privacyManager.addPrivateEvent(eventId)
+        updateWidgets()
+    }
+
+    suspend fun restoreFromPrivateVault(eventId: String) = withContext(Dispatchers.IO) {
+        val baseId = eventId.substringBefore(RECURRENCE_OCCURRENCE_SEPARATOR)
+        val event = dao.getEvent(baseId)
+        privacyManager.removePrivateEvent(baseId)
+        if (event != null) {
+            val now = System.currentTimeMillis()
+            dao.getRemindersForEvent(baseId)
+                .filter { it.triggerAtMs > now && it.isDelivered == 0 }
+                .forEach { reminderScheduler.scheduleReminder(it, event) }
+        }
+        updateWidgets()
+    }
+
     fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts()
+
+    fun observeAssignableAccounts(): Flow<List<CalendarAccount>> {
+        return dao.observeAccounts().map { accounts ->
+            accounts
+                .filterNot { it.isReadOnlyGeneratedAccount() }
+                .sortedWith(compareBy<CalendarAccount> { it.sortOrder }.thenBy { it.displayName })
+        }
+    }
 
     /** Result summary of an ICS import. */
     data class IcsImportResult(
@@ -185,6 +260,82 @@ class DotCalRepository(
         reminders.forEach { reminder -> reminderScheduler.scheduleReminder(reminder, event) }
     }
 
+    /** Result summary of a Backup restore. */
+    data class BackupImportResult(
+        val accountsAdded: Int,
+        val eventsInserted: Int,
+        val eventsUpdated: Int,
+        val remindersRestored: Int,
+    )
+
+    /**
+     * Serializes a full-fidelity snapshot of the user's calendar (accounts that own the events,
+     * the user-owned events/tasks, and their reminders) to a JSON document. Excludes generated
+     * (birthday/holiday) and Google-synced rows, which regenerate from their sources.
+     */
+    suspend fun exportBackup(): String = withContext(Dispatchers.IO) {
+        val events = dao.getAllUserEventsForExport()
+        val accounts = events.map { it.accountId }.toSet().mapNotNull { dao.getAccount(it) }
+        val reminders = events.flatMap { dao.getRemindersForEvent(it.id) }
+        BackupSerializer.encode(
+            BackupData(
+                accounts = accounts,
+                events = events,
+                reminders = reminders,
+                createdAtMs = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    /**
+     * Restores a backup produced by [exportBackup]. Non-destructive merge: absent accounts are
+     * added (existing account config is preserved), events are upserted by id (existing rows
+     * updated in place, unknown ids inserted), and an event's reminders are replaced + rescheduled
+     * only when the backup carries reminders for it (matching ICS import semantics). Live data not
+     * present in the backup is never deleted. Throws on a foreign/unparseable file.
+     */
+    suspend fun importBackup(json: String): BackupImportResult = withContext(Dispatchers.IO) {
+        val data = BackupSerializer.decode(json)
+        ensureLocalAccount()
+        var accountsAdded = 0
+        data.accounts.forEach { account ->
+            if (account.id != LOCAL_ACCOUNT_ID && dao.getAccount(account.id) == null) {
+                dao.insertAccountIfAbsent(account)
+                accountsAdded++
+            }
+        }
+        val remindersByEventId = data.reminders.groupBy { it.eventId }
+        var eventsInserted = 0
+        var eventsUpdated = 0
+        var remindersRestored = 0
+        val now = System.currentTimeMillis()
+        data.events.forEach { event ->
+            val existing = dao.getEvent(event.id)
+            // The event's account may be missing on this device; fall back to local so the FK holds.
+            val accountId = if (dao.getAccount(event.accountId) != null) event.accountId else LOCAL_ACCOUNT_ID
+            val row = event.copy(accountId = accountId)
+            dao.upsertEvent(row)
+            val reminders = remindersByEventId[event.id].orEmpty()
+            if (reminders.isNotEmpty()) {
+                dao.getRemindersForEvent(row.id).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+                dao.deleteRemindersForEvent(row.id)
+                dao.insertReminders(reminders)
+                reminders
+                    .filter { it.triggerAtMs > now && it.isDelivered == 0 }
+                    .forEach { reminderScheduler.scheduleReminder(it, row) }
+                remindersRestored += reminders.size
+            }
+            if (existing != null) eventsUpdated++ else eventsInserted++
+        }
+        if (eventsInserted > 0 || eventsUpdated > 0 || accountsAdded > 0) updateWidgets()
+        BackupImportResult(
+            accountsAdded = accountsAdded,
+            eventsInserted = eventsInserted,
+            eventsUpdated = eventsUpdated,
+            remindersRestored = remindersRestored,
+        )
+    }
+
     fun observeSelectedHolidayCountries(): Flow<List<String>> = dao.observeHolidayAccountIds()
         .map { ids -> ids.mapNotNull { it.removePrefix(HOLIDAY_ACCOUNT_PREFIX).takeIf(String::isNotBlank) } }
 
@@ -199,6 +350,17 @@ class DotCalRepository(
         val start = monthStart.minusMonths(1)
         val end = monthStart.plusMonths(2)
         return dao.observeEvents(start.atStartMs(), end.atStartMs())
+            .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
+            .map { events ->
+                withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
+            }
+    }
+
+    fun observeEventsForYear(year: Int): Flow<List<CalendarEvent>> {
+        val start = LocalDate.of(year, 1, 1)
+        val end = start.plusYears(1)
+        return dao.observeEvents(start.atStartMs(), end.atStartMs())
+            .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
             .map { events ->
                 withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
             }
@@ -209,6 +371,7 @@ class DotCalRepository(
         val end = start.plusMonths(6)
         val startMs = start.atStartMs()
         return dao.observeEvents(startMs, end.atStartMs())
+            .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
             .map { events ->
                 withContext(Dispatchers.Default) {
                     expandRecurringEvents(events, start, end)
@@ -217,17 +380,63 @@ class DotCalRepository(
             }
     }
 
+    suspend fun findConflictWarnings(
+        startDate: LocalDate,
+        endDate: LocalDate,
+        startTime: LocalTime,
+        endTime: LocalTime,
+        excludedEventId: String?,
+    ): List<CalendarEvent> {
+        val zoneId = ZoneId.systemDefault()
+        val startMs = startDate.atTime(startTime).atZone(zoneId).toInstant().toEpochMilli()
+        val endMs = endDate.atTime(endTime).atZone(zoneId).toInstant().toEpochMilli()
+        if (endMs <= startMs) return emptyList()
+        val queryStartDate = startDate.minusDays(1)
+        val queryEndDate = endDate.plusDays(2)
+        return withContext(Dispatchers.IO) {
+            val privateIds = privacyManager.observePrivateVaultIds().first()
+            val rawEvents = dao.getVisibleTimedEventsForConflictWarning(startMs, endMs)
+                .filterOutPrivate(privateIds)
+            withContext(Dispatchers.Default) {
+                expandRecurringEvents(rawEvents, queryStartDate, queryEndDate)
+                    .asSequence()
+                    .filter { event -> excludedEventId == null || event.baseEventId() != excludedEventId }
+                    .filter { event -> event.isAllDay == 0 && event.isCompleted == 0 && event.source != "BIRTHDAY" }
+                    .filter { event -> event.startTimeMs < endMs && event.conflictEndTimeMs() > startMs }
+                    .sortedBy { event -> event.startTimeMs }
+                    .toList()
+            }
+        }
+    }
+
     fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks()
+        .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
         .map { tasks ->
             withContext(Dispatchers.Default) { expandRecurringTasks(tasks) }
         }
 
+    /**
+     * Global Search (FREE): one-shot text match over user events + tasks (master rows).
+     * Reuses [CalendarDao.searchUserEvents] for the SQL LIKE, then drops Private Vault items
+     * via the existing [filterOutPrivate] helper. Facet filtering (calendar/type/date) is
+     * applied in-memory by the caller. Blank query returns empty. No schema change.
+     */
+    suspend fun searchItems(query: String): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        val q = query.trim()
+        if (q.isBlank()) return@withContext emptyList()
+        val privateIds = privacyManager.observePrivateVaultIds().first()
+        dao.searchUserEvents(q).filterOutPrivate(privateIds)
+    }
+
     fun observeTodayTasks(day: LocalDate): Flow<List<CalendarEvent>> {
         val start = day.atStartMs()
         return dao.observeTodayTasks(start, day.plusDays(1).atStartMs() - 1)
+            .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
     }
 
-    fun observeUpcomingTasks(nowMs: Long = System.currentTimeMillis()): Flow<List<CalendarEvent>> = dao.observeUpcomingTasks(nowMs)
+    fun observeUpcomingTasks(nowMs: Long = System.currentTimeMillis()): Flow<List<CalendarEvent>> =
+        dao.observeUpcomingTasks(nowMs)
+            .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
 
     /**
      * One-shot snapshot of the next upcoming items whose start is still in the future,
@@ -254,7 +463,9 @@ class DotCalRepository(
             .take(limit.coerceAtLeast(1))
     }
 
-    fun observeCompletedTasks(): Flow<List<CalendarEvent>> = dao.observeCompletedTasks()
+    fun observeCompletedTasks(): Flow<List<CalendarEvent>> =
+        dao.observeCompletedTasks()
+            .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
 
     fun observeReminders(): Flow<List<EventReminder>> = dao.observeReminders()
 
@@ -419,8 +630,10 @@ class DotCalRepository(
         }
         require(end > start) { "END MUST BE AFTER START" }
         val now = System.currentTimeMillis()
+        val targetAccountId = data.accountId ?: existingMaster?.accountId ?: existing?.accountId ?: LOCAL_ACCOUNT_ID
         val event = existingMaster?.copy(
             id = eventId,
+            accountId = targetAccountId,
             title = data.title.trim(),
             description = data.description.trim(),
             location = data.location.trim(),
@@ -428,13 +641,14 @@ class DotCalRepository(
             endTimeMs = end,
             timeZone = zoneId.id,
             isAllDay = if (data.isAllDay) 1 else 0,
+            colorHex = data.colorHex ?: existingMaster.colorHex,
             rrule = data.rrule,
             imageUris = data.imageUris,
             voiceNotePath = data.voiceNotePath,
             updatedAtMs = now,
         ) ?: CalendarEvent(
                 id = eventId,
-                accountId = LOCAL_ACCOUNT_ID,
+                accountId = targetAccountId,
                 title = data.title.trim(),
                 description = data.description.trim(),
                 location = data.location.trim(),
@@ -442,7 +656,7 @@ class DotCalRepository(
                 endTimeMs = end,
                 timeZone = zoneId.id,
                 isAllDay = if (data.isAllDay) 1 else 0,
-                colorHex = null,
+                colorHex = data.colorHex,
                 rrule = data.rrule,
                 imageUris = data.imageUris,
                 source = "LOCAL",
@@ -456,7 +670,12 @@ class DotCalRepository(
         dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
         dao.upsertEvent(event)
         dao.deleteRemindersForEvent(eventId)
-        data.reminderMinutes?.let { minutes ->
+        val reminderMinutes = data.reminderMinutesList
+            ?.distinct()
+            ?.sorted()
+            ?: data.reminderMinutes?.let { listOf(it) }
+            ?: emptyList()
+        reminderMinutes.forEach { minutes ->
             val reminder = EventReminder(
                 eventId = eventId,
                 minutesBefore = minutes,
@@ -478,7 +697,10 @@ class DotCalRepository(
             return
         }
         val eventId = event.baseEventId()
-        dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        val reminders = dao.getRemindersForEvent(eventId)
+        reminders.forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        val master = dao.getEvent(eventId) ?: event
+        recentlyDeletedStore.save(master, reminders, System.currentTimeMillis())
         event.googleEventId?.let { googleEventId ->
             dao.insertDeletedEventLog(
                 DeletedEventLog(
@@ -594,14 +816,257 @@ class DotCalRepository(
 
     suspend fun deleteTask(task: CalendarEvent) {
         val taskId = task.baseEventId()
-        dao.getRemindersForEvent(taskId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        val reminders = dao.getRemindersForEvent(taskId)
+        reminders.forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        val master = dao.getEvent(taskId) ?: task
+        recentlyDeletedStore.save(master, reminders, System.currentTimeMillis())
         dao.deleteRemindersForEvent(taskId)
         dao.deleteEvent(taskId)
         updateWidgets()
     }
 
+    // ----- Recently Deleted (file-based trash; no Room/schema change) -----
+
+    /** Snapshots of deleted events/tasks within the 30-day window, newest first. */
+    suspend fun listRecentlyDeleted(): List<DeletedSnapshot> = withContext(Dispatchers.IO) {
+        recentlyDeletedStore.list(System.currentTimeMillis())
+    }
+
+    /**
+     * Restore a deleted event/task back into the calendar. Re-inserts the row and its
+     * reminders, reschedules any still-future reminders, and drops the snapshot.
+     * Returns false if the snapshot is gone.
+     */
+    suspend fun restoreDeleted(eventId: String): Boolean = withContext(Dispatchers.IO) {
+        val snapshot = recentlyDeletedStore.get(eventId) ?: return@withContext false
+        ensureLocalAccount()
+        // The original account may have been removed; fall back to the local account
+        // so the FK constraint holds and the event is never lost.
+        val accountId = if (dao.getAccount(snapshot.event.accountId) != null) {
+            snapshot.event.accountId
+        } else {
+            LOCAL_ACCOUNT_ID
+        }
+        val event = snapshot.event.copy(accountId = accountId)
+        dao.upsertEvent(event)
+        dao.deleteRemindersForEvent(event.id)
+        if (snapshot.reminders.isNotEmpty()) {
+            dao.insertReminders(snapshot.reminders)
+            val now = System.currentTimeMillis()
+            snapshot.reminders
+                .filter { it.triggerAtMs > now && it.isDelivered == 0 }
+                .forEach { reminderScheduler.scheduleReminder(it, event) }
+        }
+        recentlyDeletedStore.remove(eventId)
+        updateWidgets()
+        true
+    }
+
+    /** Permanently drop one snapshot from the trash. */
+    suspend fun purgeDeleted(eventId: String) = withContext(Dispatchers.IO) {
+        recentlyDeletedStore.remove(eventId)
+    }
+
+    /** Empty the entire trash. */
+    suspend fun emptyRecentlyDeleted() = withContext(Dispatchers.IO) {
+        recentlyDeletedStore.clear()
+    }
+
+    // ----- Event/Task Templates (file-based, Pro) -----
+
+    /** All saved templates, newest first. */
+    suspend fun listTemplates(): List<EventTemplate> = withContext(Dispatchers.IO) {
+        eventTemplateStore.list()
+    }
+
+    /** Insert or overwrite a template. */
+    suspend fun saveTemplate(template: EventTemplate) = withContext(Dispatchers.IO) {
+        eventTemplateStore.save(template)
+    }
+
+    /** Permanently delete a template. */
+    suspend fun deleteTemplate(id: String) = withContext(Dispatchers.IO) {
+        eventTemplateStore.remove(id)
+    }
+
+    suspend fun applyTemplateToDates(
+        templateId: String,
+        dates: List<LocalDate>,
+        accountId: String?,
+    ): Int = withContext(Dispatchers.IO) {
+        val template = eventTemplateStore.list().firstOrNull { it.id == templateId } ?: return@withContext 0
+        val cleanDates = dates.distinct().sorted()
+        for (date in cleanDates) {
+            val startMinute = template.startMinuteOfDay ?: 0
+            val startTime = LocalTime.of(startMinute / 60, startMinute % 60)
+            val endDateTime = date.atTime(startTime).plusMinutes(template.durationMinutes.coerceAtLeast(1).toLong())
+            saveLocalEvent(
+                existing = null,
+                data = EventEditorData(
+                    accountId = accountId ?: template.accountId,
+                    title = template.title.ifBlank { template.name },
+                    description = template.description,
+                    location = template.location,
+                    date = date,
+                    endDate = if (template.isAllDay || template.startMinuteOfDay == null) date else endDateTime.toLocalDate(),
+                    startTime = startTime,
+                    endTime = if (template.isAllDay || template.startMinuteOfDay == null) LocalTime.of(23, 59) else endDateTime.toLocalTime(),
+                    isAllDay = template.isAllDay || template.startMinuteOfDay == null,
+                    reminderMinutes = template.reminderMinutes,
+                    rrule = null,
+                ),
+            )
+        }
+        cleanDates.size
+    }
+
+    // ----- Calendar Sets / Focus Profiles (file-based, Pro) -----
+
+    /** All saved calendar sets, newest first. */
+    suspend fun listFocusProfiles(): List<FocusProfile> = withContext(Dispatchers.IO) {
+        focusProfileStore.list()
+    }
+
+    /** Insert or overwrite a calendar set. */
+    suspend fun saveFocusProfile(profile: FocusProfile) = withContext(Dispatchers.IO) {
+        focusProfileStore.save(profile)
+    }
+
+    /** Permanently delete a calendar set. */
+    suspend fun deleteFocusProfile(id: String) = withContext(Dispatchers.IO) {
+        focusProfileStore.remove(id)
+    }
+
+    /** Show only the calendars saved in this set; hide every other calendar. LOCAL_ACCOUNT_ID always stays visible. */
+    suspend fun applyFocusProfile(id: String) = withContext(Dispatchers.IO) {
+        val profile = focusProfileStore.list().firstOrNull { it.id == id } ?: return@withContext
+        val accounts = dao.getAccountsForWidgetConfig()
+        for (account in accounts) {
+            if (account.id == LOCAL_ACCOUNT_ID) continue
+            val shouldBeVisible = account.id in profile.accountIds
+            if ((account.isVisible == 1) != shouldBeVisible) {
+                dao.updateAccountVisibility(account.id, if (shouldBeVisible) 1 else 0)
+            }
+        }
+        updateWidgets()
+    }
+
+    // ----- Shift Patterns (file-based, Pro) -----
+
+    suspend fun listShiftTypes(): List<ShiftType> = withContext(Dispatchers.IO) {
+        shiftPatternStore.listTypes()
+    }
+
+    suspend fun saveShiftType(type: ShiftType) = withContext(Dispatchers.IO) {
+        shiftPatternStore.saveType(type)
+    }
+
+    suspend fun deleteShiftType(id: String) = withContext(Dispatchers.IO) {
+        shiftPatternStore.removeType(id)
+    }
+
+    suspend fun listShiftPatterns(): List<ShiftPattern> = withContext(Dispatchers.IO) {
+        shiftPatternStore.listPatterns()
+    }
+
+    suspend fun saveShiftPattern(pattern: ShiftPattern) = withContext(Dispatchers.IO) {
+        shiftPatternStore.savePattern(pattern)
+    }
+
+    suspend fun deleteShiftPattern(id: String, removeGeneratedEvents: Boolean) = withContext(Dispatchers.IO) {
+        if (removeGeneratedEvents) removeGeneratedShiftEvents(id)
+        shiftPatternStore.removePattern(id)
+        shiftPatternStore.removeGenerationsForPattern(id)
+    }
+
+    suspend fun applyShiftPattern(
+        patternId: String,
+        rangeStart: LocalDate,
+        rangeEnd: LocalDate,
+        accountId: String?,
+    ): ShiftApplyResult = withContext(Dispatchers.IO) {
+        val pattern = shiftPatternStore.listPatterns().firstOrNull { it.id == patternId }
+            ?: return@withContext ShiftApplyResult(generatedCount = 0)
+        val shiftTypes = shiftPatternStore.listTypes().associateBy { it.id }
+        val overlapping = shiftPatternStore.listGenerations()
+            .filter { it.patternId == patternId && rangesOverlap(it.rangeStart, it.rangeEnd, rangeStart, rangeEnd) }
+        val replaced = overlapping.sumOf { it.eventIds.size }
+        overlapping.forEach { record ->
+            record.eventIds.forEach { eventId ->
+                dao.getEvent(eventId)?.let { deleteLocalEvent(it) }
+            }
+            shiftPatternStore.removeGeneration(record.id)
+        }
+        val occurrences = expandShiftPattern(pattern, shiftTypes, rangeStart, rangeEnd)
+        val eventIds = saveShiftOccurrences(occurrences, accountId)
+        shiftPatternStore.saveGeneration(
+            ShiftGenerationRecord(
+                id = ShiftGenerationRecord.newId(),
+                patternId = patternId,
+                generatedAtMs = System.currentTimeMillis(),
+                eventIds = eventIds,
+                rangeStart = rangeStart,
+                rangeEnd = rangeEnd,
+            ),
+        )
+        ShiftApplyResult(generatedCount = eventIds.size, replacedCount = replaced)
+    }
+
+    private suspend fun removeGeneratedShiftEvents(patternId: String) {
+        shiftPatternStore.listGenerations()
+            .filter { it.patternId == patternId }
+            .forEach { record ->
+                record.eventIds.forEach { eventId ->
+                    dao.getEvent(eventId)?.let { deleteLocalEvent(it) }
+                }
+                shiftPatternStore.removeGeneration(record.id)
+            }
+    }
+
+    private suspend fun saveShiftOccurrences(
+        occurrences: List<GeneratedShiftOccurrence>,
+        accountId: String?,
+    ): List<String> {
+        val eventIds = ArrayList<String>(occurrences.size)
+        for (occurrence in occurrences) {
+            val eventId = UUID.randomUUID().toString()
+            val type = occurrence.shiftType
+            val startMinute = type.startMinuteOfDay ?: 0
+            val duration = type.durationMinutes ?: 24 * 60
+            val startTime = LocalTime.of(startMinute / 60, startMinute % 60)
+            val endDateTime = occurrence.date.atTime(startTime).plusMinutes(duration.toLong())
+            saveLocalEvent(
+                existing = null,
+                data = EventEditorData(
+                    eventId = eventId,
+                    accountId = accountId,
+                    title = type.name,
+                    description = "",
+                    location = "",
+                    date = occurrence.date,
+                    endDate = if (type.isAllDay) occurrence.date else endDateTime.toLocalDate(),
+                    startTime = startTime,
+                    endTime = if (type.isAllDay) LocalTime.of(23, 59) else endDateTime.toLocalTime(),
+                    isAllDay = type.isAllDay,
+                    reminderMinutes = type.reminderMinutes,
+                    rrule = null,
+                    colorHex = type.colorHex,
+                ),
+            )
+            eventIds.add(eventId)
+        }
+        return eventIds
+    }
+
+    private fun rangesOverlap(aStart: LocalDate, aEnd: LocalDate, bStart: LocalDate, bEnd: LocalDate): Boolean =
+        !aEnd.isBefore(bStart) && !bEnd.isBefore(aStart)
+
     private fun LocalDate.atStartMs(): Long {
         return atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }
+
+    private fun CalendarEvent.conflictEndTimeMs(): Long {
+        return endTimeMs.coerceAtLeast(startTimeMs + 15 * 60 * 1000L)
     }
 
     private suspend fun saveDetachedOccurrence(existing: CalendarEvent, data: EventEditorData, zoneId: ZoneId) {
@@ -621,6 +1086,7 @@ class DotCalRepository(
         val detachedId = data.eventId ?: UUID.randomUUID().toString()
         val detachedEvent = master.copy(
             id = detachedId,
+            accountId = data.accountId ?: master.accountId,
             title = data.title.trim(),
             description = data.description.trim(),
             location = data.location.trim(),
@@ -628,6 +1094,7 @@ class DotCalRepository(
             endTimeMs = end,
             timeZone = zoneId.id,
             isAllDay = if (data.isAllDay) 1 else 0,
+            colorHex = data.colorHex ?: master.colorHex,
             rrule = null,
             exceptionDates = "[]",
             imageUris = data.imageUris,
@@ -670,15 +1137,15 @@ class DotCalRepository(
         WidgetUpdateWorker.enqueue(context)
     }
 
+    private fun List<CalendarEvent>.filterOutPrivate(privateIds: Set<String>): List<CalendarEvent> {
+        if (privateIds.isEmpty()) return this
+        return filterNot { it.baseEventId() in privateIds }
+    }
+
     private fun expandRecurringEvents(events: List<CalendarEvent>, rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
         val expanded = events.flatMap { event ->
-            when (event.rrule?.trim()) {
-                "FREQ=DAILY" -> event.expandDaily(rangeStart, rangeEndExclusive)
-                "FREQ=WEEKLY" -> event.expandWeekly(rangeStart, rangeEndExclusive)
-                "FREQ=MONTHLY" -> event.expandMonthly(rangeStart, rangeEndExclusive)
-                "FREQ=YEARLY" -> event.expandYearly(rangeStart, rangeEndExclusive)
-                else -> listOf(event)
-            }
+            val rule = RecurrenceRule.parse(event.rrule)
+            if (rule == null) listOf(event) else event.expandRule(rule, rangeStart, rangeEndExclusive)
         }
         return expanded.sortedWith(compareBy<CalendarEvent> { it.startTimeMs }.thenBy { it.title })
     }
@@ -687,75 +1154,46 @@ class DotCalRepository(
         val today = LocalDate.now()
         val rangeEnd = today.plusYears(1)
         val expanded = tasks.flatMap { task ->
-            when (task.rrule?.trim()) {
-                "FREQ=DAILY" -> task.expandDaily(today, rangeEnd)
-                "FREQ=WEEKLY" -> task.expandWeekly(today, rangeEnd)
-                "FREQ=MONTHLY" -> task.expandMonthly(today, rangeEnd)
-                "FREQ=YEARLY" -> task.expandYearly(today, rangeEnd)
-                else -> listOf(task)
-            }
+            val rule = RecurrenceRule.parse(task.rrule)
+            if (rule == null) listOf(task) else task.expandRule(rule, today, rangeEnd)
         }
         return expanded.sortedWith(compareBy<CalendarEvent> { it.isCompleted }.thenBy { if (it.startTimeMs > 0L) it.startTimeMs else Long.MAX_VALUE }.thenBy { it.title })
     }
 
-    private fun CalendarEvent.expandDaily(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
-        val firstDate = startDate()
-        val firstVisibleDate = maxOf(firstDate, rangeStart)
-        return generateOccurrences(firstVisibleDate, rangeEndExclusive) { it.plusDays(1) }
-    }
-
-    private fun CalendarEvent.expandWeekly(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
-        val firstDate = startDate()
-        val daysToRange = ChronoUnit.DAYS.between(firstDate, rangeStart).coerceAtLeast(0)
-        val weeksToRange = daysToRange / 7
-        val firstVisibleDate = firstDate.plusWeeks(weeksToRange).let { candidate ->
-            if (candidate < rangeStart) candidate.plusWeeks(1) else candidate
-        }
-        return generateOccurrences(firstVisibleDate, rangeEndExclusive) { it.plusWeeks(1) }
-    }
-
-    private fun CalendarEvent.expandMonthly(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
-        val firstDate = startDate()
-        val monthsToRange = ChronoUnit.MONTHS.between(firstDate.withDayOfMonth(1), rangeStart.withDayOfMonth(1)).coerceAtLeast(0)
-        var cursorMonth = firstDate.withDayOfMonth(1).plusMonths(monthsToRange)
-        val occurrences = mutableListOf<CalendarEvent>()
-        while (cursorMonth < rangeEndExclusive.withDayOfMonth(1).plusMonths(1)) {
-            val date = cursorMonth.dayOrNull(firstDate.dayOfMonth)
-            if (date != null && date >= firstDate && date >= rangeStart && date < rangeEndExclusive) {
-                occurrenceOn(date)?.let { occurrences += it }
-            }
-            cursorMonth = cursorMonth.plusMonths(1)
-        }
-        return occurrences
-    }
-
-    private fun CalendarEvent.expandYearly(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
-        val firstDate = startDate()
-        var cursorYear = maxOf(firstDate.year, rangeStart.year)
-        val occurrences = mutableListOf<CalendarEvent>()
-        while (cursorYear <= rangeEndExclusive.year) {
-            val date = LocalDate.of(cursorYear, 1, 1).monthDayOrNull(firstDate.monthValue, firstDate.dayOfMonth)
-            if (date != null && date >= firstDate && date >= rangeStart && date < rangeEndExclusive) {
-                occurrenceOn(date)?.let { occurrences += it }
-            }
-            cursorYear += 1
-        }
-        return occurrences
-    }
-
-    private fun CalendarEvent.generateOccurrences(
-        firstVisibleDate: LocalDate,
+    /**
+     * Expand a structured [RecurrenceRule] into visible occurrences within [rangeStart, rangeEndExclusive).
+     * Honors INTERVAL, weekly/monthly BYDAY, COUNT and UNTIL. COUNT is evaluated from the series anchor
+     * (so counts stay stable across scroll/views); the unbounded/UNTIL-only case fast-forwards to the range
+     * for performance. EXDATE handling and per-occurrence timing are delegated to [occurrenceOn].
+     */
+    private fun CalendarEvent.expandRule(
+        rule: RecurrenceRule,
+        rangeStart: LocalDate,
         rangeEndExclusive: LocalDate,
-        nextDate: (LocalDate) -> LocalDate,
     ): List<CalendarEvent> {
         val firstDate = startDate()
-        var cursor = firstVisibleDate
-        val occurrences = mutableListOf<CalendarEvent>()
-        while (cursor < rangeEndExclusive) {
-            if (cursor >= firstDate) occurrenceOn(cursor)?.let { occurrences += it }
-            cursor = nextDate(cursor)
+        val anchorCount = rule.count != null
+        var block = if (anchorCount) 0 else rule.fastForwardBlock(firstDate, rangeStart)
+        val out = mutableListOf<CalendarEvent>()
+        var emittedCount = 0
+        var iterations = 0
+        while (iterations < MAX_RECURRENCE_BLOCKS) {
+            iterations++
+            for (date in rule.datesForBlock(firstDate, block)) {
+                if (rule.until != null && date > rule.until) return out
+                if (anchorCount && emittedCount >= rule.count!!) return out
+                emittedCount++
+                if (date >= rangeStart && date < rangeEndExclusive) {
+                    occurrenceOn(date)?.let { out += it }
+                }
+            }
+            if (anchorCount && emittedCount >= rule.count!!) break
+            val anchor = rule.blockAnchorDate(firstDate, block)
+            if (rule.until != null && anchor > rule.until) break
+            if (!anchorCount && anchor >= rangeEndExclusive) break
+            block++
         }
-        return occurrences
+        return out
     }
 
     private fun CalendarEvent.occurrenceOn(date: LocalDate): CalendarEvent? {
@@ -773,15 +1211,6 @@ class DotCalRepository(
 
     private fun CalendarEvent.startDate(): LocalDate {
         return java.time.Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.of(timeZone)).toLocalDate()
-    }
-
-    private fun LocalDate.dayOrNull(day: Int): LocalDate? {
-        val yearMonth = YearMonth.from(this)
-        return if (day <= yearMonth.lengthOfMonth()) withDayOfMonth(day) else null
-    }
-
-    private fun LocalDate.monthDayOrNull(month: Int, day: Int): LocalDate? {
-        return runCatching { withMonth(month).dayOrNull(day) }.getOrNull()
     }
 
     private suspend fun disableBirthdayCalendar() {
@@ -828,8 +1257,25 @@ class DotCalRepository(
         private const val BIRTHDAY_REMINDER_MINUTES = 1440
         private const val BIRTHDAY_SORT_ORDER = 10
 
+        /** Safety cap on recurrence-block iteration; ~27 years of a daily rule. Guards pathological rules. */
+        private const val MAX_RECURRENCE_BLOCKS = 10_000
+
         fun holidayAccountId(countryCode: String): String = "$HOLIDAY_ACCOUNT_PREFIX$countryCode"
     }
+}
+
+private fun CalendarAccount.isReadOnlyGeneratedAccount(): Boolean {
+    val raw = listOf(id, accountName, displayName, accountType).joinToString(" ").lowercase(Locale.US)
+    return id == ContactsProviderDataSource.BIRTHDAY_ACCOUNT_ID ||
+        id.startsWith("holiday-") ||
+        raw.contains("birthday") ||
+        raw.contains("#holiday@") ||
+        raw.contains("holiday@group.v.calendar.google.com") ||
+        raw.contains("#contacts@") ||
+        raw.contains("contacts@group.v.calendar.google.com") ||
+        raw.contains("addressbook#contacts") ||
+        accountName.equals("BIRTHDAY", ignoreCase = true) ||
+        displayName.startsWith("Holidays -", ignoreCase = true)
 }
 
 private const val RECURRENCE_OCCURRENCE_SEPARATOR = "::occurrence::"

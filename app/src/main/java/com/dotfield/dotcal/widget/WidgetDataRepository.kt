@@ -5,6 +5,8 @@ import android.text.format.DateFormat
 import com.dotfield.dotcal.data.CalendarDao
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalDatabase
+import com.dotfield.dotcal.data.privacy.AppPrivacyManager
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -46,12 +48,16 @@ class WidgetDataRepository(
     private val context: Context,
     private val dao: CalendarDao,
 ) {
-    suspend fun load(size: DotCalWidgetSize, nowMs: Long = System.currentTimeMillis()): WidgetCalendarData = withContext(Dispatchers.IO) {
+    private val privacyManager = AppPrivacyManager(context.applicationContext)
+
+    suspend fun load(size: DotCalWidgetSize, accountId: String? = null, nowMs: Long = System.currentTimeMillis()): WidgetCalendarData = withContext(Dispatchers.IO) {
         val zoneId = ZoneId.systemDefault()
         val now = Instant.ofEpochMilli(nowMs).atZone(zoneId)
         val today = now.toLocalDate()
         val rangeEnd = today.plusDays(WIDGET_RANGE_DAYS)
-        val visibleItems = dao.getVisibleEventsForWidget(today.atStartMs(zoneId), rangeEnd.atStartMs(zoneId))
+        val privateIds = privacyManager.observePrivateVaultIds().first()
+        val visibleItems = dao.getVisibleEventsForWidget(today.atStartMs(zoneId), rangeEnd.atStartMs(zoneId), accountId)
+            .filterNot { it.id.substringBefore(RECURRENCE_SEPARATOR) in privateIds }
             .expandRecurring(today, rangeEnd)
             .filter { it.endTimeMs >= nowMs }
             .sortedForWidget(zoneId)

@@ -12,6 +12,9 @@ interface CalendarDao {
     @Query("SELECT * FROM calendar_accounts ORDER BY sortOrder ASC")
     fun observeAccounts(): Flow<List<CalendarAccount>>
 
+    @Query("SELECT * FROM calendar_accounts ORDER BY sortOrder ASC")
+    suspend fun getAccountsForWidgetConfig(): List<CalendarAccount>
+
     @Query("SELECT * FROM sync_metadata ORDER BY lastSyncMs DESC")
     fun observeSyncMetadata(): Flow<List<SyncMetadata>>
 
@@ -29,6 +32,24 @@ interface CalendarDao {
         """,
     )
     fun observeEvents(rangeStartMs: Long, rangeEndMs: Long): Flow<List<CalendarEvent>>
+
+    @Query(
+        """
+        SELECT calendar_events.* FROM calendar_events
+        INNER JOIN calendar_accounts ON calendar_accounts.id = calendar_events.accountId
+        WHERE calendar_events.isTask = 0
+        AND calendar_events.isAllDay = 0
+        AND calendar_events.isCompleted = 0
+        AND calendar_events.source != 'BIRTHDAY'
+        AND calendar_accounts.isVisible = 1
+        AND (
+            (startTimeMs < :rangeEndMs AND endTimeMs > :rangeStartMs)
+            OR (rrule IS NOT NULL AND rrule != '' AND startTimeMs < :rangeEndMs)
+        )
+        ORDER BY calendar_events.startTimeMs ASC
+        """,
+    )
+    suspend fun getVisibleTimedEventsForConflictWarning(rangeStartMs: Long, rangeEndMs: Long): List<CalendarEvent>
 
     @Query("SELECT * FROM calendar_accounts WHERE id = :accountId LIMIT 1")
     suspend fun getAccount(accountId: String): CalendarAccount?
@@ -54,6 +75,28 @@ interface CalendarDao {
         """,
     )
     suspend fun getAllUserEventsForExport(): List<CalendarEvent>
+
+    /**
+     * Global Search: master rows (events + tasks) from visible calendars whose title,
+     * description, or location matches the query. Excludes generated BIRTHDAY/HOLIDAY rows
+     * (noise). Recurring events return their single master row (not per-occurrence). Read-only
+     * query — no schema change. Private Vault filtering is applied in the repository.
+     */
+    @Query(
+        """
+        SELECT calendar_events.* FROM calendar_events
+        INNER JOIN calendar_accounts ON calendar_accounts.id = calendar_events.accountId
+        WHERE calendar_accounts.isVisible = 1
+        AND calendar_events.source NOT IN ('BIRTHDAY', 'HOLIDAY')
+        AND (
+            calendar_events.title LIKE '%' || :q || '%'
+            OR calendar_events.description LIKE '%' || :q || '%'
+            OR calendar_events.location LIKE '%' || :q || '%'
+        )
+        ORDER BY calendar_events.startTimeMs DESC
+        """,
+    )
+    suspend fun searchUserEvents(q: String): List<CalendarEvent>
 
     @Query("SELECT * FROM event_reminders WHERE eventId = :eventId ORDER BY triggerAtMs ASC")
     suspend fun getRemindersForEvent(eventId: String): List<EventReminder>
@@ -84,6 +127,7 @@ interface CalendarDao {
         SELECT calendar_events.* FROM calendar_events
         INNER JOIN calendar_accounts ON calendar_accounts.id = calendar_events.accountId
         WHERE calendar_accounts.isVisible = 1
+        AND (:accountId IS NULL OR calendar_events.accountId = :accountId)
         AND calendar_events.isTask = 0
         AND (
             (calendar_events.startTimeMs < :rangeEndMs AND calendar_events.endTimeMs >= :rangeStartMs)
@@ -92,7 +136,7 @@ interface CalendarDao {
         ORDER BY calendar_events.startTimeMs ASC
         """,
     )
-    suspend fun getVisibleEventsForWidget(rangeStartMs: Long, rangeEndMs: Long): List<CalendarEvent>
+    suspend fun getVisibleEventsForWidget(rangeStartMs: Long, rangeEndMs: Long, accountId: String?): List<CalendarEvent>
 
     @Query(
         """

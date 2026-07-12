@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.data.ics
 
+import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -212,24 +213,12 @@ object IcsParser {
     }
 
     /**
-     * DotCal only supports simple FREQ=DAILY/WEEKLY/MONTHLY/YEARLY. Keep just the FREQ token so an
-     * imported complex RRULE still produces a supported repeat instead of being dropped or breaking
-     * the recurrence expander.
+     * DotCal supports FREQ + the INTERVAL / BYDAY / COUNT / UNTIL subset that its expander honors.
+     * Parse through [RecurrenceRule] so a complex RRULE keeps the supported parts (and drops the rest)
+     * instead of being flattened to a bare FREQ or breaking the expander. Unparseable -> null.
      */
-    private fun normalizeRrule(rrule: String?): String? {
-        if (rrule == null) return null
-        val freq = rrule.split(';')
-            .firstOrNull { it.uppercase().startsWith("FREQ=") }
-            ?.uppercase()
-            ?: return null
-        return when (freq.removePrefix("FREQ=")) {
-            "DAILY" -> "FREQ=DAILY"
-            "WEEKLY" -> "FREQ=WEEKLY"
-            "MONTHLY" -> "FREQ=MONTHLY"
-            "YEARLY" -> "FREQ=YEARLY"
-            else -> null
-        }
-    }
+    private fun normalizeRrule(rrule: String?): String? =
+        RecurrenceRule.parse(rrule)?.toRRule()
 
     private data class ParsedDate(val epochMs: Long, val dateOnly: Boolean, val zone: ZoneId?)
 
