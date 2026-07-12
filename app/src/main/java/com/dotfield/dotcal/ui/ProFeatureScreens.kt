@@ -362,144 +362,199 @@ internal fun PaywallScreen(
     val price = productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
         ?: stringResource(R.string.pro_price_fallback)
     val priceIsEstimate = productDetails?.oneTimePurchaseOfferDetails?.formattedPrice == null
+    val buyEnabled = connected && !purchasing
+    val buyLabel = if (connected) "Unlock Pro - $price" else "Connecting..."
+    val launchPurchase = {
+        val activity = context.findActivity()
+        if (activity != null) {
+            purchasing = true
+            viewModel.purchasePro(activity)
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(palette.background),
     ) {
-        // ? Top bar: close only, no title.
-        Box(modifier = Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 8.dp)) {
-            IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart).size(40.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().height(56.dp).statusBarsPadding().padding(horizontal = 8.dp)) {
+            IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart).size(44.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
-        }
-
-        // ? Header - icon + title side by side, no vertical gap.
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Image(
-                painter = androidx.compose.ui.res.painterResource(id = R.mipmap.ic_launcher_foreground),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(RoundedCornerShape(30.dp)),
-            )
             Text(
                 "DotCal Pro",
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
-                fontSize = 24.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.offset(y = (-18).dp),
+                fontSize = 16.sp,
+                modifier = Modifier.align(Alignment.Center),
             )
         }
-        Spacer(modifier = Modifier.height(0.dp))
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-        ) {
 
-        // ? Feature list - bordered card.
-        Column(
+        LazyColumn(
             modifier = Modifier
-                .padding(horizontal = 28.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .border(1.dp, palette.eventCardBorder, RoundedCornerShape(14.dp))
-                .background(palette.eventCardSurface)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .weight(1f)
+                .padding(horizontal = 22.dp),
+            contentPadding = PaddingValues(top = 10.dp, bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            PRO_FEATURES.forEachIndexed { index, feature ->
-                PaywallFeatureRow(feature = feature, palette = palette)
-                if (index != PRO_FEATURES.lastIndex) {
-                    Spacer(modifier = Modifier.height(8.dp))
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(palette.eventCardSurface)
+                        .border(1.dp, palette.eventCardBorder, RoundedCornerShape(28.dp))
+                        .padding(horizontal = 22.dp, vertical = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Image(
+                        painter = androidx.compose.ui.res.painterResource(id = R.mipmap.ic_launcher_foreground),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(88.dp)
+                            .clip(RoundedCornerShape(24.dp)),
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Unlock the power tools",
+                        color = palette.primaryText,
+                        fontFamily = LocalHeadingFont.current,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 25.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Quick capture, templates, calendar sets, widgets, privacy tools, and time insights in one lifetime upgrade.",
+                        color = palette.secondaryText,
+                        fontFamily = mono,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(palette.accent.copy(alpha = 0.10f))
+                            .border(1.dp, palette.accent.copy(alpha = 0.26f), RoundedCornerShape(18.dp))
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Lifetime Pro", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(
+                                if (priceIsEstimate) "One-time purchase. Price may vary by region." else "One-time purchase. No subscription.",
+                                color = palette.secondaryText,
+                                fontFamily = mono,
+                                fontSize = 11.sp,
+                                lineHeight = 14.sp,
+                            )
+                        }
+                        Text(price, color = palette.accent, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                    }
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    PaywallMetricCard("Pay once", "Forever access", palette, Modifier.weight(1f))
+                    PaywallMetricCard("Offline-first", "No cloud account", palette, Modifier.weight(1f))
+                }
+            }
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(palette.eventCardSurface)
+                        .border(1.dp, palette.eventCardBorder, RoundedCornerShape(24.dp))
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    PRO_FEATURES.forEach { feature ->
+                        PaywallFeatureRow(feature = feature, palette = palette)
+                    }
                 }
             }
         }
-        Spacer(modifier = Modifier.height(10.dp))
 
-        // ? Price row.
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .background(palette.background)
+                .padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                "Pay once. Own it forever.",
+                if (priceIsEstimate) "One-time purchase. Regional price estimate." else "One-time purchase. No subscription.",
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(if (buyEnabled) palette.accent else palette.disabledText)
+                    .noRippleClickable(enabled = buyEnabled) { launchPurchase() },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (purchasing) {
+                    CircularProgressIndicator(color = palette.onAccent, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+                } else {
+                    Text(buyLabel, color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                "Restore Purchase",
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 12.sp,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.height(1.dp))
-            Text(
-                if (priceIsEstimate) "No subscription. Price estimate." else "No subscription.",
-                color = palette.secondaryText,
-                fontFamily = mono,
-                fontSize = 10.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 28.dp),
-            )
-        }
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // ? Buy button - accent bg, rounded, full width.
-        val buyEnabled = connected && !purchasing
-        Box(
-            modifier = Modifier
-                .padding(horizontal = 28.dp)
-                .fillMaxWidth()
-                .height(52.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(if (buyEnabled) palette.accent else palette.disabledText)
-                .noRippleClickable(enabled = buyEnabled) {
-                    val activity = context.findActivity()
-                    if (activity != null) {
-                        purchasing = true
-                        viewModel.purchasePro(activity)
-                    }
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            if (purchasing) {
-                CircularProgressIndicator(color = palette.onAccent, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
-            } else {
-                Text("Buy Pro - $price", color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // ? Restore purchase.
-        Text(
-            "Restore Purchase",
-            color = palette.secondaryText,
-            fontFamily = mono,
-            fontSize = 12.sp,
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .noRippleClickable {
-                    viewModel.restorePro { restored ->
-                        val message = if (restored) {
-                            "Purchase restored - enjoy DotCal Pro!"
-                        } else {
-                            "No previous purchase found on this account"
+                modifier = Modifier
+                    .noRippleClickable {
+                        viewModel.restorePro { restored ->
+                            val message = if (restored) {
+                                "Purchase restored - enjoy DotCal Pro!"
+                            } else {
+                                "No previous purchase found on this account"
+                            }
+                            showDotCalToast(context, palette, message)
                         }
-                        showDotCalToast(context, palette, message)
                     }
-                }
-                .padding(8.dp),
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
         }
     }
 }
 
+@Composable
+private fun PaywallMetricCard(
+    label: String,
+    value: String,
+    palette: DotCalPalette,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .height(86.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(palette.eventCardSurface)
+            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(20.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp, maxLines = 1)
+        Text(value, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 2, lineHeight = 17.sp)
+    }
+}
 
 @Composable
 private fun PaywallFeatureRow(feature: ProFeature, palette: DotCalPalette) {

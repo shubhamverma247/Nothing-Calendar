@@ -10,7 +10,7 @@ Feature batch specs live in `Docs/fable-suggested-feature.md`. For new feature w
 
 - Use `$android-development` for Android work.
 - Workdir: `D:\Caveman\caveman\Nothing-Calendar`.
-- Branch: `pro-features`.
+- Branch: `main`.
 - Preserve existing behavior/UI unless user explicitly changes it.
 - Do not change package/application id `com.dotfield.dotcal`, deep link scheme `dotcal://`, or Room DB filename `dotcal.db`.
 - Do not change Room schema unless user explicitly approves. Schema must remain exactly 5 tables: `calendar_accounts`, `calendar_events`, `event_reminders`, `sync_metadata`, `deleted_event_log`.
@@ -98,6 +98,17 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 
 ## Latest Work
 
+- 2026-07-12: Settings option-sheet style alignment completed on `main`. Shared Settings option sheets for Default view, Start of the week, Default reminder, Default event duration, and Sync interval now reuse the Font picker dialog style: no drag handle, skip-partial bottom sheet, 22dp side padding, bold 22sp heading, 10dp rounded option rows, cancel-surface unselected rows, accent-tinted selected row, border treatment, and 22dp check icon. Selection callbacks/persistence unchanged. No Room schema/package/deep-link/DB/sync/onboarding changes. `:app:assembleDebug` passed in 1m 38s, debug APK installed successfully. No manual phone UI QA run.
+- 2026-07-12: Tasks segmented perceived-gap correction completed on `main`. Root cause was label-width perception: equal-width cells made short `All` leave a large visible text gap while long `Completed` crowded the right edge, even when cell gaps were mathematically equal. Tasks filter now measures each pill by its content width plus fixed padding, then computes one equal gap used before `All`, between every pill, and after `Completed`. No Room schema/package/deep-link/DB/sync/onboarding/settings behavior changes. `:app:assembleDebug` passed in 1m 16s, debug APK installed successfully. No manual phone UI QA run.
+- 2026-07-12: Tasks segmented edge-gap correction completed on `main`. Replaced the Tasks segmented-control Row/DP-width layout with a custom pixel layout so the left edge gap, all three internal gaps, and the right edge gap are exactly the same pixel value. Any leftover pixels from screen-width division are distributed into segment widths only, not into gaps. No Room schema/package/deep-link/DB/sync/onboarding/settings behavior changes. `:app:assembleDebug` passed in 1m 17s, debug APK installed successfully. No manual phone UI QA run.
+- 2026-07-12: Tasks segmented spacing correction completed on `main`. Tasks filter segmented control now uses a fixed 4dp gap and computes each of the four segment widths from the available inner width, avoiding weight/rounding differences that made All / Today / Upcoming / Completed gaps look uneven. No Room schema/package/deep-link/DB/sync/onboarding/settings behavior changes. `:app:assembleDebug` passed in 38s, debug APK installed successfully. No manual phone UI QA run.
+- 2026-07-12: Settings picker bottom-sheet redesign completed on `main`. Replaced Settings `DropdownMenu` pickers with shared bottom-sheet option dialogs for Default view, Start of the week, Default reminder, Default event duration, and Sync interval. Existing values, callbacks, persistence behavior, selected-check state, and row labels are preserved; Font and all-day reminder time already used bottom sheets and were left intact. No Room schema/package/deep-link/DB/sync/onboarding changes. `:app:assembleDebug` passed in 1m 41s, debug APK installed successfully. No manual phone UI QA run.
+- 2026-07-12: Settings/tasks redesign feedback fixes completed on `main`. Tasks filter segmented control now uses explicit equal-width segments with equal 4dp gaps so All / Today / Upcoming / Completed spacing is consistent and labels stay compact. Settings sub-screens for Calendar Preferences, Reminder Defaults, Appearance, Widgets, Sync, Data & Restore, and App Lock & Private Vault now use the same grouped rounded panel language as the redesigned Settings root instead of the older divider-only layout. The root `App Lock & Private Vault` row no longer shows duplicate `Pro` text for non-Pro users, and Settings root/tool icon cells no longer draw the dark-theme outline border beside icons. No Room schema/package/deep-link/DB/sync/onboarding changes. `:app:assembleDebug` passed in 2m 4s, debug APK installed successfully. No manual phone UI QA run.
+- 2026-07-12: Settings root Nothing OS-style redesign follow-up completed on `main`. Removed the top `DOTCAL / SETTINGS` micro-label, top-right dot matrix, and free-plan/account summary per user feedback. Icon cells now use transparent/subtle bordered treatment instead of filled dark blocks, and the DotCal Pro card now uses the app surface in dark theme instead of an inverted white card. Grouped rounded panels, icon-led rows, two-card Tools section, real Material `Widgets` icon, existing row destinations, Pro gating, Paywall behavior, Settings sub-screen overlays, data actions, and Time Insights/Date Calculator root placement are preserved. No Room schema/package/deep-link/DB/sync/onboarding changes. `:app:assembleDebug` passed in 2m 6s, debug APK installed successfully. No manual phone UI QA run.
+- 2026-07-12: Settings root Nothing OS-style redesign completed on `main`. Settings root now uses a `DOTCAL / SETTINGS` hero with a dot-matrix accent, grouped rounded panels, icon-led rows, a two-card Tools section for Time Insights and Date Calculator, and a stronger DotCal Pro card. The Widgets row uses the real Material `Widgets` icon from the existing material-icons-extended dependency. Existing row destinations, Pro gating, Paywall behavior, Settings sub-screen overlays, data actions, and Time Insights/Date Calculator root placement are preserved. No Room schema/package/deep-link/DB/sync/onboarding changes. `:app:assembleDebug` passed in 2m 16s, debug APK installed successfully. No manual phone UI QA run.
+- 2026-07-12: Settings root tool placement correction completed on `main`. Time Insights and Date Calculator moved from Settings > Calendar Preferences > Tools to the Settings root under a `Tools` section, preserving existing Pro gating and full-screen overlays. Calendar Preferences returns to calendar-only preferences. No Room schema/package/deep-link/DB/sync/onboarding changes. `:app:assembleDebug` passed in 1m 51s, debug APK installed successfully on device `58fb7faf`. No manual phone UI QA run.
+- 2026-07-12: Calendar overflow / Settings tool placement / Tasks segmented follow-up completed on `main`. Calendar three-dot menu is now mixed free + Pro: Search and New Event are free entries, while Quick Add, Templates, Calendar Sets, and Shift Patterns remain Pro-labeled. Time Insights and Date Calculator were removed from Calendar overflow and moved into Settings > Calendar Preferences > Tools with existing Pro gating. Calendar overflow Pro label is now plain small text, not a pill. Tasks filter segmented control was tightened so `Completed` fits without ellipsis by sharing segment width, reducing internal padding, and using 13sp labels. No Room schema/package/deep-link/DB/sync/onboarding changes. `:app:assembleDebug` passed in 2m 39s with only an existing deprecated credential API warning. Debug APK installed successfully on device `58fb7faf`. No manual phone UI QA run.
+- 2026-07-12: Calendar Pro labeling + Paywall UI redesign completed on `main`. Calendar tab three-dot menu now shows compact `Pro` badges on paid tool entries: Quick Add, Templates, Calendar Sets, Time Insights, Date Calculator, and Shift Patterns; Search remains unbadged/free. Paywall was redesigned with a clear `DotCal Pro` top bar, premium hero card, lifetime price row, benefit cards, scrollable Pro feature list, and a pinned bottom purchase area so the primary `Unlock Pro - {price}` CTA plus Restore Purchase remain visible. Billing flow, product ID, ProManager gating, schema/package/deep-link/DB/sync/onboarding behavior unchanged. `:app:assembleDebug` passed in 2m 44s. Debug APK install attempted, but ADB reported `no devices/emulators found`; no APK installed and no manual phone UI QA run.
 - 2026-07-12: Settings sub-screen cleanup completed. Settings root now shows category rows instead of dense inline controls: Calendar Accounts, Calendar Preferences, Reminder Defaults, Appearance, Widgets, App Lock & Private Vault, Sync, Data & Restore, About, and DotCal Pro. Moved Week start / Default view / Week numbers / Birthday calendar / Global Holidays into Calendar Preferences; moved Default reminder / Default event duration / Default all-day reminder time into Reminder Defaults; moved Font into Appearance with Theme/Accent; moved Transparent Widgets / Widget Dot Texture into Widgets; moved Export / Import / Backup / Restore / Recently Deleted into Data & Restore. Existing callbacks, Pro gates, offline data actions, and full-screen/right-slide settings pattern preserved. No Room schema/package/deep-link/DB/onboarding/sync-provider changes. `:app:assembleDebug` passed in 1m 55s, debug APK installed successfully on device `4ab0d020` after adb reconnect recovered the device from `offline`. No manual phone UI QA run.
 - 2026-07-12: Settings/Search/Shift feedback fixes completed. Search filter dropdowns no longer show a literal `v`; they now use the standard down-arrow icon. Shift Patterns is now included in the root back-handler stack, so Android back gesture closes Shift Patterns and returns to Calendar instead of exiting the app. Settings root now has a single `Sync` row showing `Off` or the sync interval; the old root-level `Sync enabled`, `Sync interval`, and `Sync now` rows moved into a dedicated full-screen Sync settings page. No Room schema/package/deep-link/DB/onboarding/sync-provider changes. `:app:assembleDebug` passed in 2m 29s, debug APK installed successfully on device `4ab0d020`. No manual phone UI QA run.
 - 2026-07-12: Settings cleanup/tool relocation completed. Calendar tab three-dot menu now owns calendar/action tools: Search, Quick Add, Templates, Calendar Sets, Time Insights, Date Calculator, and Shift Patterns. Settings no longer shows direct rows for Date Calculator, Time Insights, Templates, Calendar Sets, or Shift Patterns; Settings remains focused on accounts, calendar preferences, reminders, appearance/widgets, sync, privacy/data, billing, and about. Existing Pro gates/full-screen overlays are reused: non-Pro tool taps open Paywall, Pro tools open their existing screens, and Search stays free. No Room schema/package/deep-link/DB/onboarding/sync/holiday/task changes. `:app:assembleDebug` passed in 2m 34s, debug APK installed successfully. No manual phone UI QA run.
@@ -134,6 +145,52 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## What To Test Next
 
+- Settings option-sheet style alignment:
+  - Open Settings > Appearance > Font. Expected: existing Font picker style remains unchanged.
+  - Open Settings > Calendar Preferences > Start of the week and Default view. Expected: sheets visually match Font picker style: no handle, same padding, bold title, bordered rounded rows, accent selected row/check.
+  - Open Settings > Reminder Defaults > Default reminder and Default event duration. Expected: same Font picker-style sheet and existing value updates still work.
+  - Open Settings > Sync > Sync interval. Expected: same Font picker-style sheet and sync interval behavior unchanged.
+- Tasks segmented perceived-gap correction:
+  - Open Tasks tab. Expected: visible gap before `All`, between `All`/`Today`, `Today`/`Upcoming`, `Upcoming`/`Completed`, and after `Completed` looks equal by label/pill edges.
+  - Switch filters. Expected: selected pill wraps its label cleanly, gaps stay equal, and `Completed` no longer crowds the right edge.
+- Tasks segmented edge-gap correction:
+  - Open Tasks tab. Expected: gap before `All`, gaps between all buttons, and gap after `Completed` are visually identical.
+  - Switch between filters including `Completed`. Expected: selected pill moves but outer edge gaps and internal gaps do not change.
+- Tasks segmented spacing correction:
+  - Open Tasks tab. Expected: All / Today / Upcoming / Completed segments have identical visible 4dp gaps between each button.
+  - Switch between all four filters. Expected: selected background moves without changing segment widths or gaps, and `Completed` stays fully visible.
+- Settings picker bottom-sheet redesign:
+  - Open Settings > Calendar Preferences, tap Start of the week. Expected: bottom sheet opens with week options, selected option highlighted with a check; choosing one updates the row and closes the sheet.
+  - Open Settings > Calendar Preferences, tap Default view. Expected: bottom sheet opens for calendar view choices and persists selection as before.
+  - Open Settings > Reminder Defaults, tap Default reminder and Default event duration. Expected: each opens a bottom sheet, selected item shows a check, and picked value updates immediately.
+  - Open Settings > Sync, tap Sync interval. Expected: bottom sheet opens with Off / 15 / 30 / 60 minute choices and existing sync behavior remains unchanged.
+  - Use Android back or outside tap while a picker sheet is open. Expected: sheet dismisses and stays on the current Settings sub-screen.
+- Settings/tasks redesign feedback fixes:
+  - Open Tasks tab. Expected: All / Today / Upcoming / Completed segments have equal gaps and `Completed` does not truncate.
+  - Open Settings root in dark theme. Expected: option row icons have no visible border box around them; locked Pro icon tint remains red/subtle.
+  - As non-Pro, check Settings root `App Lock & Private Vault`. Expected: only one small `Pro` label appears, not both a value and trailing label.
+  - Open Settings > Calendar Preferences, Reminder Defaults, Appearance, Widgets, Sync, Data & Restore, and App Lock & Private Vault. Expected: each sub-screen uses rounded grouped panels matching Settings root rather than old loose divider rows.
+  - Use toolbar back and Android back from those sub-screens. Expected: returns to Settings root with existing behavior.
+- Settings root Nothing OS-style redesign:
+  - Open Settings root. Expected: top shows only the large `Settings` title; no `DOTCAL / SETTINGS` label, no plan/account summary, and no top-right dot matrix.
+  - Scroll Settings root. Expected: Accounts, Settings, Tools, About, and DotCal Pro appear as rounded grouped surfaces, not loose divider-only rows.
+  - Check Settings rows. Expected: rows have left icons in subtle bordered cells without filled black blocks, readable title/value text, and existing destinations still open: Calendar Preferences, Reminder Defaults, Appearance, Widgets, App Lock & Private Vault, Sync, and Data & Restore.
+  - Check Tools. Expected: Time Insights and Date Calculator appear as two compact cards under Tools; non-Pro taps open Paywall, Pro taps open the existing tool screens.
+  - Check DotCal Pro card. Expected: card uses the app surface in dark theme instead of a bright white card, opens the existing Paywall/Pro flow, shows active/unlocked copy for Pro users, and does not affect billing behavior.
+  - Check light and dark themes. Expected: grouped panels, icon cells, text, and Pro card remain readable with no clipped row text.
+- Calendar overflow / Settings tools / Tasks segmented follow-up:
+  - Open Calendar > three-dot menu. Expected: Search and New Event show as free entries; Quick Add, Templates, Calendar Sets, and Shift Patterns show a small plain `Pro` text label, not a pill.
+  - In the same menu, confirm Time Insights and Date Calculator are no longer listed. Expected: menu is not mostly Pro-only.
+  - Open Settings root. Expected: Tools section contains Time Insights and Date Calculator with existing Pro behavior.
+  - Open Settings > Calendar Preferences. Expected: no Tools section; only calendar preferences remain.
+  - As non-Pro, tap Time Insights or Date Calculator from Settings root. Expected: Paywall opens.
+  - As Pro, tap Time Insights or Date Calculator from Settings root. Expected: the existing full-screen tool opens.
+  - Open Tasks tab. Expected: segmented filters All / Today / Upcoming / Completed fit without `...`.
+- Calendar Pro labels + Paywall redesign:
+  - Open Calendar and tap the top-right three-dot menu. Expected: Quick Add, Templates, Calendar Sets, and Shift Patterns each show small plain `Pro` text; Search and New Event have no Pro label.
+  - As non-Pro, tap any Pro-badged menu item. Expected: Paywall opens using the existing overlay/gating behavior.
+  - On Paywall, check the first screen and bottom area. Expected: `Unlock Pro - {price}` button is visible in a pinned bottom purchase area, with Restore Purchase below it; the feature list scrolls without hiding the pay button.
+  - Disconnect billing/network or before product details load. Expected: CTA shows a disabled connecting state until billing connects; no crash.
 - Settings sub-screen cleanup:
   - Open Settings root. Expected: root shows category rows, not inline controls for Week start, Default view, reminders, widgets, or data import/export.
   - Tap Calendar Preferences. Expected: Start of the week, Default view, Week numbers, Birthday calendar, and Global Holidays appear; toolbar back and Android back return to Settings root.
@@ -148,11 +205,11 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
   - Tap Settings > Sync. Expected: full-screen Sync page opens with Sync enabled toggle, Sync interval picker, and Sync now/status row.
   - From Settings > Sync, use the toolbar back and Android back gesture. Expected: both return to Settings root.
 - Settings cleanup/tool relocation:
-  - Open Calendar and tap the top-right three-dot menu. Expected: Search, Quick Add, Templates, Calendar Sets, Time Insights, Date Calculator, and Shift Patterns appear in the menu.
+  - Open Calendar and tap the top-right three-dot menu. Expected: Search, New Event, Quick Add, Templates, Calendar Sets, and Shift Patterns appear in the menu.
   - Tap Search. Expected: Search opens normally and does not require Pro.
   - As Pro, tap each Pro tool from Calendar three-dot menu. Expected: existing full-screen tool opens and back returns to Calendar.
-  - As non-Pro, tap Quick Add/Templates/Calendar Sets/Time Insights/Date Calculator/Shift Patterns. Expected: existing Paywall opens.
-  - Open Settings. Expected: direct feature rows for Date Calculator, Time Insights, Templates, Calendar Sets, and Shift Patterns are gone; settings remain focused on accounts/preferences/reminders/appearance/sync/data/about.
+  - As non-Pro, tap Quick Add/Templates/Calendar Sets/Shift Patterns. Expected: existing Paywall opens.
+  - Open Settings > Calendar Preferences. Expected: Time Insights and Date Calculator live under Tools; settings remain mostly focused on accounts/preferences/reminders/appearance/sync/data/about.
 - B1 Time Insights:
   - As Pro, open Settings > Additional > Time Insights. Expected: a full-screen Time Insights screen slides in with This week / This month / Custom controls and summary cards.
   - Switch between This week and This month. Expected: scheduled hours, event count, busiest day, calendar bars, and weekday chart update for the selected range.
@@ -191,12 +248,12 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## Resume Prompt
 
-Continue DotCal development in `D:\Caveman\caveman\Nothing-Calendar` on branch `pro-features`.
+Continue DotCal development in `D:\Caveman\caveman\Nothing-Calendar` on branch `main`.
 
 First read `Docs/HANDOFF.md`; it is source of truth. Respect Hard Rules, schema lock, Pro/Billing status, and current next step.
 
 For new feature work, also read `Docs/fable-suggested-feature.md`; it contains the current feature-batch instructions/specs. Suggested first feature is A2 Conflict Warning unless the user picks another item.
 
-Latest status: `versionCode 9` / `versionName 1.1.3`; `:app:assembleDebug` passing. Latest debug APK installed successfully. Latest completed app-code changes include B5 Year view feedback correction: Settings/Event toggles now reuse the Year Heatmap switch style, and filled heatmap markers no longer cut date numbers. No manual phone UI QA run unless explicitly asked.
+Latest status: `versionCode 9` / `versionName 1.1.3`; `:app:assembleDebug` passing. Latest debug APK installed successfully. Latest completed app-code change is the Settings root Nothing OS-style redesign follow-up: removed the top micro-label, plan/account label, and dot matrix; softened icon cells; and made the Pro card use the app surface in dark theme. No manual phone UI QA run unless explicitly asked.
 
 Strict: do not change Room schema, package id, deep links, DB filename, onboarding/calendar/sync/holidays/tasks unless required by the task. No Hilt, no Compose Nav graph. Build after app-code changes with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`, then install debug APK on the connected phone unless user says not to. Do not run manual phone UI QA unless explicitly asked. Do not start Advanced Reminder Profiles or Offline OCR without confirmation.

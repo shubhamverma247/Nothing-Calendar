@@ -232,11 +232,22 @@ internal fun CalendarActionBar(
                                 },
                             )
                         }
+                        ActionBarMenuItem(
+                            label = "New Event",
+                            subtitle = "Create an event quickly",
+                            icon = Icons.Default.Add,
+                            palette = palette,
+                            onClick = {
+                                showOverflow = false
+                                onAdd()
+                            },
+                        )
                         if (onQuickAdd != null) {
                             ActionBarMenuItem(
                                 label = "Quick Add",
                                 subtitle = "Type it, we schedule it",
                                 icon = Icons.Default.AutoAwesome,
+                                isPro = true,
                                 palette = palette,
                                 onClick = {
                                     showOverflow = false
@@ -249,6 +260,7 @@ internal fun CalendarActionBar(
                                 label = "Templates",
                                 subtitle = "Reuse saved events & tasks",
                                 icon = Icons.Default.Description,
+                                isPro = true,
                                 palette = palette,
                                 onClick = {
                                     showOverflow = false
@@ -261,34 +273,11 @@ internal fun CalendarActionBar(
                                 label = "Calendar Sets",
                                 subtitle = "Switch saved visibility sets",
                                 icon = Icons.Default.CalendarMonth,
+                                isPro = true,
                                 palette = palette,
                                 onClick = {
                                     showOverflow = false
                                     onCalendarSets()
-                                },
-                            )
-                        }
-                        if (onTimeInsights != null) {
-                            ActionBarMenuItem(
-                                label = "Time Insights",
-                                subtitle = "Hours, load, and task stats",
-                                icon = Icons.Default.BarChart,
-                                palette = palette,
-                                onClick = {
-                                    showOverflow = false
-                                    onTimeInsights()
-                                },
-                            )
-                        }
-                        if (onDateCalculator != null) {
-                            ActionBarMenuItem(
-                                label = "Date Calculator",
-                                subtitle = "Add days and compare dates",
-                                icon = Icons.Default.EventRepeat,
-                                palette = palette,
-                                onClick = {
-                                    showOverflow = false
-                                    onDateCalculator()
                                 },
                             )
                         }
@@ -297,6 +286,7 @@ internal fun CalendarActionBar(
                                 label = "Shift Patterns",
                                 subtitle = "Build rotating schedules",
                                 icon = Icons.Default.EventRepeat,
+                                isPro = true,
                                 palette = palette,
                                 onClick = {
                                     showOverflow = false
@@ -316,6 +306,7 @@ private fun ActionBarMenuItem(
     label: String,
     subtitle: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isPro: Boolean = false,
     palette: DotCalPalette,
     onClick: () -> Unit,
 ) {
@@ -335,7 +326,21 @@ private fun ActionBarMenuItem(
         },
         text = {
             Column {
-                Text(label, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        label,
+                        color = palette.primaryText,
+                        fontFamily = mono,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (isPro) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Pro", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 10.sp, maxLines = 1)
+                    }
+                }
                 Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
             }
         },

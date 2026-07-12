@@ -116,14 +116,12 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Settings as SettingsGearIcon
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -233,7 +231,6 @@ import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
-import com.dotfield.dotcal.ui.theme.NBlack
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -655,91 +652,126 @@ internal fun SettingsRoot(
     val listState = rememberLazyListState()
     val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
-        LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 150.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(bottom = 150.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
             item {
-                SettingsLargeHeader(palette = palette, onBack = onBack, showBack = false)
-                Spacer(modifier = Modifier.height(10.dp))
+                SettingsNothingHero(
+                    palette = palette,
+                )
             }
             item {
-            SettingsSectionTitle("Accounts", palette)
-            SettingsMenuRow(
-                title = "Calendar Accounts",
-                value = calendarAccountsLabel(accounts, hasCalendarPermission),
-                palette = palette,
-                onClick = onRequestCalendarAccess,
-            )
-            SettingsDivider(palette)
-
-            SettingsSectionTitle("Settings", palette)
-            SettingsMenuRow(
-                title = "Calendar Preferences",
-                value = defaultCalendarTab.label,
-                palette = palette,
-                onClick = onCalendarPreferencesSettings,
-            )
-            SettingsMenuRow(
-                title = "Reminder Defaults",
-                value = reminderLabel(defaultReminderMinutes),
-                palette = palette,
-                onClick = onReminderDefaultsSettings,
-            )
-            SettingsMenuRow(
-                title = "Appearance",
-                value = "${themeMode.label} / ${accentColor.label}",
-                palette = palette,
-                onClick = onThemeSettings,
-            )
-            SettingsMenuRow(
-                title = "Widgets",
-                value = if (widgetTransparent) "Transparent" else "Default",
-                palette = palette,
-                onClick = onWidgetSettings,
-            )
-            SettingsProBadgeRow(
-                title = "App Lock & Private Vault",
-                isPro = isPro,
-                palette = palette,
-                onClick = onAppPrivacy,
-            )
-            SettingsMenuRow(
-                title = "Sync",
-                value = if (syncEnabled) syncIntervalLabel(syncIntervalMins) else "Off",
-                palette = palette,
-                onClick = onSyncSettings,
-            )
-            SettingsMenuRow(
-                title = "Data & Restore",
-                value = "",
-                palette = palette,
-                onClick = onDataSettings,
-            )
-            SettingsDivider(palette)
-
-            SettingsSectionTitle("About", palette)
-            SettingsMenuRow(title = "Check for updates", value = "", palette = palette, onClick = onCheckForUpdates)
-            SettingsMenuRow(title = "Privacy Policy", value = "", palette = palette, onClick = onPrivacyPolicy)
-            SettingsMenuRow(title = "Rate DotCal", value = "", palette = palette, onClick = onRateDotCal)
-            SettingsMenuRow(title = "Send Feedback", value = "", palette = palette, onClick = {
-                context.startActivity(
-                    Intent(Intent.ACTION_SENDTO).apply {
-                        data = Uri.parse("mailto:dotfieldstudio@gmail.com?subject=DotCal%20Feedback")
-                    }
+                SettingsPanel(title = "Accounts", palette = palette) {
+                    SettingsIconMenuRow(
+                        title = "Calendar Accounts",
+                        value = calendarAccountsLabel(accounts, hasCalendarPermission),
+                        icon = Icons.Default.CalendarMonth,
+                        palette = palette,
+                        onClick = onRequestCalendarAccess,
+                    )
+                }
+            }
+            item {
+                SettingsPanel(title = "Settings", palette = palette) {
+                    SettingsIconMenuRow(
+                        title = "Calendar Preferences",
+                        value = defaultCalendarTab.label,
+                        icon = Icons.Default.CalendarMonth,
+                        palette = palette,
+                        onClick = onCalendarPreferencesSettings,
+                    )
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(
+                        title = "Reminder Defaults",
+                        value = reminderLabel(defaultReminderMinutes),
+                        icon = Icons.Default.Notifications,
+                        palette = palette,
+                        onClick = onReminderDefaultsSettings,
+                    )
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(
+                        title = "Appearance",
+                        value = "${themeMode.label} / ${accentColor.label}",
+                        icon = Icons.Default.AutoAwesome,
+                        palette = palette,
+                        onClick = onThemeSettings,
+                    )
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(
+                        title = "Widgets",
+                        value = if (widgetTransparent) "Transparent" else "Default",
+                        icon = Icons.Default.Widgets,
+                        palette = palette,
+                        onClick = onWidgetSettings,
+                    )
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(
+                        title = "App Lock & Private Vault",
+                        value = if (isPro) "Active" else "",
+                        icon = Icons.Default.Lock,
+                        isProLocked = !isPro,
+                        palette = palette,
+                        onClick = onAppPrivacy,
+                    )
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(
+                        title = "Sync",
+                        value = if (syncEnabled) syncIntervalLabel(syncIntervalMins) else "Off",
+                        icon = Icons.Default.AccessTime,
+                        palette = palette,
+                        onClick = onSyncSettings,
+                    )
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(
+                        title = "Data & Restore",
+                        value = "Local",
+                        icon = Icons.AutoMirrored.Filled.Article,
+                        palette = palette,
+                        onClick = onDataSettings,
+                    )
+                }
+            }
+            item {
+                SettingsToolsPanel(
+                    palette = palette,
+                    isPro = isPro,
+                    onTimeInsights = onTimeInsights,
+                    onDateCalculator = onDateCalculator,
                 )
-            })
-            SettingsMenuRow(title = "Version", value = BuildConfig.VERSION_NAME, palette = palette, showChevron = false, onClick = {})
-            SettingsDivider(palette)
-
-            SettingsSectionTitle("DotCal Pro", palette)
-            SettingsProRow(
-                isPro = isPro,
-                palette = palette,
-                onClick = onDotCalPro,
-            )
-            Spacer(modifier = Modifier.height(32.dp))
+            }
+            item {
+                SettingsPanel(title = "About", palette = palette) {
+                    SettingsIconMenuRow(title = "Check for updates", value = "", icon = Icons.Default.AutoAwesome, palette = palette, onClick = onCheckForUpdates)
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(title = "Privacy Policy", value = "", icon = Icons.Default.Description, palette = palette, onClick = onPrivacyPolicy)
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(title = "Rate DotCal", value = "", icon = Icons.Default.Star, palette = palette, onClick = onRateDotCal)
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(title = "Send Feedback", value = "", icon = Icons.Default.Edit, palette = palette, onClick = {
+                        context.startActivity(
+                            Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:dotfieldstudio@gmail.com?subject=DotCal%20Feedback")
+                            }
+                        )
+                    })
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(title = "Version", value = BuildConfig.VERSION_NAME, icon = Icons.Default.Description, palette = palette, showChevron = false, onClick = {})
+                }
+            }
+            item {
+                SettingsProCard(
+                    isPro = isPro,
+                    palette = palette,
+                    onClick = onDotCalPro,
+                )
+                Spacer(modifier = Modifier.height(20.dp))
             }
         }
         if (showCompactHeader) {
-            SettingsCompactHeader(palette = palette, onBack = onBack, showBack = false)
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Settings", showBack = false)
         }
     }
 }
@@ -760,46 +792,50 @@ private fun CalendarPreferencesSettings(
     onGlobalHolidays: () -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Calendar Preferences")
-            Spacer(modifier = Modifier.height(10.dp))
         }
         item {
-            SettingsSectionTitle("Calendar", palette)
-            SettingsWeekStartRow(
-                selectedOption = weekStartOption,
-                palette = palette,
-                onWeekStartSelected = onWeekStartSelected,
-            )
-            SettingsDefaultViewRow(
-                selectedTab = defaultCalendarTab,
-                palette = palette,
-                onViewSelected = onDefaultViewSelected,
-            )
-            SettingsToggleRow(
-                title = "Week numbers",
-                subtitle = "Show ISO week labels in Month and Week",
-                checked = showWeekNumbers,
-                palette = palette,
-                onCheckedChange = onShowWeekNumbersChange,
-            )
-            SettingsToggleRow(
-                title = "Birthday calendar",
-                subtitle = "Import contacts' birthdays",
-                checked = birthdayEnabled,
-                palette = palette,
-                onCheckedChange = onBirthdayEnabledChange,
-            )
-            SettingsMenuRow(
-                title = "Global Holidays",
-                value = selectedHolidayCountriesLabel(holidayCountries),
-                palette = palette,
-                onClick = onGlobalHolidays,
-            )
-            SettingsDivider(palette)
+            SettingsPanel(title = "Calendar", palette = palette) {
+                SettingsWeekStartRow(
+                    selectedOption = weekStartOption,
+                    palette = palette,
+                    onWeekStartSelected = onWeekStartSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsDefaultViewRow(
+                    selectedTab = defaultCalendarTab,
+                    palette = palette,
+                    onViewSelected = onDefaultViewSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsToggleRow(
+                    title = "Week numbers",
+                    subtitle = "Show ISO week labels in Month and Week",
+                    checked = showWeekNumbers,
+                    palette = palette,
+                    onCheckedChange = onShowWeekNumbersChange,
+                )
+                SettingsContentDivider(palette)
+                SettingsToggleRow(
+                    title = "Birthday calendar",
+                    subtitle = "Import contacts' birthdays",
+                    checked = birthdayEnabled,
+                    palette = palette,
+                    onCheckedChange = onBirthdayEnabledChange,
+                )
+                SettingsContentDivider(palette)
+                SettingsMenuRow(
+                    title = "Global Holidays",
+                    value = selectedHolidayCountriesLabel(holidayCountries),
+                    palette = palette,
+                    onClick = onGlobalHolidays,
+                )
+            }
         }
     }
 }
@@ -816,31 +852,33 @@ private fun ReminderDefaultsSettings(
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Reminder Defaults")
-            Spacer(modifier = Modifier.height(10.dp))
         }
         item {
-            SettingsSectionTitle("Defaults", palette)
-            SettingsDefaultReminderRow(
-                selectedMinutes = defaultReminderMinutes,
-                palette = palette,
-                onReminderSelected = onDefaultReminderSelected,
-            )
-            SettingsDefaultEventDurationRow(
-                selectedMinutes = defaultEventDurationMinutes,
-                palette = palette,
-                onDurationSelected = onDefaultEventDurationSelected,
-            )
-            SettingsAllDayReminderTimeRow(
-                selectedTime = defaultAllDayReminderTime,
-                palette = palette,
-                onTimeSelected = onDefaultAllDayReminderTimeSelected,
-            )
-            SettingsDivider(palette)
+            SettingsPanel(title = "Defaults", palette = palette) {
+                SettingsDefaultReminderRow(
+                    selectedMinutes = defaultReminderMinutes,
+                    palette = palette,
+                    onReminderSelected = onDefaultReminderSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsDefaultEventDurationRow(
+                    selectedMinutes = defaultEventDurationMinutes,
+                    palette = palette,
+                    onDurationSelected = onDefaultEventDurationSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsAllDayReminderTimeRow(
+                    selectedTime = defaultAllDayReminderTime,
+                    palette = palette,
+                    onTimeSelected = onDefaultAllDayReminderTimeSelected,
+                )
+            }
         }
     }
 }
@@ -856,33 +894,34 @@ private fun WidgetSettings(
     onWidgetDotTextureChange: (Boolean) -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Widgets")
-            Spacer(modifier = Modifier.height(10.dp))
         }
         item {
-            SettingsSectionTitle("Widget Style", palette)
-            SettingsWidgetToggleRow(
-                title = "Transparent Widgets",
-                subtitle = "Let wallpaper show through all DotCal widgets",
-                checked = widgetTransparent,
-                isPro = isPro,
-                palette = palette,
-                onCheckedChange = onWidgetTransparentChange,
-            )
-            SettingsWidgetToggleRow(
-                title = "Widget Dot Texture",
-                subtitle = if (widgetTransparent) "Only applies when transparent widgets are off" else "Show the subtle DotCal dotted surface",
-                checked = !widgetTransparent && widgetDotTexture,
-                enabled = !widgetTransparent,
-                isPro = isPro,
-                palette = palette,
-                onCheckedChange = onWidgetDotTextureChange,
-            )
-            SettingsDivider(palette)
+            SettingsPanel(title = "Widget Style", palette = palette) {
+                SettingsWidgetToggleRow(
+                    title = "Transparent Widgets",
+                    subtitle = "Let wallpaper show through all DotCal widgets",
+                    checked = widgetTransparent,
+                    isPro = isPro,
+                    palette = palette,
+                    onCheckedChange = onWidgetTransparentChange,
+                )
+                SettingsContentDivider(palette)
+                SettingsWidgetToggleRow(
+                    title = "Widget Dot Texture",
+                    subtitle = if (widgetTransparent) "Only applies when transparent widgets are off" else "Show the subtle DotCal dotted surface",
+                    checked = !widgetTransparent && widgetDotTexture,
+                    enabled = !widgetTransparent,
+                    isPro = isPro,
+                    palette = palette,
+                    onCheckedChange = onWidgetDotTextureChange,
+                )
+            }
         }
     }
 }
@@ -898,53 +937,57 @@ private fun DataRestoreSettings(
     onRecentlyDeleted: () -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Data & Restore")
-            Spacer(modifier = Modifier.height(10.dp))
         }
         item {
-            SettingsSectionTitle("Calendar Files", palette)
-            SettingsImportExportRow(
-                title = "Export Calendar",
-                subtitle = "Save all events & tasks to an .ics file",
-                isPro = true,
-                palette = palette,
-                onClick = onExportIcs,
-            )
-            SettingsImportExportRow(
-                title = "Import Calendar",
-                subtitle = "Load events & tasks from an .ics file",
-                isPro = true,
-                palette = palette,
-                onClick = onImportIcs,
-            )
-            SettingsDivider(palette)
-
-            SettingsSectionTitle("Backup & Restore", palette)
-            SettingsImportExportRow(
-                title = "Back Up Data",
-                subtitle = "Save all events, tasks & reminders to a file",
-                isPro = true,
-                palette = palette,
-                onClick = onBackup,
-            )
-            SettingsImportExportRow(
-                title = "Restore Data",
-                subtitle = "Merge a backup file into this device",
-                isPro = true,
-                palette = palette,
-                onClick = onRestore,
-            )
-            SettingsMenuRow(
-                title = "Recently Deleted",
-                value = "",
-                palette = palette,
-                onClick = onRecentlyDeleted,
-            )
-            SettingsDivider(palette)
+            SettingsPanel(title = "Calendar Files", palette = palette) {
+                SettingsImportExportRow(
+                    title = "Export Calendar",
+                    subtitle = "Save all events & tasks to an .ics file",
+                    isPro = true,
+                    palette = palette,
+                    onClick = onExportIcs,
+                )
+                SettingsContentDivider(palette)
+                SettingsImportExportRow(
+                    title = "Import Calendar",
+                    subtitle = "Load events & tasks from an .ics file",
+                    isPro = true,
+                    palette = palette,
+                    onClick = onImportIcs,
+                )
+            }
+        }
+        item {
+            SettingsPanel(title = "Backup & Restore", palette = palette) {
+                SettingsImportExportRow(
+                    title = "Back Up Data",
+                    subtitle = "Save all events, tasks & reminders to a file",
+                    isPro = true,
+                    palette = palette,
+                    onClick = onBackup,
+                )
+                SettingsContentDivider(palette)
+                SettingsImportExportRow(
+                    title = "Restore Data",
+                    subtitle = "Merge a backup file into this device",
+                    isPro = true,
+                    palette = palette,
+                    onClick = onRestore,
+                )
+                SettingsContentDivider(palette)
+                SettingsMenuRow(
+                    title = "Recently Deleted",
+                    value = "",
+                    palette = palette,
+                    onClick = onRecentlyDeleted,
+                )
+            }
         }
     }
 }
@@ -962,34 +1005,36 @@ private fun SyncSettings(
     onSyncNow: () -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Sync")
-            Spacer(modifier = Modifier.height(10.dp))
         }
         item {
-            SettingsSectionTitle("Calendar Sync", palette)
-            SettingsToggleRow(
-                title = "Sync enabled",
-                subtitle = "Keep DotCal updated from device calendars",
-                checked = syncEnabled,
-                palette = palette,
-                onCheckedChange = onSyncEnabledChange,
-            )
-            SettingsSyncIntervalRow(
-                intervalMins = syncIntervalMins,
-                palette = palette,
-                onIntervalSelected = onSyncIntervalSelected,
-            )
-            SettingsSyncNowRow(
-                syncMetadata = syncMetadata,
-                isSyncing = isSyncing,
-                palette = palette,
-                onClick = onSyncNow,
-            )
-            SettingsDivider(palette)
+            SettingsPanel(title = "Calendar Sync", palette = palette) {
+                SettingsToggleRow(
+                    title = "Sync enabled",
+                    subtitle = "Keep DotCal updated from device calendars",
+                    checked = syncEnabled,
+                    palette = palette,
+                    onCheckedChange = onSyncEnabledChange,
+                )
+                SettingsContentDivider(palette)
+                SettingsSyncIntervalRow(
+                    intervalMins = syncIntervalMins,
+                    palette = palette,
+                    onIntervalSelected = onSyncIntervalSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsSyncNowRow(
+                    syncMetadata = syncMetadata,
+                    isSyncing = isSyncing,
+                    palette = palette,
+                    onClick = onSyncNow,
+                )
+            }
         }
     }
 }
@@ -1011,45 +1056,49 @@ private fun AppPrivacySettings(
     var showDisableConfirm by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 22.dp),
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Privacy")
-            Spacer(modifier = Modifier.height(10.dp))
         }
         item {
-            SettingsSectionTitle("App Lock", palette)
-            SettingsWidgetToggleRow(
-                title = "Require PIN",
-                subtitle = if (appLockState.hasPin) "Lock DotCal after leaving the app" else "Set a 4-8 digit PIN",
-                checked = appLockState.enabled,
-                isPro = true,
-                palette = palette,
-                onCheckedChange = { enabled ->
-                    when {
-                        enabled && !appLockState.hasPin -> showSetPin = true
-                        enabled -> onSetLockEnabled(true)
-                        else -> showDisableConfirm = true
-                    }
-                },
-            )
-            SettingsMenuRow(
-                title = if (appLockState.hasPin) "Change PIN" else "Set PIN",
-                value = "",
-                palette = palette,
-                onClick = { showSetPin = true },
-            )
-            if (appLockState.hasPin) {
+            SettingsPanel(title = "App Lock", palette = palette) {
+                SettingsWidgetToggleRow(
+                    title = "Require PIN",
+                    subtitle = if (appLockState.hasPin) "Lock DotCal after leaving the app" else "Set a 4-8 digit PIN",
+                    checked = appLockState.enabled,
+                    isPro = true,
+                    palette = palette,
+                    onCheckedChange = { enabled ->
+                        when {
+                            enabled && !appLockState.hasPin -> showSetPin = true
+                            enabled -> onSetLockEnabled(true)
+                            else -> showDisableConfirm = true
+                        }
+                    },
+                )
+                SettingsContentDivider(palette)
                 SettingsMenuRow(
-                    title = "Remove PIN",
+                    title = if (appLockState.hasPin) "Change PIN" else "Set PIN",
                     value = "",
                     palette = palette,
-                    onClick = { showClearConfirm = true },
+                    onClick = { showSetPin = true },
                 )
+                if (appLockState.hasPin) {
+                    SettingsContentDivider(palette)
+                    SettingsMenuRow(
+                        title = "Remove PIN",
+                        value = "",
+                        palette = palette,
+                        onClick = { showClearConfirm = true },
+                    )
+                }
             }
-            SettingsDivider(palette)
-            SettingsSectionTitle("Private Vault", palette)
+        }
+        item {
+            SettingsPanel(title = "Private Vault", palette = palette) {
             Text(
                 "Hidden events and tasks stay off calendars, task lists, widgets, and reminders until restored.",
                 color = palette.secondaryText,
@@ -1058,27 +1107,35 @@ private fun AppPrivacySettings(
                 lineHeight = 19.sp,
                 modifier = Modifier.padding(vertical = 8.dp),
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            }
         }
         if (privateVaultEvents.isEmpty()) {
             item {
-                Text(
-                    "No private items",
-                    color = palette.secondaryText,
-                    fontFamily = mono,
-                    fontSize = 15.sp,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 22.dp),
-                    textAlign = TextAlign.Center,
-                )
+                SettingsPanel(title = "Private Items", palette = palette) {
+                    Text(
+                        "No private items",
+                        color = palette.secondaryText,
+                        fontFamily = mono,
+                        fontSize = 15.sp,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 22.dp),
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         } else {
-            lazyItems(privateVaultEvents, key = { it.id }) { event ->
-                PrivateVaultRow(
-                    event = event,
-                    palette = palette,
-                    onRestore = { onRestorePrivateEvent(event.baseEventId()) },
-                )
-                PrivateVaultDivider(palette)
+            item {
+                SettingsPanel(title = "Private Items", palette = palette) {
+                    privateVaultEvents.forEachIndexed { index, event ->
+                        PrivateVaultRow(
+                            event = event,
+                            palette = palette,
+                            onRestore = { onRestorePrivateEvent(event.baseEventId()) },
+                        )
+                        if (index != privateVaultEvents.lastIndex) {
+                            SettingsContentDivider(palette)
+                        }
+                    }
+                }
             }
         }
     }
@@ -1398,79 +1455,85 @@ private fun ThemeSettings(
     val listState = rememberLazyListState()
     val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
-        LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 150.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(bottom = 150.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
             item {
                 SettingsLargeHeader(palette = palette, onBack = onBack, title = "Appearance")
-                Spacer(modifier = Modifier.height(10.dp))
                 Text("Choose app appearance", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(bottom = 16.dp))
             }
             item {
-            SettingsFontRow(
-                font = appFont,
-                palette = palette,
-                onClick = { showFontSheet = true },
-            )
-            SettingsDivider(palette)
-            SettingsSectionTitle("Theme", palette)
-            DotCalThemeMode.entries.forEach { mode ->
-                ThemeOptionRow(
-                    mode = mode,
-                    accentColor = accentColor,
-                    palette = palette,
-                    selected = themeMode == mode,
-                    onClick = { onThemeSelected(mode) },
-                )
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                "Accent Color",
-                color = palette.primaryText,
-                fontFamily = LocalHeadingFont.current,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                modifier = Modifier.padding(start = 4.dp, bottom = 14.dp),
-            )
-            AccentColorSwatches(
-                accents = AccentColor.freePresets,
-                selectedAccent = accentColor,
-                palette = palette,
-                locked = false,
-                onAccentSelected = onAccentSelected,
-                onLockedClick = onRequestPro,
-            )
-            Spacer(modifier = Modifier.height(28.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "More Colors",
-                    color = palette.primaryText,
-                    fontFamily = LocalHeadingFont.current,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    modifier = Modifier.padding(start = 4.dp),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                if (!isPro) {
-                    Text("Pro", color = palette.accent, fontFamily = mono, fontSize = 11.sp)
+                SettingsPanel(title = "Font", palette = palette) {
+                    SettingsFontRow(
+                        font = appFont,
+                        palette = palette,
+                        onClick = { showFontSheet = true },
+                    )
                 }
             }
-            Spacer(modifier = Modifier.height(14.dp))
-            AccentColorSwatches(
-                accents = AccentColor.proPresets,
-                selectedAccent = accentColor,
-                palette = palette,
-                locked = !isPro,
-                onAccentSelected = onAccentSelected,
-                onLockedClick = onRequestPro,
-            )
-            Spacer(modifier = Modifier.height(28.dp))
-            CustomAccentRow(
-                accentColor = accentColor,
-                palette = palette,
-                isPro = isPro,
-                onClick = { if (isPro) showCustomPicker = true else onRequestPro() },
-            )
-            Spacer(modifier = Modifier.height(960.dp))
+            item {
+                SettingsPanel(title = "Theme", palette = palette) {
+                    DotCalThemeMode.entries.forEachIndexed { index, mode ->
+                        ThemeOptionRow(
+                            mode = mode,
+                            accentColor = accentColor,
+                            palette = palette,
+                            selected = themeMode == mode,
+                            onClick = { onThemeSelected(mode) },
+                        )
+                        if (index != DotCalThemeMode.entries.lastIndex) {
+                            SettingsContentDivider(palette)
+                        }
+                    }
+                }
             }
+            item {
+                SettingsPanel(title = "Accent Color", palette = palette) {
+                    AccentColorSwatches(
+                        accents = AccentColor.freePresets,
+                        selectedAccent = accentColor,
+                        palette = palette,
+                        locked = false,
+                        onAccentSelected = onAccentSelected,
+                        onLockedClick = onRequestPro,
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "More Colors",
+                            color = palette.primaryText,
+                            fontFamily = LocalHeadingFont.current,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (!isPro) {
+                            Text("Pro", color = palette.accent, fontFamily = mono, fontSize = 11.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    AccentColorSwatches(
+                        accents = AccentColor.proPresets,
+                        selectedAccent = accentColor,
+                        palette = palette,
+                        locked = !isPro,
+                        onAccentSelected = onAccentSelected,
+                        onLockedClick = onRequestPro,
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    CustomAccentRow(
+                        accentColor = accentColor,
+                        palette = palette,
+                        isPro = isPro,
+                        onClick = { if (isPro) showCustomPicker = true else onRequestPro() },
+                    )
+                }
+            }
+            item { Spacer(modifier = Modifier.height(720.dp)) }
         }
         if (showCompactHeader) {
             SettingsCompactHeader(palette = palette, onBack = onBack, title = "Appearance")
@@ -1990,46 +2053,35 @@ private fun SettingsDefaultViewRow(
     palette: DotCalPalette,
     onViewSelected: (CalendarTab) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .noRippleClickable { expanded = true },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Default view", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(selectedTab.shortLabel, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                UpDownChevron(tint = palette.secondaryText)
-            }
+    var showSheet by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable { showSheet = true },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Default view", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(selectedTab.shortLabel, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            UpDownChevron(tint = palette.secondaryText)
         }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(palette.dialogSurface),
-        ) {
-            CalendarTab.pickerEntries.forEach { tab ->
-                DropdownMenuItem(
-                    modifier = Modifier.background(palette.dialogSurface),
-                    text = {
-                        Text(tab.shortLabel, color = palette.primaryText, fontFamily = mono, fontSize = 16.sp)
-                    },
-                    trailingIcon = {
-                        if (tab == selectedTab) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = palette.primaryText)
-                        }
-                    },
-                    onClick = {
-                        onViewSelected(tab)
-                        expanded = false
-                    },
-                )
-            }
-        }
+    }
+    if (showSheet) {
+        SettingsOptionSheet(
+            title = "Default view",
+            options = CalendarTab.pickerEntries,
+            selected = selectedTab,
+            palette = palette,
+            label = { it.shortLabel },
+            onDismiss = { showSheet = false },
+            onSelected = {
+                onViewSelected(it)
+                showSheet = false
+            },
+        )
     }
 }
 
@@ -2040,46 +2092,35 @@ private fun SettingsDefaultEventDurationRow(
     palette: DotCalPalette,
     onDurationSelected: (Int) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .noRippleClickable { expanded = true },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Default event duration", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(eventDurationLabel(selectedMinutes), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                UpDownChevron(tint = palette.secondaryText)
-            }
+    var showSheet by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable { showSheet = true },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Default event duration", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(eventDurationLabel(selectedMinutes), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            UpDownChevron(tint = palette.secondaryText)
         }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(palette.dialogSurface),
-        ) {
-            defaultEventDurationOptions.forEach { option ->
-                DropdownMenuItem(
-                    modifier = Modifier.background(palette.dialogSurface),
-                    text = {
-                        Text(eventDurationLabel(option), color = palette.primaryText, fontFamily = mono, fontSize = 16.sp)
-                    },
-                    trailingIcon = {
-                        if (option == selectedMinutes) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = palette.primaryText)
-                        }
-                    },
-                    onClick = {
-                        onDurationSelected(option)
-                        expanded = false
-                    },
-                )
-            }
-        }
+    }
+    if (showSheet) {
+        SettingsOptionSheet(
+            title = "Default event duration",
+            options = defaultEventDurationOptions,
+            selected = selectedMinutes,
+            palette = palette,
+            label = ::eventDurationLabel,
+            onDismiss = { showSheet = false },
+            onSelected = {
+                onDurationSelected(it)
+                showSheet = false
+            },
+        )
     }
 }
 
@@ -2098,51 +2139,35 @@ private fun SettingsWeekStartRow(
     palette: DotCalPalette,
     onWeekStartSelected: (WeekStartOption) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .noRippleClickable { expanded = true },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Start of the week", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(selectedOption.label, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                UpDownChevron(tint = palette.secondaryText)
-            }
+    var showSheet by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable { showSheet = true },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Start of the week", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(selectedOption.label, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            UpDownChevron(tint = palette.secondaryText)
         }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(palette.dialogSurface),
-        ) {
-            WeekStartOption.entries.forEach { option ->
-                DropdownMenuItem(
-                    modifier = Modifier.background(palette.dialogSurface),
-                    text = {
-                        Text(
-                            option.label,
-                            color = palette.primaryText,
-                            fontFamily = mono,
-                            fontSize = 16.sp,
-                        )
-                    },
-                    trailingIcon = {
-                        if (option == selectedOption) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = palette.primaryText)
-                        }
-                    },
-                    onClick = {
-                        onWeekStartSelected(option)
-                        expanded = false
-                    },
-                )
-            }
-        }
+    }
+    if (showSheet) {
+        SettingsOptionSheet(
+            title = "Start of the week",
+            options = WeekStartOption.entries,
+            selected = selectedOption,
+            palette = palette,
+            label = { it.label },
+            onDismiss = { showSheet = false },
+            onSelected = {
+                onWeekStartSelected(it)
+                showSheet = false
+            },
+        )
     }
 }
 
@@ -2153,51 +2178,35 @@ private fun SettingsDefaultReminderRow(
     palette: DotCalPalette,
     onReminderSelected: (Int?) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .noRippleClickable { expanded = true },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Default reminder", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(reminderLabel(selectedMinutes), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                UpDownChevron(tint = palette.secondaryText)
-            }
+    var showSheet by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable { showSheet = true },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Default reminder", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(reminderLabel(selectedMinutes), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            UpDownChevron(tint = palette.secondaryText)
         }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(palette.dialogSurface),
-        ) {
-            reminderOptions.forEach { option ->
-                DropdownMenuItem(
-                    modifier = Modifier.background(palette.dialogSurface),
-                    text = {
-                        Text(
-                            reminderLabel(option),
-                            color = palette.primaryText,
-                            fontFamily = mono,
-                            fontSize = 16.sp,
-                        )
-                    },
-                    trailingIcon = {
-                        if (option == selectedMinutes) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = palette.primaryText)
-                        }
-                    },
-                    onClick = {
-                        onReminderSelected(option)
-                        expanded = false
-                    },
-                )
-            }
-        }
+    }
+    if (showSheet) {
+        SettingsOptionSheet(
+            title = "Default reminder",
+            options = reminderOptions,
+            selected = selectedMinutes,
+            palette = palette,
+            label = ::reminderLabel,
+            onDismiss = { showSheet = false },
+            onSelected = {
+                onReminderSelected(it)
+                showSheet = false
+            },
+        )
     }
 }
 
@@ -2345,6 +2354,251 @@ private fun AllDayReminderTimeSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsNothingHero(
+    palette: DotCalPalette,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 2.dp),
+    ) {
+        Text(
+            "Settings",
+            color = palette.primaryText,
+            fontFamily = LocalHeadingFont.current,
+            fontWeight = FontWeight.Normal,
+            fontSize = 34.sp,
+            lineHeight = 38.sp,
+        )
+    }
+}
+
+@Composable
+private fun SettingsPanel(
+    title: String,
+    palette: DotCalPalette,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SettingsSectionTitle(title, palette)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(26.dp))
+                .background(palette.cancelSurface)
+                .border(1.dp, palette.cancelBorder.copy(alpha = 0.72f), RoundedCornerShape(26.dp))
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun SettingsIconMenuRow(
+    title: String,
+    value: String,
+    icon: ImageVector,
+    palette: DotCalPalette,
+    showChevron: Boolean = true,
+    isProLocked: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 66.dp)
+            .noRippleClickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SettingsIconCell(icon = icon, palette = palette, active = isProLocked)
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (value.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    value,
+                    color = if (isProLocked) palette.accent else palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        if (isProLocked) {
+            Text(
+                "Pro",
+                color = palette.accent,
+                fontFamily = mono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 11.sp,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        if (showChevron) {
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun SettingsIconCell(icon: ImageVector, palette: DotCalPalette, active: Boolean = false) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (active) palette.accent.copy(alpha = 0.10f) else Color.Transparent),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (active) palette.accent else palette.primaryText,
+            modifier = Modifier.size(19.dp),
+        )
+    }
+}
+
+@Composable
+private fun SettingsToolsPanel(
+    palette: DotCalPalette,
+    isPro: Boolean,
+    onTimeInsights: () -> Unit,
+    onDateCalculator: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SettingsSectionTitle("Tools", palette)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            SettingsToolCard(
+                title = "Time Insights",
+                caption = "Load map",
+                icon = Icons.Default.AccessTime,
+                isPro = isPro,
+                palette = palette,
+                modifier = Modifier.weight(1f),
+                onClick = onTimeInsights,
+            )
+            SettingsToolCard(
+                title = "Date Calculator",
+                caption = "Date math",
+                icon = Icons.Default.CalendarMonth,
+                isPro = isPro,
+                palette = palette,
+                modifier = Modifier.weight(1f),
+                onClick = onDateCalculator,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsToolCard(
+    title: String,
+    caption: String,
+    icon: ImageVector,
+    isPro: Boolean,
+    palette: DotCalPalette,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .height(132.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(palette.cancelSurface)
+            .border(1.dp, palette.cancelBorder.copy(alpha = 0.72f), RoundedCornerShape(24.dp))
+            .noRippleClickable(onClick = onClick)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            SettingsIconCell(icon = icon, palette = palette, active = !isPro)
+            Text(
+                if (isPro) "" else "Pro",
+                color = palette.accent,
+                fontFamily = mono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 11.sp,
+            )
+        }
+        Column {
+            Text(
+                title,
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                lineHeight = 18.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(caption, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun SettingsProCard(isPro: Boolean, palette: DotCalPalette, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(palette.cancelSurface)
+            .border(1.dp, palette.accent.copy(alpha = 0.26f), RoundedCornerShape(28.dp))
+            .noRippleClickable(onClick = onClick)
+            .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(palette.accent),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.Star, contentDescription = null, tint = palette.onAccent, modifier = Modifier.size(22.dp))
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "DotCal Pro",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                if (isPro) "Lifetime unlocked" else "Lifetime tools / INR 149",
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = palette.secondaryText,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
@@ -2754,50 +3008,101 @@ private fun SettingsSyncIntervalRow(
     palette: DotCalPalette,
     onIntervalSelected: (Int) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var showSheet by remember { mutableStateOf(false) }
     val options = listOf(0, 15, 30, 60)
-    Box {
-        Row(
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable { showSheet = true },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Sync interval", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(syncIntervalLabel(intervalMins), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            UpDownChevron(tint = palette.secondaryText)
+        }
+    }
+    if (showSheet) {
+        SettingsOptionSheet(
+            title = "Sync interval",
+            options = options,
+            selected = intervalMins,
+            palette = palette,
+            label = ::syncIntervalLabel,
+            onDismiss = { showSheet = false },
+            onSelected = {
+                onIntervalSelected(it)
+                showSheet = false
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> SettingsOptionSheet(
+    title: String,
+    options: List<T>,
+    selected: T,
+    palette: DotCalPalette,
+    label: (T) -> String,
+    onDismiss: () -> Unit,
+    onSelected: (T) -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        dragHandle = null,
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
-                .noRippleClickable { expanded = true },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .navigationBarsPadding()
+                .padding(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Sync interval", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(syncIntervalLabel(intervalMins), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                UpDownChevron(tint = palette.secondaryText)
-            }
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(palette.dialogSurface),
-        ) {
+            Text(
+                title,
+                color = palette.primaryText,
+                fontFamily = LocalHeadingFont.current,
+                fontWeight = FontWeight.Bold,
+                fontSize = 22.sp,
+            )
             options.forEach { option ->
-                DropdownMenuItem(
-                    modifier = Modifier.background(palette.dialogSurface),
-                    text = {
-                        Text(
-                            syncIntervalLabel(option),
-                            color = palette.primaryText,
-                            fontFamily = mono,
-                            fontSize = 16.sp,
+                val isSelected = option == selected
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isSelected) palette.accent.copy(alpha = 0.10f) else palette.cancelSurface)
+                        .border(1.dp, if (isSelected) palette.accent else palette.cancelBorder, RoundedCornerShape(10.dp))
+                        .noRippleClickable { onSelected(option) }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        label(option),
+                        color = palette.primaryText,
+                        fontFamily = mono,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (isSelected) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = "Selected",
+                            tint = palette.accent,
+                            modifier = Modifier.size(22.dp),
                         )
-                    },
-                    trailingIcon = {
-                        if (option == intervalMins) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = palette.primaryText)
-                        }
-                    },
-                    onClick = {
-                        onIntervalSelected(option)
-                        expanded = false
-                    },
-                )
+                    }
+                }
             }
         }
     }

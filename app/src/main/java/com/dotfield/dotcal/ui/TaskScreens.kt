@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -399,7 +400,37 @@ private fun TaskFilterSegmentedControl(
     val segmentBorder = palette.disabledText.copy(alpha = if (palette.isDark) 0.35f else 0.45f)
     val segmentSelected = palette.segmentSelected
     val inactiveText = palette.secondaryText
-    Row(
+    val filters = TaskFilter.entries
+    Layout(
+        content = {
+            filters.forEach { option ->
+                val isSelected = selected == option
+                val segBg by animateColorAsState(
+                    targetValue = if (isSelected) segmentSelected else segmentSurface,
+                    animationSpec = tween(180),
+                    label = "segBg",
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(segBg)
+                        .noRippleClickable { onSelected(option) }
+                        .padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        option.label,
+                        fontFamily = mono,
+                        color = if (isSelected) palette.primaryText else inactiveText,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        },
         modifier = Modifier
             .fillMaxWidth()
             .background(palette.topBarSurface)
@@ -415,36 +446,28 @@ private fun TaskFilterSegmentedControl(
                     style = Stroke(width = 1.dp.toPx()),
                 )
             }
-            .padding(horizontal = 18.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        TaskFilter.entries.forEach { option ->
-            val isSelected = selected == option
-            val segBg by animateColorAsState(
-                targetValue = if (isSelected) segmentSelected else segmentSurface,
-                animationSpec = tween(180),
-                label = "segBg",
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(segBg)
-                    .noRippleClickable { onSelected(option) }
-                    .padding(horizontal = 10.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    option.label,
-                    fontFamily = mono,
-                    color = if (isSelected) palette.primaryText else inactiveText,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                    fontSize = 15.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
+    ) { measurables, constraints ->
+        val verticalInsetPx = 4.dp.roundToPx()
+        val count = measurables.size.coerceAtLeast(1)
+        val segmentHeight = (constraints.maxHeight - verticalInsetPx * 2).coerceAtLeast(0)
+        val minGapPx = 4.dp.roundToPx()
+        val placeables = measurables.map { measurable ->
+            measurable.measure(
+                androidx.compose.ui.unit.Constraints(
+                    minWidth = 0,
+                    maxWidth = constraints.maxWidth,
+                    minHeight = segmentHeight,
+                    maxHeight = segmentHeight,
                 )
+            )
+        }
+        val totalSegmentWidth = placeables.sumOf { it.width }
+        val evenGapPx = ((constraints.maxWidth - totalSegmentWidth) / (count + 1)).coerceAtLeast(minGapPx)
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            var x = evenGapPx
+            placeables.forEach { placeable ->
+                placeable.placeRelative(x, verticalInsetPx)
+                x += placeable.width + evenGapPx
             }
         }
     }

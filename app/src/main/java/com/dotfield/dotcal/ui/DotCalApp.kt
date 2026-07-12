@@ -1128,12 +1128,6 @@ fun DotCalApp(
                                     showPaywall = true
                                 }
                             },
-                            onTimeInsights = {
-                                if (isPro) showTimeInsights = true else showPaywall = true
-                            },
-                            onDateCalculator = {
-                                if (isPro) showDateCalculator = true else showPaywall = true
-                            },
                             onShiftPatterns = {
                                 if (isPro) {
                                     viewModel.refreshShiftPatterns()
