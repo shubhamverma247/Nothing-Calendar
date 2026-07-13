@@ -10,6 +10,7 @@ import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.privacy.AppPrivacyManager
+import com.dotfield.dotcal.data.punchcard.PunchCardStreak
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.profiles.FocusProfileStore
@@ -20,6 +21,7 @@ import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftPatternStore
 import com.dotfield.dotcal.data.shifts.ShiftType
 import com.dotfield.dotcal.data.shifts.expandShiftPattern
+import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.templates.EventTemplateStore
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
@@ -92,6 +94,7 @@ class DotCalRepository(
     private val eventTemplateStore = EventTemplateStore(context)
     private val focusProfileStore = FocusProfileStore(context)
     private val shiftPatternStore = ShiftPatternStore(context)
+    private val sideStore = SharedSideStore(context)
     private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
     private val holidayDataSource = HolidayDataSource(context.applicationContext)
     private val syncRepository = CalendarSyncRepository(
@@ -111,6 +114,22 @@ class DotCalRepository(
     suspend fun setIsPro(isPro: Boolean) = withContext(Dispatchers.IO) {
         context.calendarPreferencesDataStore.edit { preferences ->
             preferences[CalendarPreferences.KEY_IS_PRO] = isPro
+        }
+    }
+
+    suspend fun readPunchedDays(): Set<LocalDate> = withContext(Dispatchers.IO) {
+        sideStore.readNamespace(PunchCardStreak.Namespace)
+            .filterValues { it == "true" }
+            .keys
+            .mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }
+            .toSet()
+    }
+
+    suspend fun setDayPunched(date: LocalDate, punched: Boolean) {
+        if (punched) {
+            sideStore.write(PunchCardStreak.Namespace, date.toString(), "true")
+        } else {
+            sideStore.remove(PunchCardStreak.Namespace, date.toString())
         }
     }
 

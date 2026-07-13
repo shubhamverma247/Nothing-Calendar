@@ -3,6 +3,7 @@
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -57,6 +58,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -615,10 +617,14 @@ internal fun DayView(
     selectedDate: LocalDate,
     eventsByDate: Map<LocalDate, List<CalendarEvent>>,
     palette: DotCalPalette,
+    isDayPunched: Boolean,
+    punchStreak: Int,
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onJumpToday: () -> Unit,
     onJumpPickerRequest: () -> Unit,
+    onPunchDay: () -> Unit,
+    onClearPunchDay: () -> Unit,
     highlightDate: LocalDate?,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
@@ -656,6 +662,13 @@ internal fun DayView(
             onJumpToday = onJumpToday,
             onJumpPickerRequest = onJumpPickerRequest,
             highlighted = selectedDate == highlightDate,
+        )
+        PunchCardStrip(
+            isPunched = isDayPunched,
+            streak = punchStreak,
+            palette = palette,
+            onPunch = onPunchDay,
+            onClear = onClearPunchDay,
         )
         if (allDayEvents.isNotEmpty()) {
             LazyColumn(modifier = Modifier.fillMaxWidth().height(44.dp).background(palette.calendarSurface)) {
@@ -799,6 +812,84 @@ private fun DayHeader(
         }
         IconButton(onClick = onNextDay, modifier = Modifier.size(44.dp)) {
             Icon(Icons.Default.ChevronRight, contentDescription = "Next day", tint = palette.primaryText)
+        }
+    }
+}
+
+@Composable
+private fun PunchCardStrip(
+    isPunched: Boolean,
+    streak: Int,
+    palette: DotCalPalette,
+    onPunch: () -> Unit,
+    onClear: () -> Unit,
+) {
+    val haptic = LocalHapticFeedback.current
+    val progress by animateFloatAsState(
+        targetValue = if (isPunched) 1f else 0f,
+        animationSpec = tween(durationMillis = 360),
+        label = "punchCardStamp",
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .background(palette.calendarSurface)
+            .drawBehind {
+                drawLine(palette.line, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
+            }
+            .pointerInput(isPunched) {
+                detectTapGestures(
+                    onTap = {
+                        if (!isPunched) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onPunch()
+                        }
+                    },
+                    onLongPress = {
+                        if (isPunched) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onClear()
+                        }
+                    },
+                )
+            },
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Canvas(modifier = Modifier.size(30.dp)) {
+            drawPunchDots(progress = progress, palette = palette)
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = if (streak > 0) "${streak}-day streak" else "Complete day",
+            color = if (isPunched) palette.accent else palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 12.sp,
+            fontWeight = if (isPunched) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+        )
+    }
+}
+
+private fun DrawScope.drawPunchDots(
+    progress: Float,
+    palette: DotCalPalette,
+) {
+    val dotRadius = size.minDimension / 18f
+    val gap = size.minDimension / 5f
+    val start = (size.minDimension - gap * 4) / 2f
+    val activeCount = (progress * 25).toInt()
+    repeat(5) { row ->
+        repeat(5) { column ->
+            val index = row * 5 + column
+            val center = Offset(start + column * gap, start + row * gap)
+            val color = when {
+                index < activeCount -> palette.accent
+                progress > 0f -> palette.accent.copy(alpha = 0.20f)
+                else -> palette.secondaryText.copy(alpha = 0.30f)
+            }
+            drawCircle(color = color, radius = dotRadius * (1f + progress * 0.35f), center = center)
         }
     }
 }

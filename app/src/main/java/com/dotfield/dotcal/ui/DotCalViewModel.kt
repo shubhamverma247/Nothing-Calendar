@@ -22,6 +22,7 @@ import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
+import com.dotfield.dotcal.data.punchcard.PunchCardStreak
 import com.dotfield.dotcal.sync.CalendarSyncResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -50,6 +51,13 @@ data class DayDensityForecastItem(
     val scheduledMinutes: Int,
     val intensity: Int,
 )
+
+data class PunchCardUiState(
+    val punchedDays: Set<LocalDate> = emptySet(),
+) {
+    fun isPunched(date: LocalDate): Boolean = date in punchedDays
+    fun streakEndingAt(date: LocalDate): Int = PunchCardStreak.compute(punchedDays, date)
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DotCalViewModel(
@@ -83,6 +91,9 @@ class DotCalViewModel(
     val dayDensityForecast: StateFlow<List<DayDensityForecastItem>> = agendaEvents
         .map(::buildDayDensityForecast)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), buildDayDensityForecast(emptyList()))
+
+    private val _punchCardState = MutableStateFlow(PunchCardUiState())
+    val punchCardState: StateFlow<PunchCardUiState> = _punchCardState
 
     val tasks: StateFlow<List<CalendarEvent>> = repository.observeTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -151,6 +162,7 @@ class DotCalViewModel(
 
     init {
         viewModelScope.launch { repository.ensureLocalAccount() }
+        refreshPunchCard()
     }
 
     fun previousMonth() {
@@ -280,6 +292,26 @@ class DotCalViewModel(
     fun deleteTask(task: CalendarEvent) {
         viewModelScope.launch {
             repository.deleteTask(task)
+        }
+    }
+
+    fun punchDay(date: LocalDate) {
+        viewModelScope.launch {
+            repository.setDayPunched(date, punched = true)
+            _punchCardState.value = PunchCardUiState(repository.readPunchedDays())
+        }
+    }
+
+    fun clearDayPunch(date: LocalDate) {
+        viewModelScope.launch {
+            repository.setDayPunched(date, punched = false)
+            _punchCardState.value = PunchCardUiState(repository.readPunchedDays())
+        }
+    }
+
+    private fun refreshPunchCard() {
+        viewModelScope.launch {
+            _punchCardState.value = PunchCardUiState(repository.readPunchedDays())
         }
     }
 

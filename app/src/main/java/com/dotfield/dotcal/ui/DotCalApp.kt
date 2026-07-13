@@ -288,6 +288,7 @@ fun DotCalApp(
     val yearEvents by viewModel.yearEvents.collectAsStateWithLifecycle()
     val agendaEvents by viewModel.agendaEvents.collectAsStateWithLifecycle()
     val dayDensityForecast by viewModel.dayDensityForecast.collectAsStateWithLifecycle()
+    val punchCardState by viewModel.punchCardState.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val assignableAccounts by viewModel.assignableAccounts.collectAsStateWithLifecycle()
@@ -1225,10 +1226,14 @@ fun DotCalApp(
                                         selectedDate = selectedDate,
                                         eventsByDate = eventsByDate,
                                         palette = palette,
+                                        isDayPunched = punchCardState.isPunched(selectedDate),
+                                        punchStreak = punchCardState.streakEndingAt(selectedDate),
                                         onPreviousDay = { viewModel.selectDate(selectedDate.minusDays(1)) },
                                         onNextDay = { viewModel.selectDate(selectedDate.plusDays(1)) },
                                         onJumpToday = { jumpToDate(LocalDate.now()) },
                                         onJumpPickerRequest = { showJumpToDatePicker = true },
+                                        onPunchDay = { viewModel.punchDay(selectedDate) },
+                                        onClearPunchDay = { viewModel.clearDayPunch(selectedDate) },
                                         highlightDate = jumpHighlightDate,
                                         onAddAtDate = { date, time ->
                                             viewModel.selectDate(date)
