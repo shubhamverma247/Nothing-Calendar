@@ -6,6 +6,8 @@ import com.dotfield.dotcal.data.backup.BackupData
 import com.dotfield.dotcal.data.backup.BackupSerializer
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
+import com.dotfield.dotcal.data.countdown.CountdownPinResult
+import com.dotfield.dotcal.data.countdown.CountdownPinStore
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
 import com.dotfield.dotcal.data.privacy.AppLockState
@@ -131,6 +133,34 @@ class DotCalRepository(
         } else {
             sideStore.remove(PunchCardStreak.Namespace, date.toString())
         }
+    }
+
+    suspend fun readCountdownPins(): Set<String> = withContext(Dispatchers.IO) {
+        sideStore.readNamespace(CountdownPinStore.Namespace)
+            .filterValues { it == "true" }
+            .keys
+            .toSet()
+    }
+
+    suspend fun pinCountdown(eventId: String, isPro: Boolean): CountdownPinResult = withContext(Dispatchers.IO) {
+        val currentPins = readCountdownPins()
+        if (!isPro && eventId !in currentPins && currentPins.isNotEmpty()) {
+            return@withContext CountdownPinResult.FreeLimitReached(currentPins.first())
+        }
+        sideStore.write(CountdownPinStore.Namespace, eventId, "true")
+        updateWidgets()
+        CountdownPinResult.Pinned
+    }
+
+    suspend fun swapCountdownPin(activeEventId: String, newEventId: String) = withContext(Dispatchers.IO) {
+        sideStore.remove(CountdownPinStore.Namespace, activeEventId)
+        sideStore.write(CountdownPinStore.Namespace, newEventId, "true")
+        updateWidgets()
+    }
+
+    suspend fun unpinCountdown(eventId: String) = withContext(Dispatchers.IO) {
+        sideStore.remove(CountdownPinStore.Namespace, eventId)
+        updateWidgets()
     }
 
     fun observeAppLockState(): Flow<AppLockState> = privacyManager.observeAppLockState()

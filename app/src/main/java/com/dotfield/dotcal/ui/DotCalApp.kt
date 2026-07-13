@@ -217,6 +217,7 @@ import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.ics.IcsExporter
+import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
 import com.dotfield.dotcal.data.privacy.AppLockState
@@ -236,6 +237,7 @@ import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
+import com.dotfield.dotcal.share.CardImageExporter
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import com.dotfield.dotcal.ui.theme.NBlack
 import com.dotfield.dotcal.ui.theme.NWhite
@@ -289,6 +291,7 @@ fun DotCalApp(
     val agendaEvents by viewModel.agendaEvents.collectAsStateWithLifecycle()
     val dayDensityForecast by viewModel.dayDensityForecast.collectAsStateWithLifecycle()
     val punchCardState by viewModel.punchCardState.collectAsStateWithLifecycle()
+    val countdownPins by viewModel.countdownPins.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val assignableAccounts by viewModel.assignableAccounts.collectAsStateWithLifecycle()
@@ -328,6 +331,7 @@ fun DotCalApp(
     var duplicateDraftPrefill by remember { mutableStateOf<EventEditorData?>(null) }
     var pendingCopyToDateEvent by remember { mutableStateOf<CalendarEvent?>(null) }
     var pendingShareEvent by remember { mutableStateOf<CalendarEvent?>(null) }
+    var pendingCountdownLimitEvent by remember { mutableStateOf<Pair<CalendarEvent, String>?>(null) }
     var templatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     var taskTemplatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
@@ -965,6 +969,7 @@ fun DotCalApp(
         when {
             showPaywall -> showPaywall = false
             pendingShareEvent != null -> pendingShareEvent = null
+            pendingCountdownLimitEvent != null -> pendingCountdownLimitEvent = null
             pendingCopyToDateEvent != null -> pendingCopyToDateEvent = null
             showBulkTemplatePicker -> showBulkTemplatePicker = false
             showTemplates -> showTemplates = false
@@ -1072,7 +1077,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -1734,11 +1739,42 @@ fun DotCalApp(
                     account = accounts.firstOrNull { it.id == event.accountId },
                     palette = palette,
                     isPrivate = event.baseEventId() in privateVaultIds,
+                    isCountdownPinned = event.baseEventId() in countdownPins,
                     onBack = viewModel::closeEventDetail,
                     onEdit = {
                         openEditEditor(event)
                     },
                     onShare = { pendingShareEvent = event },
+                    onPinCountdown = {
+                        viewModel.pinCountdown(event, isPro) { result ->
+                            when (result) {
+                                CountdownPinResult.Pinned -> showDotCalToast(context, palette, "Countdown pinned")
+                                is CountdownPinResult.FreeLimitReached -> pendingCountdownLimitEvent = event to result.activeEventId
+                            }
+                        }
+                    },
+                    onUnpinCountdown = {
+                        viewModel.unpinCountdown(event) {
+                            showDotCalToast(context, palette, "Countdown removed")
+                        }
+                    },
+                    onShareCountdownImage = {
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    CardImageExporter.createCountdownShareUri(
+                                        context = context,
+                                        event = event,
+                                        accentColor = palette.accent.toArgb(),
+                                        darkTheme = palette.isDark,
+                                    )
+                                }
+                            }
+                            result
+                                .onSuccess { uri -> shareCountdownImage(context, event, uri, palette) }
+                                .onFailure { showDotCalToast(context, palette, "Could not share countdown") }
+                        }
+                    },
                     onDuplicate = { openDuplicateEditor(event) },
                     onCopyToDate = { pendingCopyToDateEvent = event },
                     onMoveToPrivate = {
@@ -1790,6 +1826,67 @@ fun DotCalApp(
                     },
                     palette = palette,
                 )
+            }
+        }
+        pendingCountdownLimitEvent?.let { (event, activeEventId) ->
+            ModalBottomSheet(
+                onDismissRequest = { pendingCountdownLimitEvent = null },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = palette.dialogSurface,
+                dragHandle = { BottomSheetDragHandle(palette) },
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(palette.dialogSurface)
+                        .padding(horizontal = 22.dp)
+                        .padding(bottom = 28.dp),
+                ) {
+                    Text(
+                        "1 countdown active",
+                        color = palette.primaryText,
+                        fontFamily = LocalHeadingFont.current,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 22.sp,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "DotCal Pro gives you unlimited countdowns. You can also swap your current free countdown to this event.",
+                        color = palette.secondaryText,
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp,
+                    )
+                    Spacer(modifier = Modifier.height(22.dp))
+                    Button(
+                        onClick = {
+                            pendingCountdownLimitEvent = null
+                            showPaywall = true
+                        },
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
+                    ) {
+                        Text("Unlock Unlimited", fontWeight = FontWeight.SemiBold)
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        "Swap to this countdown",
+                        color = palette.primaryText,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                pendingCountdownLimitEvent = null
+                                viewModel.swapCountdownPin(activeEventId, event) {
+                                    showDotCalToast(context, palette, "Countdown swapped")
+                                }
+                            }
+                            .padding(vertical = 14.dp),
+                    )
+                }
             }
         }
         pendingCopyToDateEvent?.let { event ->
@@ -2272,6 +2369,25 @@ private fun shareEventIcs(
     }
     runCatching {
         context.startActivity(Intent.createChooser(intent, "Share Event"))
+    }.onFailure {
+        showDotCalToast(context, palette, "No share target found")
+    }
+}
+
+private fun shareCountdownImage(
+    context: Context,
+    event: CalendarEvent,
+    uri: Uri,
+    palette: DotCalPalette,
+) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(Intent.EXTRA_SUBJECT, event.title)
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "Share Countdown"))
     }.onFailure {
         showDotCalToast(context, palette, "No share target found")
     }

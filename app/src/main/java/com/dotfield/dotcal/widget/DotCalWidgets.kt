@@ -2,6 +2,10 @@ package com.dotfield.dotcal.widget
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.DpSize
@@ -173,11 +177,12 @@ private fun SmallWidget(context: Context, data: WidgetCalendarData, palette: Dot
 @Composable
 private fun CountdownWidget(context: Context, data: WidgetCalendarData, palette: DotCalWidgetPalette) {
     val item = data.nextEvent
+    val settings = currentDotCalWidgetSettings()
     WidgetSurfaceBox(palette) {
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .padding(14.dp)
+                .padding(horizontal = 8.dp, vertical = 6.dp)
                 .clickable(actionStartActivity(item?.let { itemIntent(context, it) } ?: openAddEventIntent(context))),
             contentAlignment = Alignment.Center,
         ) {
@@ -188,13 +193,20 @@ private fun CountdownWidget(context: Context, data: WidgetCalendarData, palette:
                     modifier = GlanceModifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("NEXT IN", maxLines = 1, style = monoStyle(palette.secondary, 10, FontWeight.Bold, TextAlign.Center))
-                    Spacer(GlanceModifier.height(5.dp))
-                    Text(countdownLabel(item), maxLines = 1, style = monoStyle(palette.accent, 25, FontWeight.Bold, TextAlign.Center))
-                    Spacer(GlanceModifier.height(7.dp))
-                    Text(item.title, maxLines = 2, style = primaryStyle(palette, 14, FontWeight.Bold))
-                    Spacer(GlanceModifier.height(4.dp))
-                    Text(item.timeLabel, maxLines = 1, style = monoStyle(palette.secondary, 9, FontWeight.Normal, TextAlign.Center))
+                    Text("D-DAY", maxLines = 1, style = monoStyle(palette.secondary, 10, FontWeight.Bold, TextAlign.Center))
+                    Spacer(GlanceModifier.height(2.dp))
+                    Image(
+                        provider = ImageProvider(buildCountdownNumberGraphic(item.countdownDays.take(3), widgetAccentArgb(settings))),
+                        contentDescription = null,
+                        modifier = GlanceModifier
+                            .width(84.dp)
+                            .height(38.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                    Spacer(GlanceModifier.height(2.dp))
+                    Text("DAYS UNTIL", maxLines = 1, style = monoStyle(palette.secondary, 9, FontWeight.Normal, TextAlign.Center))
+                    Spacer(GlanceModifier.height(2.dp))
+                    Text(item.title, maxLines = 1, style = primaryStyle(palette, 13, FontWeight.Bold))
                 }
             }
         }
@@ -660,4 +672,52 @@ private fun openAddEventIntent(context: Context): Intent {
 
 private fun WidgetEventItem.detailLine(): String {
     return if (location.isBlank()) timeLabel else "$timeLabel • ${location.uppercase(Locale.getDefault())}"
+}
+ 
+private val WidgetDigitPatterns = mapOf(
+    '0' to listOf("111", "101", "101", "101", "101", "101", "111"),
+    '1' to listOf("010", "110", "010", "010", "010", "010", "111"),
+    '2' to listOf("111", "001", "001", "111", "100", "100", "111"),
+    '3' to listOf("111", "001", "001", "111", "001", "001", "111"),
+    '4' to listOf("101", "101", "101", "111", "001", "001", "001"),
+    '5' to listOf("111", "100", "100", "111", "001", "001", "111"),
+    '6' to listOf("111", "100", "100", "111", "101", "101", "111"),
+    '7' to listOf("111", "001", "001", "010", "010", "010", "010"),
+    '8' to listOf("111", "101", "101", "111", "101", "101", "111"),
+    '9' to listOf("111", "101", "101", "111", "001", "001", "111"),
+)
+
+private fun buildCountdownNumberGraphic(text: String, accentColor: Int): Bitmap {
+    val width = 228
+    val height = 74
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    val patterns = text.map { WidgetDigitPatterns[it] ?: WidgetDigitPatterns.getValue('0') }
+    val columns = patterns.sumOf { it.first().length } + (patterns.size - 1).coerceAtLeast(0)
+    val rows = 7
+    val gap = 4f
+    val dot = 5.5f
+    val totalWidth = columns * dot + (columns - 1) * gap
+    val totalHeight = rows * dot + (rows - 1) * gap
+    var xCursor = (width - totalWidth) / 2f
+    val yStart = (height - totalHeight) / 2f
+    paint.color = accentColor
+    patterns.forEach { pattern ->
+        pattern.forEachIndexed { row, line ->
+            line.forEachIndexed { column, mark ->
+                if (mark == '1') {
+                    canvas.drawCircle(
+                        xCursor + column * (dot + gap) + dot / 2f,
+                        yStart + row * (dot + gap) + dot / 2f,
+                        dot / 2f,
+                        paint,
+                    )
+                }
+            }
+        }
+        xCursor += pattern.first().length * (dot + gap)
+    }
+    return bitmap
 }

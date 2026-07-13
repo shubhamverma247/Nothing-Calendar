@@ -5,7 +5,9 @@ import android.text.format.DateFormat
 import com.dotfield.dotcal.data.CalendarDao
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalDatabase
+import com.dotfield.dotcal.data.countdown.CountdownPinStore
 import com.dotfield.dotcal.data.privacy.AppPrivacyManager
+import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,6 +27,7 @@ data class WidgetEventItem(
     val dateLabel: String,
     val dayOfMonth: String,
     val startTimeMs: Long,
+    val countdownDays: String,
 )
 
 data class WidgetCalendarDay(
@@ -49,6 +52,7 @@ class WidgetDataRepository(
     private val dao: CalendarDao,
 ) {
     private val privacyManager = AppPrivacyManager(context.applicationContext)
+    private val sideStore = SharedSideStore(context.applicationContext)
 
     suspend fun load(size: DotCalWidgetSize, accountId: String? = null, nowMs: Long = System.currentTimeMillis()): WidgetCalendarData = withContext(Dispatchers.IO) {
         val zoneId = ZoneId.systemDefault()
@@ -62,14 +66,20 @@ class WidgetDataRepository(
             .filter { it.endTimeMs >= nowMs }
             .sortedForWidget(zoneId)
         val use24Hour = DateFormat.is24HourFormat(context)
-        val items = visibleItems.asWidgetItems(zoneId, use24Hour)
+        val items = visibleItems.asWidgetItems(zoneId, use24Hour, nowMs)
+        val pinnedCountdownItems = if (size == DotCalWidgetSize.Countdown) {
+            loadPinnedCountdownItems(today, rangeEnd, zoneId, use24Hour, nowMs, privateIds)
+        } else {
+            emptyList()
+        }
+        val displayItems = pinnedCountdownItems.ifEmpty { items }
         WidgetCalendarData(
             header = today.format(DateTimeFormatter.ofPattern("EEE, MMM d")),
             monthLabel = today.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
             todayLabel = today.dayOfMonth.toString(),
-            nextEvent = items.firstOrNull(),
-            events = items.take(size.maxItems),
-            moreItemCount = (items.size - size.maxItems).coerceAtLeast(0),
+            nextEvent = displayItems.firstOrNull(),
+            events = displayItems.take(size.maxItems),
+            moreItemCount = (displayItems.size - size.maxItems).coerceAtLeast(0),
             days = if (size == DotCalWidgetSize.Large) monthDays(today, visibleItems, zoneId) else emptyList(),
         )
     }
@@ -91,7 +101,27 @@ class WidgetDataRepository(
         return if (isAllDay == 0) 0 else 1
     }
 
-    private fun List<CalendarEvent>.asWidgetItems(zoneId: ZoneId, use24Hour: Boolean): List<WidgetEventItem> {
+    private suspend fun loadPinnedCountdownItems(
+        rangeStart: LocalDate,
+        rangeEndExclusive: LocalDate,
+        zoneId: ZoneId,
+        use24Hour: Boolean,
+        nowMs: Long,
+        privateIds: Set<String>,
+    ): List<WidgetEventItem> {
+        val pinnedIds = sideStore.readNamespace(CountdownPinStore.Namespace).filterValues { it == "true" }.keys
+        if (pinnedIds.isEmpty()) return emptyList()
+        return pinnedIds
+            .mapNotNull { id -> dao.getEvent(id) }
+            .filterNot { it.id.substringBefore(RECURRENCE_SEPARATOR) in privateIds }
+            .filter { event -> dao.getAccount(event.accountId)?.isVisible == 1 }
+            .expandRecurring(rangeStart, rangeEndExclusive.plusYears(1))
+            .filter { it.endTimeMs >= nowMs }
+            .sortedForWidget(zoneId)
+            .asWidgetItems(zoneId, use24Hour, nowMs)
+    }
+
+    private fun List<CalendarEvent>.asWidgetItems(zoneId: ZoneId, use24Hour: Boolean, nowMs: Long): List<WidgetEventItem> {
         return map { event ->
             val dateTime = Instant.ofEpochMilli(event.startTimeMs).atZone(zoneId)
             WidgetEventItem(
@@ -102,6 +132,7 @@ class WidgetDataRepository(
                 dateLabel = dateTime.format(DateTimeFormatter.ofPattern("EEE, MMM d")),
                 dayOfMonth = dateTime.dayOfMonth.toString(),
                 startTimeMs = event.startTimeMs,
+                countdownDays = CountdownPinStore.daysUntil(event.startTimeMs, zoneId, nowMs).toString(),
             )
         }
     }

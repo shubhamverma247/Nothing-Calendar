@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.glance.GlanceId
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.currentState
@@ -176,4 +177,8 @@ private fun widgetAccentColor(value: String?): Color {
         runCatching { return Color(android.graphics.Color.parseColor(value)) }
     }
     return DEFAULT_ACCENT
+}
+
+internal fun widgetAccentArgb(settings: DotCalWidgetSettings): Int {
+    return widgetAccentColor(settings.accentColor).toArgb()
 }

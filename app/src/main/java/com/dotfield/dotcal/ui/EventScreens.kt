@@ -211,6 +211,7 @@ import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
+import com.dotfield.dotcal.data.countdown.CountdownPinStore
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
 import com.dotfield.dotcal.data.privacy.AppLockState
@@ -258,9 +259,13 @@ internal fun EventDetailScreen(
     account: CalendarAccount?,
     palette: DotCalPalette,
     isPrivate: Boolean,
+    isCountdownPinned: Boolean,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
+    onPinCountdown: () -> Unit,
+    onUnpinCountdown: () -> Unit,
+    onShareCountdownImage: () -> Unit,
     onDuplicate: () -> Unit,
     onCopyToDate: () -> Unit,
     onMoveToPrivate: () -> Unit,
@@ -329,6 +334,14 @@ internal fun EventDetailScreen(
                         event.recurrenceDetailLabel()?.let { label ->
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(label.toSentenceCase(), color = palette.secondaryText, fontSize = 14.sp, lineHeight = 20.sp)
+                        }
+                    }
+                }
+                if (isCountdownPinned) {
+                    item {
+                        DetailDivider(palette)
+                        DetailSection(label = "COUNTDOWN", palette = palette) {
+                            CountdownDetailCard(event = event, palette = palette, onShare = onShareCountdownImage)
                         }
                     }
                 }
@@ -437,6 +450,18 @@ internal fun EventDetailScreen(
                     showActions = false
                     onShare()
                 })
+                if (!isReadOnly) {
+                    add(CompactActionItem(if (isCountdownPinned) "Remove Countdown" else "Pin as Countdown") {
+                        showActions = false
+                        if (isCountdownPinned) onUnpinCountdown() else onPinCountdown()
+                    })
+                }
+                if (isCountdownPinned) {
+                    add(CompactActionItem("Share Countdown Image") {
+                        showActions = false
+                        onShareCountdownImage()
+                    })
+                }
                 if (!isReadOnly) {
                     add(CompactActionItem("Duplicate") {
                         showActions = false
@@ -1959,6 +1984,94 @@ internal fun JumpToDateSheet(
         }
     }
 }
+
+@Composable
+private fun CountdownDetailCard(event: CalendarEvent, palette: DotCalPalette, onShare: () -> Unit) {
+    val zoneId = remember(event.timeZone) { runCatching { ZoneId.of(event.timeZone) }.getOrDefault(ZoneId.systemDefault()) }
+    val days = remember(event.startTimeMs) { CountdownPinStore.daysUntil(event.startTimeMs, zoneId) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(palette.eventCardSurface)
+            .border(1.dp, palette.line, RoundedCornerShape(28.dp))
+            .padding(22.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        DotMatrixCountdownNumber(
+            text = days.toString(),
+            color = palette.accent,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(86.dp),
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            if (days == 1L) "DAY UNTIL ${event.title.uppercase(Locale.getDefault())}" else "DAYS UNTIL ${event.title.uppercase(Locale.getDefault())}",
+            color = palette.primaryText,
+            fontFamily = mono,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            "Share as image",
+            color = palette.accent,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .clickable(onClick = onShare)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        )
+    }
+}
+
+@Composable
+internal fun DotMatrixCountdownNumber(text: String, color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val patterns = text.map { DotDigitPatterns[it] ?: DotDigitPatterns['0'].orEmpty() }
+        val columns = patterns.sumOf { it.firstOrNull()?.length ?: 0 } + (patterns.size - 1).coerceAtLeast(0)
+        if (columns <= 0) return@Canvas
+        val rows = 7
+        val gap = 5f
+        val dot = minOf((size.width - gap * (columns - 1)) / columns, (size.height - gap * (rows - 1)) / rows).coerceAtLeast(1f)
+        val totalWidth = columns * dot + (columns - 1) * gap
+        val totalHeight = rows * dot + (rows - 1) * gap
+        var xCursor = (size.width - totalWidth) / 2f
+        val yStart = (size.height - totalHeight) / 2f
+        patterns.forEach { pattern ->
+            pattern.forEachIndexed { row, line ->
+                line.forEachIndexed { column, mark ->
+                    if (mark == '1') {
+                        drawCircle(
+                            color = color,
+                            radius = dot / 2f,
+                            center = Offset(xCursor + column * (dot + gap) + dot / 2f, yStart + row * (dot + gap) + dot / 2f),
+                        )
+                    }
+                }
+            }
+            xCursor += (pattern.firstOrNull()?.length ?: 0) * (dot + gap)
+        }
+    }
+}
+
+private val DotDigitPatterns = mapOf(
+    '0' to listOf("111", "101", "101", "101", "101", "101", "111"),
+    '1' to listOf("010", "110", "010", "010", "010", "010", "111"),
+    '2' to listOf("111", "001", "001", "111", "100", "100", "111"),
+    '3' to listOf("111", "001", "001", "111", "001", "001", "111"),
+    '4' to listOf("101", "101", "101", "111", "001", "001", "001"),
+    '5' to listOf("111", "100", "100", "111", "001", "001", "111"),
+    '6' to listOf("111", "100", "100", "111", "101", "101", "111"),
+    '7' to listOf("111", "001", "001", "010", "010", "010", "010"),
+    '8' to listOf("111", "101", "101", "111", "101", "101", "111"),
+    '9' to listOf("111", "101", "101", "111", "001", "001", "111"),
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

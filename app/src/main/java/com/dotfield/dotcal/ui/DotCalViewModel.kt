@@ -13,6 +13,7 @@ import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.billing.ProManager
+import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
@@ -94,6 +95,8 @@ class DotCalViewModel(
 
     private val _punchCardState = MutableStateFlow(PunchCardUiState())
     val punchCardState: StateFlow<PunchCardUiState> = _punchCardState
+    private val _countdownPins = MutableStateFlow<Set<String>>(emptySet())
+    val countdownPins: StateFlow<Set<String>> = _countdownPins
 
     val tasks: StateFlow<List<CalendarEvent>> = repository.observeTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -163,6 +166,7 @@ class DotCalViewModel(
     init {
         viewModelScope.launch { repository.ensureLocalAccount() }
         refreshPunchCard()
+        refreshCountdownPins()
     }
 
     fun previousMonth() {
@@ -312,6 +316,36 @@ class DotCalViewModel(
     private fun refreshPunchCard() {
         viewModelScope.launch {
             _punchCardState.value = PunchCardUiState(repository.readPunchedDays())
+        }
+    }
+
+    fun pinCountdown(event: CalendarEvent, isPro: Boolean, onResult: (CountdownPinResult) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.pinCountdown(event.baseEventId(), isPro)
+            _countdownPins.value = repository.readCountdownPins()
+            onResult(result)
+        }
+    }
+
+    fun swapCountdownPin(activeEventId: String, newEvent: CalendarEvent, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.swapCountdownPin(activeEventId, newEvent.baseEventId())
+            _countdownPins.value = repository.readCountdownPins()
+            onDone()
+        }
+    }
+
+    fun unpinCountdown(event: CalendarEvent, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.unpinCountdown(event.baseEventId())
+            _countdownPins.value = repository.readCountdownPins()
+            onDone()
+        }
+    }
+
+    private fun refreshCountdownPins() {
+        viewModelScope.launch {
+            _countdownPins.value = repository.readCountdownPins()
         }
     }
 

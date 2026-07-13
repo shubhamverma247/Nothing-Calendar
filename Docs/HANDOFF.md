@@ -82,6 +82,7 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 - A4 Jump to Date built and locally verified by debug build/install.
 - C5 Punch-Card Day Complete built and locally verified by debug build/install.
 - Smart Quick Add v2 built and locally verified by debug build/install.
+- B2 Countdowns / D-Day built and locally verified by debug build/install.
 - C2 Day Density Forecast Strip built and locally verified by debug build/install.
 - B5 Year-in-Pixels Heatmap built and locally verified by debug build/install.
 - B1 Time Insights built and locally verified by debug build/install.
@@ -101,6 +102,8 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 
 ## Latest Work
 
+- 2026-07-14: B2 countdown widget clipping fix completed on `main`. Root cause was vertical crowding inside the 2x2 Glance countdown widget after the new pinned D-Day layout: outer padding, 7-row dot digits, two text labels, and a 2-line title could overrun the available height and cut the number in half on-device. Tightened the countdown widget stack by reducing outer padding, shrinking dot cells/gaps, giving the digit grid a fixed 40dp slot, and reducing title/footer sizing so the pinned countdown number stays fully visible while preserving `D-DAY`, title, and `DAYS UNTIL`. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, debug APK installed successfully. No manual phone UI QA run.
+- 2026-07-13: B2 Countdowns / D-Day completed on `main`. Event Detail > More now supports `Pin as Countdown`, `Remove Countdown`, and `Share Countdown Image` for writable events. Countdown pins persist in the shared side-store namespace `countdown_pins` keyed by master event ID; no Room schema/package/deep-link/DB changes. Free users can keep exactly one active countdown; trying to pin a second opens a bottom sheet with `Unlock Unlimited` and `Swap to this countdown`, while Pro keeps unlimited pins. Pinned Event Detail shows a premium D-Day card with large dot-matrix day digits and a share action. Added a reusable `CardImageExporter` for countdown PNG sharing through the existing FileProvider cache path, intended for B2/C1/C7 reuse. The existing countdown widget now prefers the next active pinned countdown and renders the day count with dot rows; without pins it falls back to the existing next-event behavior. Added JVM tests for day-count math across DST, all-day-style dates, and same-day timed events. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-13: Smart Quick Add v2 completed on `main`. The existing Quick Add flow now uses an expanded pure-Kotlin on-device parser for English + Hinglish natural-language drafts, covering relative dates (`today`, `tomorrow`, `kal`, `parso`, `in 3 days`), weekdays (`next monday`, `agle somvar`), absolute dates (`14 march`, `march 14`, `14/3`, `14-03-2026`), times/ranges (`1pm`, `13:00`, `sham 5 baje`, `2-4pm`, `2pm to 4pm`), durations (`for 2 hours`, `2 ghante`), all-day date-only drafts, recurrence (`daily`, `roz`, `weekly`, `monthly`, `every/har <weekday>`, `every mon wed fri`), title cleanup, and past-time rollover. Quick Add remains Free and still pre-fills the existing event editor/save flow; no parallel creation path was added, so defaults, conflict warnings, reminders, accounts, and calendar-set behavior remain on the existing path. Preview now renders a dot-matrix chip row for Title/Date/Time/Repeats; tapping a chip continues into the existing editor for manual override. Added JVM parser tests with 30+ assertions covering the spec, Hinglish inputs, rollover, and graceful degradation. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-13: C5 Punch-Card feedback fix completed. Punch is no longer a tap-to-toggle control, so an accidental second tap after `1-day streak` does not clear the punch. Day view now shows the punch-card UI as a centered slim strip below the day date header instead of inside the previous/next navigation row. Tapping an unpunched day punches it; tapping an already-punched day leaves it punched; long-pressing a punched day clears it. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-13: C5 Punch-Card Day Complete completed on `main`. Added a reusable shared side-store at app-files `dotcal_side_store.json` with namespace/key/value JSON storage, in-memory cache, mutex protection, and suspend read/write/remove APIs. Punch-card state uses namespace `punchcard` keyed by ISO date string, with no Room schema/package/deep-link/DB/billing/sync/onboarding changes and no Pro gate. Day view header now shows a compact dot-matrix punch stamp; tapping it toggles the selected day, plays haptic feedback, fills the 5x5 dot stamp with an accent animation, persists the punch, and shows the computed consecutive streak label such as `6-day streak`. Streak math is pure Kotlin and covered across month boundaries; side-store namespace round-trip/remove behavior is covered by JVM tests. `:app:testDebugUnitTest` passed, `:app:assembleDebug` passed, and debug APK installed successfully. No manual phone UI QA run.
@@ -145,13 +148,24 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## Current Next Step
 
-- For app feature work, read `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it is the locked roadmap and supersedes `Docs/fable-suggested-feature.md`. A2, A5, A1, A3, A4, C2, B5, B1, C5, and Smart Quick Add v2 are complete. Next implementation is B2 Countdowns / D-Day unless the user picks another feature. Then continue in this order: B4 Bulk Edit / Multi-Select, B3 Drag-and-Drop Reschedule + Resize, QR Event Share, Availability Text Generator, C4 Dead Time Finder, C6 Ghost Events / Pencil-In, C3 On This Day, C1 Life-in-Dots, C7 Year Wrapped, Vault Decoy PIN.
+- Current roadmap state: A2, A5, A1, A3, A4, C2, B5, B1, C5, Smart Quick Add v2, and B2 Countdowns / D-Day are complete. Next implementation is B4 Bulk Edit / Multi-Select unless the user picks another feature. Then continue in this order: B3 Drag-and-Drop Reschedule + Resize, QR Event Share, Availability Text Generator, C4 Dead Time Finder, C6 Ghost Events / Pencil-In, C3 On This Day, C1 Life-in-Dots, C7 Year Wrapped, Vault Decoy PIN.
+
 - Play/Internal-testing billing verification remains the next product check.
 - Advanced Reminder Profiles remains NOT started; do not start without explicit confirmation.
 - Offline OCR remains possible later; do not start unless user asks.
 - Language picker scaffold/i18n remains TO BUILD; string extraction is a dedicated effort.
 
 ## What To Test Next
+
+- B2 Countdowns / D-Day:
+  - Open any writable future event > More > Pin as Countdown. Expected: the event detail shows a Countdown card with large dot-matrix day digits and `Share as image`.
+  - Tap More again. Expected: actions include `Remove Countdown` and `Share Countdown Image`.
+  - Tap `Share Countdown Image`. Expected: Android share sheet opens with a PNG card showing the day count, event title, and DotCal wordmark.
+  - Add the DotCal Countdown widget after pinning. Expected: the widget prefers the pinned event, shows `D-DAY`, dot-matrix day digits, the title, and `DAYS UNTIL`; the number is fully visible and not cut in half. With no pins it falls back to the existing next-event countdown.
+  - As a free user with one countdown already pinned, try to pin a second event. Expected: bottom sheet says `1 countdown active`, offers `Unlock Unlimited`, and offers `Swap to this countdown`.
+  - Tap `Swap to this countdown`. Expected: the old countdown unpins, the new event becomes the active countdown, and the widget updates.
+  - As Pro, pin multiple writable future events. Expected: no free-limit sheet appears and pins persist after app restart.
+  - Tap `Remove Countdown`. Expected: the detail Countdown card disappears and the widget uses the next remaining pinned countdown or falls back to next event.
 
 - Smart Quick Add v2:
   - Open Calendar > three-dot menu > Quick Add. Expected: a single free-text input appears with examples below it.
