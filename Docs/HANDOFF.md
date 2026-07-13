@@ -81,6 +81,7 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 - A3 Share Event built and locally verified by debug build/install.
 - A4 Jump to Date built and locally verified by debug build/install.
 - C5 Punch-Card Day Complete built and locally verified by debug build/install.
+- Smart Quick Add v2 built and locally verified by debug build/install.
 - C2 Day Density Forecast Strip built and locally verified by debug build/install.
 - B5 Year-in-Pixels Heatmap built and locally verified by debug build/install.
 - B1 Time Insights built and locally verified by debug build/install.
@@ -100,6 +101,7 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 
 ## Latest Work
 
+- 2026-07-13: Smart Quick Add v2 completed on `main`. The existing Quick Add flow now uses an expanded pure-Kotlin on-device parser for English + Hinglish natural-language drafts, covering relative dates (`today`, `tomorrow`, `kal`, `parso`, `in 3 days`), weekdays (`next monday`, `agle somvar`), absolute dates (`14 march`, `march 14`, `14/3`, `14-03-2026`), times/ranges (`1pm`, `13:00`, `sham 5 baje`, `2-4pm`, `2pm to 4pm`), durations (`for 2 hours`, `2 ghante`), all-day date-only drafts, recurrence (`daily`, `roz`, `weekly`, `monthly`, `every/har <weekday>`, `every mon wed fri`), title cleanup, and past-time rollover. Quick Add remains Free and still pre-fills the existing event editor/save flow; no parallel creation path was added, so defaults, conflict warnings, reminders, accounts, and calendar-set behavior remain on the existing path. Preview now renders a dot-matrix chip row for Title/Date/Time/Repeats; tapping a chip continues into the existing editor for manual override. Added JVM parser tests with 30+ assertions covering the spec, Hinglish inputs, rollover, and graceful degradation. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-13: C5 Punch-Card feedback fix completed. Punch is no longer a tap-to-toggle control, so an accidental second tap after `1-day streak` does not clear the punch. Day view now shows the punch-card UI as a centered slim strip below the day date header instead of inside the previous/next navigation row. Tapping an unpunched day punches it; tapping an already-punched day leaves it punched; long-pressing a punched day clears it. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-13: C5 Punch-Card Day Complete completed on `main`. Added a reusable shared side-store at app-files `dotcal_side_store.json` with namespace/key/value JSON storage, in-memory cache, mutex protection, and suspend read/write/remove APIs. Punch-card state uses namespace `punchcard` keyed by ISO date string, with no Room schema/package/deep-link/DB/billing/sync/onboarding changes and no Pro gate. Day view header now shows a compact dot-matrix punch stamp; tapping it toggles the selected day, plays haptic feedback, fills the 5x5 dot stamp with an accent animation, persists the punch, and shows the computed consecutive streak label such as `6-day streak`. Streak math is pure Kotlin and covered across month boundaries; side-store namespace round-trip/remove behavior is covered by JVM tests. `:app:testDebugUnitTest` passed, `:app:assembleDebug` passed, and debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-13: A4 Jump to Date completed on `main`. Calendar overflow now includes free `Go to date`; long-pressing the calendar top title/month header opens the same picker, while short-tapping the title still jumps to Today. Day view's center date header also short-taps to Today and long-presses to the picker. The picker is a DotCal bottom sheet with a first-day-of-week row, date wheel, `Today` shortcut, and `Jump` action. Jumping preserves the current calendar view, updates the selected date/current month/year through existing ViewModel state, and briefly accent-highlights the target date cell/header with a 500ms fade. No Pro gate, Room schema, package, deep-link, DB, billing, onboarding, sync, task, or storage changes. `:app:assembleDebug` passed with only existing deprecated API warnings, debug APK installed successfully on device `4ab0d020`. No manual phone UI QA run.
@@ -143,7 +145,7 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## Current Next Step
 
-- For app feature work, read `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it is the locked roadmap and supersedes `Docs/fable-suggested-feature.md`. A2, A5, A1, A3, A4, C2, B5, B1, and C5 are complete. Next implementation is Smart Quick Add v2 unless the user picks another feature. Then continue in this order: B2 Countdowns / D-Day, B4 Bulk Edit / Multi-Select, B3 Drag-and-Drop Reschedule + Resize, QR Event Share, Availability Text Generator, C4 Dead Time Finder, C6 Ghost Events / Pencil-In, C3 On This Day, C1 Life-in-Dots, C7 Year Wrapped, Vault Decoy PIN.
+- For app feature work, read `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it is the locked roadmap and supersedes `Docs/fable-suggested-feature.md`. A2, A5, A1, A3, A4, C2, B5, B1, C5, and Smart Quick Add v2 are complete. Next implementation is B2 Countdowns / D-Day unless the user picks another feature. Then continue in this order: B4 Bulk Edit / Multi-Select, B3 Drag-and-Drop Reschedule + Resize, QR Event Share, Availability Text Generator, C4 Dead Time Finder, C6 Ghost Events / Pencil-In, C3 On This Day, C1 Life-in-Dots, C7 Year Wrapped, Vault Decoy PIN.
 - Play/Internal-testing billing verification remains the next product check.
 - Advanced Reminder Profiles remains NOT started; do not start without explicit confirmation.
 - Offline OCR remains possible later; do not start unless user asks.
@@ -151,6 +153,14 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## What To Test Next
 
+- Smart Quick Add v2:
+  - Open Calendar > three-dot menu > Quick Add. Expected: a single free-text input appears with examples below it.
+  - Type `Lunch with Rahul kal 1pm`. Expected: preview chips show title `Lunch with Rahul`, tomorrow's date, `1:00 PM-2:00 PM`, and no repeat; Continue opens the existing event editor pre-filled with those values.
+  - Type `kal sham 5 baje dentist`. Expected: title is `dentist`, date is tomorrow, and time is 5:00 PM.
+  - Type `har somvar gym 7am` or `every mon wed fri training 7am`. Expected: preview shows the parsed date/time and a weekly repeat label; Continue opens the normal editor with recurrence pre-filled.
+  - Type `mummy ka birthday 14 march`. Expected: preview shows the date as an all-day draft and title stays `mummy ka birthday`.
+  - Type `deep work 9am for 2 hours` or `study 2pm to 4pm`. Expected: editor opens with the correct start/end range.
+  - Type `random text`. Expected: title is preserved, the flow degrades to the legacy default draft instead of crashing or blocking save.
 - C5 Punch-Card Day Complete:
   - Open Calendar > Day view. Expected: a centered slim punch-card strip appears below the day date header, not inside the previous/next arrow row.
   - Tap the punch strip. Expected: the stamp fills with animated accent dots, haptic feedback fires, and the label changes from `Complete day` to `1-day streak`.
@@ -272,8 +282,8 @@ Continue DotCal development in `D:\Caveman\caveman\Nothing-Calendar` on branch `
 
 First read `Docs/HANDOFF.md`; it is source of truth. Respect Hard Rules, schema lock, Pro/Billing status, and current next step.
 
-For new feature work, also read `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it supersedes previous feature lists and contains the locked 14-feature roadmap. Next feature is Smart Quick Add v2 unless the user picks another item.
+For new feature work, also read `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it supersedes previous feature lists and contains the locked 14-feature roadmap. Next feature is B2 Countdowns / D-Day unless the user picks another item.
 
-Latest status: `versionCode 9` / `versionName 1.1.3`; `:app:testDebugUnitTest` and `:app:assembleDebug` passing. Latest debug APK installed successfully. Latest completed app-code change is C5 Punch-Card feedback fix. Day view has a centered slim punch-card strip below the date header, persisted through the shared side-store namespace `punchcard`, with consecutive streak labels. Tap only punches incomplete days; long-press clears a punched day. No manual phone UI QA run unless explicitly asked.
+Latest status: `versionCode 9` / `versionName 1.1.3`; `:app:testDebugUnitTest` and `:app:assembleDebug` passing. Latest debug APK installed successfully. Latest completed app-code change is Smart Quick Add v2. Quick Add now has an expanded pure-Kotlin English + Hinglish parser and dot-matrix preview chips, still pre-filling the existing event editor/save flow. No manual phone UI QA run unless explicitly asked.
 
 Strict: do not change Room schema, package id, deep links, DB filename, onboarding/calendar/sync/holidays/tasks unless required by the task. No Hilt, no Compose Nav graph. Build after app-code changes with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`, then install debug APK on the connected phone unless user says not to. Do not run manual phone UI QA unless explicitly asked. Do not start Advanced Reminder Profiles or Offline OCR without confirmation.

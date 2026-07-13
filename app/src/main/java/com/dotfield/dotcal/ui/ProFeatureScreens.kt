@@ -1016,14 +1016,16 @@ internal fun QuickAddScreen(
             if (parsed != null) {
                 CalcSectionLabel("Preview", palette)
                 Spacer(modifier = Modifier.height(10.dp))
-                CalcFieldGroup(palette) {
-                    QuickAddPreviewRow("Title", parsed.title.ifBlank { "(none - add in next step)" }, palette)
-                    HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
-                    QuickAddPreviewRow("When", quickAddWhenLabel(parsed), palette)
-                    parsed.rrule?.let { rule ->
-                        HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
-                        QuickAddPreviewRow("Repeats", quickAddRepeatLabel(rule), palette)
-                    }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    QuickAddPreviewChip("Title", parsed.title.ifBlank { "Untitled" }, palette, onClick = ::submit)
+                    QuickAddPreviewChip("Date", parsed.date.format(editorDateFormatter), palette, onClick = ::submit)
+                    QuickAddPreviewChip(
+                        "Time",
+                        if (parsed.isAllDay || parsed.startTime == null) "All-day" else quickAddTimeLabel(parsed),
+                        palette,
+                        onClick = ::submit,
+                    )
+                    QuickAddPreviewChip("Repeats", parsed.rrule?.let(::quickAddRepeatLabel) ?: "None", palette, onClick = ::submit)
                 }
             } else {
                 CalcSectionLabel("Try one", palette)
@@ -1077,19 +1079,32 @@ internal fun QuickAddScreen(
 }
 
 @Composable
-private fun QuickAddPreviewRow(label: String, value: String, palette: DotCalPalette) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun QuickAddPreviewChip(label: String, value: String, palette: DotCalPalette, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.eventCardSurface)
+            .drawBehind {
+                drawRoundRect(
+                    color = palette.accent.copy(alpha = 0.28f),
+                    size = size,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            }
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 9.dp),
     ) {
-        Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp, modifier = Modifier.width(72.dp))
+        Text(label.uppercase(Locale.US), color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, maxLines = 1)
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             value,
             color = palette.primaryText,
             fontFamily = mono,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 14.sp,
-            modifier = Modifier.weight(1f),
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -1102,6 +1117,12 @@ private fun quickAddWhenLabel(result: QuickAddResult): String {
     } else {
         "$date / ${time.format(editorTimeFormatter)}"
     }
+}
+
+private fun quickAddTimeLabel(result: QuickAddResult): String {
+    val start = result.startTime?.format(editorTimeFormatter) ?: return "All-day"
+    val end = result.endTime?.format(editorTimeFormatter)
+    return if (end == null) start else "$start-${end}"
 }
 
 private fun quickAddRepeatLabel(rrule: String): String =
