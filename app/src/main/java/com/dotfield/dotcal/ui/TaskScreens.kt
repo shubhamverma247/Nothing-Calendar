@@ -377,6 +377,7 @@ private fun TasksTopChrome(
             title = "Tasks",
             palette = palette,
             onTitleClick = {},
+            onTitleLongClick = {},
             onAdd = onAddClick,
         )
         Spacer(modifier = Modifier.fillMaxWidth().height(12.dp).background(palette.topBarSurface))

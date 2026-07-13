@@ -9,6 +9,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,6 +58,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -94,10 +98,12 @@ internal fun CalendarTabContainer(
     activeCalendarTab: CalendarTab,
     palette: DotCalPalette,
     onTitleClick: () -> Unit,
+    onTitleLongClick: () -> Unit,
     onAdd: () -> Unit,
     onTemplates: (() -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
+    onJumpToDate: (() -> Unit)? = null,
     onCalendarSets: (() -> Unit)? = null,
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
@@ -119,10 +125,12 @@ internal fun CalendarTabContainer(
                 title = title,
                 palette = palette,
                 onTitleClick = onTitleClick,
+                onTitleLongClick = onTitleLongClick,
                 onAdd = onAdd,
                 onTemplates = onTemplates,
                 onQuickAdd = onQuickAdd,
                 onSearch = onSearch,
+                onJumpToDate = onJumpToDate,
                 onCalendarSets = onCalendarSets,
                 onTimeInsights = onTimeInsights,
                 onDateCalculator = onDateCalculator,
@@ -161,18 +169,22 @@ internal fun CalendarActionBar(
     title: String,
     palette: DotCalPalette,
     onTitleClick: () -> Unit,
+    onTitleLongClick: () -> Unit,
     onAdd: () -> Unit,
     onTemplates: (() -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
+    onJumpToDate: (() -> Unit)? = null,
     onCalendarSets: (() -> Unit)? = null,
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
     onShiftPatterns: (() -> Unit)? = null,
 ) {
     val topIconTint = if (palette.isDark) NWhite else palette.accent
+    val haptic = LocalHapticFeedback.current
     var showOverflow by remember { mutableStateOf(false) }
     val hasOverflow = onSearch != null ||
+        onJumpToDate != null ||
         onQuickAdd != null ||
         onTemplates != null ||
         onCalendarSets != null ||
@@ -194,7 +206,17 @@ internal fun CalendarActionBar(
             fontFamily = LocalHeadingFont.current,
             fontWeight = FontWeight.Bold,
             fontSize = if (title.length <= 4) 30.sp else 28.sp,
-            modifier = Modifier.padding(start = 8.dp).clickable(onClick = onTitleClick),
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .pointerInput(title) {
+                    detectTapGestures(
+                        onTap = { onTitleClick() },
+                        onLongPress = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onTitleLongClick()
+                        },
+                    )
+                },
             maxLines = 1,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -242,6 +264,18 @@ internal fun CalendarActionBar(
                                 onAdd()
                             },
                         )
+                        if (onJumpToDate != null) {
+                            ActionBarMenuItem(
+                                label = "Go to date",
+                                subtitle = "Jump without changing views",
+                                icon = Icons.Default.CalendarMonth,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onJumpToDate()
+                                },
+                            )
+                        }
                         if (onQuickAdd != null) {
                             ActionBarMenuItem(
                                 label = "Quick Add",

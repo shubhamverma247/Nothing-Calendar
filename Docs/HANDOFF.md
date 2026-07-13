@@ -1,10 +1,10 @@
 # DotCal Handoff
 
-Updated: 2026-07-12
+Updated: 2026-07-13
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full archive/history lives in `Docs/HANDOFF.original.md`; keep this file short and current.
 
-Feature batch specs live in `Docs/fable-suggested-feature.md`. For new feature work, read this handoff first, then read `Docs/fable-suggested-feature.md` and use it as the task spec unless the user overrides it.
+Feature batch specs now live in `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`, which supersedes previous feature lists including `Docs/fable-suggested-feature.md`. For new feature work, read this handoff first, then read the final-package file and use it as the task spec unless the user overrides it.
 
 ## Hard Rules
 
@@ -79,6 +79,7 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 - A5 Scheduling Defaults + ISO Week Numbers built and locally verified.
 - A1 Duplicate Event / Copy to Date built and locally verified by debug build/install.
 - A3 Share Event built and locally verified by debug build/install.
+- A4 Jump to Date built and locally verified by debug build/install.
 - C2 Day Density Forecast Strip built and locally verified by debug build/install.
 - B5 Year-in-Pixels Heatmap built and locally verified by debug build/install.
 - B1 Time Insights built and locally verified by debug build/install.
@@ -98,6 +99,8 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 
 ## Latest Work
 
+- 2026-07-13: A4 Jump to Date completed on `main`. Calendar overflow now includes free `Go to date`; long-pressing the calendar top title/month header opens the same picker, while short-tapping the title still jumps to Today. Day view's center date header also short-taps to Today and long-presses to the picker. The picker is a DotCal bottom sheet with a first-day-of-week row, date wheel, `Today` shortcut, and `Jump` action. Jumping preserves the current calendar view, updates the selected date/current month/year through existing ViewModel state, and briefly accent-highlights the target date cell/header with a 500ms fade. No Pro gate, Room schema, package, deep-link, DB, billing, onboarding, sync, task, or storage changes. `:app:assembleDebug` passed with only existing deprecated API warnings, debug APK installed successfully on device `4ab0d020`. No manual phone UI QA run.
+- 2026-07-13: Roadmap source updated. User added `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it supersedes previous feature lists after keep/remove review. Locked build order is now: A4 Jump to Date, C5 Punch-Card Day Complete, Smart Quick Add v2, B2 Countdowns / D-Day, B4 Bulk Edit / Multi-Select, B3 Drag-and-Drop Reschedule + Resize, QR Event Share, Availability Text Generator, C4 Dead Time Finder, C6 Ghost Events / Pencil-In, C3 On This Day, C1 Life-in-Dots, C7 Year Wrapped, Vault Decoy PIN. Tier changes: B2 is Free 1 / Pro unlimited; C3 is Free. New shared utilities expected by upcoming work: side-store utility, FreeSlotEngine, and CardImageExporter. No app code changed; no build/install needed.
 - 2026-07-12: Settings option-sheet style alignment completed on `main`. Shared Settings option sheets for Default view, Start of the week, Default reminder, Default event duration, and Sync interval now reuse the Font picker dialog style: no drag handle, skip-partial bottom sheet, 22dp side padding, bold 22sp heading, 10dp rounded option rows, cancel-surface unselected rows, accent-tinted selected row, border treatment, and 22dp check icon. Selection callbacks/persistence unchanged. No Room schema/package/deep-link/DB/sync/onboarding changes. `:app:assembleDebug` passed in 1m 38s, debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-12: Tasks segmented perceived-gap correction completed on `main`. Root cause was label-width perception: equal-width cells made short `All` leave a large visible text gap while long `Completed` crowded the right edge, even when cell gaps were mathematically equal. Tasks filter now measures each pill by its content width plus fixed padding, then computes one equal gap used before `All`, between every pill, and after `Completed`. No Room schema/package/deep-link/DB/sync/onboarding/settings behavior changes. `:app:assembleDebug` passed in 1m 16s, debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-12: Tasks segmented edge-gap correction completed on `main`. Replaced the Tasks segmented-control Row/DP-width layout with a custom pixel layout so the left edge gap, all three internal gaps, and the right edge gap are exactly the same pixel value. Any leftover pixels from screen-width division are distributed into segment widths only, not into gaps. No Room schema/package/deep-link/DB/sync/onboarding/settings behavior changes. `:app:assembleDebug` passed in 1m 17s, debug APK installed successfully. No manual phone UI QA run.
@@ -137,7 +140,7 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## Current Next Step
 
-- For app feature work, read `Docs/fable-suggested-feature.md`; A2, A5, A1, A3, C2, B5, and B1 are complete. Suggested next implementation from the user's current ranked list is C5 Punch-Card Day Complete unless the user picks another feature. A4 Jump to Date and C4 Dead Time Finder remain available from the original suggested build order.
+- For app feature work, read `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it is the locked roadmap and supersedes `Docs/fable-suggested-feature.md`. A2, A5, A1, A3, A4, C2, B5, and B1 are complete. Next implementation is C5 Punch-Card Day Complete unless the user picks another feature. Then continue in this order: Smart Quick Add v2, B2 Countdowns / D-Day, B4 Bulk Edit / Multi-Select, B3 Drag-and-Drop Reschedule + Resize, QR Event Share, Availability Text Generator, C4 Dead Time Finder, C6 Ghost Events / Pencil-In, C3 On This Day, C1 Life-in-Dots, C7 Year Wrapped, Vault Decoy PIN.
 - Play/Internal-testing billing verification remains the next product check.
 - Advanced Reminder Profiles remains NOT started; do not start without explicit confirmation.
 - Offline OCR remains possible later; do not start unless user asks.
@@ -145,6 +148,13 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## What To Test Next
 
+- A4 Jump to Date:
+  - Open Calendar in Month view, tap the top date title. Expected: selected date jumps to today, current month updates, and today's cell briefly accent-highlights.
+  - Long-press the top date title/month header. Expected: `Go to date` bottom sheet opens with a date wheel, first-day-of-week row matching Settings, `Today` shortcut, and `Jump` button.
+  - Pick a date in another month and tap `Jump`. Expected: the app stays in Month view, moves to that month/date, and the target date cell flashes with the 500ms accent highlight.
+  - Open Calendar > three-dot menu > Go to date. Expected: the same free picker opens; no Paywall appears.
+  - Repeat from Week, Day, Agenda, and Year. Expected: the current view is preserved, selected date/year updates, and visible target date/header highlights where that view has a date cell/header.
+  - In Day view, short-tap the center date header. Expected: jumps to today. Long-press the same header. Expected: opens the Go to date picker.
 - Settings option-sheet style alignment:
   - Open Settings > Appearance > Font. Expected: existing Font picker style remains unchanged.
   - Open Settings > Calendar Preferences > Start of the week and Default view. Expected: sheets visually match Font picker style: no handle, same padding, bold title, bordered rounded rows, accent selected row/check.
@@ -252,8 +262,8 @@ Continue DotCal development in `D:\Caveman\caveman\Nothing-Calendar` on branch `
 
 First read `Docs/HANDOFF.md`; it is source of truth. Respect Hard Rules, schema lock, Pro/Billing status, and current next step.
 
-For new feature work, also read `Docs/fable-suggested-feature.md`; it contains the current feature-batch instructions/specs. Suggested first feature is A2 Conflict Warning unless the user picks another item.
+For new feature work, also read `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it supersedes previous feature lists and contains the locked 14-feature roadmap. Next feature is C5 Punch-Card Day Complete unless the user picks another item.
 
-Latest status: `versionCode 9` / `versionName 1.1.3`; `:app:assembleDebug` passing. Latest debug APK installed successfully. Latest completed app-code change is the Settings root Nothing OS-style redesign follow-up: removed the top micro-label, plan/account label, and dot matrix; softened icon cells; and made the Pro card use the app surface in dark theme. No manual phone UI QA run unless explicitly asked.
+Latest status: `versionCode 9` / `versionName 1.1.3`; `:app:assembleDebug` passing. Latest debug APK installed successfully. Latest completed app-code change is A4 Jump to Date. Calendar overflow has free `Go to date`; long-pressing the calendar title/month header opens the picker; short-tap still jumps to Today; Day header also supports short-tap Today and long-press picker; jumps preserve current view and show a 500ms accent highlight. No manual phone UI QA run unless explicitly asked.
 
 Strict: do not change Room schema, package id, deep links, DB filename, onboarding/calendar/sync/holidays/tasks unless required by the task. No Hilt, no Compose Nav graph. Build after app-code changes with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`, then install debug APK on the connected phone unless user says not to. Do not run manual phone UI QA unless explicitly asked. Do not start Advanced Reminder Profiles or Offline OCR without confirmation.

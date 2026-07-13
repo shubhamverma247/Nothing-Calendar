@@ -1,0 +1,727 @@
+# DotCal — FINAL PACKAGE: 14 Features + Codex Prompts + Marketing
+
+> Supersedes previous feature lists. This is the locked roadmap after keep/remove review.
+> Removed: Focus Blocks, Working-days Calculator. Deferred: Travel Buffer, Day-Summary notification, Pinch-zoom, ICS preview.
+>
+> GLOBAL CONSTRAINTS (apply to every Codex prompt below):
+> - Offline-only. No INTERNET permission, no cloud, no OAuth, no analytics.
+> - Room schema is LOCKED: 5 existing tables only, NO new tables, NO new columns, NO migrations.
+> - Where per-entity flags/data are needed beyond the schema, use the established
+>   "side-store" pattern (JSON flag-store in app storage keyed by event ID — same
+>   pattern as Ghost Events). Build ONE shared side-store utility; do not create
+>   per-feature copies.
+> - Manual DI (no Hilt/Koin). Follow existing constructor-injection conventions.
+> - Pro gating: check `KEY_IS_PRO` from the existing DataStore prefs; locked features
+>   deep-link to `dotcal://paywall`.
+> - Jetpack Compose, dot-matrix / Nothing-inspired visual language, existing theme tokens only.
+
+---
+
+# PART 0 — FINAL FEATURE LIST (build order)
+
+| # | Feature | Tier | Size | Source |
+|---|---------|------|------|--------|
+| 1 | A4 Jump to Date | Free | S | Handoff |
+| 2 | C5 Punch-Card Day Complete | Free | S | Handoff |
+| 3 | Smart Quick Add (NL parsing v2) | Free | M | New |
+| 4 | B2 Countdowns / D-Day | Free (1) / Pro (unlimited) | M | Handoff (tier updated) |
+| 5 | B4 Bulk Edit / Multi-Select | Pro | M | Handoff |
+| 6 | B3 Drag-and-Drop Reschedule + Resize | Pro | L | Handoff |
+| 7 | QR Event Share | Free | S-M | New |
+| 8 | Availability Text Generator | Pro | M | New |
+| 9 | C4 Dead Time Finder | Pro | M | Handoff (pair with #8) |
+| 10 | C6 Ghost Events / Pencil-In | Pro | M | Handoff |
+| 11 | C3 On This Day | Free (was Pro) | S | Handoff (tier updated) |
+| 12 | C1 Life-in-Dots | Pro | M | Handoff |
+| 13 | C7 Year Wrapped | Pro | M-L | Handoff (launch in December) |
+| 14 | Vault Decoy PIN | Pro | S | New |
+
+Tier summary: 5 Free + 1 split + 8 Pro.
+Free side = acquisition (Smart Quick Add), viral (QR Share), retention (Punch-Card, On This Day), UX basics (Jump to Date).
+Pro side = utility + insights + privacy.
+
+Release grouping suggestion:
+- Release 1 (foundation): #1, #2, #3
+- Release 2 (Pro core): #4, #5, #6
+- Release 3 (sharing/scheduling): #7, #8, #9
+- Release 4 (insights + privacy): #10, #11, #12, #14
+- Release 5 (seasonal, December): #13 Year Wrapped
+
+---
+
+# PART 1 — CODEX IMPLEMENTATION PROMPTS
+
+For features that already have detailed specs in the existing DotCal features handoff
+(A4, C5, B2, B4, B3, C4, C6, C3, C1, C7), the prompts below are DELTA prompts: they
+reference the handoff spec and add only the tiering/integration changes decided in
+this review. The 4 new features (Smart Quick Add, QR Share, Availability, Decoy PIN)
+have full self-contained prompts.
+
+---
+
+## 1.1 — A4 Jump to Date (Free, build first)
+
+```
+Implement feature A4 "Jump to Date" exactly as specified in the DotCal features
+handoff. Tier: FREE — no KEY_IS_PRO check anywhere in this feature.
+
+Additions to the handoff spec:
+- Also register the picker on long-press of the month header (in addition to the
+  handoff's specified entry point), so power users discover it.
+- After jumping, briefly highlight the target date cell with the accent color
+  (500ms fade) so the user sees where they landed.
+- Add a "Today" shortcut inside the picker dialog.
+
+Tests: date-jump navigation unit test; picker respects the app's first-day-of-week
+setting.
+```
+
+---
+
+## 1.2 — C5 Punch-Card Day Complete (Free)
+
+```
+Implement feature C5 "Punch-Card Day Complete" exactly as specified in the DotCal
+features handoff. Tier: FREE — no KEY_IS_PRO check.
+
+Additions to the handoff spec:
+- Store punch state in the shared side-store utility (keyed by ISO date string),
+  NOT in a feature-specific file. If the shared side-store utility does not exist
+  yet, create it now — it will be reused by Countdowns, Ghost Events, and Decoy PIN:
+    - Single JSON file (or DataStore-backed) map: namespace -> key -> JSON value
+    - Suspend read/write API, in-memory cache, thread-safe
+    - Namespaces used across the app: "punchcard", "countdown_pins", "ghost_flags",
+      "vault_decoy"
+- The punch animation must use the dot-matrix language: the day's dot cell fills
+  in with a stamped-dots animation, not a generic checkmark.
+- Streak counter: consecutive punched days shown in the day header ("6-day streak")
+  computed from the side-store, no schema change.
+
+Tests: streak computation across month boundaries; side-store round-trip.
+```
+
+---
+
+## 1.3 — Smart Quick Add v2 (Free) — FULL PROMPT
+
+```
+You are working on DotCal, an offline Android calendar app (Kotlin, Jetpack Compose,
+Room with a LOCKED 5-table schema, manual DI, no INTERNET permission).
+
+TASK: Upgrade the existing structured Quick Add with a natural-language parsing
+layer ("Smart Quick Add"). Tier: FREE.
+
+ARCHITECTURE:
+- Create an on-device parser: input string -> ParsedEventDraft(title, startDateTime,
+  endDateTime?, isAllDay, recurrenceRule?). Pure Kotlin, no network, no ML runtime —
+  deterministic grammar + regex.
+- The parser PRE-FILLS the existing Quick Add / event editor flow. Do not create a
+  parallel event-creation path; reuse the existing creation use case so defaults,
+  conflict warnings (A2), and calendar-set logic all apply automatically.
+
+PARSING REQUIREMENTS (English + Hinglish):
+1. Relative dates: "today", "tomorrow", "kal" (tomorrow), "parso" (day after),
+   "next monday", "agle somvar", "in 3 days".
+2. Absolute dates: "14 march", "march 14", "14/3", "14-03-2026".
+3. Times: "1pm", "13:00", "sham 5 baje" (5pm), "subah 9" (9am), "9 baje".
+   Ranges: "2-4pm", "2pm to 4pm" -> start+end.
+4. Recurrence: "every monday", "har somvar", "every mon wed fri", "daily", "roz",
+   "weekly", "monthly" -> map to the app's existing rrule format.
+5. Duration: "for 2 hours", "2 ghante" -> end = start + duration.
+6. All-day detection: date without time -> all-day event.
+7. Title = remaining text after date/time/recurrence tokens are consumed, trimmed.
+   Preserve names/capitalization ("Lunch with Rahul").
+8. Ambiguity: if time matched but date missing -> assume today (or tomorrow if the
+   time already passed today). If nothing parseable -> whole string is the title,
+   flow behaves exactly like current Quick Add (graceful degradation).
+
+UI:
+- Quick Add input becomes a single free-text field. As the user types, show a live
+  parse preview chip row below the field: [Tomorrow] [1:00 PM] [Repeats: none],
+  each chip in dot-matrix styling using existing theme tokens.
+- Tapping a chip opens the existing picker for that field (manual override always
+  available). Misparse must never cost the user more taps than the old flow.
+- Confirm -> existing save flow.
+
+CONSTRAINTS:
+- Locale-safe date parsing; respect the app's existing week-start and 12/24h
+  settings.
+- Parser must be a pure function library with NO Android dependencies so it is
+  unit-testable on JVM.
+
+TESTS (JVM unit tests, minimum):
+- 30+ parse cases covering all rules above, including Hinglish inputs
+  ("kal sham 5 baje dentist", "har somvar gym 7am", "mummy ka birthday 14 march").
+- Past-time rollover ("1pm" typed at 3pm -> tomorrow 1pm).
+- Degradation case: "random text" -> title only, no date.
+```
+
+---
+
+## 1.4 — B2 Countdowns / D-Day (Free: 1 / Pro: unlimited)
+
+```
+Implement feature B2 "Countdowns / D-Day Counters" as specified in the DotCal
+features handoff, with ONE tiering change decided in review:
+
+TIERING (replaces the handoff's Pro-only gating):
+- FREE users: exactly 1 active countdown. Creating a second shows a bottom sheet:
+  "1 countdown active — DotCal Pro gives you unlimited" with a button deep-linking
+  to dotcal://paywall, and an option to swap (deactivate current, activate new).
+- PRO (KEY_IS_PRO): unlimited countdowns + widget customization options.
+- The single free countdown must be FULLY functional (widget included) — it is a
+  marketing/viral surface, do not water it down.
+
+IMPLEMENTATION NOTES:
+- Pinned countdown event IDs live in the shared side-store, namespace
+  "countdown_pins" (see prompt 1.2 for the utility).
+- Countdown card and widget must render the number in large dot-matrix digits
+  ("23" in dots, "days until Shaadi" below) — this card is designed to be
+  screenshot-shared.
+- Add a "Share as image" action on the countdown card: render the card to a bitmap
+  (dot-matrix digits, event title, DotCal wordmark) and share via the system sheet.
+  This works for free users too — every shared image is an ad.
+
+Tests: free-tier limit enforcement; day-count math across DST/timezone changes;
+count for all-day vs timed events.
+```
+
+---
+
+## 1.5 — B4 Bulk Edit / Multi-Select (Pro)
+
+```
+Implement feature B4 "Bulk Edit / Multi-Select" exactly as specified in the DotCal
+features handoff. Tier: PRO (KEY_IS_PRO gate; entry actions visible to free users
+but tapping shows the paywall bottom sheet with deep link to dotcal://paywall —
+visible-but-locked drives conversion better than hidden).
+
+Additions to the handoff spec:
+- Supported bulk actions: delete, move to calendar, change color, shift by N
+  days/hours, toggle ghost flag (integrates with C6 when built).
+- Every bulk operation must be UNDOABLE via a single snackbar action ("14 events
+  moved — UNDO") that restores the previous state in one transaction.
+- Long-press starts selection mode; selection count shown in a contextual top bar.
+
+Tests: bulk shift across month boundaries; undo restores exact prior state;
+recurring events handled per the handoff's recurrence rules.
+```
+
+---
+
+## 1.6 — B3 Drag-and-Drop Reschedule + Resize (Pro, largest)
+
+```
+Implement feature B3 "Drag-and-Drop Reschedule + Resize" exactly as specified in
+the DotCal features handoff. Tier: PRO (same visible-but-locked pattern as B4:
+free users see the drag affordance, drop triggers the paywall sheet and reverts).
+
+Additions to the handoff spec:
+- Haptic feedback on pickup, on 15-minute snap increments, and on drop.
+- While dragging, show a floating time label ("14:30 – 15:30") that updates live.
+- Dropping onto a slot that conflicts with another event triggers the existing A2
+  conflict warning before committing.
+- Recurring events: on drop, ask "This event only / All future events" using the
+  app's existing recurrence-edit dialog.
+- Every drag commit is undoable via snackbar UNDO.
+
+This is the largest feature in the roadmap — implement week view first, then day
+view, then (if the handoff includes it) month-view drag as a follow-up commit.
+
+Tests: snap math; drag across days in week view; recurrence split correctness;
+undo after drop.
+```
+
+---
+
+## 1.7 — QR Event Share (Free) — FULL PROMPT
+
+```
+You are working on DotCal (offline Android calendar, Kotlin, Compose, locked Room
+schema, manual DI, no INTERNET permission).
+
+TASK: Let users share an event as a QR code that another DotCal user scans to
+import. Tier: FREE (both sides) — this is a deliberate viral loop.
+
+ENCODE (share side):
+- Reuse the existing A3 "Share Event" ICS/text serialization. Compress the ICS
+  payload (Deflate) and Base64-encode; prefix with "DOTCAL1:" as a format/version
+  marker.
+- Generate the QR locally with the ZXing core library ("com.google.zxing:core") —
+  pure Java, no network, no Play Services. Do NOT use ML Kit here.
+- If the payload exceeds reliable QR capacity (~1.5KB after compression), strip
+  description/media fields first and warn "Shared without description".
+- UI: "Share as QR" action in the event detail sheet -> full-screen dialog with the
+  QR on a white card (QR needs contrast; keep the card white in both themes),
+  event title below, DotCal wordmark at the bottom. Include "Save as image" and
+  system-share actions.
+
+DECODE (scan side):
+- "Scan event QR" entry in the add-event menu.
+- Use CameraX + ML Kit barcode scanning BUNDLED variant
+  ("com.google.mlkit:barcode-scanning") so the model ships in the APK and works
+  fully offline. CAMERA permission with a plain-language rationale.
+- On a "DOTCAL1:" payload: decode -> reuse the EXISTING ICS import path (do not
+  write a second parser) -> show the standard import preview -> save.
+- Non-DotCal QR: "Not a DotCal event code" gentle error, keep scanning.
+- Foreign but valid ICS text in a QR: import it anyway (bonus interop).
+
+CONSTRAINTS:
+- No new tables/columns. No network. Camera frames must never be stored.
+
+TESTS: round-trip encode->decode->import equality for timed, all-day, and
+recurring events; oversize payload fallback; malformed payload rejection.
+```
+
+---
+
+## 1.8 — Availability Text Generator (Pro) — FULL PROMPT
+
+```
+You are working on DotCal (offline Android calendar, Kotlin, Compose, locked Room
+schema, manual DI, no INTERNET permission).
+
+TASK: Generate a human-readable "when I'm free" text for a chosen date range that
+the user pastes into WhatsApp/email. Positioning: the offline Calendly. Tier: PRO
+(KEY_IS_PRO; free users see the entry point, get the paywall sheet).
+
+SHARED ENGINE (important):
+- Build a FreeSlotEngine that computes free gaps from events in a date range.
+  This engine MUST be a shared component reused by C4 Dead Time Finder (prompt 1.9)
+  — build it once here, in a neutral package, with no UI dependencies.
+- Inputs: date range, working-hours window (default 09:00–21:00, user-adjustable),
+  minimum slot length (default 30 min), calendar-set filter (respect the currently
+  active calendar set), option to treat ghost events (C6) as busy or free.
+- All-day events: user toggle "block the whole day / ignore".
+
+OUTPUT FORMAT:
+- Grouped, compact, human text — e.g.:
+    "My availability (Mon 13 – Fri 17 Jul):
+     Mon: 2:00–5:30 pm
+     Tue: free all day
+     Wed: before 11 am, after 4 pm
+     Fri: 1:00–3:00 pm"
+- Rules: merge adjacent slots; "free all day" when the whole window is open;
+  "before X / after Y" when a single event splits the day; omit fully-busy days
+  with a trailing "Other days are fully booked."
+- Respect the app's 12/24h setting.
+
+UI:
+- Entry: "Share availability" in the calendar overflow menu + week-view long-press.
+- Config sheet: date-range picker (presets: Next 3 days / This week / Next week),
+  working-hours slider, min-slot selector, live preview of the generated text.
+- Actions: Copy, and system Share.
+
+TESTS (JVM): slot computation with overlapping events, all-day events, events
+crossing midnight, empty calendar ("free all day" x N), full-day busy;
+text formatting for each rule above.
+```
+
+---
+
+## 1.9 — C4 Dead Time Finder (Pro)
+
+```
+Implement feature C4 "Dead Time Finder" exactly as specified in the DotCal features
+handoff. Tier: PRO.
+
+Integration change decided in review:
+- Do NOT implement gap computation inside this feature. Consume the shared
+  FreeSlotEngine built for the Availability Text Generator (prompt 1.8). If C4 is
+  built first, create the engine here with the same contract described in 1.8 and
+  the Availability feature will consume it later. One engine, two features.
+- Add a cross-link: from any found dead-time slot, offer "Share availability for
+  this day" (deep-links into the Availability sheet pre-filled with that date).
+
+Tests: covered by the shared engine's tests plus the handoff's C4-specific cases.
+```
+
+---
+
+## 1.10 — C6 Ghost Events / Pencil-In Mode (Pro)
+
+```
+Implement feature C6 "Ghost Events / Pencil-In Mode" exactly as specified in the
+DotCal features handoff. Tier: PRO.
+
+Integration notes from review:
+- Ghost flags live in the shared side-store utility, namespace "ghost_flags"
+  (see prompt 1.2). If the handoff specified its own JSON store, migrate that
+  design onto the shared utility instead — one store, many namespaces.
+- Ghost events render at reduced opacity with a dotted (not solid) border — the
+  dot-matrix language makes "pencilled-in" visually literal.
+- FreeSlotEngine (1.8/1.9) must offer the "treat ghosts as busy or free" toggle;
+  wire that up when both features exist.
+- A2 conflict warnings: ghost-vs-real conflicts show as a softer notice
+  ("tentatively clashes"), not the full warning.
+
+Tests: ghost flag round-trip; ghost visibility in day/week/month views;
+FreeSlotEngine ghost toggle.
+```
+
+---
+
+## 1.11 — C3 On This Day (Free — tier changed from Pro)
+
+```
+Implement feature C3 "On This Day" exactly as specified in the DotCal features
+handoff, with ONE change: Tier is now FREE (remove any KEY_IS_PRO gating from the
+handoff spec). Rationale: this is a retention/delight feature that gives users a
+daily reason to open the app; it should not sit behind the paywall.
+
+Additions:
+- Anniversary math: for events found in previous years, show "2 years ago today"
+  and, for birthday-type recurring events, compute and show "turns 27" style
+  progression when the first occurrence year is known.
+- Keep it quiet: a small card at the top of the day/agenda view, dismissible per
+  day; no notifications (notification surface is reserved for reminders and
+  countdowns).
+
+Tests: leap-day handling (29 Feb memories on 28 Feb in non-leap years);
+multi-year lookback correctness.
+```
+
+---
+
+## 1.12 — C1 Life-in-Dots (Pro)
+
+```
+Implement feature C1 "Life-in-Dots" exactly as specified in the DotCal features
+handoff. Tier: PRO.
+
+Additions from review:
+- Add "Share as image" on the Life-in-Dots screen: render the dot grid + a caption
+  line to a bitmap with the DotCal wordmark. Shared images are organic marketing;
+  make the export beautiful (respect current theme, 4:5 portrait framing so it is
+  Instagram-ready).
+- Birthdate input stays in DataStore (no schema change) and must be deletable
+  ("Remove my birthdate") for privacy comfort.
+
+Tests: dot-grid math (weeks lived vs total), leap years, share-image generation
+does not block the UI thread.
+```
+
+---
+
+## 1.13 — C7 Year Wrapped (Pro — target December release)
+
+```
+Implement feature C7 "Year Wrapped" exactly as specified in the DotCal features
+handoff. Tier: PRO.
+
+Review additions:
+- Every Wrapped stat card must have "Share as image" (same bitmap-export approach
+  as C1/B2 — extract ONE shared CardImageExporter utility used by Countdowns,
+  Life-in-Dots, and Wrapped; do not duplicate the renderer three times).
+- Add a locked teaser for FREE users: they can open Wrapped and see the first
+  summary card ("You scheduled 412 events in 2026") with remaining cards blurred
+  behind a "Unlock your full Wrapped with Pro" paywall CTA. Seasonal conversion
+  moment — this teaser is the point of the December timing.
+- All computation strictly on-device from existing Room data.
+
+Tests: stat computations against a synthetic year of fixture events; free-teaser
+gating; export utility reuse.
+```
+
+---
+
+## 1.14 — Vault Decoy PIN (Pro) — FULL PROMPT
+
+```
+You are working on DotCal (offline Android calendar, Kotlin, Compose, locked Room
+schema, manual DI). DotCal has an existing PIN-protected Vault for private events.
+
+TASK: Add a DECOY PIN — a second PIN that opens an empty (or separate) vault, for
+plausible deniability. Tier: PRO.
+
+BEHAVIOR:
+- Vault settings (accessible only from inside the real vault) gain "Set decoy PIN"
+  (KEY_IS_PRO gated).
+- Decoy PIN must differ from the real PIN; validate on set.
+- Entering the REAL PIN at the vault lock screen -> real vault (unchanged).
+- Entering the DECOY PIN -> a fully functional but SEPARATE vault space that starts
+  empty. Events created inside the decoy vault persist to the decoy space (side-store
+  namespace "vault_decoy" for the membership flags, reusing the shared utility from
+  prompt 1.2 — no schema change).
+- CRITICAL: the decoy vault must be visually IDENTICAL to the real one. No label,
+  toast, log line, or settings difference visible from inside the decoy. Decoy
+  settings show "Set decoy PIN" too (no-op that appears to work) so inspection
+  reveals nothing.
+- Wrong PIN (neither real nor decoy) -> normal error path, unchanged.
+- PIN storage: hash both PINs with the same KDF the vault already uses (never
+  plaintext). If the vault currently stores a weaker hash, upgrade both to a salted
+  KDF now.
+- Removing the decoy PIN (from the real vault only) deletes decoy-space membership
+  flags after a confirm dialog.
+
+TESTS: PIN routing (real/decoy/wrong); decoy isolation (decoy session can never
+query real-vault events — verify at the repository layer, not just UI); flags
+round-trip; KDF verification.
+```
+
+---
+
+# PART 2 — INSTAGRAM MARKETING (new features)
+
+Format per post: image generation prompt (4:5 portrait, dot-matrix / Nothing
+aesthetic) + caption + reel script where the feature moves.
+
+---
+
+## Post 1 — Smart Quick Add (acquisition hero)
+
+### Reel Script (20s) — "Type it like you'd say it"
+
+```
+HOOK (0-3s):
+Text: "Adding an event should take 3 seconds. Not 12 taps."
+Visual: split screen — left: someone tapping through date picker, time picker,
+repeat picker in a generic calendar. Right: cursor blinking in DotCal.
+
+DEMO (3-14s):
+Screen recording: typing "lunch with rahul kal 1pm" -> parse chips appear live
+[Tomorrow] [1:00 PM] -> tap save -> event lands on the calendar.
+Second example, fast: "gym har somvar 7am" -> [Every Monday] [7:00 AM] -> saved.
+
+TWIST (14-17s):
+Text: "Parsed on your phone. No cloud. No account. Works in Hinglish."
+
+CTA (17-20s):
+Text: "DotCal — the offline calendar. Link in bio."
+```
+
+### Image Generation Prompt
+
+```
+Minimalist tech poster, 4:5 portrait, pure black background. Center: a single
+white text input field rendered in thin outline, containing the typed text
+"lunch with rahul kal 1pm" in monospaced white type. Below it, three small
+glowing chips in dot-matrix style reading "TOMORROW", "1:00 PM", "LUNCH WITH
+RAHUL", connected to the input by thin dotted lines. Headline in white
+dot-matrix typography: "TYPE IT. DONE." Subline in small monospaced grey text:
+"Natural language events. Parsed on-device." Bottom: dot-matrix wordmark
+"DotCal". Nothing-phone-inspired aesthetic, flat, high contrast, extreme
+negative space.
+```
+
+### Caption
+
+```
+"lunch with rahul kal 1pm"
+
+That's it. That's the whole event.
+
+DotCal now understands plain language — English, Hindi, ya dono mix. Date,
+time, repeat rule: sab auto-parsed, on your phone, zero cloud.
+
+No account. No sync servers. No 12-tap date pickers.
+
+#android #calendar #productivity #offlinefirst #privacy #madeinindia
+```
+
+---
+
+## Post 2 — QR Event Share (viral loop)
+
+### Reel Script (18s) — "Share an event without the internet"
+
+```
+HOOK (0-3s):
+Text: "Send a calendar invite... with no internet, no email, no account."
+Visual: two phones side by side, airplane mode icons visible on both.
+
+DEMO (3-13s):
+Phone A: open event "House party Sat 8pm" -> Share as QR -> QR fills screen.
+Phone B: DotCal -> Scan event QR -> camera sees the code -> import preview ->
+saved. Both phones show the same event.
+
+TWIST (13-16s):
+Text: "The event travels 10 centimeters. Not through a server."
+
+CTA (16-18s):
+Text: "DotCal — link in bio. (Your friend needs it too. That's the point.)"
+```
+
+### Image Generation Prompt
+
+```
+Minimalist tech poster, 4:5 portrait, pure black background. Two smartphone
+outlines facing each other in thin white line art. The left phone displays a
+QR code made of white dots on a small white card; a dotted arc of tiny dots
+travels from the left phone to the right phone, where a calendar event card
+is materializing out of dots. Headline in white dot-matrix typography:
+"INVITES WITHOUT INTERNET". Subline in small monospaced grey text: "Scan.
+Import. Done. Zero servers." Bottom: dot-matrix wordmark "DotCal".
+Nothing-phone-inspired aesthetic, flat, high contrast, extreme negative space.
+```
+
+### Caption
+
+```
+Calendar invites need: an email account, a sync server, and someone's cloud.
+
+Or... a QR code.
+
+DotCal turns any event into a QR code. Your friend scans it, taps import,
+done. Works in airplane mode. The event never touches the internet.
+
+Family dinners, society meetings, group study — shared like it's 2026,
+private like it's 1996.
+
+#android #calendar #offline #privacy #qrcode #nocloud
+```
+
+---
+
+## Post 3 — Availability Text Generator (Pro flagship)
+
+### Reel Script (22s) — "The Calendly killer that works offline"
+
+```
+HOOK (0-3s):
+Text: "'When are you free?' — the most annoying question in group chats."
+Visual: WhatsApp chat with 14 messages of back-and-forth scheduling chaos.
+
+DEMO (3-15s):
+Screen recording: DotCal -> Share availability -> pick "Next week" -> working
+hours 10-6 -> generated text appears:
+"Mon: 2:00–5:30 pm / Tue: free all day / Wed: before 11 am..."
+-> Copy -> paste into the same WhatsApp chat. One message. Done.
+
+TWIST (15-19s):
+Text: "Scheduling links need servers and accounts. DotCal needs a paste.
+Your calendar never leaves your phone."
+
+CTA (19-22s):
+Text: "DotCal Pro — one-time price, no subscription. Link in bio."
+```
+
+### Image Generation Prompt
+
+```
+Minimalist tech poster, 4:5 portrait, pure black background. Center: a clean
+chat message bubble in white containing monospaced text: "Mon: 2–5:30 pm /
+Tue: free all day / Wed: after 4 pm", with a small dot-matrix calendar icon
+beside it. Above the bubble, a crossed-out link icon (a chain link made of
+dots with a subtle red dotted strike through it). Headline in white dot-matrix
+typography: "NO LINK. NO SERVER. JUST PASTE." Subline in small monospaced grey
+text: "Your availability, computed on your phone." Bottom: dot-matrix wordmark
+"DotCal". Nothing-phone-inspired aesthetic, flat, high contrast, extreme
+negative space.
+```
+
+### Caption
+
+```
+Scheduling apps: create account, connect calendar to their cloud, send link,
+hope they click it.
+
+DotCal: tap, copy, paste.
+
+"Share availability" reads your week on-device and writes a human answer —
+"Mon 2–5:30, Tue free all day, Wed after 4." Paste it anywhere.
+
+No booking page is reading your calendar. Because no one is reading your
+calendar.
+
+#android #calendar #scheduling #calendly #privacy #productivity
+```
+
+---
+
+## Post 4 — Countdowns (shareable emotion)
+
+### Static Post — Image Generation Prompt
+
+```
+Minimalist tech poster, 4:5 portrait, pure black background. Center: a giant
+number "23" rendered entirely in a white LED dot-matrix grid, glowing softly.
+Below it in smaller dot-matrix type: "DAYS UNTIL SHAADI" with a tiny red
+dot-matrix heart. Thin dotted progress ring around the number, partially
+filled in red dots. Headline absent — the number is the poster. Small
+monospaced grey line at the bottom: "Count down to what matters." and the
+dot-matrix wordmark "DotCal". Nothing-phone-inspired aesthetic, flat, high
+contrast, extreme negative space.
+```
+
+### Caption
+
+```
+23 days until shaadi.
+147 days until graduation.
+9 days until the trip.
+
+Pin any event. Watch it count down — on a widget, in dots.
+
+Tap "share as image" and post yours. (Tag us — the best countdown gets
+reposted.)
+
+#countdown #shaadi #android #calendar #widget #nothingphone
+```
+
+---
+
+## Post 5 — Vault Decoy PIN (privacy edge)
+
+### Reel Script (18s) — "The vault inside the vault"
+
+```
+HOOK (0-3s):
+Text: "Someone asks to see your phone. They know you have a vault."
+Visual: over-the-shoulder shot, someone handing a phone over reluctantly.
+
+DEMO (3-13s):
+Screen recording: vault lock screen -> PIN 1234 entered -> vault opens...
+empty. Clean. Nothing to see.
+Cut. Same lock screen -> PIN 8080 entered -> the REAL vault opens: private
+events visible.
+Text overlay: "Two PINs. One truth."
+
+TWIST (13-16s):
+Text: "The decoy vault is pixel-identical. No one can prove there's more."
+
+CTA (16-18s):
+Text: "DotCal Pro. Your calendar, actually private. Link in bio."
+```
+
+### Caption
+
+```
+A vault protects your private events.
+A decoy PIN protects your vault.
+
+Enter one PIN: an empty vault. Enter the other: the real one. Both look
+identical — because deniability only works when it's plausible.
+
+Offline calendar. Zero cloud. And now, two answers to "unlock it."
+
+#privacy #android #securityapp #vault #calendar #digitalprivacy
+```
+
+---
+
+# PART 3 — MARKETING FOR EXISTING FEATURES (unchanged from prior package)
+
+The scripts for Shift Pattern Builder (#1 existing feature — zero mainstream
+competition), Private Vault, and Year Heatmap remain as written in
+DOTCAL-FEATURES-MARKETING.md Part 3. Reuse them as-is; they are not superseded.
+
+---
+
+# PART 4 — POSTING CALENDAR (adjusted to final roadmap)
+
+| Week | Post | Format | Goal |
+|------|------|--------|------|
+| 1 | Smart Quick Add | Reel | Acquisition — lead with the wow |
+| 1 | Countdown "23 days" | Static | Shareable emotion, follower seeding |
+| 2 | Shift Pattern Builder (existing) | Reel | Niche domination — nurses/shift workers |
+| 2 | QR Event Share | Reel | Viral loop — "your friend needs it too" |
+| 3 | Availability Text | Reel | Pro conversion — Calendly-killer angle |
+| 3 | Year Heatmap (existing) | Static | Brand aesthetic |
+| 4 | Vault + Decoy PIN | Reel | Privacy positioning |
+| 4 | Life-in-Dots share card | Static | Organic shares |
+| Dec | Year Wrapped teaser + launch | Reel + Statics | Seasonal Pro conversion spike |
+
+Rules: reels for anything that moves, statics for numbers and brand shots.
+One CTA per caption. Price anchor everywhere Pro is mentioned: one-time
+price, no subscription. Reply to every comment in week 1.

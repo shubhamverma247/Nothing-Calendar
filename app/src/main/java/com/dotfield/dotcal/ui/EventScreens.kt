@@ -1871,6 +1871,97 @@ internal fun EditorValueRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+internal fun JumpToDateSheet(
+    selectedDate: LocalDate,
+    weekStart: DayOfWeek,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (LocalDate) -> Unit,
+) {
+    val today = remember { LocalDate.now() }
+    val dates = remember(selectedDate) {
+        val start = selectedDate.minusYears(1)
+        List(731) { start.plusDays(it.toLong()) }
+    }
+    val weekLabels = remember(weekStart) {
+        List(7) { index -> weekStart.plus(index.toLong()).name.take(3) }
+    }
+    var pickedDate by remember(selectedDate) { mutableStateOf(selectedDate) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(palette.dialogSurface)
+                .padding(horizontal = 20.dp)
+                .padding(top = 4.dp, bottom = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Go to date", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(
+                pickedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy", Locale.US)),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                weekLabels.forEach { label ->
+                    Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                }
+            }
+            WheelColumn(
+                items = dates,
+                selected = pickedDate,
+                label = { it.format(DateTimeFormatter.ofPattern("EEE, MMM d yyyy", Locale.US)) },
+                palette = palette,
+                modifier = Modifier.fillMaxWidth(),
+                onSelected = { pickedDate = it },
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Button(
+                    onClick = { pickedDate = today },
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.cancelSurface, contentColor = palette.primaryText),
+                    shape = RoundedCornerShape(18.dp),
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .border(1.dp, palette.cancelBorder, RoundedCornerShape(18.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("Today", fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Button(
+                    onClick = { onSelected(pickedDate) },
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+                    shape = RoundedCornerShape(18.dp),
+                ) {
+                    Text("Jump", fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 internal fun DateTimeChoiceSheet(
     title: String,
     selectedDate: LocalDate,

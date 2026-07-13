@@ -314,12 +314,14 @@ fun DotCalApp(
     var showDateCalculator by remember { mutableStateOf(false) }
     var showTimeInsights by remember { mutableStateOf(false) }
     var showQuickAdd by remember { mutableStateOf(false) }
+    var showJumpToDatePicker by remember { mutableStateOf(false) }
     var showRecentlyDeleted by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var showTemplates by remember { mutableStateOf(false) }
     var showFocusProfiles by remember { mutableStateOf(false) }
     var showShiftPatterns by remember { mutableStateOf(false) }
     var selectedBulkDates by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
+    var jumpHighlightDate by remember { mutableStateOf<LocalDate?>(null) }
     var showBulkTemplatePicker by remember { mutableStateOf(false) }
     var quickAddPrefill by remember { mutableStateOf<QuickAddResult?>(null) }
     var duplicateDraftPrefill by remember { mutableStateOf<EventEditorData?>(null) }
@@ -808,6 +810,18 @@ fun DotCalApp(
             }
         }
     }
+    fun jumpToDate(date: LocalDate) {
+        showJumpToDatePicker = false
+        showSheet = false
+        viewModel.selectDate(date)
+        jumpHighlightDate = date
+    }
+    LaunchedEffect(jumpHighlightDate) {
+        if (jumpHighlightDate != null) {
+            delay(500)
+            jumpHighlightDate = null
+        }
+    }
     fun openAddEditor(startTime: LocalTime = LocalTime.of(9, 0), date: LocalDate? = null) {
         editorSessionKey = UUID.randomUUID().toString()
         quickAddPrefill = null
@@ -960,6 +974,7 @@ fun DotCalApp(
             showDateCalculator -> showDateCalculator = false
             showTimeInsights -> showTimeInsights = false
             showQuickAdd -> showQuickAdd = false
+            showJumpToDatePicker -> showJumpToDatePicker = false
             addSheet -> {
                 editingEvent = null
                 addEditorDateOverride = null
@@ -1056,7 +1071,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showQuickAdd || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -1108,7 +1123,8 @@ fun DotCalApp(
                             title = calendarHeaderLabel,
                             activeCalendarTab = activeCalendarTab,
                             palette = palette,
-                            onTitleClick = { viewModel.selectDate(LocalDate.now()) },
+                            onTitleClick = { jumpToDate(LocalDate.now()) },
+                            onTitleLongClick = { showJumpToDatePicker = true },
                             onAdd = { openAddEditor() },
                             onTemplates = {
                                 if (isPro) {
@@ -1120,6 +1136,7 @@ fun DotCalApp(
                             },
                             onQuickAdd = { if (isPro) showQuickAdd = true else showPaywall = true },
                             onSearch = { showSearch = true },
+                            onJumpToDate = { showJumpToDatePicker = true },
                             onCalendarSets = {
                                 if (isPro) {
                                     viewModel.refreshFocusProfiles()
@@ -1157,7 +1174,9 @@ fun DotCalApp(
                                         showWeekNumbers = showWeekNumbers,
                                         onPrevious = viewModel::previousMonth,
                                         onNext = viewModel::nextMonth,
-                                        onJumpToday = { viewModel.selectDate(LocalDate.now()) },
+                                        onJumpToday = { jumpToDate(LocalDate.now()) },
+                                        onJumpPickerRequest = { showJumpToDatePicker = true },
+                                        highlightDate = jumpHighlightDate,
                                         selectedBulkDates = selectedBulkDates,
                                         onBulkSelectionStart = { date ->
                                             if (!isPro) {
@@ -1192,7 +1211,9 @@ fun DotCalApp(
                                         showWeekNumbers = showWeekNumbers,
                                         onPreviousWeek = { viewModel.selectDate(selectedDate.minusWeeks(1)) },
                                         onNextWeek = { viewModel.selectDate(selectedDate.plusWeeks(1)) },
-                                        onJumpToday = { viewModel.selectDate(LocalDate.now()) },
+                                        onJumpToday = { jumpToDate(LocalDate.now()) },
+                                        onJumpPickerRequest = { showJumpToDatePicker = true },
+                                        highlightDate = jumpHighlightDate,
                                         onDateSelected = viewModel::selectDate,
                                         onAddAtDate = { date, time ->
                                             viewModel.selectDate(date)
@@ -1206,7 +1227,9 @@ fun DotCalApp(
                                         palette = palette,
                                         onPreviousDay = { viewModel.selectDate(selectedDate.minusDays(1)) },
                                         onNextDay = { viewModel.selectDate(selectedDate.plusDays(1)) },
-                                        onJumpToday = { viewModel.selectDate(LocalDate.now()) },
+                                        onJumpToday = { jumpToDate(LocalDate.now()) },
+                                        onJumpPickerRequest = { showJumpToDatePicker = true },
+                                        highlightDate = jumpHighlightDate,
                                         onAddAtDate = { date, time ->
                                             viewModel.selectDate(date)
                                             openAddEditor(time)
@@ -1219,7 +1242,9 @@ fun DotCalApp(
                                         palette = palette,
                                         onPreviousRange = { viewModel.selectDate(selectedDate.minusDays(3)) },
                                         onNextRange = { viewModel.selectDate(selectedDate.plusDays(3)) },
-                                        onJumpToday = { viewModel.selectDate(LocalDate.now()) },
+                                        onJumpToday = { jumpToDate(LocalDate.now()) },
+                                        onJumpPickerRequest = { showJumpToDatePicker = true },
+                                        highlightDate = jumpHighlightDate,
                                         onDateSelected = viewModel::selectDate,
                                         onAddAtDate = { date, time ->
                                             viewModel.selectDate(date)
@@ -1255,7 +1280,8 @@ fun DotCalApp(
                                         },
                                         onPreviousYear = { viewModel.selectDate(selectedDate.minusYears(1)) },
                                         onNextYear = { viewModel.selectDate(selectedDate.plusYears(1)) },
-                                        onJumpToday = { viewModel.selectDate(LocalDate.now()) },
+                                        onJumpToday = { jumpToDate(LocalDate.now()) },
+                                        onJumpPickerRequest = { showJumpToDatePicker = true },
                                         onMonthSelected = {
                                             viewModel.selectDate(it)
                                             selectCalendarTab(CalendarTab.Month)
@@ -2099,6 +2125,15 @@ fun DotCalApp(
                     showSearch = false
                     viewModel.clearSearch()
                 },
+            )
+        }
+        if (showJumpToDatePicker) {
+            JumpToDateSheet(
+                selectedDate = selectedDate,
+                weekStart = weekStartDay,
+                palette = palette,
+                onDismiss = { showJumpToDatePicker = false },
+                onSelected = ::jumpToDate,
             )
         }
         pendingDelete?.let { request ->

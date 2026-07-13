@@ -2,6 +2,8 @@
 
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -89,6 +91,8 @@ internal fun MonthView(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onJumpToday: () -> Unit,
+    onJumpPickerRequest: () -> Unit,
+    highlightDate: LocalDate?,
     selectedBulkDates: Set<LocalDate>,
     onBulkSelectionStart: (LocalDate) -> Unit,
     onBulkApply: () -> Unit,
@@ -150,6 +154,7 @@ internal fun MonthView(
                                 activeMonth = YearMonth.from(month),
                                 isSelected = day == selectedDate,
                                 isBulkSelected = day in selectedBulkDates,
+                                isHighlighted = day == highlightDate,
                                 events = eventsByDate[day].orEmpty(),
                                 palette = palette,
                                 onClick = { onDateSelected(day) },
@@ -186,6 +191,7 @@ private fun DayCell(
     activeMonth: YearMonth,
     isSelected: Boolean,
     isBulkSelected: Boolean,
+    isHighlighted: Boolean,
     events: List<CalendarEvent>,
     palette: DotCalPalette,
     onClick: () -> Unit,
@@ -195,10 +201,24 @@ private fun DayCell(
     val isToday = date == LocalDate.now()
     val inMonth = YearMonth.from(date) == activeMonth
     val haptic = LocalHapticFeedback.current
+    val highlightColor by animateColorAsState(
+        targetValue = if (isHighlighted) palette.accent.copy(alpha = 0.28f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 500),
+        label = "jumpDayHighlight",
+    )
     Box(
         modifier = modifier
             .aspectRatio(1f)
             .background(palette.calendarSurface)
+            .drawBehind {
+                if (inMonth && highlightColor.alpha > 0f) {
+                    drawCircle(
+                        color = highlightColor,
+                        radius = size.minDimension * 0.42f,
+                        center = Offset(size.width / 2f, size.height * 0.36f),
+                    )
+                }
+            }
             .pointerInput(date) {
                 detectTapGestures(
                     onTap = {
@@ -267,6 +287,8 @@ internal fun WeekView(
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     onJumpToday: () -> Unit,
+    onJumpPickerRequest: () -> Unit,
+    highlightDate: LocalDate?,
     onDateSelected: (LocalDate) -> Unit,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
@@ -305,6 +327,7 @@ internal fun WeekView(
                 WeekDayHeader(
                     date = day,
                     selected = day == selectedDate,
+                    highlighted = day == highlightDate,
                     palette = palette,
                     onClick = { onDateSelected(day) },
                     modifier = Modifier.weight(1f),
@@ -392,13 +415,30 @@ private fun isoWeekNumberLabel(date: LocalDate): String {
 private fun WeekDayHeader(
     date: LocalDate,
     selected: Boolean,
+    highlighted: Boolean,
     palette: DotCalPalette,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val today = date == LocalDate.now()
+    val highlightColor by animateColorAsState(
+        targetValue = if (highlighted) palette.accent.copy(alpha = 0.24f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 500),
+        label = "jumpWeekHeaderHighlight",
+    )
     Column(
-        modifier = modifier.noRippleClickable(onClick = onClick).padding(vertical = 8.dp),
+        modifier = modifier
+            .drawBehind {
+                if (highlightColor.alpha > 0f) {
+                    drawCircle(
+                        color = highlightColor,
+                        radius = size.minDimension * 0.44f,
+                        center = Offset(size.width / 2f, size.height * 0.55f),
+                    )
+                }
+            }
+            .noRippleClickable(onClick = onClick)
+            .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -578,6 +618,8 @@ internal fun DayView(
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onJumpToday: () -> Unit,
+    onJumpPickerRequest: () -> Unit,
+    highlightDate: LocalDate?,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
 ) {
@@ -612,6 +654,8 @@ internal fun DayView(
             onPreviousDay = onPreviousDay,
             onNextDay = onNextDay,
             onJumpToday = onJumpToday,
+            onJumpPickerRequest = onJumpPickerRequest,
+            highlighted = selectedDate == highlightDate,
         )
         if (allDayEvents.isNotEmpty()) {
             LazyColumn(modifier = Modifier.fillMaxWidth().height(44.dp).background(palette.calendarSurface)) {
@@ -699,12 +743,23 @@ private fun DayHeader(
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onJumpToday: () -> Unit,
+    onJumpPickerRequest: () -> Unit,
+    highlighted: Boolean,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val highlightColor by animateColorAsState(
+        targetValue = if (highlighted) palette.accent.copy(alpha = 0.18f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 500),
+        label = "jumpDayHeaderHighlight",
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(52.dp)
             .background(palette.calendarSurface)
+            .drawBehind {
+                if (highlightColor.alpha > 0f) drawRect(highlightColor)
+            }
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -714,7 +769,15 @@ private fun DayHeader(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .noRippleClickable(onClick = onJumpToday),
+                .pointerInput(selectedDate) {
+                    detectTapGestures(
+                        onTap = { onJumpToday() },
+                        onLongPress = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onJumpPickerRequest()
+                        },
+                    )
+                },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -864,6 +927,8 @@ internal fun ThreeDayView(
     onPreviousRange: () -> Unit,
     onNextRange: () -> Unit,
     onJumpToday: () -> Unit,
+    onJumpPickerRequest: () -> Unit,
+    highlightDate: LocalDate?,
     onDateSelected: (LocalDate) -> Unit,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
@@ -898,6 +963,7 @@ internal fun ThreeDayView(
                 WeekDayHeader(
                     date = day,
                     selected = day == selectedDate,
+                    highlighted = day == highlightDate,
                     palette = palette,
                     onClick = { onDateSelected(day) },
                     modifier = Modifier.weight(1f),
@@ -988,6 +1054,7 @@ internal fun YearView(
     onPreviousYear: () -> Unit,
     onNextYear: () -> Unit,
     onJumpToday: () -> Unit,
+    onJumpPickerRequest: () -> Unit,
     onMonthSelected: (LocalDate) -> Unit,
 ) {
     var dragTotal by remember { mutableFloatStateOf(0f) }
