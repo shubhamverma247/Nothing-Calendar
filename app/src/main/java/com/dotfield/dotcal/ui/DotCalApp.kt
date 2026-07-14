@@ -1054,10 +1054,10 @@ fun DotCalApp(
         viewModel.syncNow { result ->
             isSyncing = false
             if (showToast) {
-                val message = if (result.isSuccess && result.getOrNull()?.permissionDenied != true) {
-                    "Calendars synced"
-                } else {
-                    "Sync failed\nCheck your internet connection"
+                val message = when {
+                    result.isSuccess && result.getOrNull()?.permissionDenied != true -> "Calendars synced"
+                    result.getOrNull()?.permissionDenied == true -> "Sync failed\nCheck calendar access"
+                    else -> "Sync failed\nTry again"
                 }
                 showDotCalToast(context, palette, message)
             }
