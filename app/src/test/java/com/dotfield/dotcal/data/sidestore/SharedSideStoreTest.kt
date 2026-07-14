@@ -8,27 +8,19 @@ import java.io.File
 
 class SharedSideStoreTest {
     @Test
-    fun roundTripsNamespaceValues() = runBlocking {
-        val file = File.createTempFile("dotcal-side-store", ".json").apply { deleteOnExit() }
+    fun writeReadAndRemoveGhostNamespaceEntry() = runBlocking {
+        val file = File.createTempFile("dotcal-side-store", ".json")
+        file.deleteOnExit()
         val store = SharedSideStore(file)
 
-        store.write("punchcard", "2026-07-01", "true")
-        store.write("countdown_pins", "event-1", "{\"active\":true}")
+        store.write("ghost_flags", "event-1", "1")
 
-        assertEquals("true", store.read("punchcard", "2026-07-01"))
-        assertEquals(mapOf("event-1" to "{\"active\":true}"), store.readNamespace("countdown_pins"))
-    }
+        assertEquals("1", store.read("ghost_flags", "event-1"))
+        assertEquals(mapOf("event-1" to "1"), store.readNamespace("ghost_flags"))
 
-    @Test
-    fun removeDeletesOnlyRequestedKey() = runBlocking {
-        val file = File.createTempFile("dotcal-side-store", ".json").apply { deleteOnExit() }
-        val store = SharedSideStore(file)
+        store.remove("ghost_flags", "event-1")
 
-        store.write("punchcard", "2026-07-01", "true")
-        store.write("punchcard", "2026-07-02", "true")
-        store.remove("punchcard", "2026-07-01")
-
-        assertNull(store.read("punchcard", "2026-07-01"))
-        assertEquals("true", store.read("punchcard", "2026-07-02"))
+        assertNull(store.read("ghost_flags", "event-1"))
+        assertEquals(emptyMap<String, String>(), store.readNamespace("ghost_flags"))
     }
 }

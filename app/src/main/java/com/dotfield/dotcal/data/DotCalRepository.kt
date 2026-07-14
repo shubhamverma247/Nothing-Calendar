@@ -81,6 +81,20 @@ data class BirthdayImportResult(
     val permissionDenied: Boolean = false,
 )
 
+data class BulkEditUndoToken(
+    val previousEvents: List<CalendarEvent> = emptyList(),
+    val previousReminders: List<EventReminder> = emptyList(),
+    val insertedEventIds: List<String> = emptyList(),
+    val deletedSnapshotIds: List<String> = emptyList(),
+    val previousGhostFlags: Map<String, Boolean> = emptyMap(),
+)
+
+data class BulkEditResult(
+    val changedCount: Int,
+    val skippedCount: Int = 0,
+    val undoToken: BulkEditUndoToken,
+)
+
 enum class RecurringEditScope {
     ThisEvent,
     WholeSeries,
@@ -874,6 +888,252 @@ class DotCalRepository(
         updateWidgets()
     }
 
+    suspend fun bulkShiftEvents(eventIds: Set<String>, days: Long, hours: Long): BulkEditResult = withContext(Dispatchers.IO) {
+        val deltaMs = days * 86_400_000L + hours * 3_600_000L
+        if (deltaMs == 0L) return@withContext BulkEditResult(0, 0, BulkEditUndoToken())
+        val candidates = loadBulkEditableMasters(eventIds)
+        val editable = candidates.filterNot { it.source == "BIRTHDAY" }
+        val reminders = editable.flatMap { dao.getRemindersForEvent(it.id) }
+        val now = System.currentTimeMillis()
+        val shifted = editable.map { event ->
+            event.copy(
+                startTimeMs = event.startTimeMs + deltaMs,
+                endTimeMs = event.endTimeMs + deltaMs,
+                updatedAtMs = now,
+            )
+        }
+        val shiftedReminders = reminders.map { it.copy(triggerAtMs = it.triggerAtMs + deltaMs, isDelivered = 0) }
+        applyBulkEventUpdates(shifted, shiftedReminders)
+        BulkEditResult(
+            changedCount = shifted.size,
+            skippedCount = candidates.size - editable.size,
+            undoToken = BulkEditUndoToken(previousEvents = editable, previousReminders = reminders),
+        )
+    }
+
+    suspend fun bulkMoveToDate(eventIds: Set<String>, targetDate: LocalDate): BulkEditResult = withContext(Dispatchers.IO) {
+        val candidates = loadBulkEditableMasters(eventIds)
+        val editable = candidates.filterNot { it.source == "BIRTHDAY" }
+        val reminders = editable.flatMap { dao.getRemindersForEvent(it.id) }
+        val zoneId = ZoneId.systemDefault()
+        val now = System.currentTimeMillis()
+        val moved = editable.map { event ->
+            val start = Instant.ofEpochMilli(event.startTimeMs).atZone(zoneId)
+            val end = Instant.ofEpochMilli(event.endTimeMs).atZone(zoneId)
+            val dayDelta = ChronoUnit.DAYS.between(start.toLocalDate(), targetDate)
+            event.copy(
+                startTimeMs = start.plusDays(dayDelta).toInstant().toEpochMilli(),
+                endTimeMs = end.plusDays(dayDelta).toInstant().toEpochMilli(),
+                timeZone = zoneId.id,
+                updatedAtMs = now,
+            )
+        }
+        val deltaById = editable.zip(moved).associate { (before, after) -> before.id to after.startTimeMs - before.startTimeMs }
+        val movedReminders = reminders.map { reminder ->
+            reminder.copy(triggerAtMs = reminder.triggerAtMs + (deltaById[reminder.eventId] ?: 0L), isDelivered = 0)
+        }
+        applyBulkEventUpdates(moved, movedReminders)
+        BulkEditResult(
+            changedCount = moved.size,
+            skippedCount = candidates.size - editable.size,
+            undoToken = BulkEditUndoToken(previousEvents = editable, previousReminders = reminders),
+        )
+    }
+
+    suspend fun bulkCopyToDate(eventIds: Set<String>, targetDate: LocalDate): BulkEditResult = withContext(Dispatchers.IO) {
+        ensureLocalAccount()
+        val candidates = loadBulkEditableMasters(eventIds)
+        val editable = candidates.filterNot { it.source == "BIRTHDAY" }
+        val zoneId = ZoneId.systemDefault()
+        val now = System.currentTimeMillis()
+        val copies = mutableListOf<CalendarEvent>()
+        val copyReminders = mutableListOf<EventReminder>()
+        editable.forEach { event ->
+            val copyId = UUID.randomUUID().toString()
+            val start = Instant.ofEpochMilli(event.startTimeMs).atZone(zoneId)
+            val end = Instant.ofEpochMilli(event.endTimeMs).atZone(zoneId)
+            val dayDelta = ChronoUnit.DAYS.between(start.toLocalDate(), targetDate)
+            val newStart = start.plusDays(dayDelta).toInstant().toEpochMilli()
+            val newEnd = end.plusDays(dayDelta).toInstant().toEpochMilli()
+            copies += event.copy(
+                id = copyId,
+                accountId = LOCAL_ACCOUNT_ID,
+                startTimeMs = newStart,
+                endTimeMs = newEnd,
+                timeZone = zoneId.id,
+                source = "LOCAL",
+                googleEventId = null,
+                googleCalendarId = null,
+                syncVersion = 0,
+                imageUris = "[]",
+                voiceNotePath = null,
+                createdAtMs = now,
+                updatedAtMs = now,
+            )
+            val deltaMs = newStart - event.startTimeMs
+            dao.getRemindersForEvent(event.id).forEach { reminder ->
+                copyReminders += reminder.copy(
+                    eventId = copyId,
+                    triggerAtMs = reminder.triggerAtMs + deltaMs,
+                    alarmRequestCode = "$copyId-${reminder.minutesBefore}".hashCode().absoluteValue,
+                    isDelivered = 0,
+                )
+            }
+        }
+        if (copies.isNotEmpty()) dao.upsertEvents(copies)
+        if (copyReminders.isNotEmpty()) dao.insertReminders(copyReminders)
+        copies.forEach { event ->
+            copyReminders
+                .filter { it.eventId == event.id && it.triggerAtMs > now && it.isDelivered == 0 }
+                .forEach { reminder -> reminderScheduler.scheduleReminder(reminder, event) }
+        }
+        updateWidgets()
+        BulkEditResult(
+            changedCount = copies.size,
+            skippedCount = candidates.size - editable.size,
+            undoToken = BulkEditUndoToken(insertedEventIds = copies.map { it.id }),
+        )
+    }
+
+    suspend fun bulkChangeCalendar(eventIds: Set<String>, accountId: String): BulkEditResult = withContext(Dispatchers.IO) {
+        val candidates = loadBulkEditableMasters(eventIds)
+        val accountExists = dao.getAccount(accountId) != null
+        val editable = candidates.filter { accountExists && it.source == "LOCAL" }
+        val reminders = editable.flatMap { dao.getRemindersForEvent(it.id) }
+        val now = System.currentTimeMillis()
+        val moved = editable.map { it.copy(accountId = accountId, updatedAtMs = now) }
+        if (moved.isNotEmpty()) dao.upsertEvents(moved)
+        updateWidgets()
+        BulkEditResult(
+            changedCount = moved.size,
+            skippedCount = candidates.size - editable.size,
+            undoToken = BulkEditUndoToken(previousEvents = editable, previousReminders = reminders),
+        )
+    }
+
+    suspend fun bulkChangeColor(eventIds: Set<String>, colorHex: String?): BulkEditResult = withContext(Dispatchers.IO) {
+        val candidates = loadBulkEditableMasters(eventIds)
+        val editable = candidates.filterNot { it.source == "BIRTHDAY" || it.source == "HOLIDAY" }
+        val reminders = editable.flatMap { dao.getRemindersForEvent(it.id) }
+        val now = System.currentTimeMillis()
+        val recolored = editable.map { it.copy(colorHex = colorHex, updatedAtMs = now) }
+        if (recolored.isNotEmpty()) dao.upsertEvents(recolored)
+        updateWidgets()
+        BulkEditResult(
+            changedCount = recolored.size,
+            skippedCount = candidates.size - editable.size,
+            undoToken = BulkEditUndoToken(previousEvents = editable, previousReminders = reminders),
+        )
+    }
+
+    suspend fun bulkDeleteEvents(eventIds: Set<String>): BulkEditResult = withContext(Dispatchers.IO) {
+        val candidates = loadBulkEditableMasters(eventIds)
+        val editable = candidates.filterNot { it.source == "BIRTHDAY" }
+        val reminders = editable.flatMap { dao.getRemindersForEvent(it.id) }
+        editable.forEach { event ->
+            val eventReminders = reminders.filter { it.eventId == event.id }
+            eventReminders.forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+            recentlyDeletedStore.save(event, eventReminders, System.currentTimeMillis())
+            event.googleEventId?.let { googleEventId ->
+                dao.insertDeletedEventLog(
+                    DeletedEventLog(
+                        googleEventId = googleEventId,
+                        deletedAtMs = System.currentTimeMillis(),
+                    ),
+                )
+            }
+            dao.deleteRemindersForEvent(event.id)
+            dao.deleteEvent(event.id)
+        }
+        updateWidgets()
+        BulkEditResult(
+            changedCount = editable.size,
+            skippedCount = candidates.size - editable.size,
+            undoToken = BulkEditUndoToken(
+                previousEvents = editable,
+                previousReminders = reminders,
+                deletedSnapshotIds = editable.map { it.id },
+            ),
+        )
+    }
+
+    suspend fun bulkToggleGhost(eventIds: Set<String>): BulkEditResult = withContext(Dispatchers.IO) {
+        val editable = loadBulkEditableMasters(eventIds).filterNot { it.source == "BIRTHDAY" }
+        val previousFlags = linkedMapOf<String, Boolean>()
+        editable.forEach { event ->
+            previousFlags[event.id] = sideStore.read(GHOST_FLAGS_NAMESPACE, event.id) == "1"
+        }
+        val shouldGhost = editable.any { previousFlags[it.id] != true }
+        editable.forEach { event ->
+            if (shouldGhost) {
+                sideStore.write(GHOST_FLAGS_NAMESPACE, event.id, "1")
+            } else {
+                sideStore.remove(GHOST_FLAGS_NAMESPACE, event.id)
+            }
+        }
+        updateWidgets()
+        BulkEditResult(
+            changedCount = editable.size,
+            undoToken = BulkEditUndoToken(previousGhostFlags = previousFlags),
+        )
+    }
+
+    suspend fun undoBulkEdit(token: BulkEditUndoToken) = withContext(Dispatchers.IO) {
+        token.insertedEventIds.forEach { eventId ->
+            dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+            dao.deleteRemindersForEvent(eventId)
+            dao.deleteEvent(eventId)
+        }
+        if (token.previousEvents.isNotEmpty()) {
+            dao.upsertEvents(token.previousEvents)
+            token.previousEvents.forEach { dao.deleteRemindersForEvent(it.id) }
+        }
+        if (token.previousReminders.isNotEmpty()) {
+            dao.insertReminders(token.previousReminders)
+            val now = System.currentTimeMillis()
+            token.previousReminders
+                .filter { it.triggerAtMs > now && it.isDelivered == 0 }
+                .forEach { reminder ->
+                    token.previousEvents.firstOrNull { it.id == reminder.eventId }?.let { event ->
+                        reminderScheduler.scheduleReminder(reminder, event)
+                    }
+                }
+        }
+        token.previousGhostFlags.forEach { (eventId, ghosted) ->
+            if (ghosted) {
+                sideStore.write(GHOST_FLAGS_NAMESPACE, eventId, "1")
+            } else {
+                sideStore.remove(GHOST_FLAGS_NAMESPACE, eventId)
+            }
+        }
+        token.deletedSnapshotIds.forEach { recentlyDeletedStore.remove(it) }
+        updateWidgets()
+    }
+
+    private suspend fun loadBulkEditableMasters(eventIds: Set<String>): List<CalendarEvent> {
+        return eventIds
+            .map { it.substringBefore(RECURRENCE_OCCURRENCE_SEPARATOR) }
+            .distinct()
+            .mapNotNull { dao.getEvent(it) }
+            .filter { it.isTask == 0 }
+    }
+
+    private suspend fun applyBulkEventUpdates(events: List<CalendarEvent>, reminders: List<EventReminder>) {
+        val now = System.currentTimeMillis()
+        events.forEach { event ->
+            dao.getRemindersForEvent(event.id).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        }
+        if (events.isNotEmpty()) dao.upsertEvents(events)
+        events.forEach { dao.deleteRemindersForEvent(it.id) }
+        if (reminders.isNotEmpty()) dao.insertReminders(reminders)
+        events.forEach { event ->
+            reminders
+                .filter { it.eventId == event.id && it.triggerAtMs > now && it.isDelivered == 0 }
+                .forEach { reminder -> reminderScheduler.scheduleReminder(reminder, event) }
+        }
+        updateWidgets()
+    }
+
     // ----- Recently Deleted (file-based trash; no Room/schema change) -----
 
     /** Snapshots of deleted events/tasks within the 30-day window, newest first. */
@@ -1301,6 +1561,7 @@ class DotCalRepository(
         const val LOCAL_ACCOUNT_ID = "local-primary"
         private const val HOLIDAY_ACCOUNT_PREFIX = "holiday-"
         private const val DEFAULT_EVENT_COLOR = "#FF0000"
+        private const val GHOST_FLAGS_NAMESPACE = "ghost_flags"
         private const val BIRTHDAY_ACCOUNT_ID = ContactsProviderDataSource.BIRTHDAY_ACCOUNT_ID
         private const val BIRTHDAY_COLOR = ContactsProviderDataSource.BIRTHDAY_COLOR
         private const val BIRTHDAY_REMINDER_MINUTES = 1440

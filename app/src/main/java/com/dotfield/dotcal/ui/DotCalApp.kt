@@ -132,6 +132,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -216,6 +220,7 @@ import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
+import com.dotfield.dotcal.data.BulkEditResult
 import com.dotfield.dotcal.data.ics.IcsExporter
 import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.nlp.QuickAddParser
@@ -264,7 +269,9 @@ private const val BOOT_PREFS = "dotcal_boot"
 private const val BOOT_THEME_KEY = "theme_mode"
 private const val BOOT_ACCENT_KEY = "accent_color"
 private const val BOOT_DEFAULT_VIEW_KEY = "default_view"
+private const val BULK_UNDO_SNACKBAR_MILLIS = 4_000L
 private enum class DeleteSource { Editor, Detail }
+private enum class BulkEventSheet { Actions, Shift, Calendar, Color, MoveDate, CopyDate }
 private data class PendingDelete(
     val event: CalendarEvent,
     val scope: RecurringEditScope,
@@ -325,6 +332,9 @@ fun DotCalApp(
     var showFocusProfiles by remember { mutableStateOf(false) }
     var showShiftPatterns by remember { mutableStateOf(false) }
     var selectedBulkDates by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
+    var selectedAgendaEventIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var bulkEventSheet by remember { mutableStateOf<BulkEventSheet?>(null) }
+    var pendingBulkDelete by remember { mutableStateOf(false) }
     var jumpHighlightDate by remember { mutableStateOf<LocalDate?>(null) }
     var showBulkTemplatePicker by remember { mutableStateOf(false) }
     var quickAddPrefill by remember { mutableStateOf<QuickAddResult?>(null) }
@@ -349,6 +359,7 @@ fun DotCalApp(
     var isSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     val bootPreferences = remember(context) { context.getSharedPreferences(BOOT_PREFS, android.content.Context.MODE_PRIVATE) }
     val bootThemeMode = remember(bootPreferences) {
         DotCalThemeMode.fromStorage(bootPreferences.getString(BOOT_THEME_KEY, null))
@@ -965,9 +976,37 @@ fun DotCalApp(
         viewModel.closeEventDetail()
         addSheet = true
     }
+    fun showBulkResult(message: String, result: Result<BulkEditResult>) {
+        result
+            .onSuccess { summary ->
+                selectedAgendaEventIds = emptySet()
+                bulkEventSheet = null
+                val suffix = if (summary.skippedCount > 0) ", ${summary.skippedCount} skipped" else ""
+                scope.launch {
+                    val dismissJob = launch {
+                        delay(BULK_UNDO_SNACKBAR_MILLIS)
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                    }
+                    val snackbarResult = snackbarHostState.showSnackbar(
+                        message = "$message$suffix",
+                        actionLabel = "UNDO",
+                    )
+                    dismissJob.cancel()
+                    if (snackbarResult == SnackbarResult.ActionPerformed) {
+                        viewModel.undoBulkEdit(summary.undoToken) {
+                            showDotCalToast(context, palette, "Bulk edit undone")
+                        }
+                    }
+                }
+            }
+            .onFailure {
+                showDotCalToast(context, palette, "Bulk edit failed")
+            }
+    }
     fun closeTopSurface() {
         when {
             showPaywall -> showPaywall = false
+            bulkEventSheet != null -> bulkEventSheet = null
             pendingShareEvent != null -> pendingShareEvent = null
             pendingCountdownLimitEvent != null -> pendingCountdownLimitEvent = null
             pendingCopyToDateEvent != null -> pendingCopyToDateEvent = null
@@ -1267,9 +1306,27 @@ fun DotCalApp(
                                         events = agendaEvents,
                                         forecast = dayDensityForecast,
                                         palette = palette,
+                                        selectedEventIds = selectedAgendaEventIds,
                                         onAdd = { openAddEditor() },
                                         onDateSelected = viewModel::selectDate,
                                         onEventClick = viewModel::openEventDetail,
+                                        onSelectionStart = { event ->
+                                            if (!isPro) {
+                                                showPaywall = true
+                                            } else if (event.source != "BIRTHDAY") {
+                                                selectedAgendaEventIds = setOf(event.baseEventId())
+                                            }
+                                        },
+                                        onSelectionToggle = { event ->
+                                            val eventId = event.baseEventId()
+                                            selectedAgendaEventIds = if (eventId in selectedAgendaEventIds) {
+                                                selectedAgendaEventIds - eventId
+                                            } else {
+                                                selectedAgendaEventIds + eventId
+                                            }
+                                        },
+                                        onSelectionClear = { selectedAgendaEventIds = emptySet() },
+                                        onBulkActionClick = { bulkEventSheet = BulkEventSheet.Actions },
                                     )
                                     CalendarTab.Year -> YearView(
                                         selectedDate = selectedDate,
@@ -1726,6 +1783,21 @@ fun DotCalApp(
                     else Color.White.copy(alpha = 0.55f),
                 ),
         )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(start = 16.dp, end = 16.dp, bottom = 104.dp),
+        ) { snackbarData ->
+            Snackbar(
+                snackbarData = snackbarData,
+                containerColor = palette.dialogSurface,
+                contentColor = palette.primaryText,
+                actionColor = palette.accent,
+                shape = RoundedCornerShape(18.dp),
+            )
+        }
         AnimatedVisibility(
             visible = detailEvent != null,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
@@ -1826,6 +1898,160 @@ fun DotCalApp(
                     },
                     palette = palette,
                 )
+            }
+        }
+        bulkEventSheet?.let { sheet ->
+            when (sheet) {
+                BulkEventSheet.Actions -> {
+                    ModalBottomSheet(
+                        onDismissRequest = { bulkEventSheet = null },
+                        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                        containerColor = palette.dialogSurface,
+                        dragHandle = { BottomSheetDragHandle(palette) },
+                    ) {
+                        CompactActionSheetContent(
+                            title = "Bulk Edit",
+                            actions = listOf(
+                                CompactActionItem("Move to date") { bulkEventSheet = BulkEventSheet.MoveDate },
+                                CompactActionItem("Copy to date") { bulkEventSheet = BulkEventSheet.CopyDate },
+                                CompactActionItem("Shift by days/hours") { bulkEventSheet = BulkEventSheet.Shift },
+                                CompactActionItem("Move to calendar") { bulkEventSheet = BulkEventSheet.Calendar },
+                                CompactActionItem("Change color") { bulkEventSheet = BulkEventSheet.Color },
+                                CompactActionItem("Toggle ghost") {
+                                    viewModel.bulkToggleGhost(selectedAgendaEventIds) { result ->
+                                        showBulkResult("${selectedAgendaEventIds.size} events updated", result)
+                                    }
+                                },
+                                CompactActionItem("Delete selected") {
+                                    bulkEventSheet = null
+                                    pendingBulkDelete = true
+                                },
+                            ),
+                            palette = palette,
+                        )
+                    }
+                }
+                BulkEventSheet.Shift -> {
+                    ModalBottomSheet(
+                        onDismissRequest = { bulkEventSheet = null },
+                        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                        containerColor = palette.dialogSurface,
+                        dragHandle = { BottomSheetDragHandle(palette) },
+                    ) {
+                        CompactActionSheetContent(
+                            title = "Shift Selected",
+                            actions = listOf(
+                                CompactActionItem("-7 days") {
+                                    viewModel.bulkShiftEvents(selectedAgendaEventIds, days = -7, hours = 0) { result ->
+                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                    }
+                                },
+                                CompactActionItem("-1 day") {
+                                    viewModel.bulkShiftEvents(selectedAgendaEventIds, days = -1, hours = 0) { result ->
+                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                    }
+                                },
+                                CompactActionItem("+1 day") {
+                                    viewModel.bulkShiftEvents(selectedAgendaEventIds, days = 1, hours = 0) { result ->
+                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                    }
+                                },
+                                CompactActionItem("+7 days") {
+                                    viewModel.bulkShiftEvents(selectedAgendaEventIds, days = 7, hours = 0) { result ->
+                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                    }
+                                },
+                                CompactActionItem("-1 hour") {
+                                    viewModel.bulkShiftEvents(selectedAgendaEventIds, days = 0, hours = -1) { result ->
+                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                    }
+                                },
+                                CompactActionItem("+1 hour") {
+                                    viewModel.bulkShiftEvents(selectedAgendaEventIds, days = 0, hours = 1) { result ->
+                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                    }
+                                },
+                            ),
+                            palette = palette,
+                        )
+                    }
+                }
+                BulkEventSheet.Calendar -> {
+                    ModalBottomSheet(
+                        onDismissRequest = { bulkEventSheet = null },
+                        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                        containerColor = palette.dialogSurface,
+                        dragHandle = { BottomSheetDragHandle(palette) },
+                    ) {
+                        CompactActionSheetContent(
+                            title = "Move to Calendar",
+                            actions = assignableAccounts.map { account ->
+                                CompactActionItem(account.displayName.readableCalendarLabel()) {
+                                    viewModel.bulkChangeCalendar(selectedAgendaEventIds, account.id) { result ->
+                                        showBulkResult("${selectedAgendaEventIds.size} events moved", result)
+                                    }
+                                }
+                            },
+                            palette = palette,
+                        )
+                    }
+                }
+                BulkEventSheet.Color -> {
+                    ModalBottomSheet(
+                        onDismissRequest = { bulkEventSheet = null },
+                        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                        containerColor = palette.dialogSurface,
+                        dragHandle = { BottomSheetDragHandle(palette) },
+                    ) {
+                        CompactActionSheetContent(
+                            title = "Change Color",
+                            actions = AccentColor.freePresets.map { preset ->
+                                CompactActionItem(preset.label) {
+                                    viewModel.bulkChangeColor(selectedAgendaEventIds, preset.hex) { result ->
+                                        showBulkResult("${selectedAgendaEventIds.size} events recolored", result)
+                                    }
+                                }
+                            } + CompactActionItem("Use calendar color") {
+                                viewModel.bulkChangeColor(selectedAgendaEventIds, null) { result ->
+                                    showBulkResult("${selectedAgendaEventIds.size} events recolored", result)
+                                }
+                            },
+                            palette = palette,
+                        )
+                    }
+                }
+                BulkEventSheet.MoveDate -> {
+                    DateTimeChoiceSheet(
+                        title = "Move to date",
+                        selectedDate = selectedDate,
+                        selectedTime = LocalTime.of(9, 0),
+                        minDate = null,
+                        includeTime = false,
+                        palette = palette,
+                        onDismiss = { bulkEventSheet = null },
+                        onSelected = { pickedDate, _ ->
+                            viewModel.bulkMoveToDate(selectedAgendaEventIds, pickedDate) { result ->
+                                showBulkResult("${selectedAgendaEventIds.size} events moved", result)
+                            }
+                        },
+                    )
+                }
+                BulkEventSheet.CopyDate -> {
+                    DateTimeChoiceSheet(
+                        title = "Copy to date",
+                        selectedDate = selectedDate,
+                        selectedTime = LocalTime.of(9, 0),
+                        minDate = null,
+                        includeTime = false,
+                        palette = palette,
+                        onDismiss = { bulkEventSheet = null },
+                        onSelected = { pickedDate, _ ->
+                            viewModel.bulkCopyToDate(selectedAgendaEventIds, pickedDate) { result ->
+                                showBulkResult("${selectedAgendaEventIds.size} events copied", result)
+                            }
+                        },
+                    )
+                }
             }
         }
         pendingCountdownLimitEvent?.let { (event, activeEventId) ->
@@ -2236,6 +2462,21 @@ fun DotCalApp(
                 palette = palette,
                 onDismiss = { showJumpToDatePicker = false },
                 onSelected = ::jumpToDate,
+            )
+        }
+        if (pendingBulkDelete) {
+            ConfirmDeleteDialog(
+                title = "Delete selected events?",
+                confirmLabel = "Delete selected",
+                palette = palette,
+                onDismiss = { pendingBulkDelete = false },
+                onConfirm = {
+                    val count = selectedAgendaEventIds.size
+                    pendingBulkDelete = false
+                    viewModel.bulkDeleteEvents(selectedAgendaEventIds) { result ->
+                        showBulkResult("$count events deleted", result)
+                    }
+                },
             )
         }
         pendingDelete?.let { request ->

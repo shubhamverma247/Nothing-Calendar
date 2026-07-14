@@ -1,9 +1,11 @@
 package com.dotfield.dotcal.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,11 +24,16 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dotfield.dotcal.data.CalendarEvent
+import com.dotfield.dotcal.data.baseEventId
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -160,11 +168,17 @@ internal fun AgendaPreview(
     events: List<CalendarEvent>,
     forecast: List<DayDensityForecastItem>,
     palette: DotCalPalette,
+    selectedEventIds: Set<String> = emptySet(),
     onAdd: () -> Unit,
     onDateSelected: (LocalDate) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
+    onSelectionStart: (CalendarEvent) -> Unit = {},
+    onSelectionToggle: (CalendarEvent) -> Unit = {},
+    onSelectionClear: () -> Unit = {},
+    onBulkActionClick: () -> Unit = {},
 ) {
     val agendaStartDate = LocalDate.now()
+    val selectionMode = selectedEventIds.isNotEmpty()
     val upcomingEvents = remember(events, agendaStartDate) {
         events
             .filter { it.isTask == 0 && !it.localDate().isBefore(agendaStartDate) }
@@ -190,6 +204,14 @@ internal fun AgendaPreview(
             .fillMaxSize()
             .background(palette.calendarSurface),
     ) {
+        if (selectionMode) {
+            AgendaSelectionBar(
+                count = selectedEventIds.size,
+                palette = palette,
+                onClear = onSelectionClear,
+                onActions = onBulkActionClick,
+            )
+        }
         DayDensityForecastStrip(
             forecast = forecast,
             selectedDate = selectedDate,
@@ -216,7 +238,17 @@ internal fun AgendaPreview(
                         AgendaDateHeader(date = date, isFirst = date == agendaStartDate, palette = palette)
                     }
                     lazyItems(dateEvents, key = { it.id }) { event ->
-                        AgendaEventCard(event = event, palette = palette, onClick = { onEventClick(event) }, modifier = Modifier.animateItem())
+                        AgendaEventCard(
+                            event = event,
+                            palette = palette,
+                            selected = event.baseEventId() in selectedEventIds,
+                            selectionMode = selectionMode,
+                            onClick = {
+                                if (selectionMode) onSelectionToggle(event) else onEventClick(event)
+                            },
+                            onLongClick = { onSelectionStart(event) },
+                            modifier = Modifier.animateItem(),
+                        )
                     }
                 }
                 item {
@@ -229,6 +261,37 @@ internal fun AgendaPreview(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AgendaSelectionBar(
+    count: Int,
+    palette: DotCalPalette,
+    onClear: () -> Unit,
+    onActions: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(palette.topBarSurface)
+            .padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onClear) {
+            Icon(Icons.Default.Close, contentDescription = "Clear selection", tint = palette.primaryText)
+        }
+        Text(
+            "$count selected",
+            color = palette.primaryText,
+            fontFamily = LocalHeadingFont.current,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 20.sp,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onActions) {
+            Icon(Icons.Default.MoreVert, contentDescription = "Bulk actions", tint = palette.primaryText)
         }
     }
 }
@@ -315,11 +378,15 @@ private fun DayDensityDot(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AgendaEventCard(
     event: CalendarEvent,
     palette: DotCalPalette,
+    selected: Boolean,
+    selectionMode: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val cardBg = if (palette.isDark) palette.dialogSurface else palette.eventCardSurface
@@ -334,10 +401,14 @@ private fun AgendaEventCard(
                 drawRect(accentStrip, topLeft = Offset.Zero, size = androidx.compose.ui.geometry.Size(4.dp.toPx(), size.height))
             }
             .border(1.dp, palette.eventCardBorder, cardShape)
-            .noRippleClickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(start = 16.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
         verticalAlignment = Alignment.Top,
     ) {
+        if (selectionMode) {
+            AgendaSelectionDot(selected = selected, palette = palette)
+            Spacer(modifier = Modifier.width(12.dp))
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 event.agendaTimeRange(),
@@ -378,6 +449,22 @@ private fun AgendaEventCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AgendaSelectionDot(selected: Boolean, palette: DotCalPalette) {
+    Box(
+        modifier = Modifier
+            .size(24.dp)
+            .clip(CircleShape)
+            .background(if (selected) palette.accent else Color.Transparent)
+            .border(1.dp, if (selected) palette.accent else palette.line, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
         }
     }
 }

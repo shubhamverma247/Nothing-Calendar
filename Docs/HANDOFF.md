@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-07-13
+Updated: 2026-07-14
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full archive/history lives in `Docs/HANDOFF.original.md`; keep this file short and current.
 
@@ -83,6 +83,7 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 - C5 Punch-Card Day Complete built and locally verified by debug build/install.
 - Smart Quick Add v2 built and locally verified by debug build/install.
 - B2 Countdowns / D-Day built and locally verified by debug build/install.
+- B4 Bulk Edit / Multi-Select built and locally verified by JVM tests/debug build/install.
 - C2 Day Density Forecast Strip built and locally verified by debug build/install.
 - B5 Year-in-Pixels Heatmap built and locally verified by debug build/install.
 - B1 Time Insights built and locally verified by debug build/install.
@@ -102,6 +103,9 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 
 ## Latest Work
 
+- 2026-07-14: B4 bulk undo snackbar auto-dismiss/theme fix completed for Open Testing prep. User found the Agenda bulk action undo snackbar/dialog stayed visible after bulk actions and did not follow the selected DotCal theme. Root cause was the action snackbar relying on Material default action duration/accessibility timing and default snackbar colors. The bulk undo snackbar now force-dismisses after 4 seconds unless `UNDO` is tapped, and its container/text/action colors use the active DotCal palette/accent. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` completed/up-to-date during the combined verification run; first combined build hit a transient APK metadata timing failure after tests, then `:app:assembleDebug` passed on rerun and debug APK installed successfully on device `4ab0d020`. No manual phone UI QA run.
+- 2026-07-14: B4 bulk undo snackbar placement bug fixed for Open Testing prep. User found the Shift + undo snackbar/dialog rendered behind the floating bottom nav, making `UNDO` hard to see/tap. Moved the snackbar host out of the Scaffold default slot into the root overlay and padded it above the DotCal bottom nav plus system navigation area. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, debug APK installed successfully. No manual phone UI QA run.
+- 2026-07-14: B4 Bulk Edit / Multi-Select completed on `main`. Agenda event cards now support Pro-only long-press selection mode with a contextual top bar showing the selected count and a bulk actions sheet. Free users still see the entry gesture, but long-press routes to Paywall instead of entering selection. Bulk actions now include Move to date, Copy to date, Shift by days/hours, Move to calendar, Change color, Toggle ghost, and Delete selected. Bulk domain operations live in `DotCalRepository` with single-snackbar `UNDO` tokens that restore prior event/reminder state, remove copied events, restore ghost flags, and clean stale Recently Deleted snapshots after delete undo. Ghost flags use the shared side-store namespace `ghost_flags`; no Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, debug APK installed successfully on device `4ab0d020`. No manual phone UI QA run.
 - 2026-07-14: B2 countdown widget clipping fix completed on `main`. Root cause was vertical crowding inside the 2x2 Glance countdown widget after the new pinned D-Day layout: outer padding, 7-row dot digits, two text labels, and a 2-line title could overrun the available height and cut the number in half on-device. Tightened the countdown widget stack by reducing outer padding, shrinking dot cells/gaps, giving the digit grid a fixed 40dp slot, and reducing title/footer sizing so the pinned countdown number stays fully visible while preserving `D-DAY`, title, and `DAYS UNTIL`. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-13: B2 Countdowns / D-Day completed on `main`. Event Detail > More now supports `Pin as Countdown`, `Remove Countdown`, and `Share Countdown Image` for writable events. Countdown pins persist in the shared side-store namespace `countdown_pins` keyed by master event ID; no Room schema/package/deep-link/DB changes. Free users can keep exactly one active countdown; trying to pin a second opens a bottom sheet with `Unlock Unlimited` and `Swap to this countdown`, while Pro keeps unlimited pins. Pinned Event Detail shows a premium D-Day card with large dot-matrix day digits and a share action. Added a reusable `CardImageExporter` for countdown PNG sharing through the existing FileProvider cache path, intended for B2/C1/C7 reuse. The existing countdown widget now prefers the next active pinned countdown and renders the day count with dot rows; without pins it falls back to the existing next-event behavior. Added JVM tests for day-count math across DST, all-day-style dates, and same-day timed events. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, debug APK installed successfully. No manual phone UI QA run.
 - 2026-07-13: Smart Quick Add v2 completed on `main`. The existing Quick Add flow now uses an expanded pure-Kotlin on-device parser for English + Hinglish natural-language drafts, covering relative dates (`today`, `tomorrow`, `kal`, `parso`, `in 3 days`), weekdays (`next monday`, `agle somvar`), absolute dates (`14 march`, `march 14`, `14/3`, `14-03-2026`), times/ranges (`1pm`, `13:00`, `sham 5 baje`, `2-4pm`, `2pm to 4pm`), durations (`for 2 hours`, `2 ghante`), all-day date-only drafts, recurrence (`daily`, `roz`, `weekly`, `monthly`, `every/har <weekday>`, `every mon wed fri`), title cleanup, and past-time rollover. Quick Add remains Free and still pre-fills the existing event editor/save flow; no parallel creation path was added, so defaults, conflict warnings, reminders, accounts, and calendar-set behavior remain on the existing path. Preview now renders a dot-matrix chip row for Title/Date/Time/Repeats; tapping a chip continues into the existing editor for manual override. Added JVM parser tests with 30+ assertions covering the spec, Hinglish inputs, rollover, and graceful degradation. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, debug APK installed successfully. No manual phone UI QA run.
@@ -148,7 +152,7 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## Current Next Step
 
-- Current roadmap state: A2, A5, A1, A3, A4, C2, B5, B1, C5, Smart Quick Add v2, and B2 Countdowns / D-Day are complete. Next implementation is B4 Bulk Edit / Multi-Select unless the user picks another feature. Then continue in this order: B3 Drag-and-Drop Reschedule + Resize, QR Event Share, Availability Text Generator, C4 Dead Time Finder, C6 Ghost Events / Pencil-In, C3 On This Day, C1 Life-in-Dots, C7 Year Wrapped, Vault Decoy PIN.
+- Current roadmap state: A2, A5, A1, A3, A4, C2, B5, B1, C5, Smart Quick Add v2, B2 Countdowns / D-Day, and B4 Bulk Edit / Multi-Select are complete. Next implementation is B3 Drag-and-Drop Reschedule + Resize unless the user picks another feature. Then continue in this order: QR Event Share, Availability Text Generator, C4 Dead Time Finder, C6 Ghost Events / Pencil-In, C3 On This Day, C1 Life-in-Dots, C7 Year Wrapped, Vault Decoy PIN.
 
 - Play/Internal-testing billing verification remains the next product check.
 - Advanced Reminder Profiles remains NOT started; do not start without explicit confirmation.
@@ -156,6 +160,17 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 - Language picker scaffold/i18n remains TO BUILD; string extraction is a dedicated effort.
 
 ## What To Test Next
+
+- B4 Bulk Edit / Multi-Select:
+  - Open Calendar > Agenda, long-press a writable event as Pro. Expected: selection mode starts and the top bar shows `1 selected`.
+  - Tap the selection bar More action. Expected: bulk sheet shows Move to date, Copy to date, Shift by days/hours, Move to calendar, Change color, Toggle ghost, and Delete selected.
+  - Select multiple events and use Shift +1 day or +1 hour. Expected: events move together, snackbar shows `UNDO`, and undo restores the original dates/times.
+  - Repeat the bulk action without tapping `UNDO`. Expected: the snackbar sits above the floating bottom nav, uses the current light/dark theme surface/text with accent `UNDO`, and hides automatically after about 4 seconds.
+  - Use Move to date and Copy to date. Expected: moved/copied events land on the chosen date; undo restores prior state or removes created copies.
+  - Use Change color. Expected: selected events recolor together and undo restores old colors.
+  - Use Toggle ghost. Expected: selected events toggle ghost state together and undo restores prior ghost flags.
+  - Use Delete selected, then tap `UNDO`. Expected: events restore and no stale Recently Deleted snapshots remain.
+  - As a free user, long-press an Agenda event. Expected: Paywall opens instead of entering selection mode.
 
 - B2 Countdowns / D-Day:
   - Open any writable future event > More > Pin as Countdown. Expected: the event detail shows a Countdown card with large dot-matrix day digits and `Share as image`.
@@ -296,8 +311,8 @@ Continue DotCal development in `D:\Caveman\caveman\Nothing-Calendar` on branch `
 
 First read `Docs/HANDOFF.md`; it is source of truth. Respect Hard Rules, schema lock, Pro/Billing status, and current next step.
 
-For new feature work, also read `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it supersedes previous feature lists and contains the locked 14-feature roadmap. Next feature is B2 Countdowns / D-Day unless the user picks another item.
+For new feature work, also read `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it supersedes previous feature lists and contains the locked 14-feature roadmap. Next feature is B3 Drag-and-Drop Reschedule + Resize unless the user picks another item.
 
-Latest status: `versionCode 9` / `versionName 1.1.3`; `:app:testDebugUnitTest` and `:app:assembleDebug` passing. Latest debug APK installed successfully. Latest completed app-code change is Smart Quick Add v2. Quick Add now has an expanded pure-Kotlin English + Hinglish parser and dot-matrix preview chips, still pre-filling the existing event editor/save flow. No manual phone UI QA run unless explicitly asked.
+Latest status: `versionCode 9` / `versionName 1.1.3`; `:app:testDebugUnitTest` and `:app:assembleDebug` passing. Latest debug APK installed successfully on device `4ab0d020`. Latest completed app-code change is the B4 bulk undo snackbar auto-dismiss/theme fix for Open Testing prep. Agenda has Pro-only long-press multi-select with bulk move/copy/shift/calendar/color/ghost/delete actions and snackbar UNDO; the snackbar host now sits above the floating bottom nav, uses the active DotCal theme/accent, and auto-dismisses after about 4 seconds unless `UNDO` is tapped. No manual phone UI QA run unless explicitly asked.
 
 Strict: do not change Room schema, package id, deep links, DB filename, onboarding/calendar/sync/holidays/tasks unless required by the task. No Hilt, no Compose Nav graph. Build after app-code changes with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`, then install debug APK on the connected phone unless user says not to. Do not run manual phone UI QA unless explicitly asked. Do not start Advanced Reminder Profiles or Offline OCR without confirmation.

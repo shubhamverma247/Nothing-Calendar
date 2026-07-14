@@ -3,6 +3,8 @@ package com.dotfield.dotcal.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dotfield.dotcal.data.BirthdayImportResult
+import com.dotfield.dotcal.data.BulkEditResult
+import com.dotfield.dotcal.data.BulkEditUndoToken
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalRepository
@@ -271,6 +273,41 @@ class DotCalViewModel(
                 event = event,
                 recurringEditScope = recurringEditScope,
             )
+        }
+    }
+
+    fun bulkShiftEvents(eventIds: Set<String>, days: Long, hours: Long, onDone: (Result<BulkEditResult>) -> Unit = {}) {
+        viewModelScope.launch { onDone(runCatching { repository.bulkShiftEvents(eventIds, days, hours) }) }
+    }
+
+    fun bulkMoveToDate(eventIds: Set<String>, targetDate: LocalDate, onDone: (Result<BulkEditResult>) -> Unit = {}) {
+        viewModelScope.launch { onDone(runCatching { repository.bulkMoveToDate(eventIds, targetDate) }) }
+    }
+
+    fun bulkCopyToDate(eventIds: Set<String>, targetDate: LocalDate, onDone: (Result<BulkEditResult>) -> Unit = {}) {
+        viewModelScope.launch { onDone(runCatching { repository.bulkCopyToDate(eventIds, targetDate) }) }
+    }
+
+    fun bulkChangeCalendar(eventIds: Set<String>, accountId: String, onDone: (Result<BulkEditResult>) -> Unit = {}) {
+        viewModelScope.launch { onDone(runCatching { repository.bulkChangeCalendar(eventIds, accountId) }) }
+    }
+
+    fun bulkChangeColor(eventIds: Set<String>, colorHex: String?, onDone: (Result<BulkEditResult>) -> Unit = {}) {
+        viewModelScope.launch { onDone(runCatching { repository.bulkChangeColor(eventIds, colorHex) }) }
+    }
+
+    fun bulkDeleteEvents(eventIds: Set<String>, onDone: (Result<BulkEditResult>) -> Unit = {}) {
+        viewModelScope.launch { onDone(runCatching { repository.bulkDeleteEvents(eventIds) }) }
+    }
+
+    fun bulkToggleGhost(eventIds: Set<String>, onDone: (Result<BulkEditResult>) -> Unit = {}) {
+        viewModelScope.launch { onDone(runCatching { repository.bulkToggleGhost(eventIds) }) }
+    }
+
+    fun undoBulkEdit(token: BulkEditUndoToken, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.undoBulkEdit(token)
+            onDone()
         }
     }
 
