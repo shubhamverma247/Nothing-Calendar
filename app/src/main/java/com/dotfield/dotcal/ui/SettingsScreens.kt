@@ -1807,7 +1807,7 @@ private fun PrivacyPolicySettings(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        "DotCal stores your calendar data locally on your device. Nothing goes to any server. No account, no sync service, no telemetry - ever.",
+                        "DotCal stores your calendar data locally on your device. Your calendar content does not go to Dotfield Studio servers. No account, no cloud sync, no analytics.",
                         color = palette.secondaryText,
                         fontFamily = mono,
                         fontSize = 13.sp,
@@ -1819,28 +1819,28 @@ private fun PrivacyPolicySettings(
             item {
                 PrivacySection(
                     "01  Overview",
-                    "DotCal collects no personal data and transmits no information to any server. All calendar events, tasks, reminders, attachments, and settings exist only on your Android device.\n\nThis policy covers the DotCal Android app (com.dotfield.dotcal), published by Dotfield Studio, and applies from the date of your first install.\n\nWe built DotCal with a simple rule: data about your life belongs to you. The app works entirely offline. There is no backend, no account system, and no analytics SDK embedded anywhere in the code.",
+                    "DotCal does not collect your calendar content and does not transmit events, tasks, reminders, attachments, or settings to Dotfield Studio. Your calendar data exists only on your Android device.\n\nThis policy covers the DotCal Android app (com.dotfield.dotcal), published by Dotfield Studio, and applies from the date of your first install.\n\nWe built DotCal with a simple rule: data about your life belongs to you. The app has no Dotfield backend, no account system, no advertising, and no analytics SDK embedded anywhere in the code. Google Play services are used only for Play Billing, purchase restore, and in-app update checks.",
                     palette,
                 )
             }
             item {
                 PrivacySection(
                     "02  Data We Collect",
-                    "DotCal does not collect, store, or transmit any personal data to Dotfield Studio or any third party.\n\nCalendar events, tasks, reminder alarms, voice notes, image attachments, theme and app settings, and any imported contact birthdays or Google Calendar events all live only on your device. None of it is ever sent anywhere, and we cannot access any of it.\n\nNo crash analytics. No usage analytics. Nothing is collected.",
+                    "DotCal does not collect, store, or transmit your calendar content to Dotfield Studio.\n\nCalendar events, tasks, reminder alarms, voice notes, image attachments, theme and app settings, and any imported contact birthdays or Google Calendar events all live only on your device. None of that content is sent to Dotfield Studio, and we cannot access it.\n\nDotCal stores a local Pro entitlement flag after a successful Google Play purchase or restore. Payment processing, receipts, and account-level purchase data are handled by Google Play, not by Dotfield Studio. No crash analytics. No usage analytics. No advertising identifiers.",
                     palette,
                 )
             }
             item {
                 PrivacySection(
                     "03  App Permissions",
-                    "DotCal requests only what it needs to function:\n\n- Calendar (read/write) - only if you enable Google Calendar sync, to read/create events via Android's CalendarProvider. No data leaves the device.\n- Contacts - optional, to read contact birthdays as yearly events. Only reads dates, not full contact data.\n- Exact Alarm & Boot - schedule reminder alarms and re-register them after a reboot.\n- Notifications - display event and task reminders (Android 13+).\n- Microphone - optional, to record voice notes. Saved to app-private storage, only when you tap record.\n- Photos - selected via Android Photo Picker only. DotCal never accesses your full gallery.",
+                    "DotCal requests only what it needs to function:\n\n- Calendar (read/write) - only if you enable Google Calendar sync, to read/create events via Android's CalendarProvider. Calendar data does not leave the device through DotCal.\n- Contacts - optional, to read contact birthdays as yearly events. Only reads dates, not full contact data.\n- Exact Alarm & Boot - schedule reminder alarms and re-register them after a reboot.\n- Notifications - display event and task reminders (Android 13+).\n- Microphone - optional, to record voice notes. Saved to app-private storage, only when you tap record.\n- Photos - selected via Android Photo Picker only. DotCal never accesses your full gallery.\n- Internet / Network State - used by Google Play Billing and in-app update checks. DotCal does not use this permission to upload calendar data, analytics, or ads.",
                     palette,
                 )
             }
             item {
                 PrivacySection(
                     "04  Google Calendar Sync",
-                    "DotCal does not connect to Google's servers. It reads from Android's built-in CalendarProvider - the same local database the default Calendar app uses. No Google credentials are ever seen or stored.\n\nThis is different from apps that use the Google Calendar REST API or OAuth. DotCal never makes HTTP requests and never sees your Google credentials.\n\nIf you disable sync, DotCal stops querying CalendarProvider. Previously imported events stay in DotCal's local database until you delete them.",
+                    "DotCal's calendar sync does not connect to Google's Calendar API. It reads from Android's built-in CalendarProvider - the same local database the default Calendar app uses. No Google Calendar credentials are ever seen or stored by DotCal.\n\nThis is different from apps that use the Google Calendar REST API or OAuth. DotCal does not make HTTP requests for calendar sync and never sees your Google credentials.\n\nIf you disable sync, DotCal stops querying CalendarProvider. Previously imported events stay in DotCal's local database until you delete them.",
                     palette,
                 )
             }
@@ -1854,14 +1854,14 @@ private fun PrivacyPolicySettings(
             item {
                 PrivacySection(
                     "06  Third Parties",
-                    "DotCal integrates no third-party SDKs for analytics, advertising, crash reporting, or remote configuration. No Firebase, no Crashlytics, no advertising networks, no A/B testing - nothing that makes outbound network requests.\n\nThe only external dependency is the Android operating system itself.",
+                    "DotCal integrates no third-party SDKs for analytics, advertising, crash reporting, or remote configuration. No Firebase Analytics, no Crashlytics, no advertising networks, no A/B testing.\n\nDotCal uses Google Play Billing for the one-time Pro purchase and restore flow, Google Play In-App Updates for update checks, and the Nothing Glyph SDK for local Glyph Toy integration on supported Nothing devices. These services do not receive your calendar events, tasks, reminders, attachments, voice notes, or settings from DotCal.",
                     palette,
                 )
             }
             item {
                 PrivacySection(
                     "07  Security",
-                    "Because DotCal stores all data locally and makes no network calls, the attack surface is limited to physical device access. Keep your device PIN or biometric lock active.\n\nAndroid's app sandbox provides the primary protection. On modern devices with hardware-backed encryption, the OS-level encryption protects DotCal data at rest.",
+                    "Because DotCal stores calendar data locally and does not upload your calendar content, the main risk is physical device access. Keep your device PIN or biometric lock active.\n\nAndroid's app sandbox provides the primary protection. On modern devices with hardware-backed encryption, the OS-level encryption protects DotCal data at rest.",
                     palette,
                 )
             }
@@ -1882,7 +1882,7 @@ private fun PrivacyPolicySettings(
             item {
                 PrivacySection(
                     "10  Policy Changes",
-                    "If this policy changes materially - for example, if DotCal adds any network feature - we will update this page and the effective date below, and flag the change in a release note. We commit to never adding advertising, analytics, or cloud storage without updating this policy and prominently notifying users.",
+                    "If this policy changes materially - for example, if DotCal adds cloud sync, analytics, advertising, or a Dotfield server feature - we will update this page and the effective date below, and flag the change in a release note. We commit to never adding advertising, analytics, or cloud storage without updating this policy and prominently notifying users.",
                     palette,
                 )
             }
@@ -1930,7 +1930,7 @@ private fun PrivacyPolicySettings(
             }
             item {
                 Text(
-                    "Effective June 27, 2026 / Dotfield Studio",
+                    "Effective July 14, 2026 / Dotfield Studio",
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 11.sp,
