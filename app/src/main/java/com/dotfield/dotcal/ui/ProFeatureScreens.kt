@@ -265,7 +265,6 @@ private val PRO_FEATURES = listOf(
     ProFeature("Widget Pack Config", "Transparent widgets plus DotCal dot texture"),
     ProFeature("Date Calculator", "Calculate days between dates instantly"),
     ProFeature("Custom Accent Colors", "Extra palettes plus any custom hex color"),
-    ProFeature("Quick Add", "Type 'gym every mon 7am' - we build the event"),
     ProFeature("Advanced Recurrence", "Every N weeks, nth weekday, end date or count"),
     ProFeature("App Lock & Private Vault", "PIN lock plus hidden events and tasks"),
     ProFeature("Event & Task Templates", "Save presets and reuse them from the + button"),

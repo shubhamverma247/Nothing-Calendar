@@ -800,7 +800,7 @@ private fun CalendarPreferencesSettings(
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Calendar Preferences")
         }
         item {
-            SettingsPanel(title = "Calendar", palette = palette) {
+            SettingsPanel(title = "Calendar", palette = palette, framed = false) {
                 SettingsWeekStartRow(
                     selectedOption = weekStartOption,
                     palette = palette,
@@ -860,7 +860,7 @@ private fun ReminderDefaultsSettings(
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Reminder Defaults")
         }
         item {
-            SettingsPanel(title = "Defaults", palette = palette) {
+            SettingsPanel(title = "Defaults", palette = palette, framed = false) {
                 SettingsDefaultReminderRow(
                     selectedMinutes = defaultReminderMinutes,
                     palette = palette,
@@ -902,7 +902,7 @@ private fun WidgetSettings(
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Widgets")
         }
         item {
-            SettingsPanel(title = "Widget Style", palette = palette) {
+            SettingsPanel(title = "Widget Style", palette = palette, framed = false) {
                 SettingsWidgetToggleRow(
                     title = "Transparent Widgets",
                     subtitle = "Let wallpaper show through all DotCal widgets",
@@ -945,7 +945,7 @@ private fun DataRestoreSettings(
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Data & Restore")
         }
         item {
-            SettingsPanel(title = "Calendar Files", palette = palette) {
+            SettingsPanel(title = "Calendar Files", palette = palette, framed = false) {
                 SettingsImportExportRow(
                     title = "Export Calendar",
                     subtitle = "Save all events & tasks to an .ics file",
@@ -964,7 +964,7 @@ private fun DataRestoreSettings(
             }
         }
         item {
-            SettingsPanel(title = "Backup & Restore", palette = palette) {
+            SettingsPanel(title = "Backup & Restore", palette = palette, framed = false) {
                 SettingsImportExportRow(
                     title = "Back Up Data",
                     subtitle = "Save all events, tasks & reminders to a file",
@@ -1013,7 +1013,7 @@ private fun SyncSettings(
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Sync")
         }
         item {
-            SettingsPanel(title = "Calendar Sync", palette = palette) {
+            SettingsPanel(title = "Calendar Sync", palette = palette, framed = false) {
                 SettingsToggleRow(
                     title = "Sync enabled",
                     subtitle = "Keep DotCal updated from device calendars",
@@ -1064,7 +1064,7 @@ private fun AppPrivacySettings(
             SettingsLargeHeader(palette = palette, onBack = onBack, title = "Privacy")
         }
         item {
-            SettingsPanel(title = "App Lock", palette = palette) {
+            SettingsPanel(title = "App Lock", palette = palette, framed = false) {
                 SettingsWidgetToggleRow(
                     title = "Require PIN",
                     subtitle = if (appLockState.hasPin) "Lock DotCal after leaving the app" else "Set a 4-8 digit PIN",
@@ -1098,7 +1098,7 @@ private fun AppPrivacySettings(
             }
         }
         item {
-            SettingsPanel(title = "Private Vault", palette = palette) {
+            SettingsPanel(title = "Private Vault", palette = palette, framed = false) {
             Text(
                 "Hidden events and tasks stay off calendars, task lists, widgets, and reminders until restored.",
                 color = palette.secondaryText,
@@ -1111,7 +1111,7 @@ private fun AppPrivacySettings(
         }
         if (privateVaultEvents.isEmpty()) {
             item {
-                SettingsPanel(title = "Private Items", palette = palette) {
+                SettingsPanel(title = "Private Items", palette = palette, framed = false) {
                     Text(
                         "No private items",
                         color = palette.secondaryText,
@@ -1124,7 +1124,7 @@ private fun AppPrivacySettings(
             }
         } else {
             item {
-                SettingsPanel(title = "Private Items", palette = palette) {
+                SettingsPanel(title = "Private Items", palette = palette, framed = false) {
                     privateVaultEvents.forEachIndexed { index, event ->
                         PrivateVaultRow(
                             event = event,
@@ -1466,7 +1466,7 @@ private fun ThemeSettings(
                 Text("Choose app appearance", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(bottom = 16.dp))
             }
             item {
-                SettingsPanel(title = "Font", palette = palette) {
+                SettingsPanel(title = "Font", palette = palette, framed = false) {
                     SettingsFontRow(
                         font = appFont,
                         palette = palette,
@@ -1475,7 +1475,7 @@ private fun ThemeSettings(
                 }
             }
             item {
-                SettingsPanel(title = "Theme", palette = palette) {
+                SettingsPanel(title = "Theme", palette = palette, framed = false) {
                     DotCalThemeMode.entries.forEachIndexed { index, mode ->
                         ThemeOptionRow(
                             mode = mode,
@@ -1491,7 +1491,7 @@ private fun ThemeSettings(
                 }
             }
             item {
-                SettingsPanel(title = "Accent Color", palette = palette) {
+                SettingsPanel(title = "Accent Color", palette = palette, framed = false) {
                     AccentColorSwatches(
                         accents = AccentColor.freePresets,
                         selectedAccent = accentColor,
@@ -2381,17 +2381,23 @@ private fun SettingsNothingHero(
 private fun SettingsPanel(
     title: String,
     palette: DotCalPalette,
+    framed: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         SettingsSectionTitle(title, palette)
-        Column(
-            modifier = Modifier
+        val contentModifier = if (framed) {
+            Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(26.dp))
                 .background(palette.cancelSurface)
                 .border(1.dp, palette.cancelBorder.copy(alpha = 0.72f), RoundedCornerShape(26.dp))
-                .padding(horizontal = 14.dp, vertical = 6.dp),
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+        } else {
+            Modifier.fillMaxWidth()
+        }
+        Column(
+            modifier = contentModifier,
             content = content,
         )
     }

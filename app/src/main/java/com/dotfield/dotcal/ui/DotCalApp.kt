@@ -1179,7 +1179,7 @@ fun DotCalApp(
                                     showPaywall = true
                                 }
                             },
-                            onQuickAdd = { if (isPro) showQuickAdd = true else showPaywall = true },
+                            onQuickAdd = { showQuickAdd = true },
                             onSearch = { showSearch = true },
                             onJumpToDate = { showJumpToDatePicker = true },
                             onCalendarSets = {
@@ -1198,6 +1198,7 @@ fun DotCalApp(
                                     showPaywall = true
                                 }
                             },
+                            showProBadges = !isPro,
                             onCalendarTabSelected = {
                                 screenTab = ScreenTab.Calendar
                                 previousScreenTab = ScreenTab.Calendar

@@ -108,6 +108,7 @@ internal fun CalendarTabContainer(
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
     onShiftPatterns: (() -> Unit)? = null,
+    showProBadges: Boolean = true,
     onCalendarTabSelected: (CalendarTab) -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -135,6 +136,7 @@ internal fun CalendarTabContainer(
                 onTimeInsights = onTimeInsights,
                 onDateCalculator = onDateCalculator,
                 onShiftPatterns = onShiftPatterns,
+                showProBadges = showProBadges,
             )
         }
         Spacer(
@@ -179,6 +181,7 @@ internal fun CalendarActionBar(
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
     onShiftPatterns: (() -> Unit)? = null,
+    showProBadges: Boolean = true,
 ) {
     val topIconTint = if (palette.isDark) NWhite else palette.accent
     val haptic = LocalHapticFeedback.current
@@ -281,7 +284,6 @@ internal fun CalendarActionBar(
                                 label = "Quick Add",
                                 subtitle = "Type it, we schedule it",
                                 icon = Icons.Default.AutoAwesome,
-                                isPro = true,
                                 palette = palette,
                                 onClick = {
                                     showOverflow = false
@@ -294,7 +296,7 @@ internal fun CalendarActionBar(
                                 label = "Templates",
                                 subtitle = "Reuse saved events & tasks",
                                 icon = Icons.Default.Description,
-                                isPro = true,
+                                isPro = showProBadges,
                                 palette = palette,
                                 onClick = {
                                     showOverflow = false
@@ -307,7 +309,7 @@ internal fun CalendarActionBar(
                                 label = "Calendar Sets",
                                 subtitle = "Switch saved visibility sets",
                                 icon = Icons.Default.CalendarMonth,
-                                isPro = true,
+                                isPro = showProBadges,
                                 palette = palette,
                                 onClick = {
                                     showOverflow = false
@@ -320,7 +322,7 @@ internal fun CalendarActionBar(
                                 label = "Shift Patterns",
                                 subtitle = "Build rotating schedules",
                                 icon = Icons.Default.EventRepeat,
-                                isPro = true,
+                                isPro = showProBadges,
                                 palette = palette,
                                 onClick = {
                                     showOverflow = false
