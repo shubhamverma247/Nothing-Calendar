@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 
@@ -278,6 +279,41 @@ class DotCalViewModel(
 
     fun bulkShiftEvents(eventIds: Set<String>, days: Long, hours: Long, onDone: (Result<BulkEditResult>) -> Unit = {}) {
         viewModelScope.launch { onDone(runCatching { repository.bulkShiftEvents(eventIds, days, hours) }) }
+    }
+
+    fun checkDragConflicts(
+        event: CalendarEvent,
+        targetStart: LocalDateTime,
+        targetEnd: LocalDateTime,
+        onDone: (List<CalendarEvent>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onDone(
+                repository.findConflictWarnings(
+                    startDate = targetStart.toLocalDate(),
+                    endDate = targetEnd.toLocalDate(),
+                    startTime = targetStart.toLocalTime(),
+                    endTime = targetEnd.toLocalTime(),
+                    excludedEventId = event.baseEventId(),
+                ),
+            )
+        }
+    }
+
+    fun rescheduleEvent(
+        event: CalendarEvent,
+        targetStart: LocalDateTime,
+        targetEnd: LocalDateTime,
+        recurringEditScope: RecurringEditScope,
+        onDone: (Result<BulkEditResult>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onDone(
+                runCatching {
+                    repository.rescheduleEvent(event, targetStart, targetEnd, recurringEditScope)
+                },
+            )
+        }
     }
 
     fun bulkMoveToDate(eventIds: Set<String>, targetDate: LocalDate, onDone: (Result<BulkEditResult>) -> Unit = {}) {

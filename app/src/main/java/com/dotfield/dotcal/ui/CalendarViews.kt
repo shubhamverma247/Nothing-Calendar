@@ -9,6 +9,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -48,12 +50,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
@@ -62,6 +67,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -71,16 +77,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.dotfield.dotcal.data.CalendarEvent
+import com.dotfield.dotcal.data.scheduling.EventDragMath
+import com.dotfield.dotcal.data.scheduling.EventTimeRange
 import com.dotfield.dotcal.ui.theme.NWhite
+import java.time.Duration
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.WeekFields
 import java.util.Locale
+
+internal data class EventDragChange(
+    val event: CalendarEvent,
+    val targetStart: LocalDateTime,
+    val targetEnd: LocalDateTime,
+)
+
+private enum class EventDragMode {
+    Move,
+    ResizeStart,
+    ResizeEnd,
+}
 
 @Composable
 internal fun MonthView(
@@ -294,6 +316,8 @@ internal fun WeekView(
     onDateSelected: (LocalDate) -> Unit,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
+    onEventDrag: (EventDragChange) -> Unit,
+    use24HourFormat: Boolean,
 ) {
     val days = remember(selectedDate, weekStart) { weekDays(selectedDate, weekStart) }
     val weekEvents = remember(eventsByDate, days) { days.flatMap { eventsByDate[it].orEmpty() } }
@@ -303,6 +327,7 @@ internal fun WeekView(
     val timedEventsByDay = remember(timedEvents) { timedEvents.groupBy { it.localDate() } }
 
     var dragTotal by remember { mutableFloatStateOf(0f) }
+    var activeDragDay by remember(selectedDate) { mutableStateOf<LocalDate?>(null) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -375,7 +400,19 @@ internal fun WeekView(
                             palette = palette,
                             onAddAtDate = onAddAtDate,
                             onEventClick = onEventClick,
-                            modifier = Modifier.weight(1f),
+                            onEventDrag = onEventDrag,
+                            use24HourFormat = use24HourFormat,
+                            allowedDayDelta = -days.indexOf(day)..(days.lastIndex - days.indexOf(day)),
+                            onDragActiveChange = { active ->
+                                activeDragDay = when {
+                                    active -> day
+                                    activeDragDay == day -> null
+                                    else -> activeDragDay
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .zIndex(if (activeDragDay == day) 10f else 0f),
                         )
                     }
                 }
@@ -524,11 +561,15 @@ private fun WeekDayColumn(
     palette: DotCalPalette,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
+    onEventDrag: (EventDragChange) -> Unit,
+    use24HourFormat: Boolean,
+    allowedDayDelta: IntRange,
+    onDragActiveChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val now = LocalTime.now()
     val showNow = day == selectedDate && day == LocalDate.now()
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .height((24 * WEEK_HOUR_HEIGHT_DP).dp)
             .background(palette.calendarSurface)
@@ -560,29 +601,20 @@ private fun WeekDayColumn(
         }
         events.sortedBy { it.startTimeMs }.forEach { event ->
             val layout = eventLayouts[event.id] ?: WeekEventLayout(column = 0, columnCount = 1)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(weekEventHeight(event))
-                    .offset(y = weekEventTopOffset(event.startLocalTime()))
-                    .zIndex(1f)
-                    .padding(horizontal = 2.dp),
-            ) {
-                repeat(layout.columnCount) { column ->
-                    if (column == layout.column) {
-                        WeekEventBlock(
-                            event = event,
-                            palette = palette,
-                            onClick = { onEventClick(event) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(),
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
+            DraggableEventRow(
+                event = event,
+                layout = layout,
+                palette = palette,
+                baseTop = weekEventTopOffset(event.startLocalTime()),
+                hourHeightDp = WEEK_HOUR_HEIGHT_DP,
+                minimumHeightDp = 22f,
+                dayColumnWidthPx = constraints.maxWidth.toFloat(),
+                allowedDayDelta = allowedDayDelta,
+                use24HourFormat = use24HourFormat,
+                onClick = { onEventClick(event) },
+                onEventDrag = onEventDrag,
+                onDragActiveChange = onDragActiveChange,
+            )
         }
     }
 }
@@ -613,6 +645,225 @@ private fun WeekEventBlock(
 }
 
 @Composable
+private fun DraggableEventRow(
+    event: CalendarEvent,
+    layout: WeekEventLayout,
+    palette: DotCalPalette,
+    baseTop: androidx.compose.ui.unit.Dp,
+    hourHeightDp: Float,
+    minimumHeightDp: Float,
+    dayColumnWidthPx: Float,
+    allowedDayDelta: IntRange,
+    use24HourFormat: Boolean,
+    onClick: () -> Unit,
+    onEventDrag: (EventDragChange) -> Unit,
+    onDragActiveChange: (Boolean) -> Unit = {},
+) {
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    val hourHeightPx = with(density) { hourHeightDp.dp.toPx() }
+    val minHeightPx = with(density) { minimumHeightDp.dp.toPx() }
+    val originalRange = remember(event.id, event.startTimeMs, event.endTimeMs) {
+        val zoneId = ZoneId.systemDefault()
+        EventTimeRange(
+            start = Instant.ofEpochMilli(event.startTimeMs).atZone(zoneId).toLocalDateTime(),
+            end = Instant.ofEpochMilli(event.endTimeMs).atZone(zoneId).toLocalDateTime(),
+        )
+    }
+    var dragMode by remember(event.id) { mutableStateOf<EventDragMode?>(null) }
+    var totalX by remember(event.id) { mutableFloatStateOf(0f) }
+    var totalY by remember(event.id) { mutableFloatStateOf(0f) }
+    var minuteDelta by remember(event.id) { mutableIntStateOf(0) }
+    var dayDelta by remember(event.id) { mutableIntStateOf(0) }
+
+    fun resetDrag() {
+        val wasDragging = dragMode != null
+        dragMode = null
+        totalX = 0f
+        totalY = 0f
+        minuteDelta = 0
+        dayDelta = 0
+        if (wasDragging) {
+            onDragActiveChange(false)
+        }
+    }
+
+    fun updateDrag(amount: Offset) {
+        totalX += amount.x
+        totalY += amount.y
+        val nextMinutes = EventDragMath.snapMinutes(totalY, hourHeightPx)
+        val nextDays = if (dragMode == EventDragMode.Move && dayColumnWidthPx > 0f) {
+            kotlin.math.round(totalX / dayColumnWidthPx).toInt().coerceIn(allowedDayDelta)
+        } else {
+            0
+        }
+        if (nextMinutes != minuteDelta || nextDays != dayDelta) {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+        minuteDelta = nextMinutes
+        dayDelta = nextDays
+    }
+
+    fun currentRange(): EventTimeRange {
+        return when (dragMode) {
+            EventDragMode.Move -> EventDragMath.move(originalRange.start, originalRange.end, minuteDelta, dayDelta)
+            EventDragMode.ResizeStart -> EventDragMath.resizeStart(originalRange.start, originalRange.end, minuteDelta)
+            EventDragMode.ResizeEnd -> EventDragMath.resizeEnd(originalRange.start, originalRange.end, minuteDelta)
+            null -> originalRange
+        }
+    }
+    val previewRange = currentRange()
+    val previewDurationMinutes = Duration.between(previewRange.start, previewRange.end).toMinutes().coerceAtLeast(15)
+    val previewHeightPx = ((previewDurationMinutes / 60f) * hourHeightPx).coerceAtLeast(minHeightPx)
+    val translationY = when (dragMode) {
+        EventDragMode.Move, EventDragMode.ResizeStart -> (minuteDelta / 60f) * hourHeightPx
+        else -> 0f
+    }
+    val translationX = if (dragMode == EventDragMode.Move) dayDelta * dayColumnWidthPx else 0f
+    val draggable = event.isTask == 0 && event.isAllDay == 0 && event.source != "BIRTHDAY"
+
+    fun finishDrag() {
+        val finalRange = currentRange()
+        val changed = finalRange != originalRange
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        if (changed) {
+            onEventDrag(EventDragChange(event, finalRange.start, finalRange.end))
+        }
+        resetDrag()
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(with(density) { previewHeightPx.toDp() })
+            .offset(y = baseTop)
+            .graphicsLayer {
+                this.translationX = translationX
+                this.translationY = translationY
+                shadowElevation = if (dragMode == null) 0f else 12.dp.toPx()
+                alpha = if (dragMode == null) 1f else 0.92f
+            }
+            .zIndex(if (dragMode == null) 1f else 20f)
+            .padding(horizontal = 2.dp),
+    ) {
+        repeat(layout.columnCount) { column ->
+            if (column == layout.column) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .pointerInput(event.id, draggable, hourHeightPx, dayColumnWidthPx) {
+                            if (!draggable) return@pointerInput
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    dragMode = EventDragMode.Move
+                                    onDragActiveChange(true)
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDragCancel = ::resetDrag,
+                                onDragEnd = ::finishDrag,
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    updateDrag(amount)
+                                },
+                            )
+                        }
+                        .noRippleClickable(onClick = onClick),
+                ) {
+                    WeekEventBlock(
+                        event = event,
+                        palette = palette,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    if (draggable) {
+                        DragResizeHandle(
+                            modifier = Modifier.align(Alignment.TopCenter),
+                            onStart = {
+                                dragMode = EventDragMode.ResizeStart
+                                onDragActiveChange(true)
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            },
+                            onDrag = { updateDrag(Offset(0f, it)) },
+                            onCancel = ::resetDrag,
+                            onEnd = ::finishDrag,
+                            palette = palette,
+                        )
+                        DragResizeHandle(
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                            onStart = {
+                                dragMode = EventDragMode.ResizeEnd
+                                onDragActiveChange(true)
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            },
+                            onDrag = { updateDrag(Offset(0f, it)) },
+                            onCancel = ::resetDrag,
+                            onEnd = ::finishDrag,
+                            palette = palette,
+                        )
+                    }
+                    if (dragMode != null) {
+                        Text(
+                            text = dragTimeLabel(previewRange, use24HourFormat),
+                            color = palette.primaryText,
+                            fontFamily = mono,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .offset(y = (-28).dp)
+                                .background(palette.dialogSurface, RoundedCornerShape(4.dp))
+                                .border(1.dp, palette.line, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 3.dp),
+                        )
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DragResizeHandle(
+    modifier: Modifier,
+    palette: DotCalPalette,
+    onStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onCancel: () -> Unit,
+    onEnd: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(12.dp)
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { onStart() },
+                    onDragCancel = onCancel,
+                    onDragEnd = onEnd,
+                    onDrag = { change, amount ->
+                        change.consume()
+                        onDrag(amount.y)
+                    },
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 20.dp, height = 2.dp)
+                .background(palette.onAccent.copy(alpha = 0.86f), RoundedCornerShape(2.dp)),
+        )
+    }
+}
+
+private fun dragTimeLabel(range: EventTimeRange, use24HourFormat: Boolean): String {
+    val formatter = DateTimeFormatter.ofPattern(if (use24HourFormat) "HH:mm" else "h:mm a", Locale.getDefault())
+    return "${range.start.toLocalTime().format(formatter)} - ${range.end.toLocalTime().format(formatter)}"
+}
+
+@Composable
 internal fun DayView(
     selectedDate: LocalDate,
     eventsByDate: Map<LocalDate, List<CalendarEvent>>,
@@ -628,6 +879,8 @@ internal fun DayView(
     highlightDate: LocalDate?,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
+    onEventDrag: (EventDragChange) -> Unit,
+    use24HourFormat: Boolean,
 ) {
     val dayAll = remember(eventsByDate, selectedDate) { eventsByDate[selectedDate].orEmpty() }
     val dayEvents = remember(dayAll) { dayAll.filter { it.isTask == 0 } }
@@ -700,6 +953,8 @@ internal fun DayView(
                         palette = palette,
                         onAddAtDate = onAddAtDate,
                         onEventClick = onEventClick,
+                        onEventDrag = onEventDrag,
+                        use24HourFormat = use24HourFormat,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -944,11 +1199,13 @@ private fun DayTimelineColumn(
     palette: DotCalPalette,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
+    onEventDrag: (EventDragChange) -> Unit,
+    use24HourFormat: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val now = LocalTime.now()
     val showNow = selectedDate == LocalDate.now()
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .height((24 * DAY_HOUR_HEIGHT_DP).dp)
             .background(palette.calendarSurface)
@@ -979,27 +1236,19 @@ private fun DayTimelineColumn(
         }
         events.sortedBy { it.startTimeMs }.forEach { event ->
             val layout = eventLayouts[event.id] ?: WeekEventLayout(column = 0, columnCount = 1)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(dayEventHeight(event))
-                    .offset(y = dayEventTopOffset(event.startLocalTime()))
-                    .zIndex(1f)
-                    .padding(start = 6.dp, end = 8.dp),
-            ) {
-                repeat(layout.columnCount) { column ->
-                    if (column == layout.column) {
-                        WeekEventBlock(
-                            event = event,
-                            palette = palette,
-                            onClick = { onEventClick(event) },
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
+            DraggableEventRow(
+                event = event,
+                layout = layout,
+                palette = palette,
+                baseTop = dayEventTopOffset(event.startLocalTime()),
+                hourHeightDp = DAY_HOUR_HEIGHT_DP,
+                minimumHeightDp = 24f,
+                dayColumnWidthPx = constraints.maxWidth.toFloat(),
+                allowedDayDelta = 0..0,
+                use24HourFormat = use24HourFormat,
+                onClick = { onEventClick(event) },
+                onEventDrag = onEventDrag,
+            )
         }
     }
 }

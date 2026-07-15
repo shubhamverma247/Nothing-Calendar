@@ -16,6 +16,8 @@ import com.dotfield.dotcal.data.punchcard.PunchCardStreak
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.profiles.FocusProfileStore
+import com.dotfield.dotcal.data.scheduling.EventDragMath
+import com.dotfield.dotcal.data.scheduling.EventTimeRange
 import com.dotfield.dotcal.data.shifts.GeneratedShiftOccurrence
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
 import com.dotfield.dotcal.data.shifts.ShiftGenerationRecord
@@ -42,6 +44,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -911,6 +914,79 @@ class DotCalRepository(
         )
     }
 
+    suspend fun rescheduleEvent(
+        event: CalendarEvent,
+        targetStart: LocalDateTime,
+        targetEnd: LocalDateTime,
+        recurringEditScope: RecurringEditScope,
+    ): BulkEditResult = withContext(Dispatchers.IO) {
+        require(event.isAllDay == 0 && event.isTask == 0 && event.source != "BIRTHDAY") {
+            "EVENT CANNOT BE RESCHEDULED"
+        }
+        require(targetEnd.isAfter(targetStart)) { "END MUST BE AFTER START" }
+
+        val master = dao.getEvent(event.baseEventId()) ?: event
+        val previousReminders = dao.getRemindersForEvent(master.id)
+        val detachedId = if (event.isRecurrenceOccurrence() && recurringEditScope == RecurringEditScope.ThisEvent) {
+            UUID.randomUUID().toString()
+        } else {
+            null
+        }
+        val targetRange = if (event.isRecurrenceOccurrence() && recurringEditScope == RecurringEditScope.WholeSeries) {
+            val zoneId = ZoneId.of(event.timeZone)
+            val occurrenceStart = Instant.ofEpochMilli(event.startTimeMs).atZone(zoneId).toLocalDateTime()
+            val occurrenceEnd = Instant.ofEpochMilli(event.endTimeMs).atZone(zoneId).toLocalDateTime()
+            val masterStart = Instant.ofEpochMilli(master.startTimeMs).atZone(zoneId).toLocalDateTime()
+            val masterEnd = Instant.ofEpochMilli(master.endTimeMs).atZone(zoneId).toLocalDateTime()
+            val adjusted = EventDragMath.applyOccurrenceChangeToSeries(
+                master = EventTimeRange(masterStart, masterEnd),
+                occurrence = EventTimeRange(occurrenceStart, occurrenceEnd),
+                target = EventTimeRange(targetStart, targetEnd),
+            )
+            adjusted.start to adjusted.end
+        } else {
+            targetStart to targetEnd
+        }
+        val reminderMinutes = previousReminders.map { it.minutesBefore }.distinct().sorted()
+        saveLocalEvent(
+            existing = if (
+                event.isRecurrenceOccurrence() &&
+                recurringEditScope == RecurringEditScope.ThisEvent
+            ) {
+                event
+            } else {
+                master
+            },
+            data = EventEditorData(
+                eventId = detachedId ?: master.id,
+                accountId = master.accountId,
+                title = master.title,
+                description = master.description,
+                location = master.location,
+                date = targetRange.first.toLocalDate(),
+                endDate = targetRange.second.toLocalDate(),
+                startTime = targetRange.first.toLocalTime(),
+                endTime = targetRange.second.toLocalTime(),
+                isAllDay = false,
+                reminderMinutes = reminderMinutes.firstOrNull(),
+                reminderMinutesList = reminderMinutes.takeIf { it.isNotEmpty() },
+                rrule = master.rrule,
+                imageUris = master.imageUris,
+                voiceNotePath = master.voiceNotePath,
+                colorHex = master.colorHex,
+            ),
+            recurringEditScope = recurringEditScope,
+        )
+        BulkEditResult(
+            changedCount = 1,
+            undoToken = BulkEditUndoToken(
+                previousEvents = listOf(master),
+                previousReminders = previousReminders,
+                insertedEventIds = listOfNotNull(detachedId),
+            ),
+        )
+    }
+
     suspend fun bulkMoveToDate(eventIds: Set<String>, targetDate: LocalDate): BulkEditResult = withContext(Dispatchers.IO) {
         val candidates = loadBulkEditableMasters(eventIds)
         val editable = candidates.filterNot { it.source == "BIRTHDAY" }
@@ -1415,7 +1491,12 @@ class DotCalRepository(
             updatedAtMs = now,
         )
         dao.upsertEvent(detachedEvent)
-        data.reminderMinutes?.let { minutes ->
+        val reminderMinutes = data.reminderMinutesList
+            ?.distinct()
+            ?.sorted()
+            ?: data.reminderMinutes?.let(::listOf)
+            ?: emptyList()
+        reminderMinutes.forEach { minutes ->
             val reminder = EventReminder(
                 eventId = detachedId,
                 minutesBefore = minutes,

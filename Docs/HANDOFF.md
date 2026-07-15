@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-07-15
+Updated: 2026-07-16
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full archive/history lives in `Docs/HANDOFF.original.md`; keep this file short and current.
 
@@ -10,7 +10,7 @@ Feature batch specs now live in `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`, 
 
 - Use `$android-development` for Android work.
 - Workdir: `D:\Caveman\caveman\Nothing-Calendar`.
-- Branch: `main`.
+- Branch: `pro-features`.
 - Preserve existing behavior/UI unless user explicitly changes it.
 - Do not change package/application id `com.dotfield.dotcal`, deep link scheme `dotcal://`, or Room DB filename `dotcal.db`.
 - Do not change Room schema unless user explicitly approves. Schema must remain exactly 5 tables: `calendar_accounts`, `calendar_events`, `event_reminders`, `sync_metadata`, `deleted_event_log`.
@@ -20,7 +20,7 @@ Feature batch specs now live in `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`, 
 - After app-code changes run:
 
 ```powershell
-.\gradlew.bat --no-daemon --console=plain :app:assembleDebug
+.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug
 ```
 
 - After successful debug builds, install the debug APK on the connected phone unless user explicitly says not to:
@@ -84,6 +84,7 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 - Smart Quick Add v2 built and locally verified by debug build/install.
 - B2 Countdowns / D-Day built and locally verified by debug build/install.
 - B4 Bulk Edit / Multi-Select built and locally verified by JVM tests/debug build/install.
+- B3 Drag-and-Drop Reschedule + Resize built for Week/Day and locally verified by JVM tests/debug build/install.
 - C2 Day Density Forecast Strip built and locally verified by debug build/install.
 - B5 Year-in-Pixels Heatmap built and locally verified by debug build/install.
 - B1 Time Insights built and locally verified by debug build/install.
@@ -103,6 +104,8 @@ C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\b
 
 ## Latest Work
 
+- 2026-07-16: B3 Week cross-day drag visibility fix completed on `pro-features`. User found that a timed event could temporarily disappear while being dragged horizontally through some Week day sections, then reappear after leaving that section. Root cause was Compose sibling draw order: the dragged event had elevated z-order only inside its original day column, so later day-column siblings could paint over the translated event. Week view now tracks the active drag source day and elevates that entire day column for the drag/resize lifetime, keeping the event and live time label visible across every target day. Normal column order restores on drop or cancellation. No drag math, persistence, recurrence, conflict, Pro gate, Room schema, package id, deep links, DB filename, billing, sync, onboarding, holidays, or tasks changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed. Debug APK installed successfully on device `4ab0d020`. No manual phone UI QA run.
+- 2026-07-15: B3 Drag-and-Drop Reschedule + Resize completed on `pro-features` for Week and Day views. Timed writable events now show compact top/bottom resize handles; long-press lifts an event for drag, vertical movement and resize snap to 15-minute increments, and Week drag can cross day columns. Pickup, snap changes, and drop use haptic feedback, while a floating time label follows the active range using the app's 12/24-hour setting. Free users can use the visible affordance but drop reverts and opens Paywall. Pro drops run the existing A2 overlap query before save, show a conflict confirmation when needed, use the existing recurring-event scope sheet for `This event` / `Whole series`, persist through the existing repository event-save path, preserve reminders/media/color/account data, and expose a themed `UNDO` snackbar that restores the prior event/reminder state. All-day, task, and BIRTHDAY-source events remain non-draggable. Added pure JVM coverage for 15-minute snap math, cross-day moves, and 15-minute minimum resize duration. Month and hidden ThreeDay drag were intentionally not added. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, and debug APK installed successfully on device `4ab0d020`. No manual phone UI QA run.
 - 2026-07-15: Open Testing Settings divider alignment fix completed. User found Settings divider lines did not draw fully to the left in both root cards and sub-screens. Removed the left inset from the shared Settings content divider so separators now span the full row/content width everywhere that divider is used. No Settings row behavior, navigation, toggles, pickers, Pro gates, Room schema, package id, deep links, DB filename, billing, sync, or onboarding changes. `:app:assembleDebug` passed, and debug APK installed successfully on device `4ab0d020`. No manual phone UI QA run.
 - 2026-07-15: Open Testing Settings sub-screen card cleanup completed. User requested no card/grouped surfaces inside Settings sub-screens. Settings root still keeps its Nothing OS-style grouped surfaces, but Calendar Preferences, Reminder Defaults, Widgets, Data & Restore, Sync, App Lock/Private Vault, and Appearance sub-screen sections now render as flat sections directly on the settings background instead of rounded card panels. Row actions, toggles, pickers, Pro gates, App Lock/Vault behavior, Data & Restore actions, Sync actions, theme/accent/font controls, and root Settings navigation are unchanged. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed, and debug APK installed successfully on device `4ab0d020`. No manual phone UI QA run.
 - 2026-07-15: Open Testing calendar overflow Pro-label fix completed. User found the Calendar Month three-dot menu still showed `Pro` labels to a Pro user. Root cause was the overflow menu rendering static Pro badges instead of deriving badge visibility from the active entitlement. Calendar overflow now hides locked-feature `Pro` labels for Pro users, keeps those labels for free users on actually locked entries, and treats Smart Quick Add v2 as Free per the final-package roadmap by opening Quick Add for all users and removing Quick Add from the Paywall Pro feature list. No Room schema/package/deep-link/DB/billing/sync/onboarding changes. `:app:testDebugUnitTest` and `:app:assembleDebug` passed. No ADB device connected, so debug APK was not installed. No manual phone UI QA run.
@@ -158,7 +161,7 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## Current Next Step
 
-- Current roadmap state: A2, A5, A1, A3, A4, C2, B5, B1, C5, Smart Quick Add v2, B2 Countdowns / D-Day, and B4 Bulk Edit / Multi-Select are complete. Next implementation is B3 Drag-and-Drop Reschedule + Resize unless the user picks another feature. Then continue in this order: QR Event Share, Availability Text Generator, C4 Dead Time Finder, C6 Ghost Events / Pencil-In, C3 On This Day, C1 Life-in-Dots, C7 Year Wrapped, Vault Decoy PIN.
+- Current roadmap state: A2, A5, A1, A3, A4, C2, B5, B1, C5, Smart Quick Add v2, B2 Countdowns / D-Day, B4 Bulk Edit / Multi-Select, and B3 Drag-and-Drop Reschedule + Resize are complete. Next implementation is QR Event Share unless the user picks another feature. Then continue in this order: Availability Text Generator, C4 Dead Time Finder, C6 Ghost Events / Pencil-In, C3 On This Day, C1 Life-in-Dots, C7 Year Wrapped, Vault Decoy PIN.
 
 - Play/Internal-testing billing verification remains the next product check.
 - Advanced Reminder Profiles remains NOT started; do not start without explicit confirmation.
@@ -166,6 +169,20 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 - Language picker scaffold/i18n remains TO BUILD; string extraction is a dedicated effort.
 
 ## What To Test Next
+
+- B3 Drag-and-Drop Reschedule + Resize:
+  - As Pro, open Calendar > Week and long-press a timed writable event block. Expected: pickup haptic fires, block lifts, and a live time label appears.
+  - Drag horizontally across every visible Week day section, including both directions. Expected: the event and live time label remain continuously visible with no temporary hidden section.
+  - Drag vertically. Expected: time label changes in 15-minute increments with snap haptics; dropping moves the event and shows `UNDO`.
+  - Drag across Week day columns. Expected: event moves to the target date while preserving duration.
+  - Tap `UNDO`. Expected: original date/time and reminders restore. Leave snackbar untouched. Expected: it dismisses after about 4 seconds.
+  - Drag the top handle. Expected: start time changes in 15-minute increments and cannot pass within 15 minutes of the end.
+  - Drag the bottom handle. Expected: end time changes in 15-minute increments and duration never becomes shorter than 15 minutes.
+  - Repeat move/resize in Day view. Expected: same snap, haptic, label, persistence, and undo behavior without cross-day-column movement.
+  - Drop onto a time occupied by another event. Expected: `Schedule conflict` appears before save; Cancel reverts, `Move anyway` commits.
+  - Drag a recurring occurrence. Expected: `Apply to` sheet appears; `This event` detaches only that occurrence, while `Whole series` shifts the series.
+  - As a free user, drag or resize a writable timed event. Expected: preview reverts on drop and Paywall opens.
+  - Check all-day, task, and birthday rows. Expected: no drag/resize affordance or persistence change.
 
 - B4 Bulk Edit / Multi-Select:
   - Open Calendar > Agenda, long-press a writable event as Pro. Expected: selection mode starts and the top bar shows `1 selected`.
@@ -313,12 +330,12 @@ Current dirty files may include earlier Pro/UI polish and release assets. Do not
 
 ## Resume Prompt
 
-Continue DotCal development in `D:\Caveman\caveman\Nothing-Calendar` on branch `main`.
+Continue DotCal development in `D:\Caveman\caveman\Nothing-Calendar` on branch `pro-features`.
 
 First read `Docs/HANDOFF.md`; it is source of truth. Respect Hard Rules, schema lock, Pro/Billing status, and current next step.
 
-For new feature work, also read `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it supersedes previous feature lists and contains the locked 14-feature roadmap. Next feature is B3 Drag-and-Drop Reschedule + Resize unless the user picks another item.
+For new feature work, also read `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`; it supersedes previous feature lists and contains the locked 14-feature roadmap. B3 Drag-and-Drop Reschedule + Resize is complete for Week/Day. Next feature is QR Event Share unless the user picks another item.
 
-Latest status: `versionCode 10` / `versionName 1.1.3`; `:app:testDebugUnitTest` and `:app:assembleDebug` passing. Latest completed release-prep changes: Settings divider lines now span the full row/content width; Settings sub-screen sections are flat/no-card while Settings root keeps grouped surfaces; Calendar overflow Pro labels are entitlement-aware, and Smart Quick Add v2 is Free/open to all users. Latest debug APK installed successfully on device `4ab0d020`. Agenda has Pro-only long-press multi-select with bulk move/copy/shift/calendar/color/ghost/delete actions and snackbar UNDO; the snackbar host now sits above the floating bottom nav, uses the active DotCal theme/accent, and auto-dismisses after about 4 seconds unless `UNDO` is tapped. No manual phone UI QA run unless explicitly asked.
+Latest status: `versionCode 10` / `versionName 1.1.3`; `:app:testDebugUnitTest` and `:app:assembleDebug` passing. B3 Week/Day drag-and-drop + resize is built on `pro-features`: 15-minute snapping, cross-day Week movement, top/bottom resize handles, haptics, live time label, Pro gate, conflict confirmation, recurring scope choice, persistence, and snackbar UNDO. Latest debug APK installed successfully on device `4ab0d020`. No manual phone UI QA run unless explicitly asked.
 
-Strict: do not change Room schema, package id, deep links, DB filename, onboarding/calendar/sync/holidays/tasks unless required by the task. No Hilt, no Compose Nav graph. Build after app-code changes with `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`, then install debug APK on the connected phone unless user says not to. Do not run manual phone UI QA unless explicitly asked. Do not start Advanced Reminder Profiles or Offline OCR without confirmation.
+Strict: do not change Room schema, package id, deep links, DB filename, onboarding/calendar/sync/holidays/tasks unless required by the task. No Hilt, no Compose Nav graph. Build after app-code changes with `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug`, then install debug APK on the connected phone unless user says not to. Do not run manual phone UI QA unless explicitly asked. Do not start Advanced Reminder Profiles or Offline OCR without confirmation.

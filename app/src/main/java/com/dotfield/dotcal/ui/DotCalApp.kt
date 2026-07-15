@@ -277,6 +277,10 @@ private data class PendingDelete(
     val scope: RecurringEditScope,
     val source: DeleteSource,
 )
+private data class PendingEventDrag(
+    val change: EventDragChange,
+    val scope: RecurringEditScope,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -350,6 +354,8 @@ fun DotCalApp(
     val privateVaultEvents by viewModel.privateVaultEvents.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
     var pendingTaskDelete by remember { mutableStateOf<CalendarEvent?>(null) }
+    var pendingDragScope by remember { mutableStateOf<EventDragChange?>(null) }
+    var pendingDragConflict by remember { mutableStateOf<Pair<PendingEventDrag, Int>?>(null) }
     var appUnlocked by remember { mutableStateOf(false) }
     var handledTaskDeepLinkId by remember { mutableStateOf<String?>(null) }
     var handledRouteToken by remember { mutableStateOf<Long?>(null) }
@@ -1003,6 +1009,59 @@ fun DotCalApp(
                 showDotCalToast(context, palette, "Bulk edit failed")
             }
     }
+    fun showDragResult(result: Result<BulkEditResult>) {
+        result
+            .onSuccess { summary ->
+                scope.launch {
+                    val dismissJob = launch {
+                        delay(BULK_UNDO_SNACKBAR_MILLIS)
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                    }
+                    val snackbarResult = snackbarHostState.showSnackbar(
+                        message = "Event updated",
+                        actionLabel = "UNDO",
+                    )
+                    dismissJob.cancel()
+                    if (snackbarResult == SnackbarResult.ActionPerformed) {
+                        viewModel.undoBulkEdit(summary.undoToken) {
+                            showDotCalToast(context, palette, "Change undone")
+                        }
+                    }
+                }
+            }
+            .onFailure {
+                showDotCalToast(context, palette, "Couldn't move event")
+            }
+    }
+    fun commitEventDrag(request: PendingEventDrag) {
+        viewModel.rescheduleEvent(
+            event = request.change.event,
+            targetStart = request.change.targetStart,
+            targetEnd = request.change.targetEnd,
+            recurringEditScope = request.scope,
+            onDone = ::showDragResult,
+        )
+    }
+    fun checkEventDrag(request: PendingEventDrag) {
+        viewModel.checkDragConflicts(
+            event = request.change.event,
+            targetStart = request.change.targetStart,
+            targetEnd = request.change.targetEnd,
+        ) { conflicts ->
+            if (conflicts.isEmpty()) {
+                commitEventDrag(request)
+            } else {
+                pendingDragConflict = request to conflicts.size
+            }
+        }
+    }
+    fun requestEventDrag(change: EventDragChange) {
+        when {
+            !isPro -> showPaywall = true
+            !change.event.rrule.isNullOrBlank() -> pendingDragScope = change
+            else -> checkEventDrag(PendingEventDrag(change, RecurringEditScope.WholeSeries))
+        }
+    }
     fun closeTopSurface() {
         when {
             showPaywall -> showPaywall = false
@@ -1266,6 +1325,8 @@ fun DotCalApp(
                                             openAddEditor(time)
                                         },
                                         onEventClick = viewModel::openEventDetail,
+                                        onEventDrag = ::requestEventDrag,
+                                        use24HourFormat = use24HourFormat,
                                     )
                                     CalendarTab.Day -> DayView(
                                         selectedDate = selectedDate,
@@ -1285,6 +1346,8 @@ fun DotCalApp(
                                             openAddEditor(time)
                                         },
                                         onEventClick = viewModel::openEventDetail,
+                                        onEventDrag = ::requestEventDrag,
+                                        use24HourFormat = use24HourFormat,
                                     )
                                     CalendarTab.ThreeDay -> ThreeDayView(
                                         selectedDate = selectedDate,
@@ -2463,6 +2526,28 @@ fun DotCalApp(
                 palette = palette,
                 onDismiss = { showJumpToDatePicker = false },
                 onSelected = ::jumpToDate,
+            )
+        }
+        pendingDragScope?.let { change ->
+            ApplyScopeChoiceSheet(
+                selected = RecurringEditScope.ThisEvent,
+                palette = palette,
+                onDismiss = { pendingDragScope = null },
+                onSelected = { selectedScope ->
+                    pendingDragScope = null
+                    checkEventDrag(PendingEventDrag(change, selectedScope))
+                },
+            )
+        }
+        pendingDragConflict?.let { (request, conflictCount) ->
+            DragConflictDialog(
+                conflictCount = conflictCount,
+                palette = palette,
+                onDismiss = { pendingDragConflict = null },
+                onConfirm = {
+                    pendingDragConflict = null
+                    commitEventDrag(request)
+                },
             )
         }
         if (pendingBulkDelete) {

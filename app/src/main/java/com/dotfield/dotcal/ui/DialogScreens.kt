@@ -30,6 +30,41 @@ internal fun ConfirmDeleteDialog(
 }
 
 @Composable
+internal fun DragConflictDialog(
+    conflictCount: Int,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        titleContentColor = palette.primaryText,
+        textContentColor = palette.secondaryText,
+        title = { Text("Schedule conflict") },
+        text = {
+            Text(
+                if (conflictCount == 1) {
+                    "This time overlaps another event."
+                } else {
+                    "This time overlaps $conflictCount other events."
+                },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Move anyway", color = palette.accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = palette.primaryText)
+            }
+        },
+    )
+}
+
+@Composable
 internal fun ConfirmDeleteDialog(
     title: String,
     confirmLabel: String,
