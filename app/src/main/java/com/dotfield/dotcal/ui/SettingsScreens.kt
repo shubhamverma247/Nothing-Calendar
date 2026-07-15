@@ -3132,7 +3132,7 @@ private fun SettingsDivider(palette: DotCalPalette) {
 
 @Composable
 private fun SettingsContentDivider(palette: DotCalPalette) {
-    HorizontalDivider(color = palette.line, thickness = 1.dp, modifier = Modifier.padding(start = 24.dp))
+    HorizontalDivider(color = palette.line, thickness = 1.dp, modifier = Modifier.fillMaxWidth())
 }
 
 @Composable
