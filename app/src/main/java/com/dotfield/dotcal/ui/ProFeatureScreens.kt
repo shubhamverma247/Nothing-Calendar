@@ -271,6 +271,7 @@ private val PRO_FEATURES = listOf(
     ProFeature("Calendar Sets", "Save Work/Personal/Family visibility and switch instantly"),
     ProFeature("Shift Patterns", "Build rotating shift cycles and generate them in bulk"),
     ProFeature("Time Insights", "See hours, busiest days, and task completion"),
+    ProFeature("Share Availability", "Turn free time into text you can paste anywhere"),
 )
 
 private enum class TimeInsightRange(val label: String) {

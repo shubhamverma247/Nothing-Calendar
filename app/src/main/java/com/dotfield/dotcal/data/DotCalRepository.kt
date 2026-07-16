@@ -16,8 +16,12 @@ import com.dotfield.dotcal.data.punchcard.PunchCardStreak
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.profiles.FocusProfileStore
+import com.dotfield.dotcal.data.scheduling.BusyPeriod
+import com.dotfield.dotcal.data.scheduling.DayAvailability
 import com.dotfield.dotcal.data.scheduling.EventDragMath
 import com.dotfield.dotcal.data.scheduling.EventTimeRange
+import com.dotfield.dotcal.data.scheduling.FreeSlotEngine
+import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import com.dotfield.dotcal.data.shifts.GeneratedShiftOccurrence
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
 import com.dotfield.dotcal.data.shifts.ShiftGenerationRecord
@@ -430,6 +434,31 @@ class DotCalRepository(
             .map { events ->
                 withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
             }
+    }
+
+    suspend fun computeAvailability(request: FreeSlotRequest): List<DayAvailability> {
+        val rangeEndExclusive = request.rangeEnd.plusDays(1)
+        val events = dao.observeEvents(request.rangeStart.atStartMs(), rangeEndExclusive.atStartMs()).first()
+        val privateIds = privacyManager.observePrivateVaultIds().first()
+        val ghostIds = sideStore.readNamespace(GHOST_FLAGS_NAMESPACE)
+            .filterValues { it == "1" }
+            .keys
+        val busyPeriods = expandRecurringEvents(
+            events.filterOutPrivate(privateIds),
+            request.rangeStart,
+            rangeEndExclusive,
+        ).map { event ->
+            val zone = runCatching { ZoneId.of(event.timeZone) }.getOrDefault(ZoneId.systemDefault())
+            BusyPeriod(
+                start = Instant.ofEpochMilli(event.startTimeMs).atZone(zone).toLocalDateTime(),
+                end = Instant.ofEpochMilli(event.endTimeMs).atZone(zone).toLocalDateTime(),
+                isAllDay = event.isAllDay == 1,
+                isGhost = event.baseEventId() in ghostIds,
+            )
+        }
+        return withContext(Dispatchers.Default) {
+            FreeSlotEngine.compute(request, busyPeriods)
+        }
     }
 
     fun observeUpcomingAgendaEvents(startDate: LocalDate): Flow<List<CalendarEvent>> {

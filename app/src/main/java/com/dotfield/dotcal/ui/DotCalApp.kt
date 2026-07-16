@@ -317,6 +317,7 @@ fun DotCalApp(
     val dayDensityForecast by viewModel.dayDensityForecast.collectAsStateWithLifecycle()
     val punchCardState by viewModel.punchCardState.collectAsStateWithLifecycle()
     val countdownPins by viewModel.countdownPins.collectAsStateWithLifecycle()
+    val availabilityState by viewModel.availabilityState.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val assignableAccounts by viewModel.assignableAccounts.collectAsStateWithLifecycle()
@@ -342,6 +343,8 @@ fun DotCalApp(
     var showPaywall by remember { mutableStateOf(false) }
     var showDateCalculator by remember { mutableStateOf(false) }
     var showTimeInsights by remember { mutableStateOf(false) }
+    var showAvailability by remember { mutableStateOf(false) }
+    var availabilityInitialDate by remember { mutableStateOf(LocalDate.now()) }
     var showQuickAdd by remember { mutableStateOf(false) }
     var showJumpToDatePicker by remember { mutableStateOf(false) }
     var showRecentlyDeleted by remember { mutableStateOf(false) }
@@ -1101,6 +1104,10 @@ fun DotCalApp(
             showRecentlyDeleted -> showRecentlyDeleted = false
             showDateCalculator -> showDateCalculator = false
             showTimeInsights -> showTimeInsights = false
+            showAvailability -> {
+                showAvailability = false
+                viewModel.clearAvailability()
+            }
             showQuickAdd -> showQuickAdd = false
             showJumpToDatePicker -> showJumpToDatePicker = false
             addSheet -> {
@@ -1199,7 +1206,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || qrShareSession != null || pendingIcsImport != null || showQrScanner || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || qrShareSession != null || pendingIcsImport != null || showQrScanner || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showAvailability || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -1266,6 +1273,15 @@ fun DotCalApp(
                             onSearch = { showSearch = true },
                             onScanQr = { showQrScanner = true },
                             onJumpToDate = { showJumpToDatePicker = true },
+                            onAvailability = {
+                                if (isPro) {
+                                    availabilityInitialDate = selectedDate
+                                    viewModel.clearAvailability()
+                                    showAvailability = true
+                                } else {
+                                    showPaywall = true
+                                }
+                            },
                             onCalendarSets = {
                                 if (isPro) {
                                     viewModel.refreshFocusProfiles()
@@ -1351,6 +1367,15 @@ fun DotCalApp(
                                         },
                                         onEventClick = viewModel::openEventDetail,
                                         onEventDrag = ::requestEventDrag,
+                                        onAvailabilityRequest = { date ->
+                                            if (isPro) {
+                                                availabilityInitialDate = date
+                                                viewModel.clearAvailability()
+                                                showAvailability = true
+                                            } else {
+                                                showPaywall = true
+                                            }
+                                        },
                                         use24HourFormat = use24HourFormat,
                                     )
                                     CalendarTab.Day -> DayView(
@@ -2514,6 +2539,31 @@ fun DotCalApp(
             )
         }
         AnimatedVisibility(
+            visible = showAvailability,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            AvailabilityScreen(
+                palette = palette,
+                initialDate = availabilityInitialDate,
+                weekStart = weekStartDay,
+                use24HourFormat = use24HourFormat,
+                state = availabilityState,
+                onBack = {
+                    showAvailability = false
+                    viewModel.clearAvailability()
+                },
+                onRefresh = { request -> viewModel.refreshAvailability(request, use24HourFormat) },
+                onCopy = { text ->
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("DotCal availability", text))
+                    showDotCalToast(context, palette, "Availability copied")
+                },
+                onShare = { text -> shareAvailabilityText(context, text) },
+            )
+        }
+        AnimatedVisibility(
             visible = showQuickAdd,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
@@ -2905,6 +2955,14 @@ private fun CalendarEvent.shareText(use24HourFormat: Boolean): String {
     if (location.isNotBlank()) lines += "Location: $location"
     if (description.isNotBlank()) lines += "Notes: $description"
     return lines.joinToString("\n")
+}
+
+private fun shareAvailabilityText(context: Context, text: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share availability"))
 }
 
 private fun CalendarEvent.shareDateTimeLine(use24HourFormat: Boolean): String {

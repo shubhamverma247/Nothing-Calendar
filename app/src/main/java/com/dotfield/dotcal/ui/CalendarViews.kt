@@ -317,6 +317,7 @@ internal fun WeekView(
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
     onEventDrag: (EventDragChange) -> Unit,
+    onAvailabilityRequest: (LocalDate) -> Unit,
     use24HourFormat: Boolean,
 ) {
     val days = remember(selectedDate, weekStart) { weekDays(selectedDate, weekStart) }
@@ -357,6 +358,7 @@ internal fun WeekView(
                     highlighted = day == highlightDate,
                     palette = palette,
                     onClick = { onDateSelected(day) },
+                    onLongClick = { onAvailabilityRequest(day) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -457,9 +459,11 @@ private fun WeekDayHeader(
     highlighted: Boolean,
     palette: DotCalPalette,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = onClick,
     modifier: Modifier = Modifier,
 ) {
     val today = date == LocalDate.now()
+    val haptic = LocalHapticFeedback.current
     val highlightColor by animateColorAsState(
         targetValue = if (highlighted) palette.accent.copy(alpha = 0.24f) else Color.Transparent,
         animationSpec = tween(durationMillis = 500),
@@ -476,7 +480,15 @@ private fun WeekDayHeader(
                     )
                 }
             }
-            .noRippleClickable(onClick = onClick)
+            .pointerInput(date) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onLongPress = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onLongClick()
+                    },
+                )
+            }
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

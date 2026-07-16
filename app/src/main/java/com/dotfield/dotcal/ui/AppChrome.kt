@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Settings as SettingsGearIcon
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -106,6 +107,7 @@ internal fun CalendarTabContainer(
     onSearch: (() -> Unit)? = null,
     onScanQr: (() -> Unit)? = null,
     onJumpToDate: (() -> Unit)? = null,
+    onAvailability: (() -> Unit)? = null,
     onCalendarSets: (() -> Unit)? = null,
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
@@ -135,6 +137,7 @@ internal fun CalendarTabContainer(
                 onSearch = onSearch,
                 onScanQr = onScanQr,
                 onJumpToDate = onJumpToDate,
+                onAvailability = onAvailability,
                 onCalendarSets = onCalendarSets,
                 onTimeInsights = onTimeInsights,
                 onDateCalculator = onDateCalculator,
@@ -181,6 +184,7 @@ internal fun CalendarActionBar(
     onSearch: (() -> Unit)? = null,
     onScanQr: (() -> Unit)? = null,
     onJumpToDate: (() -> Unit)? = null,
+    onAvailability: (() -> Unit)? = null,
     onCalendarSets: (() -> Unit)? = null,
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
@@ -192,6 +196,7 @@ internal fun CalendarActionBar(
     var showOverflow by remember { mutableStateOf(false) }
     val hasOverflow = onSearch != null ||
         onJumpToDate != null ||
+        onAvailability != null ||
         onQuickAdd != null ||
         onTemplates != null ||
         onCalendarSets != null ||
@@ -300,6 +305,19 @@ internal fun CalendarActionBar(
                                 onClick = {
                                     showOverflow = false
                                     onQuickAdd()
+                                },
+                            )
+                        }
+                        if (onAvailability != null) {
+                            ActionBarMenuItem(
+                                label = "Share availability",
+                                subtitle = "Copy when you're free",
+                                icon = Icons.Default.Share,
+                                isPro = showProBadges,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onAvailability()
                                 },
                             )
                         }

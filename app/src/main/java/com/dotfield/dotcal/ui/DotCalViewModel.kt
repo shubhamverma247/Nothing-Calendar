@@ -18,6 +18,8 @@ import com.dotfield.dotcal.data.billing.ProManager
 import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.profiles.FocusProfile
+import com.dotfield.dotcal.data.scheduling.AvailabilityTextFormatter
+import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
@@ -63,6 +65,12 @@ data class PunchCardUiState(
     fun streakEndingAt(date: LocalDate): Int = PunchCardStreak.compute(punchedDays, date)
 }
 
+data class AvailabilityUiState(
+    val isLoading: Boolean = false,
+    val text: String = "",
+    val error: String? = null,
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class DotCalViewModel(
     private val repository: DotCalRepository,
@@ -100,6 +108,9 @@ class DotCalViewModel(
     val punchCardState: StateFlow<PunchCardUiState> = _punchCardState
     private val _countdownPins = MutableStateFlow<Set<String>>(emptySet())
     val countdownPins: StateFlow<Set<String>> = _countdownPins
+    private val _availabilityState = MutableStateFlow(AvailabilityUiState())
+    val availabilityState: StateFlow<AvailabilityUiState> = _availabilityState
+    private var availabilityJob: Job? = null
 
     val tasks: StateFlow<List<CalendarEvent>> = repository.observeTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -244,6 +255,26 @@ class DotCalViewModel(
     fun clearConflictWarnings() {
         conflictWarningJob?.cancel()
         _conflictWarnings.value = emptyList()
+    }
+
+    fun refreshAvailability(request: FreeSlotRequest, use24HourFormat: Boolean) {
+        availabilityJob?.cancel()
+        _availabilityState.value = _availabilityState.value.copy(isLoading = true, error = null)
+        availabilityJob = viewModelScope.launch {
+            runCatching {
+                val days = repository.computeAvailability(request)
+                AvailabilityTextFormatter.format(days, use24HourFormat)
+            }.onSuccess { text ->
+                _availabilityState.value = AvailabilityUiState(text = text)
+            }.onFailure {
+                _availabilityState.value = AvailabilityUiState(error = "Couldn't calculate availability")
+            }
+        }
+    }
+
+    fun clearAvailability() {
+        availabilityJob?.cancel()
+        _availabilityState.value = AvailabilityUiState()
     }
 
     fun saveEvent(
