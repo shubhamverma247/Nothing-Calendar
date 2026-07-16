@@ -222,6 +222,10 @@ import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.BulkEditResult
 import com.dotfield.dotcal.data.ics.IcsExporter
+import com.dotfield.dotcal.data.ics.IcsParser
+import com.dotfield.dotcal.data.ics.ParsedIcsItem
+import com.dotfield.dotcal.data.qr.QrEventDecodeResult
+import com.dotfield.dotcal.data.qr.QrEventPayloadCodec
 import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
@@ -243,6 +247,7 @@ import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
 import com.dotfield.dotcal.share.CardImageExporter
+import com.dotfield.dotcal.share.QrEventImageExporter
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import com.dotfield.dotcal.ui.theme.NBlack
 import com.dotfield.dotcal.ui.theme.NWhite
@@ -280,6 +285,15 @@ private data class PendingDelete(
 private data class PendingEventDrag(
     val change: EventDragChange,
     val scope: RecurringEditScope,
+)
+private data class QrShareSession(
+    val event: CalendarEvent,
+    val payload: String,
+    val sharedWithoutDescription: Boolean,
+)
+private data class PendingIcsImport(
+    val icsText: String,
+    val items: List<ParsedIcsItem>,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -345,6 +359,9 @@ fun DotCalApp(
     var duplicateDraftPrefill by remember { mutableStateOf<EventEditorData?>(null) }
     var pendingCopyToDateEvent by remember { mutableStateOf<CalendarEvent?>(null) }
     var pendingShareEvent by remember { mutableStateOf<CalendarEvent?>(null) }
+    var qrShareSession by remember { mutableStateOf<QrShareSession?>(null) }
+    var showQrScanner by remember { mutableStateOf(false) }
+    var pendingIcsImport by remember { mutableStateOf<PendingIcsImport?>(null) }
     var pendingCountdownLimitEvent by remember { mutableStateOf<Pair<CalendarEvent, String>?>(null) }
     var templatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     var taskTemplatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
@@ -654,7 +671,18 @@ fun DotCalApp(
     var onboardingPageIndex by remember { mutableStateOf(0) }
     var selectedDateRestored by remember { mutableStateOf(false) }
 
-    // ----- ICS export / import (Pro) -----
+    fun openIcsPreview(icsText: String, errorMessage: String) {
+        scope.launch {
+            val items = withContext(Dispatchers.Default) { IcsParser.parse(icsText) }
+            if (items.isEmpty()) {
+                showDotCalToast(context, palette, errorMessage)
+            } else {
+                pendingIcsImport = PendingIcsImport(icsText, items)
+            }
+        }
+    }
+
+    // ----- ICS export / import (Free) -----
     val exportIcsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/calendar"),
     ) { uri ->
@@ -674,23 +702,16 @@ fun DotCalApp(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val text = runCatching {
-            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-        }.getOrNull()
-        if (text.isNullOrBlank()) {
-            showDotCalToast(context, palette, "Couldn't read file")
-            return@rememberLauncherForActivityResult
-        }
-        viewModel.importIcs(text) { result ->
-            result.onSuccess { summary ->
-                showDotCalToast(
-                    context,
-                    palette,
-                    "Imported: ${summary.inserted} new, ${summary.updated} updated",
-                    Toast.LENGTH_LONG,
-                )
-            }.onFailure {
-                showDotCalToast(context, palette, "Import failed - not a valid .ics file")
+        scope.launch {
+            val text = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                }.getOrNull()
+            }
+            if (text.isNullOrBlank()) {
+                showDotCalToast(context, palette, "Couldn't read file")
+            } else {
+                openIcsPreview(text, "Import failed - not a valid .ics file")
             }
         }
     }
@@ -1067,6 +1088,9 @@ fun DotCalApp(
             showPaywall -> showPaywall = false
             bulkEventSheet != null -> bulkEventSheet = null
             pendingShareEvent != null -> pendingShareEvent = null
+            qrShareSession != null -> qrShareSession = null
+            pendingIcsImport != null -> pendingIcsImport = null
+            showQrScanner -> showQrScanner = false
             pendingCountdownLimitEvent != null -> pendingCountdownLimitEvent = null
             pendingCopyToDateEvent != null -> pendingCopyToDateEvent = null
             showBulkTemplatePicker -> showBulkTemplatePicker = false
@@ -1175,7 +1199,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || qrShareSession != null || pendingIcsImport != null || showQrScanner || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -1240,6 +1264,7 @@ fun DotCalApp(
                             },
                             onQuickAdd = { showQuickAdd = true },
                             onSearch = { showSearch = true },
+                            onScanQr = { showQrScanner = true },
                             onJumpToDate = { showJumpToDatePicker = true },
                             onCalendarSets = {
                                 if (isPro) {
@@ -1881,6 +1906,39 @@ fun DotCalApp(
                         openEditEditor(event)
                     },
                     onShare = { pendingShareEvent = event },
+                    onShareQr = {
+                        val eventReminders = reminders.filter { it.eventId == event.baseEventId() }
+                        scope.launch {
+                            val result = withContext(Dispatchers.Default) {
+                                runCatching {
+                                    val remindersById = mapOf(
+                                        event.id to eventReminders,
+                                        event.baseEventId() to eventReminders,
+                                    )
+                                    val fullIcs = IcsExporter.export(listOf(event), remindersById)
+                                    val compactEvent = event.copy(
+                                        description = "",
+                                        imageUris = "[]",
+                                        voiceNotePath = null,
+                                    )
+                                    val compactIcs = IcsExporter.export(listOf(compactEvent), remindersById)
+                                    QrEventPayloadCodec.encode(fullIcs, compactIcs)
+                                }
+                            }
+                            result.onSuccess { encoded ->
+                                qrShareSession = QrShareSession(
+                                    event = event,
+                                    payload = encoded.payload,
+                                    sharedWithoutDescription = encoded.sharedWithoutDescription,
+                                )
+                                if (encoded.sharedWithoutDescription) {
+                                    showDotCalToast(context, palette, "Shared without description")
+                                }
+                            }.onFailure {
+                                showDotCalToast(context, palette, "Event is too large to share as QR")
+                            }
+                        }
+                    },
                     onPinCountdown = {
                         viewModel.pinCountdown(event, isPro) { result ->
                             when (result) {
@@ -1961,6 +2019,96 @@ fun DotCalApp(
                         }
                     },
                     palette = palette,
+                )
+            }
+        }
+        qrShareSession?.let { session ->
+            AnimatedVisibility(
+                visible = true,
+                enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+                exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+                modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            ) {
+                QrEventShareScreen(
+                    eventTitle = session.event.title,
+                    payload = session.payload,
+                    sharedWithoutDescription = session.sharedWithoutDescription,
+                    palette = palette,
+                    onBack = { qrShareSession = null },
+                    onShare = { bitmap ->
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    QrEventImageExporter.createShareUri(
+                                        context = context,
+                                        bitmap = bitmap,
+                                        eventId = session.event.baseEventId(),
+                                    )
+                                }
+                            }
+                            result
+                                .onSuccess { uri -> shareQrEventImage(context, session.event, uri, palette) }
+                                .onFailure { showDotCalToast(context, palette, "Could not share QR image") }
+                        }
+                    },
+                )
+            }
+        }
+        AnimatedVisibility(
+            visible = showQrScanner,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            QrEventScannerScreen(
+                palette = palette,
+                onBack = { showQrScanner = false },
+                onCodeDetected = { rawValue ->
+                    when (val decoded = QrEventPayloadCodec.decode(rawValue)) {
+                        is QrEventDecodeResult.Success -> {
+                            val parsedItems = IcsParser.parse(decoded.icsText)
+                            if (parsedItems.isEmpty()) {
+                                QrScanOutcome.Rejected("Not a valid event code")
+                            } else {
+                                showQrScanner = false
+                                pendingIcsImport = PendingIcsImport(decoded.icsText, parsedItems)
+                                QrScanOutcome.Accepted
+                            }
+                        }
+                        QrEventDecodeResult.NotDotCal -> QrScanOutcome.Rejected("Not a DotCal event code")
+                        QrEventDecodeResult.UnsupportedVersion -> QrScanOutcome.Rejected("DotCal event code needs a newer app")
+                        QrEventDecodeResult.Malformed -> QrScanOutcome.Rejected("Not a valid event code")
+                    }
+                },
+            )
+        }
+        pendingIcsImport?.let { pending ->
+            AnimatedVisibility(
+                visible = true,
+                enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+                exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+                modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            ) {
+                IcsImportPreviewScreen(
+                    items = pending.items,
+                    palette = palette,
+                    use24HourFormat = use24HourFormat,
+                    onBack = { pendingIcsImport = null },
+                    onImport = {
+                        viewModel.importIcs(pending.icsText) { result ->
+                            result.onSuccess { summary ->
+                                pendingIcsImport = null
+                                showDotCalToast(
+                                    context,
+                                    palette,
+                                    "Imported: ${summary.inserted} new, ${summary.updated} updated",
+                                    Toast.LENGTH_LONG,
+                                )
+                            }.onFailure {
+                                showDotCalToast(context, palette, "Import failed - not a valid .ics file")
+                            }
+                        }
+                    },
                 )
             }
         }
@@ -2715,6 +2863,25 @@ private fun shareCountdownImage(
     }
     runCatching {
         context.startActivity(Intent.createChooser(intent, "Share Countdown"))
+    }.onFailure {
+        showDotCalToast(context, palette, "No share target found")
+    }
+}
+
+private fun shareQrEventImage(
+    context: Context,
+    event: CalendarEvent,
+    uri: Uri,
+    palette: DotCalPalette,
+) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(Intent.EXTRA_SUBJECT, event.title)
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "Share Event QR"))
     }.onFailure {
         showDotCalToast(context, palette, "No share target found")
     }

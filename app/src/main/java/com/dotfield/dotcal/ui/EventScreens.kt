@@ -263,6 +263,7 @@ internal fun EventDetailScreen(
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
+    onShareQr: () -> Unit,
     onPinCountdown: () -> Unit,
     onUnpinCountdown: () -> Unit,
     onShareCountdownImage: () -> Unit,
@@ -449,6 +450,10 @@ internal fun EventDetailScreen(
                 add(CompactActionItem("Share") {
                     showActions = false
                     onShare()
+                })
+                add(CompactActionItem("Share as QR") {
+                    showActions = false
+                    onShareQr()
                 })
                 if (!isReadOnly) {
                     add(CompactActionItem(if (isCountdownPinned) "Remove Countdown" else "Pin as Countdown") {
