@@ -12,12 +12,10 @@ object AvailabilityTextFormatter {
         locale: Locale = Locale.getDefault(),
     ): String {
         if (days.isEmpty()) return "No availability in this range."
-        val visibleDays = days.filterNot { it.isFullyBusy }
         val lines = mutableListOf("My availability (${formatRange(days.first().date, days.last().date, locale)}):")
-        visibleDays.forEach { day ->
+        days.forEach { day ->
             lines += "${day.date.format(DateTimeFormatter.ofPattern("EEE", locale))}: ${formatDay(day, use24HourFormat, locale)}"
         }
-        if (visibleDays.size < days.size) lines += "Other days are fully booked."
         return lines.joinToString("\n")
     }
 
@@ -26,6 +24,7 @@ object AvailabilityTextFormatter {
         use24HourFormat: Boolean,
         locale: Locale,
     ): String {
+        if (day.isFullyBusy) return "fully booked"
         if (day.isFreeAllDay) return "free all day"
         val slots = day.freeSlots
         if (slots.size == 2 &&

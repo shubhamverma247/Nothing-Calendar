@@ -88,7 +88,7 @@ object QrEventImageExporter {
         return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     }
 
-    private fun createQrBitmap(payload: String, size: Int): Bitmap {
+    fun createQrBitmap(payload: String, size: Int = QR_SIZE): Bitmap {
         val hints = mapOf(
             EncodeHintType.CHARACTER_SET to Charsets.UTF_8.name(),
             EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,

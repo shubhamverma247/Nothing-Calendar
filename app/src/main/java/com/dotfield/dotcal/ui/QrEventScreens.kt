@@ -15,6 +15,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -50,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -96,9 +98,14 @@ internal fun QrEventShareScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val bitmapResult by produceState<Result<Bitmap>?>(initialValue = null, payload, eventTitle) {
+    val exportBitmapResult by produceState<Result<Bitmap>?>(initialValue = null, payload, eventTitle) {
         value = withContext(Dispatchers.Default) {
             runCatching { QrEventImageExporter.createCard(payload, eventTitle, eventDateTime, eventMeta) }
+        }
+    }
+    val qrBitmapResult by produceState<Result<Bitmap>?>(initialValue = null, payload) {
+        value = withContext(Dispatchers.Default) {
+            runCatching { QrEventImageExporter.createQrBitmap(payload, size = 920) }
         }
     }
     var pendingSaveBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -127,18 +134,18 @@ internal fun QrEventShareScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 12.dp),
+                .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-                    .background(Color.White, RoundedCornerShape(8.dp))
-                    .padding(12.dp),
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                bitmapResult?.fold(
+                qrBitmapResult?.fold(
                     onSuccess = { bitmap ->
                         Image(
                             bitmap = bitmap.asImageBitmap(),
@@ -147,8 +154,44 @@ internal fun QrEventShareScreen(
                         )
                     },
                     onFailure = {
-                        Text("Could not create QR code", color = Color.Black, textAlign = TextAlign.Center)
+                        Text(
+                            "Could not create QR code",
+                            color = palette.accent,
+                            textAlign = TextAlign.Center,
+                        )
                     },
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+            Text(
+                eventTitle,
+                color = palette.primaryText,
+                fontFamily = LocalHeadingFont.current,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+            )
+            if (eventDateTime.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    eventDateTime,
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (eventMeta.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    eventMeta,
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
                 )
             }
             if (sharedWithoutDescription) {
@@ -170,12 +213,12 @@ internal fun QrEventShareScreen(
         ) {
             Button(
                 onClick = {
-                    bitmapResult?.getOrNull()?.let { bitmap ->
+                    exportBitmapResult?.getOrNull()?.let { bitmap ->
                         pendingSaveBitmap = bitmap
                         saveLauncher.launch("${eventTitle.safeQrFilename()}.png")
                     }
                 },
-                enabled = bitmapResult?.isSuccess == true,
+                enabled = exportBitmapResult?.isSuccess == true,
                 modifier = Modifier.weight(1f).height(56.dp),
                 border = secondaryActionBorder(palette),
                 colors = ButtonDefaults.buttonColors(
@@ -191,8 +234,8 @@ internal fun QrEventShareScreen(
                 Text("Save image", fontWeight = FontWeight.SemiBold)
             }
             Button(
-                onClick = { bitmapResult?.getOrNull()?.let(onShare) },
-                enabled = bitmapResult?.isSuccess == true,
+                onClick = { exportBitmapResult?.getOrNull()?.let(onShare) },
+                enabled = exportBitmapResult?.isSuccess == true,
                 modifier = Modifier.weight(1f).height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = palette.accent,

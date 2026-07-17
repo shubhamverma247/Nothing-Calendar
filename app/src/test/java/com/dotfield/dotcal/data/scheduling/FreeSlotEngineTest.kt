@@ -108,7 +108,7 @@ class FreeSlotEngineTest {
     }
 
     @Test
-    fun textFormatterCoversCompactRulesAndBusySummary() {
+    fun textFormatterCoversCompactRulesAndBusyDays() {
         val request = request(rangeEnd = monday.plusDays(3))
         val days = FreeSlotEngine.compute(
             request,
@@ -126,7 +126,7 @@ class FreeSlotEngineTest {
             Mon: 2:00 pm-5:30 pm
             Tue: free all day
             Wed: before 11 am, after 4 pm
-            Other days are fully booked.
+            Thu: fully booked
             """.trimIndent(),
             AvailabilityTextFormatter.format(days, use24HourFormat = false, locale = Locale.US),
         )

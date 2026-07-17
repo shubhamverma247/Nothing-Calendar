@@ -5,18 +5,23 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
@@ -81,6 +86,8 @@ internal fun AvailabilityScreen(
     var treatGhostsAsBusy by remember { mutableStateOf(true) }
     var pickingStart by remember { mutableStateOf(false) }
     var pickingEnd by remember { mutableStateOf(false) }
+    val formScrollState = rememberScrollState()
+    val previewScrollState = rememberScrollState()
 
     val request = remember(
         rangeStart,
@@ -131,6 +138,7 @@ internal fun AvailabilityScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .verticalScroll(formScrollState)
                 .padding(start = 18.dp, top = 12.dp, end = 18.dp, bottom = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -138,7 +146,7 @@ internal fun AvailabilityScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 96.dp, max = 178.dp)
+                        .heightIn(min = 156.dp, max = 244.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(palette.eventCardSurface)
                         .border(1.dp, palette.eventCardBorder, RoundedCornerShape(8.dp))
@@ -166,7 +174,7 @@ internal fun AvailabilityScreen(
                     }
                     Spacer(Modifier.height(10.dp))
                     Box(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().weight(1f),
                         contentAlignment = if (state.isLoading && state.text.isBlank()) Alignment.Center else Alignment.TopStart,
                     ) {
                         when {
@@ -187,9 +195,33 @@ internal fun AvailabilityScreen(
                                 fontFamily = mono,
                                 fontSize = 13.sp,
                                 lineHeight = 19.sp,
-                                maxLines = 6,
-                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(previewScrollState)
+                                    .padding(end = 10.dp),
                             )
+                        }
+                        if (previewScrollState.maxValue > 0) {
+                            BoxWithConstraints(
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .fillMaxHeight()
+                                    .width(3.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(palette.line.copy(alpha = 0.35f)),
+                            ) {
+                                val thumbHeight = if (maxHeight < 32.dp) maxHeight else 32.dp
+                                val travel = maxHeight - thumbHeight
+                                val thumbOffset = travel * (previewScrollState.value.toFloat() / previewScrollState.maxValue)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(thumbHeight)
+                                        .offset(y = thumbOffset)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(palette.accent),
+                                )
+                            }
                         }
                     }
                 }
@@ -231,6 +263,26 @@ internal fun AvailabilityScreen(
                     selectedPreset = null
                     pickingEnd = true
                 }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Working hours",
+                    color = palette.primaryText,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "${formatAvailabilityTime(request.workingStart, use24HourFormat)} - ${formatAvailabilityTime(request.workingEnd, use24HourFormat)}",
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 AvailabilityHourStepper(
