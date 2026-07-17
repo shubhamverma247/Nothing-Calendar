@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-07-16
+Updated: 2026-07-17
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full history: `Docs/HANDOFF.original.md`. Feature spec: `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. Do not touch `Docs/HANDOFF - Copy.md`.
 
@@ -82,21 +82,28 @@ Availability Text Generator complete locally on `pro-features`.
 - Week day-header long-press: same flow, seeded from pressed date.
 - Controls: Next 3 days / This week / Next week, custom From/To, working hours, 15/30/45/60-minute minimum, all-day policy, ghost busy/free policy.
 - Output: compact 12/24-hour-aware text; Copy and system Share.
+- UI polish: compact balanced-spacing layout, content-bounded bordered preview card, vertically unclipped From/To date cards, stepper-style working-hours controls instead of slider, navigation-bar-safe actions, and stable enabled state so Copy/Share do not blink during refresh.
 - Active Calendar Set respected through visible-account queries.
 - Private Vault events excluded.
 - Recurring events expanded.
 - Shared UI-free `FreeSlotEngine` handles overlap/adjacency merging, midnight clipping, all-day events, minimum gaps, and ghost policy.
 - JVM tests cover overlap, adjacency, midnight, empty/full calendars, all-day, minimum duration, ghost policy, and text formatting.
 - No Room/package/deep-link/DB/Hilt/Nav changes.
-- Required tests/build passed.
-- Debug APK installed on device `4ab0d020`.
+- Secondary filled actions now use one shared light/dark rule: theme surface background with accent outline/text.
+- Required tests/build passed after latest UI polish.
+- Latest debug APK installed on device `000153573000720` after latest UI polish.
 - No manual phone QA run.
+
+Quick Add UI polish:
+
+- Continue action moved into the main content area instead of pinned to the bottom, avoiding home/gesture bar crowding.
 
 QR Event Share complete in commit `4fdb4c4`.
 
 - Free QR scanner icon immediately left of `+`.
 - Event Detail > More > Share as QR.
 - DotCal QR scans into existing ICS import preview.
+- UI polish: Share QR card renders event title/date/location inside the white QR image under the barcode, Save image follows the same secondary action color rule as Availability Copy (surface background, red outline/text in light and dark), bottom actions and import preview action are navigation-bar-safe, and bottom actions have no outer border.
 
 ## Next Roadmap
 

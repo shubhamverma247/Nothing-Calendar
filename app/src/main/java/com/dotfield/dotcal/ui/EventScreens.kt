@@ -1964,14 +1964,13 @@ internal fun JumpToDateSheet(
                 Button(
                     onClick = { pickedDate = today },
                     modifier = Modifier.weight(1f).height(54.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = palette.cancelSurface, contentColor = palette.primaryText),
+                    border = secondaryActionBorder(palette),
+                    colors = ButtonDefaults.buttonColors(containerColor = secondaryActionContainer(palette), contentColor = palette.accent),
                     shape = RoundedCornerShape(18.dp),
                     contentPadding = PaddingValues(0.dp),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .border(1.dp, palette.cancelBorder, RoundedCornerShape(18.dp)),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text("Today", fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
@@ -2166,17 +2165,16 @@ internal fun DateTimeChoiceSheet(
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(54.dp),
+                    border = secondaryActionBorder(palette),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = palette.cancelSurface,
-                        contentColor = palette.primaryText,
+                        containerColor = secondaryActionContainer(palette),
+                        contentColor = palette.accent,
                     ),
                     shape = RoundedCornerShape(18.dp),
                     contentPadding = PaddingValues(0.dp),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .border(1.dp, palette.cancelBorder, RoundedCornerShape(18.dp)),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text("Cancel", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)

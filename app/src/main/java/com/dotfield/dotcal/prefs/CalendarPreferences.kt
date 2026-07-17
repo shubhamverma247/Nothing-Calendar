@@ -36,4 +36,6 @@ object CalendarPreferences {
     val KEY_APP_LOCK_PIN_SALT = stringPreferencesKey("app_lock_pin_salt")
     val KEY_APP_LOCK_PIN_HASH = stringPreferencesKey("app_lock_pin_hash")
     val KEY_PRIVATE_VAULT_EVENT_IDS = stringPreferencesKey("private_vault_event_ids")
+    val KEY_FREE_TIME_START_HOUR = intPreferencesKey("free_time_start_hour")
+    val KEY_FREE_TIME_END_HOUR = intPreferencesKey("free_time_end_hour")
 }

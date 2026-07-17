@@ -22,7 +22,7 @@ object QrEventImageExporter {
     private const val CARD_HEIGHT = 1_500
     private const val QR_SIZE = 960
 
-    fun createCard(payload: String, eventTitle: String): Bitmap {
+    fun createCard(payload: String, eventTitle: String, eventDateTime: String = "", eventMeta: String = ""): Bitmap {
         val card = Bitmap.createBitmap(CARD_WIDTH, CARD_HEIGHT, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(card)
         canvas.drawColor(Color.WHITE)
@@ -47,6 +47,27 @@ object QrEventImageExporter {
         titleLayout.draw(canvas)
         canvas.restore()
 
+        val detailText = listOf(eventDateTime.trim(), eventMeta.trim())
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
+        if (detailText.isNotBlank()) {
+            val detailPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(80, 80, 80)
+                textSize = 34f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            }
+            val detailLayout = StaticLayout.Builder
+                .obtain(detailText, 0, detailText.length, detailPaint, CARD_WIDTH - 180)
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setMaxLines(3)
+                .setEllipsize(android.text.TextUtils.TruncateAt.END)
+                .build()
+            canvas.save()
+            canvas.translate(90f, 1_220f)
+            detailLayout.draw(canvas)
+            canvas.restore()
+        }
+
         val wordmarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.BLACK
             textSize = 58f
@@ -54,7 +75,7 @@ object QrEventImageExporter {
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
             letterSpacing = 0f
         }
-        canvas.drawText("DotCal", CARD_WIDTH / 2f, 1_420f, wordmarkPaint)
+        canvas.drawText("DotCal", CARD_WIDTH / 2f, 1_440f, wordmarkPaint)
         return card
     }
 

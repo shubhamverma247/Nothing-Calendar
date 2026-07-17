@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -85,6 +86,8 @@ internal sealed interface QrScanOutcome {
 @Composable
 internal fun QrEventShareScreen(
     eventTitle: String,
+    eventDateTime: String,
+    eventMeta: String,
     payload: String,
     sharedWithoutDescription: Boolean,
     palette: DotCalPalette,
@@ -95,7 +98,7 @@ internal fun QrEventShareScreen(
     val scope = rememberCoroutineScope()
     val bitmapResult by produceState<Result<Bitmap>?>(initialValue = null, payload, eventTitle) {
         value = withContext(Dispatchers.Default) {
-            runCatching { QrEventImageExporter.createCard(payload, eventTitle) }
+            runCatching { QrEventImageExporter.createCard(payload, eventTitle, eventDateTime, eventMeta) }
         }
     }
     var pendingSaveBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -121,7 +124,10 @@ internal fun QrEventShareScreen(
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
         QrTopBar(title = "Share as QR", palette = palette, onBack = onBack)
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 18.dp),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
@@ -153,44 +159,51 @@ internal fun QrEventShareScreen(
                     modifier = Modifier.padding(top = 10.dp),
                 )
             }
-            Spacer(modifier = Modifier.height(14.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(palette.bottomNavSurface)
+                .navigationBarsPadding()
+                .padding(start = 20.dp, top = 14.dp, end = 20.dp, bottom = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Button(
+                onClick = {
+                    bitmapResult?.getOrNull()?.let { bitmap ->
+                        pendingSaveBitmap = bitmap
+                        saveLauncher.launch("${eventTitle.safeQrFilename()}.png")
+                    }
+                },
+                enabled = bitmapResult?.isSuccess == true,
+                modifier = Modifier.weight(1f).height(56.dp),
+                border = secondaryActionBorder(palette),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = secondaryActionContainer(palette),
+                    contentColor = palette.accent,
+                    disabledContainerColor = secondaryActionContainer(palette).copy(alpha = 0.55f),
+                    disabledContentColor = palette.disabledText,
+                ),
+                shape = RoundedCornerShape(8.dp),
             ) {
-                Button(
-                    onClick = {
-                        bitmapResult?.getOrNull()?.let { bitmap ->
-                            pendingSaveBitmap = bitmap
-                            saveLauncher.launch("${eventTitle.safeQrFilename()}.png")
-                        }
-                    },
-                    enabled = bitmapResult?.isSuccess == true,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = palette.dialogSurface,
-                        contentColor = palette.primaryText,
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Icon(Icons.Default.FileDownload, contentDescription = null)
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text("Save image")
-                }
-                Button(
-                    onClick = { bitmapResult?.getOrNull()?.let(onShare) },
-                    enabled = bitmapResult?.isSuccess == true,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = palette.accent,
-                        contentColor = Color.White,
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Icon(Icons.Default.Share, contentDescription = null)
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text("Share")
-                }
+                Icon(Icons.Default.FileDownload, contentDescription = null)
+                Spacer(modifier = Modifier.size(8.dp))
+                Text("Save image", fontWeight = FontWeight.SemiBold)
+            }
+            Button(
+                onClick = { bitmapResult?.getOrNull()?.let(onShare) },
+                enabled = bitmapResult?.isSuccess == true,
+                modifier = Modifier.weight(1f).height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = palette.accent,
+                    contentColor = palette.onAccent,
+                    disabledContainerColor = palette.accent.copy(alpha = 0.45f),
+                ),
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Icon(Icons.Default.Share, contentDescription = null)
+                Spacer(modifier = Modifier.size(8.dp))
+                Text("Share", fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -400,7 +413,11 @@ internal fun IcsImportPreviewScreen(
         }
         Button(
             onClick = onImport,
-            modifier = Modifier.fillMaxWidth().padding(20.dp).height(52.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 20.dp)
+                .height(56.dp),
             colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
             shape = RoundedCornerShape(8.dp),
         ) {

@@ -18,6 +18,8 @@ import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.profiles.FocusProfileStore
 import com.dotfield.dotcal.data.scheduling.BusyPeriod
 import com.dotfield.dotcal.data.scheduling.DayAvailability
+import com.dotfield.dotcal.data.scheduling.DeadTimeFinder
+import com.dotfield.dotcal.data.scheduling.DeadTimeResult
 import com.dotfield.dotcal.data.scheduling.EventDragMath
 import com.dotfield.dotcal.data.scheduling.EventTimeRange
 import com.dotfield.dotcal.data.scheduling.FreeSlotEngine
@@ -437,15 +439,37 @@ class DotCalRepository(
     }
 
     suspend fun computeAvailability(request: FreeSlotRequest): List<DayAvailability> {
-        val rangeEndExclusive = request.rangeEnd.plusDays(1)
-        val events = dao.observeEvents(request.rangeStart.atStartMs(), rangeEndExclusive.atStartMs()).first()
+        val busyPeriods = loadBusyPeriods(request.rangeStart, request.rangeEnd)
+        return withContext(Dispatchers.Default) {
+            FreeSlotEngine.compute(request, busyPeriods)
+        }
+    }
+
+    suspend fun computeDeadTime(
+        startDate: LocalDate,
+        startHour: Int,
+        endHour: Int,
+    ): DeadTimeResult {
+        val rangeEnd = startDate.plusDays(DeadTimeFinder.DAYS_TO_SEARCH - 1L)
+        val busyPeriods = loadBusyPeriods(startDate, rangeEnd)
+        return withContext(Dispatchers.Default) {
+            DeadTimeFinder.find(startDate, busyPeriods, startHour, endHour)
+        }
+    }
+
+    private suspend fun loadBusyPeriods(
+        rangeStart: LocalDate,
+        rangeEnd: LocalDate,
+    ): List<BusyPeriod> {
+        val rangeEndExclusive = rangeEnd.plusDays(1)
+        val events = dao.observeEvents(rangeStart.atStartMs(), rangeEndExclusive.atStartMs()).first()
         val privateIds = privacyManager.observePrivateVaultIds().first()
         val ghostIds = sideStore.readNamespace(GHOST_FLAGS_NAMESPACE)
             .filterValues { it == "1" }
             .keys
-        val busyPeriods = expandRecurringEvents(
+        return expandRecurringEvents(
             events.filterOutPrivate(privateIds),
-            request.rangeStart,
+            rangeStart,
             rangeEndExclusive,
         ).map { event ->
             val zone = runCatching { ZoneId.of(event.timeZone) }.getOrDefault(ZoneId.systemDefault())
@@ -455,9 +479,6 @@ class DotCalRepository(
                 isAllDay = event.isAllDay == 1,
                 isGhost = event.baseEventId() in ghostIds,
             )
-        }
-        return withContext(Dispatchers.Default) {
-            FreeSlotEngine.compute(request, busyPeriods)
         }
     }
 

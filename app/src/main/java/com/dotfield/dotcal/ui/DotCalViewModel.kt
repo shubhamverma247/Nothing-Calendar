@@ -19,6 +19,7 @@ import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.scheduling.AvailabilityTextFormatter
+import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
 import com.dotfield.dotcal.data.shifts.ShiftPattern
@@ -71,6 +72,12 @@ data class AvailabilityUiState(
     val error: String? = null,
 )
 
+data class DeadTimeUiState(
+    val isLoading: Boolean = false,
+    val slots: List<FreeSlot> = emptyList(),
+    val error: String? = null,
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class DotCalViewModel(
     private val repository: DotCalRepository,
@@ -111,6 +118,9 @@ class DotCalViewModel(
     private val _availabilityState = MutableStateFlow(AvailabilityUiState())
     val availabilityState: StateFlow<AvailabilityUiState> = _availabilityState
     private var availabilityJob: Job? = null
+    private val _deadTimeState = MutableStateFlow(DeadTimeUiState())
+    val deadTimeState: StateFlow<DeadTimeUiState> = _deadTimeState
+    private var deadTimeJob: Job? = null
 
     val tasks: StateFlow<List<CalendarEvent>> = repository.observeTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -275,6 +285,24 @@ class DotCalViewModel(
     fun clearAvailability() {
         availabilityJob?.cancel()
         _availabilityState.value = AvailabilityUiState()
+    }
+
+    fun refreshDeadTime(
+        startDate: LocalDate,
+        startHour: Int,
+        endHour: Int,
+    ) {
+        deadTimeJob?.cancel()
+        _deadTimeState.value = _deadTimeState.value.copy(isLoading = true, error = null)
+        deadTimeJob = viewModelScope.launch {
+            runCatching {
+                repository.computeDeadTime(startDate, startHour, endHour).slots
+            }.onSuccess { slots ->
+                _deadTimeState.value = DeadTimeUiState(slots = slots)
+            }.onFailure {
+                _deadTimeState.value = DeadTimeUiState(error = "Couldn't find free time")
+            }
+        }
     }
 
     fun saveEvent(

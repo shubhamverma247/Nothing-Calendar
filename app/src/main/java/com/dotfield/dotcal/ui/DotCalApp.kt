@@ -318,6 +318,7 @@ fun DotCalApp(
     val punchCardState by viewModel.punchCardState.collectAsStateWithLifecycle()
     val countdownPins by viewModel.countdownPins.collectAsStateWithLifecycle()
     val availabilityState by viewModel.availabilityState.collectAsStateWithLifecycle()
+    val deadTimeState by viewModel.deadTimeState.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val assignableAccounts by viewModel.assignableAccounts.collectAsStateWithLifecycle()
@@ -345,6 +346,7 @@ fun DotCalApp(
     var showTimeInsights by remember { mutableStateOf(false) }
     var showAvailability by remember { mutableStateOf(false) }
     var availabilityInitialDate by remember { mutableStateOf(LocalDate.now()) }
+    var availabilityInitialEndDate by remember { mutableStateOf(LocalDate.now().plusDays(2)) }
     var showQuickAdd by remember { mutableStateOf(false) }
     var showJumpToDatePicker by remember { mutableStateOf(false) }
     var showRecentlyDeleted by remember { mutableStateOf(false) }
@@ -553,6 +555,16 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_24_HOUR_FORMAT] ?: true
         }
     }.collectAsStateWithLifecycle(initialValue = true)
+    val freeTimeStartHour by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            (preferences[CalendarPreferences.KEY_FREE_TIME_START_HOUR] ?: 8).coerceIn(0, 22)
+        }
+    }.collectAsStateWithLifecycle(initialValue = 8)
+    val freeTimeEndHour by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            (preferences[CalendarPreferences.KEY_FREE_TIME_END_HOUR] ?: 22).coerceIn(1, 23)
+        }
+    }.collectAsStateWithLifecycle(initialValue = 22)
     val weekStartOption by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             parseWeekStartOption(preferences[CalendarPreferences.KEY_WEEK_START])
@@ -1276,6 +1288,7 @@ fun DotCalApp(
                             onAvailability = {
                                 if (isPro) {
                                     availabilityInitialDate = selectedDate
+                                    availabilityInitialEndDate = selectedDate.plusDays(2)
                                     viewModel.clearAvailability()
                                     showAvailability = true
                                 } else {
@@ -1370,6 +1383,7 @@ fun DotCalApp(
                                         onAvailabilityRequest = { date ->
                                             if (isPro) {
                                                 availabilityInitialDate = date
+                                                availabilityInitialEndDate = date.plusDays(2)
                                                 viewModel.clearAvailability()
                                                 showAvailability = true
                                             } else {
@@ -1714,6 +1728,11 @@ fun DotCalApp(
                     )
                 },
                 onCheckForUpdates = { checkForUpdates(true) },
+                onMoreApps = {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.dotfiles.app")),
+                    )
+                },
                 onRequestCalendarAccess = {
                     if (hasCalendarPermission) {
                         runSyncNow(showToast = false)
@@ -2056,6 +2075,8 @@ fun DotCalApp(
             ) {
                 QrEventShareScreen(
                     eventTitle = session.event.title,
+                    eventDateTime = session.event.shareDateTimeLine(use24HourFormat),
+                    eventMeta = session.event.qrShareMetaLine(),
                     payload = session.payload,
                     sharedWithoutDescription = session.sharedWithoutDescription,
                     palette = palette,
@@ -2535,7 +2556,41 @@ fun DotCalApp(
                 palette = palette,
                 events = events,
                 accounts = accounts,
+                deadTimeState = deadTimeState,
+                freeTimeStartHour = minOf(freeTimeStartHour, freeTimeEndHour - 1),
+                freeTimeEndHour = maxOf(freeTimeEndHour, freeTimeStartHour + 1),
+                use24HourFormat = use24HourFormat,
                 onBack = { showTimeInsights = false },
+                onRefreshDeadTime = viewModel::refreshDeadTime,
+                onFreeTimeBoundsChange = { startHour, endHour ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_FREE_TIME_START_HOUR] = startHour
+                            preferences[CalendarPreferences.KEY_FREE_TIME_END_HOUR] = endHour
+                        }
+                    }
+                },
+                onUseFreeSlot = { slot ->
+                    showTimeInsights = false
+                    openQuickAddResult(
+                        QuickAddResult(
+                            title = "",
+                            date = slot.date,
+                            endDate = slot.date,
+                            startTime = slot.start,
+                            endTime = slot.end,
+                            isAllDay = false,
+                            rrule = null,
+                        ),
+                    )
+                },
+                onShareFreeDay = { date ->
+                    showTimeInsights = false
+                    availabilityInitialDate = date
+                    availabilityInitialEndDate = date
+                    viewModel.clearAvailability()
+                    showAvailability = true
+                },
             )
         }
         AnimatedVisibility(
@@ -2547,6 +2602,7 @@ fun DotCalApp(
             AvailabilityScreen(
                 palette = palette,
                 initialDate = availabilityInitialDate,
+                initialEndDate = availabilityInitialEndDate,
                 weekStart = weekStartDay,
                 use24HourFormat = use24HourFormat,
                 state = availabilityState,
@@ -2987,6 +3043,9 @@ private fun CalendarEvent.shareDateTimeLine(use24HourFormat: Boolean): String {
     }
     return "$startText - $endText"
 }
+
+private fun CalendarEvent.qrShareMetaLine(): String =
+    location.takeIf { it.isNotBlank() }.orEmpty()
 
 private fun String.safeShareFilename(): String {
     val cleaned = lowercase(Locale.US)

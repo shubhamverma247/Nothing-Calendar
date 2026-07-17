@@ -6,16 +6,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -27,8 +27,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.RangeSlider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,6 +59,7 @@ private enum class AvailabilityPreset(val label: String) {
 internal fun AvailabilityScreen(
     palette: DotCalPalette,
     initialDate: LocalDate,
+    initialEndDate: LocalDate = initialDate.plusDays(2),
     weekStart: DayOfWeek,
     use24HourFormat: Boolean,
     state: AvailabilityUiState,
@@ -70,8 +69,12 @@ internal fun AvailabilityScreen(
     onShare: (String) -> Unit,
 ) {
     var rangeStart by remember(initialDate) { mutableStateOf(initialDate) }
-    var rangeEnd by remember(initialDate) { mutableStateOf(initialDate.plusDays(2)) }
-    var selectedPreset by remember(initialDate) { mutableStateOf<AvailabilityPreset?>(AvailabilityPreset.NextThreeDays) }
+    var rangeEnd by remember(initialDate, initialEndDate) { mutableStateOf(initialEndDate) }
+    var selectedPreset by remember(initialDate, initialEndDate) {
+        mutableStateOf<AvailabilityPreset?>(
+            AvailabilityPreset.NextThreeDays.takeIf { initialEndDate == initialDate.plusDays(2) },
+        )
+    }
     var workingHours by remember { mutableStateOf(9f..21f) }
     var minimumMinutes by remember { mutableStateOf(30) }
     var blockAllDayEvents by remember { mutableStateOf(true) }
@@ -124,169 +127,192 @@ internal fun AvailabilityScreen(
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 22.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(start = 18.dp, top = 12.dp, end = 18.dp, bottom = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item {
-                SettingsSectionTitle("DATE RANGE", palette)
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    AvailabilityPreset.entries.forEach { preset ->
-                        AvailabilityChoiceChip(
-                            label = preset.label,
-                            selected = selectedPreset == preset,
-                            palette = palette,
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                selectedPreset = preset
-                                val weekAnchor = initialDate.with(TemporalAdjusters.previousOrSame(weekStart))
-                                when (preset) {
-                                    AvailabilityPreset.NextThreeDays -> {
-                                        rangeStart = initialDate
-                                        rangeEnd = initialDate.plusDays(2)
-                                    }
-                                    AvailabilityPreset.ThisWeek -> {
-                                        rangeStart = weekAnchor
-                                        rangeEnd = weekAnchor.plusDays(6)
-                                    }
-                                    AvailabilityPreset.NextWeek -> {
-                                        rangeStart = weekAnchor.plusWeeks(1)
-                                        rangeEnd = weekAnchor.plusWeeks(1).plusDays(6)
-                                    }
-                                }
-                            },
-                        )
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    AvailabilityDateRow("From", rangeStart, palette, Modifier.weight(1f)) {
-                        selectedPreset = null
-                        pickingStart = true
-                    }
-                    AvailabilityDateRow("To", rangeEnd, palette, Modifier.weight(1f)) {
-                        selectedPreset = null
-                        pickingEnd = true
-                    }
-                }
-            }
-            item {
-                SettingsSectionTitle("WORKING HOURS", palette)
-                Spacer(Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(
-                        formatAvailabilityTime(request.workingStart, use24HourFormat),
-                        color = palette.primaryText,
-                        fontFamily = mono,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                    )
-                    Text(
-                        formatAvailabilityTime(request.workingEnd, use24HourFormat),
-                        color = palette.primaryText,
-                        fontFamily = mono,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                    )
-                }
-                RangeSlider(
-                    value = workingHours,
-                    onValueChange = { proposed ->
-                        val start = proposed.start.roundToInt().coerceIn(0, 23)
-                        val end = proposed.endInclusive.roundToInt().coerceIn(start + 1, 24)
-                        workingHours = start.toFloat()..end.toFloat()
-                    },
-                    valueRange = 0f..24f,
-                    steps = 23,
-                    colors = SliderDefaults.colors(
-                        thumbColor = palette.accent,
-                        activeTrackColor = palette.accent,
-                        inactiveTrackColor = palette.line,
-                    ),
-                )
-            }
-            item {
-                SettingsSectionTitle("MINIMUM SLOT", palette)
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    listOf(15, 30, 45, 60).forEach { minutes ->
-                        AvailabilityChoiceChip(
-                            label = "$minutes min",
-                            selected = minimumMinutes == minutes,
-                            palette = palette,
-                            modifier = Modifier.weight(1f),
-                            onClick = { minimumMinutes = minutes },
-                        )
-                    }
-                }
-            }
-            item {
-                AvailabilityToggleRow(
-                    title = "All-day events",
-                    subtitle = if (blockAllDayEvents) "Block the whole day" else "Ignore",
-                    checked = blockAllDayEvents,
-                    palette = palette,
-                    onCheckedChange = { blockAllDayEvents = it },
-                )
-                HorizontalDivider(color = palette.line.copy(alpha = 0.45f))
-                AvailabilityToggleRow(
-                    title = "Ghost events",
-                    subtitle = if (treatGhostsAsBusy) "Treat as busy" else "Treat as free",
-                    checked = treatGhostsAsBusy,
-                    palette = palette,
-                    onCheckedChange = { treatGhostsAsBusy = it },
-                )
-            }
-            item {
-                SettingsSectionTitle("PREVIEW", palette)
-                Spacer(Modifier.height(10.dp))
-                Box(
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = 96.dp, max = 178.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(palette.eventCardSurface)
                         .border(1.dp, palette.eventCardBorder, RoundedCornerShape(8.dp))
-                        .padding(16.dp),
-                    contentAlignment = if (state.isLoading && state.text.isBlank()) Alignment.Center else Alignment.TopStart,
+                        .padding(14.dp),
                 ) {
-                    when {
-                        state.isLoading && state.text.isBlank() -> CircularProgressIndicator(
-                            color = palette.accent,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(24.dp),
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Preview",
+                            color = palette.secondaryText,
+                            fontFamily = mono,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
                         )
-                        state.error != null -> Text(
-                            state.error,
+                        Text(
+                            if (state.isLoading) "UPDATING" else "READY",
                             color = palette.accent,
                             fontFamily = mono,
-                            fontSize = 14.sp,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
                         )
-                        else -> Text(
-                            state.text,
-                            color = palette.primaryText,
-                            fontFamily = mono,
-                            fontSize = 14.sp,
-                            lineHeight = 21.sp,
-                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = if (state.isLoading && state.text.isBlank()) Alignment.Center else Alignment.TopStart,
+                    ) {
+                        when {
+                            state.isLoading && state.text.isBlank() -> CircularProgressIndicator(
+                                color = palette.accent,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(24.dp),
+                            )
+                            state.error != null -> Text(
+                                state.error,
+                                color = palette.accent,
+                                fontFamily = mono,
+                                fontSize = 13.sp,
+                            )
+                            else -> Text(
+                                state.text,
+                                color = palette.primaryText,
+                                fontFamily = mono,
+                                fontSize = 13.sp,
+                                lineHeight = 19.sp,
+                                maxLines = 6,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                AvailabilityPreset.entries.forEach { preset ->
+                    AvailabilityChoiceChip(
+                        label = preset.label,
+                        selected = selectedPreset == preset,
+                        palette = palette,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            selectedPreset = preset
+                            val weekAnchor = initialDate.with(TemporalAdjusters.previousOrSame(weekStart))
+                            when (preset) {
+                                AvailabilityPreset.NextThreeDays -> {
+                                    rangeStart = initialDate
+                                    rangeEnd = initialDate.plusDays(2)
+                                }
+                                AvailabilityPreset.ThisWeek -> {
+                                    rangeStart = weekAnchor
+                                    rangeEnd = weekAnchor.plusDays(6)
+                                }
+                                AvailabilityPreset.NextWeek -> {
+                                    rangeStart = weekAnchor.plusWeeks(1)
+                                    rangeEnd = weekAnchor.plusWeeks(1).plusDays(6)
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                AvailabilityDateRow("From", rangeStart, palette, Modifier.weight(1f)) {
+                    selectedPreset = null
+                    pickingStart = true
+                }
+                AvailabilityDateRow("To", rangeEnd, palette, Modifier.weight(1f)) {
+                    selectedPreset = null
+                    pickingEnd = true
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                AvailabilityHourStepper(
+                    label = "Start",
+                    value = request.workingStart,
+                    use24HourFormat = use24HourFormat,
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    onMinus = {
+                        val start = (workingHours.start.roundToInt() - 1).coerceIn(0, workingHours.endInclusive.roundToInt() - 1)
+                        workingHours = start.toFloat()..workingHours.endInclusive
+                    },
+                    onPlus = {
+                        val start = (workingHours.start.roundToInt() + 1).coerceIn(0, workingHours.endInclusive.roundToInt() - 1)
+                        workingHours = start.toFloat()..workingHours.endInclusive
+                    },
+                )
+                AvailabilityHourStepper(
+                    label = "End",
+                    value = request.workingEnd,
+                    use24HourFormat = use24HourFormat,
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    onMinus = {
+                        val end = (workingHours.endInclusive.roundToInt() - 1).coerceIn(workingHours.start.roundToInt() + 1, 24)
+                        workingHours = workingHours.start..end.toFloat()
+                    },
+                    onPlus = {
+                        val end = (workingHours.endInclusive.roundToInt() + 1).coerceIn(workingHours.start.roundToInt() + 1, 24)
+                        workingHours = workingHours.start..end.toFloat()
+                    },
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                listOf(15, 30, 45, 60).forEach { minutes ->
+                    AvailabilityChoiceChip(
+                        label = "$minutes min",
+                        selected = minimumMinutes == minutes,
+                        palette = palette,
+                        modifier = Modifier.weight(1f),
+                        onClick = { minimumMinutes = minutes },
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                AvailabilityCompactToggle(
+                    title = "All-day",
+                    subtitle = if (blockAllDayEvents) "Block" else "Ignore",
+                    checked = blockAllDayEvents,
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    onCheckedChange = { blockAllDayEvents = it },
+                )
+                AvailabilityCompactToggle(
+                    title = "Ghosts",
+                    subtitle = if (treatGhostsAsBusy) "Busy" else "Free",
+                    checked = treatGhostsAsBusy,
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    onCheckedChange = { treatGhostsAsBusy = it },
+                )
+            }
         }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(palette.bottomNavSurface)
+                .navigationBarsPadding()
+                .padding(start = 20.dp, top = 14.dp, end = 20.dp, bottom = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Button(
                 onClick = { onCopy(state.text) },
-                enabled = state.text.isNotBlank() && !state.isLoading,
-                modifier = Modifier.weight(1f).height(52.dp),
+                enabled = state.text.isNotBlank(),
+                modifier = Modifier.weight(1f).height(56.dp),
                 shape = RoundedCornerShape(8.dp),
+                border = secondaryActionBorder(palette),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = palette.cell,
-                    contentColor = palette.primaryText,
-                    disabledContainerColor = palette.cell.copy(alpha = 0.5f),
+                    containerColor = secondaryActionContainer(palette),
+                    contentColor = palette.accent,
+                    disabledContainerColor = secondaryActionContainer(palette).copy(alpha = 0.55f),
+                    disabledContentColor = palette.disabledText,
                 ),
             ) {
                 Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -295,8 +321,8 @@ internal fun AvailabilityScreen(
             }
             Button(
                 onClick = { onShare(state.text) },
-                enabled = state.text.isNotBlank() && !state.isLoading,
-                modifier = Modifier.weight(1f).height(52.dp),
+                enabled = state.text.isNotBlank(),
+                modifier = Modifier.weight(1f).height(56.dp),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = palette.accent,
@@ -382,19 +408,83 @@ private fun AvailabilityDateRow(
 ) {
     Column(
         modifier = modifier
+            .height(76.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(palette.cell)
+            .border(1.dp, palette.line.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
-            .padding(12.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.Center,
     ) {
-        Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
-        Spacer(Modifier.height(4.dp))
+        Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp, lineHeight = 14.sp)
+        Spacer(Modifier.height(5.dp))
         Text(
-            date.format(DateTimeFormatter.ofPattern("EEE, d MMM")),
+            date.format(DateTimeFormatter.ofPattern("d MMM")),
             color = palette.primaryText,
             fontFamily = mono,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun AvailabilityHourStepper(
+    label: String,
+    value: LocalTime,
+    use24HourFormat: Boolean,
+    palette: DotCalPalette,
+    modifier: Modifier,
+    onMinus: () -> Unit,
+    onPlus: () -> Unit,
+) {
+    Row(
+        modifier = modifier
+            .height(56.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(palette.calendarSurface)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp)
+            Text(
+                formatAvailabilityTime(value, use24HourFormat),
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+            )
+        }
+        AvailabilityStepButton("-", palette, onMinus)
+        Spacer(Modifier.width(4.dp))
+        AvailabilityStepButton("+", palette, onPlus)
+    }
+}
+
+@Composable
+private fun AvailabilityStepButton(
+    label: String,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(palette.cell)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = palette.primaryText,
+            fontFamily = mono,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
         )
     }
 }
@@ -414,6 +504,36 @@ private fun AvailabilityToggleRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = palette.primaryText, fontFamily = mono, fontSize = 15.sp)
             Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+        }
+        DotCalSwitch(
+            checked = checked,
+            palette = palette,
+            onCheckedChange = onCheckedChange,
+        )
+    }
+}
+
+@Composable
+private fun AvailabilityCompactToggle(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    palette: DotCalPalette,
+    modifier: Modifier,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = modifier
+            .height(54.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(palette.calendarSurface)
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = palette.primaryText, fontFamily = mono, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
         }
         DotCalSwitch(
             checked = checked,
