@@ -310,7 +310,7 @@ internal fun AvailabilityScreen(
                 border = secondaryActionBorder(palette),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = secondaryActionContainer(palette),
-                    contentColor = palette.accent,
+                    contentColor = secondaryActionContent(palette),
                     disabledContainerColor = secondaryActionContainer(palette).copy(alpha = 0.55f),
                     disabledContentColor = palette.disabledText,
                 ),

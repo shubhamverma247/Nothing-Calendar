@@ -321,7 +321,7 @@ internal fun EventDetailScreen(
                         fontSize = 32.sp,
                         lineHeight = 38.sp,
                     )
-                    Spacer(modifier = Modifier.height(26.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
                 item {
                     DetailSection(label = "TIME", palette = palette) {
@@ -1965,7 +1965,7 @@ internal fun JumpToDateSheet(
                     onClick = { pickedDate = today },
                     modifier = Modifier.weight(1f).height(54.dp),
                     border = secondaryActionBorder(palette),
-                    colors = ButtonDefaults.buttonColors(containerColor = secondaryActionContainer(palette), contentColor = palette.accent),
+                    colors = ButtonDefaults.buttonColors(containerColor = secondaryActionContainer(palette), contentColor = secondaryActionContent(palette)),
                     shape = RoundedCornerShape(18.dp),
                     contentPadding = PaddingValues(0.dp),
                 ) {
@@ -2168,7 +2168,7 @@ internal fun DateTimeChoiceSheet(
                     border = secondaryActionBorder(palette),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = secondaryActionContainer(palette),
-                        contentColor = palette.accent,
+                        contentColor = secondaryActionContent(palette),
                     ),
                     shape = RoundedCornerShape(18.dp),
                     contentPadding = PaddingValues(0.dp),

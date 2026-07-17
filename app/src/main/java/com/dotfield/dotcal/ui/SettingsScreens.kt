@@ -2337,7 +2337,7 @@ private fun AllDayReminderTimeSheet(
                     border = secondaryActionBorder(palette),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = secondaryActionContainer(palette),
-                        contentColor = palette.accent,
+                        contentColor = secondaryActionContent(palette),
                     ),
                     shape = RoundedCornerShape(18.dp),
                     contentPadding = PaddingValues(0.dp),

@@ -73,7 +73,14 @@ internal fun secondaryActionContainer(palette: DotCalPalette) =
 
 @Composable
 internal fun secondaryActionBorder(palette: DotCalPalette) =
-    BorderStroke(1.dp, palette.accent.copy(alpha = if (palette.isDark) 0.82f else 0.72f))
+    BorderStroke(
+        1.dp,
+        if (palette.isDark) palette.line.copy(alpha = 0.78f) else palette.accent.copy(alpha = 0.72f),
+    )
+
+@Composable
+internal fun secondaryActionContent(palette: DotCalPalette) =
+    if (palette.isDark) palette.primaryText else palette.accent
 
 @Composable
 internal fun DotCalSwitch(

@@ -89,7 +89,7 @@ Availability Text Generator complete locally on `pro-features`.
 - Shared UI-free `FreeSlotEngine` handles overlap/adjacency merging, midnight clipping, all-day events, minimum gaps, and ghost policy.
 - JVM tests cover overlap, adjacency, midnight, empty/full calendars, all-day, minimum duration, ghost policy, and text formatting.
 - No Room/package/deep-link/DB/Hilt/Nav changes.
-- Secondary filled actions now use one shared light/dark rule: theme surface background with accent outline/text.
+- Secondary filled actions now use one shared rule: light uses surface with red outline/text; dark uses dark surface with subtle grey outline and white text/icons.
 - Required tests/build passed after latest UI polish.
 - Latest debug APK installed on device `000153573000720` after latest UI polish.
 - No manual phone QA run.
@@ -103,7 +103,12 @@ QR Event Share complete in commit `4fdb4c4`.
 - Free QR scanner icon immediately left of `+`.
 - Event Detail > More > Share as QR.
 - DotCal QR scans into existing ICS import preview.
-- UI polish: Share QR card renders event title/date/location inside the white QR image under the barcode, Save image follows the same secondary action color rule as Availability Copy (surface background, red outline/text in light and dark), bottom actions and import preview action are navigation-bar-safe, and bottom actions have no outer border.
+- UI polish: Share QR card renders event title/date/location inside the white QR image under the barcode, Save image follows the same secondary action color rule as Availability Copy, bottom actions and import preview action are navigation-bar-safe, and bottom actions have no outer border.
+
+General UI polish:
+
+- Event Details title-to-time spacing tightened for a closer title/time hierarchy.
+- Agenda date headers and event cards use tighter vertical spacing for a denser date/event hierarchy.
 
 ## Next Roadmap
 

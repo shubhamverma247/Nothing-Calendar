@@ -222,7 +222,7 @@ internal fun AgendaPreview(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 0.dp, bottom = 90.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (upcomingEvents.isEmpty()) {
                 item {
@@ -402,7 +402,7 @@ private fun AgendaEventCard(
             }
             .border(1.dp, palette.eventCardBorder, cardShape)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(start = 16.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
+            .padding(start = 16.dp, end = 14.dp, top = 11.dp, bottom = 11.dp),
         verticalAlignment = Alignment.Top,
     ) {
         if (selectionMode) {
@@ -474,7 +474,7 @@ internal fun AgendaDateHeader(date: LocalDate, isFirst: Boolean, palette: DotCal
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = if (isFirst) 0.dp else 20.dp, bottom = 10.dp),
+            .padding(top = if (isFirst) 0.dp else 10.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
