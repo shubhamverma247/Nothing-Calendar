@@ -45,7 +45,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -111,7 +113,8 @@ internal fun EventRow(event: CalendarEvent, palette: DotCalPalette, onClick: (()
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(palette.eventCardSurface)
-            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(16.dp))
+            .then(if (event.isGhost) Modifier.ghostDottedCardBorder(palette, 16f) else Modifier.border(1.dp, palette.eventCardBorder, RoundedCornerShape(16.dp)))
+            .graphicsLayer { alpha = if (event.isGhost) 0.72f else 1f }
             .noRippleClickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -398,9 +401,10 @@ private fun AgendaEventCard(
             .clip(cardShape)
             .drawBehind {
                 drawRect(cardBg)
-                drawRect(accentStrip, topLeft = Offset.Zero, size = androidx.compose.ui.geometry.Size(4.dp.toPx(), size.height))
+                drawRect(accentStrip.copy(alpha = if (event.isGhost) 0.42f else 1f), topLeft = Offset.Zero, size = androidx.compose.ui.geometry.Size(4.dp.toPx(), size.height))
             }
-            .border(1.dp, palette.eventCardBorder, cardShape)
+            .then(if (event.isGhost) Modifier.ghostDottedCardBorder(palette, 16f) else Modifier.border(1.dp, palette.eventCardBorder, cardShape))
+            .graphicsLayer { alpha = if (event.isGhost) 0.74f else 1f }
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(start = 16.dp, end = 14.dp, top = 11.dp, bottom = 11.dp),
         verticalAlignment = Alignment.Top,
@@ -451,6 +455,17 @@ private fun AgendaEventCard(
             }
         }
     }
+}
+
+private fun Modifier.ghostDottedCardBorder(palette: DotCalPalette, radiusDp: Float): Modifier = drawBehind {
+    drawRoundRect(
+        color = palette.primaryText.copy(alpha = if (palette.isDark) 0.60f else 0.44f),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(radiusDp.dp.toPx(), radiusDp.dp.toPx()),
+        style = Stroke(
+            width = 1.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx())),
+        ),
+    )
 }
 
 @Composable

@@ -75,6 +75,7 @@ data class EventEditorData(
     val imageUris: String = "[]",
     val voiceNotePath: String? = null,
     val colorHex: String? = null,
+    val isGhost: Boolean = false,
 )
 
 data class TaskEditorData(
@@ -424,7 +425,8 @@ class DotCalRepository(
         return dao.observeEvents(start.atStartMs(), end.atStartMs())
             .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
             .map { events ->
-                withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
+                val expanded = withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
+                expanded.withGhostFlags()
             }
     }
 
@@ -434,7 +436,8 @@ class DotCalRepository(
         return dao.observeEvents(start.atStartMs(), end.atStartMs())
             .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
             .map { events ->
-                withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
+                val expanded = withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
+                expanded.withGhostFlags()
             }
     }
 
@@ -489,10 +492,11 @@ class DotCalRepository(
         return dao.observeEvents(startMs, end.atStartMs())
             .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
             .map { events ->
-                withContext(Dispatchers.Default) {
+                val expanded = withContext(Dispatchers.Default) {
                     expandRecurringEvents(events, start, end)
                         .filter { event -> event.endTimeMs >= startMs }
                 }
+                expanded.withGhostFlags()
             }
     }
 
@@ -521,7 +525,7 @@ class DotCalRepository(
                     .filter { event -> event.startTimeMs < endMs && event.conflictEndTimeMs() > startMs }
                     .sortedBy { event -> event.startTimeMs }
                     .toList()
-            }
+            }.withGhostFlags()
         }
     }
 
@@ -585,7 +589,7 @@ class DotCalRepository(
 
     fun observeReminders(): Flow<List<EventReminder>> = dao.observeReminders()
 
-    suspend fun getEvent(eventId: String): CalendarEvent? = dao.getEvent(eventId)
+    suspend fun getEvent(eventId: String): CalendarEvent? = dao.getEvent(eventId)?.withGhostFlag()
 
     suspend fun getReminderByRequestCode(alarmRequestCode: Int): EventReminder? = dao.getReminderByRequestCode(alarmRequestCode)
 
@@ -785,6 +789,7 @@ class DotCalRepository(
             )
         dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
         dao.upsertEvent(event)
+        writeGhostFlag(eventId, data.isGhost)
         dao.deleteRemindersForEvent(eventId)
         val reminderMinutes = data.reminderMinutesList
             ?.distinct()
@@ -1197,6 +1202,10 @@ class DotCalRepository(
                 sideStore.remove(GHOST_FLAGS_NAMESPACE, event.id)
             }
         }
+        if (editable.isNotEmpty()) {
+            val now = System.currentTimeMillis()
+            dao.upsertEvents(editable.map { it.copy(updatedAtMs = now) })
+        }
         updateWidgets()
         BulkEditResult(
             changedCount = editable.size,
@@ -1541,6 +1550,7 @@ class DotCalRepository(
             updatedAtMs = now,
         )
         dao.upsertEvent(detachedEvent)
+        writeGhostFlag(detachedId, data.isGhost)
         val reminderMinutes = data.reminderMinutesList
             ?.distinct()
             ?.sorted()
@@ -1580,6 +1590,25 @@ class DotCalRepository(
     private fun List<CalendarEvent>.filterOutPrivate(privateIds: Set<String>): List<CalendarEvent> {
         if (privateIds.isEmpty()) return this
         return filterNot { it.baseEventId() in privateIds }
+    }
+
+    private suspend fun CalendarEvent.withGhostFlag(): CalendarEvent {
+        return also { it.isGhost = sideStore.read(GHOST_FLAGS_NAMESPACE, baseEventId()) == "1" }
+    }
+
+    private suspend fun List<CalendarEvent>.withGhostFlags(): List<CalendarEvent> {
+        val ghostIds = sideStore.readNamespace(GHOST_FLAGS_NAMESPACE)
+            .filterValues { it == "1" }
+            .keys
+        return onEach { event -> event.isGhost = event.baseEventId() in ghostIds }
+    }
+
+    private suspend fun writeGhostFlag(eventId: String, isGhost: Boolean) {
+        if (isGhost) {
+            sideStore.write(GHOST_FLAGS_NAMESPACE, eventId, "1")
+        } else {
+            sideStore.remove(GHOST_FLAGS_NAMESPACE, eventId)
+        }
     }
 
     private fun expandRecurringEvents(events: List<CalendarEvent>, rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {

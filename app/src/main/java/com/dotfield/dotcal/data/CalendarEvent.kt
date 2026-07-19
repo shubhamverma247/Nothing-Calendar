@@ -2,6 +2,7 @@ package com.dotfield.dotcal.data
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -48,4 +49,7 @@ data class CalendarEvent(
     val voiceNotePath: String?,
     val createdAtMs: Long,
     val updatedAtMs: Long,
-)
+) {
+    @Ignore
+    var isGhost: Boolean = false
+}

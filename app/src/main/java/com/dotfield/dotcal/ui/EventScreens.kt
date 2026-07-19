@@ -1206,6 +1206,7 @@ internal fun EventEditorScreen(
         mutableStateOf(if (tpl != null) tpl.reminderMinutes else draft?.reminderMinutes ?: draftReminderMinutes?.firstOrNull() ?: initialReminderMinutes)
     }
     var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule ?: draft?.rrule ?: seed?.rrule ?: tpl?.rrule) }
+    var isGhost by remember(editorStateKey) { mutableStateOf(event?.isGhost ?: draft?.isGhost ?: false) }
     var imageUris by remember(editorStateKey) { mutableStateOf(parseJsonStringArray(event?.imageUris ?: "[]")) }
     var voiceNotePath by remember(editorStateKey) { mutableStateOf(event?.voiceNotePath) }
     val writableAccounts = accounts
@@ -1293,6 +1294,7 @@ internal fun EventEditorScreen(
             imageUris = imageUris.toJsonStringArray(),
             voiceNotePath = voiceNotePath,
             colorHex = draft?.colorHex ?: event?.colorHex,
+            isGhost = isGhost,
         )
     }
     fun buildTemplate(name: String): EventTemplate {
@@ -1480,6 +1482,29 @@ internal fun EventEditorScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.Edit, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Pencil in", color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
+                        Text("Tentative; can be ignored by free-time tools", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+                    }
+                }
+                DotCalSwitch(
+                    checked = isGhost,
+                    palette = palette,
+                    onCheckedChange = { checked ->
+                        clearEditorFocus()
+                        if (!isPro) {
+                            onRequestPro()
+                        } else {
+                            isGhost = checked
+                        }
+                    },
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("All-day", color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
                 DotCalSwitch(
                     checked = allDay,
@@ -1510,6 +1535,7 @@ internal fun EventEditorScreen(
             )
             ConflictWarningSection(
                 conflicts = conflictWarnings,
+                currentIsGhost = isGhost,
                 use24HourFormat = use24HourFormat,
                 palette = palette,
             )
@@ -1672,21 +1698,24 @@ internal fun EventEditorScreen(
 @Composable
 private fun ConflictWarningSection(
     conflicts: List<CalendarEvent>,
+    currentIsGhost: Boolean,
     use24HourFormat: Boolean,
     palette: DotCalPalette,
 ) {
     if (conflicts.isEmpty()) return
     val visibleConflicts = conflicts.take(3)
     val extraCount = (conflicts.size - visibleConflicts.size).coerceAtLeast(0)
+    val isSoft = currentIsGhost || visibleConflicts.any { it.isGhost }
+    val warningColor = if (isSoft) palette.secondaryText else palette.accent
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(palette.accent.copy(alpha = if (palette.isDark) 0.14f else 0.08f))
+            .background(warningColor.copy(alpha = if (palette.isDark) 0.12f else 0.07f))
             .drawBehind {
                 drawRoundRect(
-                    color = palette.accent.copy(alpha = 0.45f),
+                    color = warningColor.copy(alpha = 0.45f),
                     cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx()),
                     style = Stroke(width = 1.dp.toPx()),
                 )
@@ -1696,7 +1725,7 @@ private fun ConflictWarningSection(
     ) {
         visibleConflicts.forEach { conflict ->
             Text(
-                text = "Overlaps with ${conflict.title.ifBlank { "Untitled" }} ${conflict.conflictTimeRangeLabel(use24HourFormat)}",
+                text = "${if (currentIsGhost || conflict.isGhost) "Tentatively clashes with" else "Overlaps with"} ${conflict.title.ifBlank { "Untitled" }} ${conflict.conflictTimeRangeLabel(use24HourFormat)}",
                 color = palette.primaryText,
                 fontFamily = mono,
                 fontSize = 12.sp,

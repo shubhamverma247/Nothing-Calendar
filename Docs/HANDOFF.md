@@ -71,10 +71,22 @@ Always report what to test, how to test, and expected result.
 - QR Event Share
 - Availability Text Generator
 - C4 Dead Time Finder
+- C6 Ghost Events / Pencil-In
 
 Earlier complete: A1/A2/A3/A5, C2, B1, B5, Search, Templates, Calendar Sets, Shift Patterns, Private Vault, App Lock, import/export, backup/restore, widgets, holidays, birthdays, reminders, billing.
 
 ## Latest Feature
+
+C6 Ghost Events / Pencil-In complete locally on `pro-features`.
+
+- Pro-gated `Pencil in` toggle added to the event editor.
+- Ghost flags persist in shared side-store namespace `ghost_flags`; no Room/schema change.
+- Calendar/agenda rendering now shows ghost events with reduced opacity and dotted/hollow treatment.
+- Conflict warnings use softer "Tentatively clashes with..." copy when a ghost event is involved.
+- Availability and Dead Time continue to use shared `FreeSlotEngine` ghost busy/free policy.
+- JVM coverage includes ghost flag side-store reload plus existing FreeSlotEngine ghost busy/free policy.
+- Required tests/build passed after C6.
+- Latest debug APK installed on device `4ab0d020` after C6.
 
 C4 Dead Time Finder polish complete locally on `pro-features`.
 
@@ -125,11 +137,10 @@ General UI polish:
 
 ## Next Roadmap
 
-1. C6 Ghost Events / Pencil-In
-2. C3 On This Day
-3. C1 Life-in-Dots
-4. C7 Year Wrapped
-5. Vault Decoy PIN
+1. C3 On This Day
+2. C1 Life-in-Dots
+3. C7 Year Wrapped
+4. Vault Decoy PIN
 
 ## Manual QA
 
@@ -158,7 +169,16 @@ C4 Dead Time Finder:
 - Add/delete an event while Dead Time is open, then return. Expected: dead-time slots refresh to reflect the changed calendar.
 - Free user: Settings > Tools > Dead Time. Expected: Paywall opens.
 
+C6 Ghost Events / Pencil-In:
+
+- Pro: open any event editor, enable `Pencil in`, save. Expected: event persists and renders lighter with a dotted/hollow treatment in Month, Week, Day, and Agenda.
+- Reopen the same event editor. Expected: `Pencil in` is still enabled.
+- Disable `Pencil in`, save, and reopen. Expected: event returns to normal opacity/solid treatment and toggle stays off.
+- Free user: tap `Pencil in` in the editor. Expected: paywall opens and the flag does not change.
+- Create a real event overlapping a ghost event. Expected: conflict message says `Tentatively clashes with...` and uses softer styling.
+- Availability: toggle ghost policy between busy/free. Expected: when ghosts are free, penciled events stop blocking generated slots; when busy, they block.
+
 ## Worktree Notes
 
-- Current app changes are uncommitted.
+- Current app changes are uncommitted after C6.
 - User-owned untracked files: `Docs/HANDOFF - Copy.md`, `build-b4.log`. Leave untouched.

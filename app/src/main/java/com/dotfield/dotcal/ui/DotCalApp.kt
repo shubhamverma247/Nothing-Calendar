@@ -1003,6 +1003,7 @@ fun DotCalApp(
             imageUris = "[]",
             voiceNotePath = null,
             colorHex = event.colorHex,
+            isGhost = event.isGhost,
         )
     }
     fun openDuplicateEditor(event: CalendarEvent, targetDate: LocalDate? = null) {

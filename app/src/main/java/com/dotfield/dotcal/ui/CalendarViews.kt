@@ -61,9 +61,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -287,7 +289,8 @@ private fun DayCell(
                             modifier = Modifier
                                 .size(4.dp)
                                 .clip(CircleShape)
-                                .background(event.displayColor(palette)),
+                                .background(if (event.isGhost) Color.Transparent else event.displayColor(palette))
+                                .border(0.7.dp, event.displayColor(palette).copy(alpha = if (event.isGhost) 0.55f else 1f), CircleShape),
                         )
                     }
                 }
@@ -370,7 +373,12 @@ internal fun WeekView(
                 days.forEach { day ->
                     val event = allDayEvents.firstOrNull { it.localDate() == day }
                     Box(
-                        modifier = Modifier.weight(1f).height(32.dp).padding(2.dp).background(if (event == null) Color.Transparent else event.displayColor(palette).copy(alpha = 0.75f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(32.dp)
+                            .padding(2.dp)
+                            .background(if (event == null) Color.Transparent else event.displayColor(palette).copy(alpha = if (event.isGhost) 0.32f else 0.75f))
+                            .then(if (event?.isGhost == true) Modifier.ghostDottedBorder(palette, 4f) else Modifier),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (event != null) {
@@ -647,7 +655,9 @@ private fun WeekEventBlock(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(event.displayColor(palette).copy(alpha = 0.80f))
+            .clip(RoundedCornerShape(4.dp))
+            .background(event.displayColor(palette).copy(alpha = if (event.isGhost) 0.34f else 0.80f))
+            .then(if (event.isGhost) Modifier.ghostDottedBorder(palette, 4f) else Modifier)
             .noRippleClickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -946,7 +956,8 @@ internal fun DayView(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp)
-                            .background(allDayEvents[index].displayColor(palette).copy(alpha = 0.75f))
+                            .background(allDayEvents[index].displayColor(palette).copy(alpha = if (allDayEvents[index].isGhost) 0.32f else 0.75f))
+                            .then(if (allDayEvents[index].isGhost) Modifier.ghostDottedBorder(palette, 2f) else Modifier)
                             .clickable { onEventClick(allDayEvents[index]) }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     )
@@ -993,6 +1004,17 @@ internal fun DayView(
             TimelineBottomBoundary(palette = palette, modifier = Modifier.align(Alignment.BottomCenter))
         }
     }
+}
+
+private fun Modifier.ghostDottedBorder(palette: DotCalPalette, radiusDp: Float): Modifier = drawBehind {
+    drawRoundRect(
+        color = palette.primaryText.copy(alpha = if (palette.isDark) 0.62f else 0.46f),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(radiusDp.dp.toPx(), radiusDp.dp.toPx()),
+        style = Stroke(
+            width = 1.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx())),
+        ),
+    )
 }
 
 @Composable
