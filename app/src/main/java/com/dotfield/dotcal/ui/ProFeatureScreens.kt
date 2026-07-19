@@ -1483,7 +1483,7 @@ internal fun TimeInsightsScreen(
     val stats = remember(events, accounts, rangeStart, rangeEnd) {
         buildTimeInsightsStats(events, accounts, rangeStart, rangeEnd)
     }
-    LaunchedEffect(today, freeTimeStartHour, freeTimeEndHour) {
+    LaunchedEffect(today, freeTimeStartHour, freeTimeEndHour, events) {
         onRefreshDeadTime(today, freeTimeStartHour, freeTimeEndHour)
     }
 
@@ -1632,7 +1632,7 @@ private fun DeadTimeControls(
     val pendingStart = pendingBounds.start.roundToInt().coerceIn(0, 22)
     val pendingEnd = pendingBounds.endInclusive.roundToInt().coerceIn(pendingStart + 1, 23)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SettingsSectionTitle("FREE TIME · NEXT 7 DAYS", palette)
+        SettingsSectionTitle("DEAD TIME FINDER", palette)
         Column(
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
                 .background(palette.eventCardSurface)
@@ -1655,7 +1655,7 @@ private fun DeadTimeControls(
                     inactiveTrackColor = palette.line,
                 ),
             )
-            Text("Slots of 1 hour or longer", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+            Text("Next 7 days · slots of 1 hour or longer", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
         }
     }
 }
@@ -1690,7 +1690,7 @@ private fun DeadTimeSlotRow(
             Text(formatDeadTimeDuration(minutes), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
         }
         TextButton(onClick = { onShareDay(slot.date) }) {
-            Text("Share day", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+            Text("Share availability", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
         }
         Icon(Icons.Default.ChevronRight, contentDescription = "Create event in this slot", tint = palette.secondaryText, modifier = Modifier.size(18.dp))
     }

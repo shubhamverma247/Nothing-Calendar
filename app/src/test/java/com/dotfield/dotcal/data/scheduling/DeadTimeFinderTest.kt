@@ -46,6 +46,37 @@ class DeadTimeFinderTest {
         )
     }
 
+    @Test
+    fun allDayAndGhostEventsBlockDeadTimeSlots() {
+        val result = DeadTimeFinder.find(
+            startDate = startDate,
+            busyPeriods = listOf(
+                busy("2026-07-16T00:00", "2026-07-17T00:00", isAllDay = true),
+                busy("2026-07-17T08:00", "2026-07-17T22:00", isGhost = true),
+            ),
+        )
+
+        assertEquals(emptyList<FreeSlot>(), result.days[0].freeSlots)
+        assertEquals(emptyList<FreeSlot>(), result.days[1].freeSlots)
+        assertEquals(
+            FreeSlot(startDate.plusDays(2), LocalTime.of(8, 0), LocalTime.of(22, 0)),
+            result.slots.first(),
+        )
+    }
+
+    @Test
+    fun searchesExactlySevenDaysFromStartDate() {
+        val result = DeadTimeFinder.find(
+            startDate = startDate,
+            busyPeriods = emptyList(),
+        )
+
+        assertEquals(7, result.days.size)
+        assertEquals(startDate, result.days.first().date)
+        assertEquals(startDate.plusDays(6), result.days.last().date)
+        assertEquals(7, result.slots.size)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejectsInvalidBounds() {
         DeadTimeFinder.find(
@@ -56,8 +87,15 @@ class DeadTimeFinderTest {
         )
     }
 
-    private fun busy(start: String, end: String) = BusyPeriod(
+    private fun busy(
+        start: String,
+        end: String,
+        isAllDay: Boolean = false,
+        isGhost: Boolean = false,
+    ) = BusyPeriod(
         start = LocalDateTime.parse(start),
         end = LocalDateTime.parse(end),
+        isAllDay = isAllDay,
+        isGhost = isGhost,
     )
 }

@@ -2496,8 +2496,8 @@ private fun SettingsToolsPanel(
         SettingsSectionTitle("Tools", palette)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             SettingsToolCard(
-                title = "Time Insights",
-                caption = "Load map",
+                title = "Dead Time",
+                caption = "Free slots",
                 icon = Icons.Default.AccessTime,
                 isPro = isPro,
                 palette = palette,

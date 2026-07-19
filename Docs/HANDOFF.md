@@ -6,7 +6,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full history: `Docs/HANDOFF.
 
 ## Resume Prompt
 
-Continue DotCal in `D:\Caveman\caveman\Nothing-Calendar` on branch `pro-features`. Read `Docs/HANDOFF.md` and `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. QR Event Share and Availability Text Generator complete. Next: C4 Dead Time Finder using existing shared `FreeSlotEngine`. Keep Room at 5 tables; no package/deep-link/DB filename changes, Hilt, or Compose Nav. After app changes run required tests/build, then install debug APK when device connected. Report exact manual QA steps and expected results.
+Continue DotCal in `D:\Caveman\caveman\Nothing-Calendar` on branch `pro-features`. Read `Docs/HANDOFF.md` and `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. QR Event Share, Availability Text Generator, and C4 Dead Time Finder complete. Next: C6 Ghost Events / Pencil-In using shared side-store namespace `ghost_flags` and existing `FreeSlotEngine` ghost policy. Keep Room at 5 tables; no package/deep-link/DB filename changes, Hilt, or Compose Nav. After app changes run required tests/build, then install debug APK when device connected. Report exact manual QA steps and expected results.
 
 ## Hard Rules
 
@@ -70,10 +70,23 @@ Always report what to test, how to test, and expected result.
 - B3 Drag-and-Drop Reschedule + Resize
 - QR Event Share
 - Availability Text Generator
+- C4 Dead Time Finder
 
 Earlier complete: A1/A2/A3/A5, C2, B1, B5, Search, Templates, Calendar Sets, Shift Patterns, Private Vault, App Lock, import/export, backup/restore, widgets, holidays, birthdays, reminders, billing.
 
 ## Latest Feature
+
+C4 Dead Time Finder polish complete locally on `pro-features`.
+
+- Pro entry: Settings > Tools > Dead Time.
+- Finds >=60-minute open slots across next 7 days using shared `FreeSlotEngine` via `DeadTimeFinder`.
+- Bounds still use `KEY_FREE_TIME_START_HOUR` / `KEY_FREE_TIME_END_HOUR`; no Room/schema changes.
+- Slot tap opens event creation prefilled with that date/time.
+- Each slot has `Share availability` cross-link, opening Availability for that exact day.
+- Dead-time refresh now reacts to event-list changes while the screen is open.
+- JVM tests cover exact 7-day window plus all-day and ghost events blocking dead-time slots.
+- Required tests/build passed after C4 polish.
+- Latest debug APK installed on device `4ab0d020` after C4 polish.
 
 Availability Text Generator complete locally on `pro-features`.
 
@@ -112,14 +125,11 @@ General UI polish:
 
 ## Next Roadmap
 
-1. C4 Dead Time Finder
-2. C6 Ghost Events / Pencil-In
-3. C3 On This Day
-4. C1 Life-in-Dots
-5. C7 Year Wrapped
-6. Vault Decoy PIN
-
-C4 must reuse `FreeSlotEngine`; no duplicate gap logic. Add “Share availability for this day” cross-link.
+1. C6 Ghost Events / Pencil-In
+2. C3 On This Day
+3. C1 Life-in-Dots
+4. C7 Year Wrapped
+5. Vault Decoy PIN
 
 ## Manual QA
 
@@ -138,6 +148,15 @@ QR:
 
 - Event Detail > More > Share as QR. Expected: QR opens.
 - Scan from Calendar top bar. Expected: DotCal QR opens ICS import preview.
+
+C4 Dead Time Finder:
+
+- Pro: Settings > Tools > Dead Time. Expected: Time Insights opens with Dead Time Finder section.
+- Move free-time bounds. Expected: slots refresh after slider release and all slots stay within selected hours.
+- Tap a dead-time slot row. Expected: event editor opens prefilled with that slot date/start/end.
+- Tap Share availability on a slot. Expected: Availability opens for that exact day only.
+- Add/delete an event while Dead Time is open, then return. Expected: dead-time slots refresh to reflect the changed calendar.
+- Free user: Settings > Tools > Dead Time. Expected: Paywall opens.
 
 ## Worktree Notes
 
