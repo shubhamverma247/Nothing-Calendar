@@ -18,6 +18,9 @@ import com.dotfield.dotcal.data.billing.ProManager
 import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.profiles.FocusProfile
+import com.dotfield.dotcal.data.scheduling.AvailabilityTextFormatter
+import com.dotfield.dotcal.data.scheduling.FreeSlot
+import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
@@ -25,6 +28,7 @@ import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
+import com.dotfield.dotcal.data.insights.OnThisDayMemory
 import com.dotfield.dotcal.data.punchcard.PunchCardStreak
 import com.dotfield.dotcal.sync.CalendarSyncResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,6 +44,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 
@@ -61,6 +66,18 @@ data class PunchCardUiState(
     fun isPunched(date: LocalDate): Boolean = date in punchedDays
     fun streakEndingAt(date: LocalDate): Int = PunchCardStreak.compute(punchedDays, date)
 }
+
+data class AvailabilityUiState(
+    val isLoading: Boolean = false,
+    val text: String = "",
+    val error: String? = null,
+)
+
+data class DeadTimeUiState(
+    val isLoading: Boolean = false,
+    val slots: List<FreeSlot> = emptyList(),
+    val error: String? = null,
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DotCalViewModel(
@@ -91,6 +108,10 @@ class DotCalViewModel(
     val agendaEvents: StateFlow<List<CalendarEvent>> = repository.observeUpcomingAgendaEvents(LocalDate.now())
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val onThisDayMemories: StateFlow<List<OnThisDayMemory>> = selectedDate
+        .flatMapLatest(repository::observeOnThisDay)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val dayDensityForecast: StateFlow<List<DayDensityForecastItem>> = agendaEvents
         .map(::buildDayDensityForecast)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), buildDayDensityForecast(emptyList()))
@@ -99,6 +120,12 @@ class DotCalViewModel(
     val punchCardState: StateFlow<PunchCardUiState> = _punchCardState
     private val _countdownPins = MutableStateFlow<Set<String>>(emptySet())
     val countdownPins: StateFlow<Set<String>> = _countdownPins
+    private val _availabilityState = MutableStateFlow(AvailabilityUiState())
+    val availabilityState: StateFlow<AvailabilityUiState> = _availabilityState
+    private var availabilityJob: Job? = null
+    private val _deadTimeState = MutableStateFlow(DeadTimeUiState())
+    val deadTimeState: StateFlow<DeadTimeUiState> = _deadTimeState
+    private var deadTimeJob: Job? = null
 
     val tasks: StateFlow<List<CalendarEvent>> = repository.observeTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -192,6 +219,14 @@ class DotCalViewModel(
         _detailEvent.value = event
     }
 
+    fun dismissOnThisDay(date: LocalDate) {
+        viewModelScope.launch { repository.dismissOnThisDay(date) }
+    }
+
+    fun openMemoryById(eventId: String) {
+        openEventDetailById(eventId)
+    }
+
     fun openEventDetailById(eventId: String, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             if (eventId.substringBefore("::occurrence::") in repository.observePrivateVaultIds().first()) {
@@ -245,6 +280,44 @@ class DotCalViewModel(
         _conflictWarnings.value = emptyList()
     }
 
+    fun refreshAvailability(request: FreeSlotRequest, use24HourFormat: Boolean) {
+        availabilityJob?.cancel()
+        _availabilityState.value = _availabilityState.value.copy(isLoading = true, error = null)
+        availabilityJob = viewModelScope.launch {
+            runCatching {
+                val days = repository.computeAvailability(request)
+                AvailabilityTextFormatter.format(days, use24HourFormat)
+            }.onSuccess { text ->
+                _availabilityState.value = AvailabilityUiState(text = text)
+            }.onFailure {
+                _availabilityState.value = AvailabilityUiState(error = "Couldn't calculate availability")
+            }
+        }
+    }
+
+    fun clearAvailability() {
+        availabilityJob?.cancel()
+        _availabilityState.value = AvailabilityUiState()
+    }
+
+    fun refreshDeadTime(
+        startDate: LocalDate,
+        startHour: Int,
+        endHour: Int,
+    ) {
+        deadTimeJob?.cancel()
+        _deadTimeState.value = _deadTimeState.value.copy(isLoading = true, error = null)
+        deadTimeJob = viewModelScope.launch {
+            runCatching {
+                repository.computeDeadTime(startDate, startHour, endHour).slots
+            }.onSuccess { slots ->
+                _deadTimeState.value = DeadTimeUiState(slots = slots)
+            }.onFailure {
+                _deadTimeState.value = DeadTimeUiState(error = "Couldn't find free time")
+            }
+        }
+    }
+
     fun saveEvent(
         existing: CalendarEvent?,
         data: EventEditorData,
@@ -278,6 +351,41 @@ class DotCalViewModel(
 
     fun bulkShiftEvents(eventIds: Set<String>, days: Long, hours: Long, onDone: (Result<BulkEditResult>) -> Unit = {}) {
         viewModelScope.launch { onDone(runCatching { repository.bulkShiftEvents(eventIds, days, hours) }) }
+    }
+
+    fun checkDragConflicts(
+        event: CalendarEvent,
+        targetStart: LocalDateTime,
+        targetEnd: LocalDateTime,
+        onDone: (List<CalendarEvent>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onDone(
+                repository.findConflictWarnings(
+                    startDate = targetStart.toLocalDate(),
+                    endDate = targetEnd.toLocalDate(),
+                    startTime = targetStart.toLocalTime(),
+                    endTime = targetEnd.toLocalTime(),
+                    excludedEventId = event.baseEventId(),
+                ),
+            )
+        }
+    }
+
+    fun rescheduleEvent(
+        event: CalendarEvent,
+        targetStart: LocalDateTime,
+        targetEnd: LocalDateTime,
+        recurringEditScope: RecurringEditScope,
+        onDone: (Result<BulkEditResult>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onDone(
+                runCatching {
+                    repository.rescheduleEvent(event, targetStart, targetEnd, recurringEditScope)
+                },
+            )
+        }
     }
 
     fun bulkMoveToDate(eventIds: Set<String>, targetDate: LocalDate, onDone: (Result<BulkEditResult>) -> Unit = {}) {

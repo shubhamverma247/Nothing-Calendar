@@ -11,8 +11,10 @@ import android.view.Gravity
 import android.widget.TextView
 import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import com.dotfield.dotcal.data.CalendarAccount
@@ -64,6 +66,21 @@ internal fun showDotCalToast(
     }
     toast.show()
 }
+
+@Composable
+internal fun secondaryActionContainer(palette: DotCalPalette) =
+    if (palette.isDark) palette.bottomNavSurface else palette.calendarSurface
+
+@Composable
+internal fun secondaryActionBorder(palette: DotCalPalette) =
+    BorderStroke(
+        1.dp,
+        if (palette.isDark) palette.line.copy(alpha = 0.78f) else palette.accent.copy(alpha = 0.72f),
+    )
+
+@Composable
+internal fun secondaryActionContent(palette: DotCalPalette) =
+    if (palette.isDark) palette.primaryText else palette.accent
 
 @Composable
 internal fun DotCalSwitch(

@@ -45,7 +45,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.baseEventId
+import com.dotfield.dotcal.data.insights.OnThisDayMemory
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -111,7 +114,8 @@ internal fun EventRow(event: CalendarEvent, palette: DotCalPalette, onClick: (()
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(palette.eventCardSurface)
-            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(16.dp))
+            .then(if (event.isGhost) Modifier.ghostDottedCardBorder(palette, 16f) else Modifier.border(1.dp, palette.eventCardBorder, RoundedCornerShape(16.dp)))
+            .graphicsLayer { alpha = if (event.isGhost) 0.72f else 1f }
             .noRippleClickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -168,10 +172,13 @@ internal fun AgendaPreview(
     events: List<CalendarEvent>,
     forecast: List<DayDensityForecastItem>,
     palette: DotCalPalette,
+    onThisDayMemories: List<OnThisDayMemory> = emptyList(),
     selectedEventIds: Set<String> = emptySet(),
     onAdd: () -> Unit,
     onDateSelected: (LocalDate) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
+    onMemoryClick: (String) -> Unit = {},
+    onMemoryDismiss: () -> Unit = {},
     onSelectionStart: (CalendarEvent) -> Unit = {},
     onSelectionToggle: (CalendarEvent) -> Unit = {},
     onSelectionClear: () -> Unit = {},
@@ -195,8 +202,10 @@ internal fun AgendaPreview(
         }
     }
     val listState = rememberLazyListState()
-    LaunchedEffect(selectedDate, dateIndex) {
-        val targetIndex = dateIndex[selectedDate] ?: 0
+    // The "On This Day" card occupies index 0 when present, pushing the date headers down by one.
+    val headerOffset = if (onThisDayMemories.isNotEmpty()) 1 else 0
+    LaunchedEffect(selectedDate, dateIndex, headerOffset) {
+        val targetIndex = (dateIndex[selectedDate] ?: 0) + headerOffset
         listState.animateScrollToItem(targetIndex)
     }
     Column(
@@ -222,8 +231,19 @@ internal fun AgendaPreview(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 0.dp, bottom = 90.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            if (onThisDayMemories.isNotEmpty()) {
+                item(key = "on-this-day") {
+                    OnThisDayCard(
+                        memories = onThisDayMemories,
+                        palette = palette,
+                        onMemoryClick = onMemoryClick,
+                        onDismiss = onMemoryDismiss,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+                    )
+                }
+            }
             if (upcomingEvents.isEmpty()) {
                 item {
                     AgendaEndOfDayState(
@@ -398,11 +418,12 @@ private fun AgendaEventCard(
             .clip(cardShape)
             .drawBehind {
                 drawRect(cardBg)
-                drawRect(accentStrip, topLeft = Offset.Zero, size = androidx.compose.ui.geometry.Size(4.dp.toPx(), size.height))
+                drawRect(accentStrip.copy(alpha = if (event.isGhost) 0.42f else 1f), topLeft = Offset.Zero, size = androidx.compose.ui.geometry.Size(4.dp.toPx(), size.height))
             }
-            .border(1.dp, palette.eventCardBorder, cardShape)
+            .then(if (event.isGhost) Modifier.ghostDottedCardBorder(palette, 16f) else Modifier.border(1.dp, palette.eventCardBorder, cardShape))
+            .graphicsLayer { alpha = if (event.isGhost) 0.74f else 1f }
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(start = 16.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
+            .padding(start = 16.dp, end = 14.dp, top = 11.dp, bottom = 11.dp),
         verticalAlignment = Alignment.Top,
     ) {
         if (selectionMode) {
@@ -453,6 +474,17 @@ private fun AgendaEventCard(
     }
 }
 
+private fun Modifier.ghostDottedCardBorder(palette: DotCalPalette, radiusDp: Float): Modifier = drawBehind {
+    drawRoundRect(
+        color = palette.primaryText.copy(alpha = if (palette.isDark) 0.60f else 0.44f),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(radiusDp.dp.toPx(), radiusDp.dp.toPx()),
+        style = Stroke(
+            width = 1.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx())),
+        ),
+    )
+}
+
 @Composable
 private fun AgendaSelectionDot(selected: Boolean, palette: DotCalPalette) {
     Box(
@@ -474,7 +506,7 @@ internal fun AgendaDateHeader(date: LocalDate, isFirst: Boolean, palette: DotCal
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = if (isFirst) 0.dp else 20.dp, bottom = 10.dp),
+            .padding(top = if (isFirst) 0.dp else 10.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

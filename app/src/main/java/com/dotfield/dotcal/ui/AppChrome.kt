@@ -35,7 +35,9 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Settings as SettingsGearIcon
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -103,7 +105,9 @@ internal fun CalendarTabContainer(
     onTemplates: (() -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
+    onScanQr: (() -> Unit)? = null,
     onJumpToDate: (() -> Unit)? = null,
+    onAvailability: (() -> Unit)? = null,
     onCalendarSets: (() -> Unit)? = null,
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
@@ -131,7 +135,9 @@ internal fun CalendarTabContainer(
                 onTemplates = onTemplates,
                 onQuickAdd = onQuickAdd,
                 onSearch = onSearch,
+                onScanQr = onScanQr,
                 onJumpToDate = onJumpToDate,
+                onAvailability = onAvailability,
                 onCalendarSets = onCalendarSets,
                 onTimeInsights = onTimeInsights,
                 onDateCalculator = onDateCalculator,
@@ -176,7 +182,9 @@ internal fun CalendarActionBar(
     onTemplates: (() -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
+    onScanQr: (() -> Unit)? = null,
     onJumpToDate: (() -> Unit)? = null,
+    onAvailability: (() -> Unit)? = null,
     onCalendarSets: (() -> Unit)? = null,
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
@@ -188,6 +196,7 @@ internal fun CalendarActionBar(
     var showOverflow by remember { mutableStateOf(false) }
     val hasOverflow = onSearch != null ||
         onJumpToDate != null ||
+        onAvailability != null ||
         onQuickAdd != null ||
         onTemplates != null ||
         onCalendarSets != null ||
@@ -223,6 +232,14 @@ internal fun CalendarActionBar(
             maxLines = 1,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (onScanQr != null) {
+                IconButton(
+                    onClick = onScanQr,
+                    modifier = Modifier.size(44.dp),
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan event QR", tint = topIconTint)
+                }
+            }
             IconButton(
                 onClick = onAdd,
                 modifier = Modifier.size(44.dp),
@@ -288,6 +305,19 @@ internal fun CalendarActionBar(
                                 onClick = {
                                     showOverflow = false
                                     onQuickAdd()
+                                },
+                            )
+                        }
+                        if (onAvailability != null) {
+                            ActionBarMenuItem(
+                                label = "Share availability",
+                                subtitle = "Copy when you're free",
+                                icon = Icons.Default.Share,
+                                isPro = showProBadges,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onAvailability()
                                 },
                             )
                         }

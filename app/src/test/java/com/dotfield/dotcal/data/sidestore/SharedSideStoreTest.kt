@@ -23,4 +23,14 @@ class SharedSideStoreTest {
         assertNull(store.read("ghost_flags", "event-1"))
         assertEquals(emptyMap<String, String>(), store.readNamespace("ghost_flags"))
     }
+
+    @Test
+    fun ghostFlagSurvivesStoreReload() = runBlocking {
+        val file = File.createTempFile("dotcal-side-store-reload", ".json")
+        file.deleteOnExit()
+
+        SharedSideStore(file).write("ghost_flags", "event-2", "1")
+
+        assertEquals("1", SharedSideStore(file).read("ghost_flags", "event-2"))
+    }
 }

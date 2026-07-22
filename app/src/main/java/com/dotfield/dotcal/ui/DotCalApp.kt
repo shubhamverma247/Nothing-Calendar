@@ -222,6 +222,10 @@ import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.BulkEditResult
 import com.dotfield.dotcal.data.ics.IcsExporter
+import com.dotfield.dotcal.data.ics.IcsParser
+import com.dotfield.dotcal.data.ics.ParsedIcsItem
+import com.dotfield.dotcal.data.qr.QrEventDecodeResult
+import com.dotfield.dotcal.data.qr.QrEventPayloadCodec
 import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
@@ -243,6 +247,7 @@ import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
 import com.dotfield.dotcal.share.CardImageExporter
+import com.dotfield.dotcal.share.QrEventImageExporter
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import com.dotfield.dotcal.ui.theme.NBlack
 import com.dotfield.dotcal.ui.theme.NWhite
@@ -277,6 +282,19 @@ private data class PendingDelete(
     val scope: RecurringEditScope,
     val source: DeleteSource,
 )
+private data class PendingEventDrag(
+    val change: EventDragChange,
+    val scope: RecurringEditScope,
+)
+private data class QrShareSession(
+    val event: CalendarEvent,
+    val payload: String,
+    val sharedWithoutDescription: Boolean,
+)
+private data class PendingIcsImport(
+    val icsText: String,
+    val items: List<ParsedIcsItem>,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -297,8 +315,11 @@ fun DotCalApp(
     val yearEvents by viewModel.yearEvents.collectAsStateWithLifecycle()
     val agendaEvents by viewModel.agendaEvents.collectAsStateWithLifecycle()
     val dayDensityForecast by viewModel.dayDensityForecast.collectAsStateWithLifecycle()
+    val onThisDayMemories by viewModel.onThisDayMemories.collectAsStateWithLifecycle()
     val punchCardState by viewModel.punchCardState.collectAsStateWithLifecycle()
     val countdownPins by viewModel.countdownPins.collectAsStateWithLifecycle()
+    val availabilityState by viewModel.availabilityState.collectAsStateWithLifecycle()
+    val deadTimeState by viewModel.deadTimeState.collectAsStateWithLifecycle()
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val assignableAccounts by viewModel.assignableAccounts.collectAsStateWithLifecycle()
@@ -324,6 +345,9 @@ fun DotCalApp(
     var showPaywall by remember { mutableStateOf(false) }
     var showDateCalculator by remember { mutableStateOf(false) }
     var showTimeInsights by remember { mutableStateOf(false) }
+    var showAvailability by remember { mutableStateOf(false) }
+    var availabilityInitialDate by remember { mutableStateOf(LocalDate.now()) }
+    var availabilityInitialEndDate by remember { mutableStateOf(LocalDate.now().plusDays(2)) }
     var showQuickAdd by remember { mutableStateOf(false) }
     var showJumpToDatePicker by remember { mutableStateOf(false) }
     var showRecentlyDeleted by remember { mutableStateOf(false) }
@@ -341,6 +365,9 @@ fun DotCalApp(
     var duplicateDraftPrefill by remember { mutableStateOf<EventEditorData?>(null) }
     var pendingCopyToDateEvent by remember { mutableStateOf<CalendarEvent?>(null) }
     var pendingShareEvent by remember { mutableStateOf<CalendarEvent?>(null) }
+    var qrShareSession by remember { mutableStateOf<QrShareSession?>(null) }
+    var showQrScanner by remember { mutableStateOf(false) }
+    var pendingIcsImport by remember { mutableStateOf<PendingIcsImport?>(null) }
     var pendingCountdownLimitEvent by remember { mutableStateOf<Pair<CalendarEvent, String>?>(null) }
     var templatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     var taskTemplatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
@@ -350,6 +377,8 @@ fun DotCalApp(
     val privateVaultEvents by viewModel.privateVaultEvents.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
     var pendingTaskDelete by remember { mutableStateOf<CalendarEvent?>(null) }
+    var pendingDragScope by remember { mutableStateOf<EventDragChange?>(null) }
+    var pendingDragConflict by remember { mutableStateOf<Pair<PendingEventDrag, Int>?>(null) }
     var appUnlocked by remember { mutableStateOf(false) }
     var handledTaskDeepLinkId by remember { mutableStateOf<String?>(null) }
     var handledRouteToken by remember { mutableStateOf<Long?>(null) }
@@ -527,6 +556,16 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_24_HOUR_FORMAT] ?: true
         }
     }.collectAsStateWithLifecycle(initialValue = true)
+    val freeTimeStartHour by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            (preferences[CalendarPreferences.KEY_FREE_TIME_START_HOUR] ?: 8).coerceIn(0, 22)
+        }
+    }.collectAsStateWithLifecycle(initialValue = 8)
+    val freeTimeEndHour by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            (preferences[CalendarPreferences.KEY_FREE_TIME_END_HOUR] ?: 22).coerceIn(1, 23)
+        }
+    }.collectAsStateWithLifecycle(initialValue = 22)
     val weekStartOption by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             parseWeekStartOption(preferences[CalendarPreferences.KEY_WEEK_START])
@@ -648,7 +687,18 @@ fun DotCalApp(
     var onboardingPageIndex by remember { mutableStateOf(0) }
     var selectedDateRestored by remember { mutableStateOf(false) }
 
-    // ----- ICS export / import (Pro) -----
+    fun openIcsPreview(icsText: String, errorMessage: String) {
+        scope.launch {
+            val items = withContext(Dispatchers.Default) { IcsParser.parse(icsText) }
+            if (items.isEmpty()) {
+                showDotCalToast(context, palette, errorMessage)
+            } else {
+                pendingIcsImport = PendingIcsImport(icsText, items)
+            }
+        }
+    }
+
+    // ----- ICS export / import (Free) -----
     val exportIcsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/calendar"),
     ) { uri ->
@@ -668,23 +718,16 @@ fun DotCalApp(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val text = runCatching {
-            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-        }.getOrNull()
-        if (text.isNullOrBlank()) {
-            showDotCalToast(context, palette, "Couldn't read file")
-            return@rememberLauncherForActivityResult
-        }
-        viewModel.importIcs(text) { result ->
-            result.onSuccess { summary ->
-                showDotCalToast(
-                    context,
-                    palette,
-                    "Imported: ${summary.inserted} new, ${summary.updated} updated",
-                    Toast.LENGTH_LONG,
-                )
-            }.onFailure {
-                showDotCalToast(context, palette, "Import failed - not a valid .ics file")
+        scope.launch {
+            val text = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                }.getOrNull()
+            }
+            if (text.isNullOrBlank()) {
+                showDotCalToast(context, palette, "Couldn't read file")
+            } else {
+                openIcsPreview(text, "Import failed - not a valid .ics file")
             }
         }
     }
@@ -961,6 +1004,7 @@ fun DotCalApp(
             imageUris = "[]",
             voiceNotePath = null,
             colorHex = event.colorHex,
+            isGhost = event.isGhost,
         )
     }
     fun openDuplicateEditor(event: CalendarEvent, targetDate: LocalDate? = null) {
@@ -1003,11 +1047,67 @@ fun DotCalApp(
                 showDotCalToast(context, palette, "Bulk edit failed")
             }
     }
+    fun showDragResult(result: Result<BulkEditResult>) {
+        result
+            .onSuccess { summary ->
+                scope.launch {
+                    val dismissJob = launch {
+                        delay(BULK_UNDO_SNACKBAR_MILLIS)
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                    }
+                    val snackbarResult = snackbarHostState.showSnackbar(
+                        message = "Event updated",
+                        actionLabel = "UNDO",
+                    )
+                    dismissJob.cancel()
+                    if (snackbarResult == SnackbarResult.ActionPerformed) {
+                        viewModel.undoBulkEdit(summary.undoToken) {
+                            showDotCalToast(context, palette, "Change undone")
+                        }
+                    }
+                }
+            }
+            .onFailure {
+                showDotCalToast(context, palette, "Couldn't move event")
+            }
+    }
+    fun commitEventDrag(request: PendingEventDrag) {
+        viewModel.rescheduleEvent(
+            event = request.change.event,
+            targetStart = request.change.targetStart,
+            targetEnd = request.change.targetEnd,
+            recurringEditScope = request.scope,
+            onDone = ::showDragResult,
+        )
+    }
+    fun checkEventDrag(request: PendingEventDrag) {
+        viewModel.checkDragConflicts(
+            event = request.change.event,
+            targetStart = request.change.targetStart,
+            targetEnd = request.change.targetEnd,
+        ) { conflicts ->
+            if (conflicts.isEmpty()) {
+                commitEventDrag(request)
+            } else {
+                pendingDragConflict = request to conflicts.size
+            }
+        }
+    }
+    fun requestEventDrag(change: EventDragChange) {
+        when {
+            !isPro -> showPaywall = true
+            !change.event.rrule.isNullOrBlank() -> pendingDragScope = change
+            else -> checkEventDrag(PendingEventDrag(change, RecurringEditScope.WholeSeries))
+        }
+    }
     fun closeTopSurface() {
         when {
             showPaywall -> showPaywall = false
             bulkEventSheet != null -> bulkEventSheet = null
             pendingShareEvent != null -> pendingShareEvent = null
+            qrShareSession != null -> qrShareSession = null
+            pendingIcsImport != null -> pendingIcsImport = null
+            showQrScanner -> showQrScanner = false
             pendingCountdownLimitEvent != null -> pendingCountdownLimitEvent = null
             pendingCopyToDateEvent != null -> pendingCopyToDateEvent = null
             showBulkTemplatePicker -> showBulkTemplatePicker = false
@@ -1018,6 +1118,10 @@ fun DotCalApp(
             showRecentlyDeleted -> showRecentlyDeleted = false
             showDateCalculator -> showDateCalculator = false
             showTimeInsights -> showTimeInsights = false
+            showAvailability -> {
+                showAvailability = false
+                viewModel.clearAvailability()
+            }
             showQuickAdd -> showQuickAdd = false
             showJumpToDatePicker -> showJumpToDatePicker = false
             addSheet -> {
@@ -1116,7 +1220,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || qrShareSession != null || pendingIcsImport != null || showQrScanner || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showAvailability || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -1181,7 +1285,18 @@ fun DotCalApp(
                             },
                             onQuickAdd = { showQuickAdd = true },
                             onSearch = { showSearch = true },
+                            onScanQr = { showQrScanner = true },
                             onJumpToDate = { showJumpToDatePicker = true },
+                            onAvailability = {
+                                if (isPro) {
+                                    availabilityInitialDate = selectedDate
+                                    availabilityInitialEndDate = selectedDate.plusDays(2)
+                                    viewModel.clearAvailability()
+                                    showAvailability = true
+                                } else {
+                                    showPaywall = true
+                                }
+                            },
                             onCalendarSets = {
                                 if (isPro) {
                                     viewModel.refreshFocusProfiles()
@@ -1266,6 +1381,18 @@ fun DotCalApp(
                                             openAddEditor(time)
                                         },
                                         onEventClick = viewModel::openEventDetail,
+                                        onEventDrag = ::requestEventDrag,
+                                        onAvailabilityRequest = { date ->
+                                            if (isPro) {
+                                                availabilityInitialDate = date
+                                                availabilityInitialEndDate = date.plusDays(2)
+                                                viewModel.clearAvailability()
+                                                showAvailability = true
+                                            } else {
+                                                showPaywall = true
+                                            }
+                                        },
+                                        use24HourFormat = use24HourFormat,
                                     )
                                     CalendarTab.Day -> DayView(
                                         selectedDate = selectedDate,
@@ -1273,18 +1400,23 @@ fun DotCalApp(
                                         palette = palette,
                                         isDayPunched = punchCardState.isPunched(selectedDate),
                                         punchStreak = punchCardState.streakEndingAt(selectedDate),
+                                        onThisDayMemories = onThisDayMemories,
                                         onPreviousDay = { viewModel.selectDate(selectedDate.minusDays(1)) },
                                         onNextDay = { viewModel.selectDate(selectedDate.plusDays(1)) },
                                         onJumpToday = { jumpToDate(LocalDate.now()) },
                                         onJumpPickerRequest = { showJumpToDatePicker = true },
                                         onPunchDay = { viewModel.punchDay(selectedDate) },
                                         onClearPunchDay = { viewModel.clearDayPunch(selectedDate) },
+                                        onMemoryClick = { viewModel.openMemoryById(it) },
+                                        onMemoryDismiss = { viewModel.dismissOnThisDay(selectedDate) },
                                         highlightDate = jumpHighlightDate,
                                         onAddAtDate = { date, time ->
                                             viewModel.selectDate(date)
                                             openAddEditor(time)
                                         },
                                         onEventClick = viewModel::openEventDetail,
+                                        onEventDrag = ::requestEventDrag,
+                                        use24HourFormat = use24HourFormat,
                                     )
                                     CalendarTab.ThreeDay -> ThreeDayView(
                                         selectedDate = selectedDate,
@@ -1307,10 +1439,13 @@ fun DotCalApp(
                                         events = agendaEvents,
                                         forecast = dayDensityForecast,
                                         palette = palette,
+                                        onThisDayMemories = onThisDayMemories,
                                         selectedEventIds = selectedAgendaEventIds,
                                         onAdd = { openAddEditor() },
                                         onDateSelected = viewModel::selectDate,
                                         onEventClick = viewModel::openEventDetail,
+                                        onMemoryClick = { viewModel.openMemoryById(it) },
+                                        onMemoryDismiss = { viewModel.dismissOnThisDay(selectedDate) },
                                         onSelectionStart = { event ->
                                             if (!isPro) {
                                                 showPaywall = true
@@ -1601,6 +1736,11 @@ fun DotCalApp(
                     )
                 },
                 onCheckForUpdates = { checkForUpdates(true) },
+                onMoreApps = {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.dotfiles.app")),
+                    )
+                },
                 onRequestCalendarAccess = {
                     if (hasCalendarPermission) {
                         runSyncNow(showToast = false)
@@ -1818,6 +1958,39 @@ fun DotCalApp(
                         openEditEditor(event)
                     },
                     onShare = { pendingShareEvent = event },
+                    onShareQr = {
+                        val eventReminders = reminders.filter { it.eventId == event.baseEventId() }
+                        scope.launch {
+                            val result = withContext(Dispatchers.Default) {
+                                runCatching {
+                                    val remindersById = mapOf(
+                                        event.id to eventReminders,
+                                        event.baseEventId() to eventReminders,
+                                    )
+                                    val fullIcs = IcsExporter.export(listOf(event), remindersById)
+                                    val compactEvent = event.copy(
+                                        description = "",
+                                        imageUris = "[]",
+                                        voiceNotePath = null,
+                                    )
+                                    val compactIcs = IcsExporter.export(listOf(compactEvent), remindersById)
+                                    QrEventPayloadCodec.encode(fullIcs, compactIcs)
+                                }
+                            }
+                            result.onSuccess { encoded ->
+                                qrShareSession = QrShareSession(
+                                    event = event,
+                                    payload = encoded.payload,
+                                    sharedWithoutDescription = encoded.sharedWithoutDescription,
+                                )
+                                if (encoded.sharedWithoutDescription) {
+                                    showDotCalToast(context, palette, "Shared without description")
+                                }
+                            }.onFailure {
+                                showDotCalToast(context, palette, "Event is too large to share as QR")
+                            }
+                        }
+                    },
                     onPinCountdown = {
                         viewModel.pinCountdown(event, isPro) { result ->
                             when (result) {
@@ -1898,6 +2071,98 @@ fun DotCalApp(
                         }
                     },
                     palette = palette,
+                )
+            }
+        }
+        qrShareSession?.let { session ->
+            AnimatedVisibility(
+                visible = true,
+                enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+                exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+                modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            ) {
+                QrEventShareScreen(
+                    eventTitle = session.event.title,
+                    eventDateTime = session.event.shareDateTimeLine(use24HourFormat),
+                    eventMeta = session.event.qrShareMetaLine(),
+                    payload = session.payload,
+                    sharedWithoutDescription = session.sharedWithoutDescription,
+                    palette = palette,
+                    onBack = { qrShareSession = null },
+                    onShare = { bitmap ->
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    QrEventImageExporter.createShareUri(
+                                        context = context,
+                                        bitmap = bitmap,
+                                        eventId = session.event.baseEventId(),
+                                    )
+                                }
+                            }
+                            result
+                                .onSuccess { uri -> shareQrEventImage(context, session.event, uri, palette) }
+                                .onFailure { showDotCalToast(context, palette, "Could not share QR image") }
+                        }
+                    },
+                )
+            }
+        }
+        AnimatedVisibility(
+            visible = showQrScanner,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            QrEventScannerScreen(
+                palette = palette,
+                onBack = { showQrScanner = false },
+                onCodeDetected = { rawValue ->
+                    when (val decoded = QrEventPayloadCodec.decode(rawValue)) {
+                        is QrEventDecodeResult.Success -> {
+                            val parsedItems = IcsParser.parse(decoded.icsText)
+                            if (parsedItems.isEmpty()) {
+                                QrScanOutcome.Rejected("Not a valid event code")
+                            } else {
+                                showQrScanner = false
+                                pendingIcsImport = PendingIcsImport(decoded.icsText, parsedItems)
+                                QrScanOutcome.Accepted
+                            }
+                        }
+                        QrEventDecodeResult.NotDotCal -> QrScanOutcome.Rejected("Not a DotCal event code")
+                        QrEventDecodeResult.UnsupportedVersion -> QrScanOutcome.Rejected("DotCal event code needs a newer app")
+                        QrEventDecodeResult.Malformed -> QrScanOutcome.Rejected("Not a valid event code")
+                    }
+                },
+            )
+        }
+        pendingIcsImport?.let { pending ->
+            AnimatedVisibility(
+                visible = true,
+                enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+                exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+                modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            ) {
+                IcsImportPreviewScreen(
+                    items = pending.items,
+                    palette = palette,
+                    use24HourFormat = use24HourFormat,
+                    onBack = { pendingIcsImport = null },
+                    onImport = {
+                        viewModel.importIcs(pending.icsText) { result ->
+                            result.onSuccess { summary ->
+                                pendingIcsImport = null
+                                showDotCalToast(
+                                    context,
+                                    palette,
+                                    "Imported: ${summary.inserted} new, ${summary.updated} updated",
+                                    Toast.LENGTH_LONG,
+                                )
+                            }.onFailure {
+                                showDotCalToast(context, palette, "Import failed - not a valid .ics file")
+                            }
+                        }
+                    },
                 )
             }
         }
@@ -2299,7 +2564,67 @@ fun DotCalApp(
                 palette = palette,
                 events = events,
                 accounts = accounts,
+                deadTimeState = deadTimeState,
+                freeTimeStartHour = minOf(freeTimeStartHour, freeTimeEndHour - 1),
+                freeTimeEndHour = maxOf(freeTimeEndHour, freeTimeStartHour + 1),
+                use24HourFormat = use24HourFormat,
                 onBack = { showTimeInsights = false },
+                onRefreshDeadTime = viewModel::refreshDeadTime,
+                onFreeTimeBoundsChange = { startHour, endHour ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_FREE_TIME_START_HOUR] = startHour
+                            preferences[CalendarPreferences.KEY_FREE_TIME_END_HOUR] = endHour
+                        }
+                    }
+                },
+                onUseFreeSlot = { slot ->
+                    showTimeInsights = false
+                    openQuickAddResult(
+                        QuickAddResult(
+                            title = "",
+                            date = slot.date,
+                            endDate = slot.date,
+                            startTime = slot.start,
+                            endTime = slot.end,
+                            isAllDay = false,
+                            rrule = null,
+                        ),
+                    )
+                },
+                onShareFreeDay = { date ->
+                    showTimeInsights = false
+                    availabilityInitialDate = date
+                    availabilityInitialEndDate = date
+                    viewModel.clearAvailability()
+                    showAvailability = true
+                },
+            )
+        }
+        AnimatedVisibility(
+            visible = showAvailability,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+        ) {
+            AvailabilityScreen(
+                palette = palette,
+                initialDate = availabilityInitialDate,
+                initialEndDate = availabilityInitialEndDate,
+                weekStart = weekStartDay,
+                use24HourFormat = use24HourFormat,
+                state = availabilityState,
+                onBack = {
+                    showAvailability = false
+                    viewModel.clearAvailability()
+                },
+                onRefresh = { request -> viewModel.refreshAvailability(request, use24HourFormat) },
+                onCopy = { text ->
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("DotCal availability", text))
+                    showDotCalToast(context, palette, "Availability copied")
+                },
+                onShare = { text -> shareAvailabilityText(context, text) },
             )
         }
         AnimatedVisibility(
@@ -2463,6 +2788,28 @@ fun DotCalApp(
                 palette = palette,
                 onDismiss = { showJumpToDatePicker = false },
                 onSelected = ::jumpToDate,
+            )
+        }
+        pendingDragScope?.let { change ->
+            ApplyScopeChoiceSheet(
+                selected = RecurringEditScope.ThisEvent,
+                palette = palette,
+                onDismiss = { pendingDragScope = null },
+                onSelected = { selectedScope ->
+                    pendingDragScope = null
+                    checkEventDrag(PendingEventDrag(change, selectedScope))
+                },
+            )
+        }
+        pendingDragConflict?.let { (request, conflictCount) ->
+            DragConflictDialog(
+                conflictCount = conflictCount,
+                palette = palette,
+                onDismiss = { pendingDragConflict = null },
+                onConfirm = {
+                    pendingDragConflict = null
+                    commitEventDrag(request)
+                },
             )
         }
         if (pendingBulkDelete) {
@@ -2635,6 +2982,25 @@ private fun shareCountdownImage(
     }
 }
 
+private fun shareQrEventImage(
+    context: Context,
+    event: CalendarEvent,
+    uri: Uri,
+    palette: DotCalPalette,
+) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(Intent.EXTRA_SUBJECT, event.title)
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "Share Event QR"))
+    }.onFailure {
+        showDotCalToast(context, palette, "No share target found")
+    }
+}
+
 private fun createSingleEventIcsUri(
     context: Context,
     event: CalendarEvent,
@@ -2653,6 +3019,14 @@ private fun CalendarEvent.shareText(use24HourFormat: Boolean): String {
     if (location.isNotBlank()) lines += "Location: $location"
     if (description.isNotBlank()) lines += "Notes: $description"
     return lines.joinToString("\n")
+}
+
+private fun shareAvailabilityText(context: Context, text: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share availability"))
 }
 
 private fun CalendarEvent.shareDateTimeLine(use24HourFormat: Boolean): String {
@@ -2677,6 +3051,9 @@ private fun CalendarEvent.shareDateTimeLine(use24HourFormat: Boolean): String {
     }
     return "$startText - $endText"
 }
+
+private fun CalendarEvent.qrShareMetaLine(): String =
+    location.takeIf { it.isNotBlank() }.orEmpty()
 
 private fun String.safeShareFilename(): String {
     val cleaned = lowercase(Locale.US)

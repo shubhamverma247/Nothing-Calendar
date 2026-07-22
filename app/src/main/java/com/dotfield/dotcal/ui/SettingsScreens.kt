@@ -102,6 +102,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
@@ -297,6 +298,7 @@ internal fun SettingsPreview(
     onRemoveHolidayCountry: (HolidayCountryUiItem) -> Unit,
     onRateDotCal: () -> Unit,
     onCheckForUpdates: () -> Unit,
+    onMoreApps: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
     onAddAccount: () -> Unit,
     isPro: Boolean,
@@ -378,6 +380,7 @@ internal fun SettingsPreview(
             onPrivacyPolicy = { onScreenChange(SettingsScreen.PrivacyPolicy) },
             onRateDotCal = onRateDotCal,
             onCheckForUpdates = onCheckForUpdates,
+            onMoreApps = onMoreApps,
             onRequestCalendarAccess = onRequestCalendarAccess,
             onAddAccount = { onScreenChange(SettingsScreen.AddAccount) },
             isPro = isPro,
@@ -631,6 +634,7 @@ internal fun SettingsRoot(
     onPrivacyPolicy: () -> Unit,
     onRateDotCal: () -> Unit,
     onCheckForUpdates: () -> Unit,
+    onMoreApps: () -> Unit,
     onRequestCalendarAccess: () -> Unit,
     onAddAccount: () -> Unit,
     isPro: Boolean,
@@ -749,6 +753,8 @@ internal fun SettingsRoot(
                     SettingsIconMenuRow(title = "Privacy Policy", value = "", icon = Icons.Default.Description, palette = palette, onClick = onPrivacyPolicy)
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(title = "Rate DotCal", value = "", icon = Icons.Default.Star, palette = palette, onClick = onRateDotCal)
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(title = "More apps from us", value = "DotFiles — File Manager", icon = Icons.Default.Apps, palette = palette, onClick = onMoreApps)
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(title = "Send Feedback", value = "", icon = Icons.Default.Edit, palette = palette, onClick = {
                         context.startActivity(
@@ -2328,17 +2334,16 @@ private fun AllDayReminderTimeSheet(
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(54.dp),
+                    border = secondaryActionBorder(palette),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = palette.cancelSurface,
-                        contentColor = palette.primaryText,
+                        containerColor = secondaryActionContainer(palette),
+                        contentColor = secondaryActionContent(palette),
                     ),
                     shape = RoundedCornerShape(18.dp),
                     contentPadding = PaddingValues(0.dp),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .border(1.dp, palette.cancelBorder, RoundedCornerShape(18.dp)),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text("Cancel", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -2491,8 +2496,8 @@ private fun SettingsToolsPanel(
         SettingsSectionTitle("Tools", palette)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             SettingsToolCard(
-                title = "Time Insights",
-                caption = "Load map",
+                title = "Dead Time",
+                caption = "Free slots",
                 icon = Icons.Default.AccessTime,
                 isPro = isPro,
                 palette = palette,

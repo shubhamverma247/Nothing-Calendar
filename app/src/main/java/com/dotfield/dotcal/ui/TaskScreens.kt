@@ -1074,17 +1074,16 @@ private fun TaskTimeChoiceSheet(
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(54.dp),
+                    border = secondaryActionBorder(palette),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = palette.cancelSurface,
-                        contentColor = palette.primaryText,
+                        containerColor = secondaryActionContainer(palette),
+                        contentColor = secondaryActionContent(palette),
                     ),
                     shape = RoundedCornerShape(18.dp),
                     contentPadding = PaddingValues(0.dp),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .border(1.dp, palette.cancelBorder, RoundedCornerShape(18.dp)),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text("Cancel", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)

@@ -131,7 +131,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -215,6 +217,7 @@ import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
+import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
 import com.dotfield.dotcal.data.privacy.AppLockState
@@ -271,6 +274,8 @@ private val PRO_FEATURES = listOf(
     ProFeature("Calendar Sets", "Save Work/Personal/Family visibility and switch instantly"),
     ProFeature("Shift Patterns", "Build rotating shift cycles and generate them in bulk"),
     ProFeature("Time Insights", "See hours, busiest days, and task completion"),
+    ProFeature("Dead Time Finder", "Find open blocks across the next seven days"),
+    ProFeature("Share Availability", "Turn free time into text you can paste anywhere"),
 )
 
 private enum class TimeInsightRange(val label: String) {
@@ -1051,15 +1056,13 @@ internal fun QuickAddScreen(
                     }
                 }
             }
-        }
 
-        // Continue button pinned to the bottom.
-        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp)) {
+            Spacer(modifier = Modifier.height(30.dp))
             val enabled = parsed != null
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(56.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(if (enabled) palette.accent else palette.disabledText.copy(alpha = 0.25f))
                     .noRippleClickable(enabled = enabled) { submit() },
@@ -1073,6 +1076,7 @@ internal fun QuickAddScreen(
                     fontSize = 16.sp,
                 )
             }
+            Spacer(modifier = Modifier.height(48.dp))
         }
     }
 }
@@ -1449,7 +1453,15 @@ internal fun TimeInsightsScreen(
     palette: DotCalPalette,
     events: List<CalendarEvent>,
     accounts: List<CalendarAccount>,
+    deadTimeState: DeadTimeUiState,
+    freeTimeStartHour: Int,
+    freeTimeEndHour: Int,
+    use24HourFormat: Boolean,
     onBack: () -> Unit,
+    onRefreshDeadTime: (LocalDate, Int, Int) -> Unit,
+    onFreeTimeBoundsChange: (Int, Int) -> Unit,
+    onUseFreeSlot: (FreeSlot) -> Unit,
+    onShareFreeDay: (LocalDate) -> Unit,
 ) {
     val today = LocalDate.now()
     val weekStart = remember(today) { today.with(WeekFields.ISO.dayOfWeek(), 1) }
@@ -1470,6 +1482,9 @@ internal fun TimeInsightsScreen(
     }
     val stats = remember(events, accounts, rangeStart, rangeEnd) {
         buildTimeInsightsStats(events, accounts, rangeStart, rangeEnd)
+    }
+    LaunchedEffect(today, freeTimeStartHour, freeTimeEndHour, events) {
+        onRefreshDeadTime(today, freeTimeStartHour, freeTimeEndHour)
     }
 
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
@@ -1524,6 +1539,34 @@ internal fun TimeInsightsScreen(
                 }
             }
             item {
+                DeadTimeControls(
+                    startHour = freeTimeStartHour,
+                    endHour = freeTimeEndHour,
+                    use24HourFormat = use24HourFormat,
+                    palette = palette,
+                    onBoundsChange = onFreeTimeBoundsChange,
+                )
+            }
+            when {
+                deadTimeState.isLoading && deadTimeState.slots.isEmpty() -> item {
+                    Box(Modifier.fillMaxWidth().height(72.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = palette.accent, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+                    }
+                }
+                deadTimeState.error != null -> item {
+                    ShiftEmptyText(deadTimeState.error, palette)
+                }
+                deadTimeState.slots.isEmpty() -> item {
+                    ShiftEmptyText("No open slots of 1 hour or longer.", palette)
+                }
+                else -> lazyItems(
+                    items = deadTimeState.slots,
+                    key = { slot -> "${slot.date}-${slot.start}-${slot.end}" },
+                ) { slot ->
+                    DeadTimeSlotRow(slot, use24HourFormat, palette, onUseFreeSlot, onShareFreeDay)
+                }
+            }
+            item {
                 SettingsSectionTitle("WEEKDAY LOAD", palette)
                 WeekdayHoursChart(hours = stats.weekdayHours, palette = palette)
             }
@@ -1572,6 +1615,100 @@ internal fun TimeInsightsScreen(
                 pickingEnd = false
             },
         )
+    }
+}
+
+@Composable
+private fun DeadTimeControls(
+    startHour: Int,
+    endHour: Int,
+    use24HourFormat: Boolean,
+    palette: DotCalPalette,
+    onBoundsChange: (Int, Int) -> Unit,
+) {
+    var pendingBounds by remember(startHour, endHour) {
+        mutableStateOf(startHour.toFloat()..endHour.toFloat())
+    }
+    val pendingStart = pendingBounds.start.roundToInt().coerceIn(0, 22)
+    val pendingEnd = pendingBounds.endInclusive.roundToInt().coerceIn(pendingStart + 1, 23)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SettingsSectionTitle("DEAD TIME FINDER", palette)
+        Column(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
+                .background(palette.eventCardSurface)
+                .border(1.dp, palette.eventCardBorder, RoundedCornerShape(22.dp))
+                .padding(16.dp),
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatDeadTimeHour(pendingStart, use24HourFormat), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text(formatDeadTimeHour(pendingEnd, use24HourFormat), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            }
+            RangeSlider(
+                value = pendingBounds,
+                onValueChange = { pendingBounds = it },
+                onValueChangeFinished = { onBoundsChange(pendingStart, pendingEnd) },
+                valueRange = 0f..23f,
+                steps = 22,
+                colors = SliderDefaults.colors(
+                    thumbColor = palette.accent,
+                    activeTrackColor = palette.accent,
+                    inactiveTrackColor = palette.line,
+                ),
+            )
+            Text("Next 7 days · slots of 1 hour or longer", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+private fun DeadTimeSlotRow(
+    slot: FreeSlot,
+    use24HourFormat: Boolean,
+    palette: DotCalPalette,
+    onUseSlot: (FreeSlot) -> Unit,
+    onShareDay: (LocalDate) -> Unit,
+) {
+    val minutes = java.time.Duration.between(slot.start, slot.end).toMinutes()
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+            .background(palette.eventCardSurface)
+            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(16.dp))
+            .clickable { onUseSlot(slot) }
+            .padding(start = 14.dp, top = 10.dp, end = 6.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "${slot.date.format(DateTimeFormatter.ofPattern("EEE, MMM d"))} · ${formatDeadTime(slot.start, use24HourFormat)}-${formatDeadTime(slot.end, use24HourFormat)}",
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(formatDeadTimeDuration(minutes), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+        }
+        TextButton(onClick = { onShareDay(slot.date) }) {
+            Text("Share availability", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+        }
+        Icon(Icons.Default.ChevronRight, contentDescription = "Create event in this slot", tint = palette.secondaryText, modifier = Modifier.size(18.dp))
+    }
+}
+
+private fun formatDeadTime(time: LocalTime, use24HourFormat: Boolean): String =
+    time.format(DateTimeFormatter.ofPattern(if (use24HourFormat) "HH:mm" else "h:mm a"))
+
+private fun formatDeadTimeHour(hour: Int, use24HourFormat: Boolean): String =
+    formatDeadTime(LocalTime.of(hour, 0), use24HourFormat)
+
+private fun formatDeadTimeDuration(minutes: Long): String {
+    val hours = minutes / 60
+    val remainder = minutes % 60
+    return when {
+        remainder == 0L -> "$hours h free"
+        hours == 0L -> "$remainder min free"
+        else -> "$hours h $remainder min free"
     }
 }
 

@@ -98,6 +98,25 @@ interface CalendarDao {
     )
     suspend fun searchUserEvents(q: String): List<CalendarEvent>
 
+    /**
+     * "On This Day" candidates: master event rows (no per-occurrence expansion) from visible
+     * calendars whose start is strictly before the target day. Personal events + birthdays only;
+     * holidays repeat every year and would spam the card, so they are excluded. Tasks are not
+     * memories. Month/day matching, leap-day handling, and anniversary math happen in Kotlin.
+     */
+    @Query(
+        """
+        SELECT calendar_events.* FROM calendar_events
+        INNER JOIN calendar_accounts ON calendar_accounts.id = calendar_events.accountId
+        WHERE calendar_events.isTask = 0
+        AND calendar_accounts.isVisible = 1
+        AND calendar_events.source != 'HOLIDAY'
+        AND calendar_events.startTimeMs < :targetDayStartMs
+        ORDER BY calendar_events.startTimeMs DESC
+        """,
+    )
+    fun observeOnThisDayCandidates(targetDayStartMs: Long): Flow<List<CalendarEvent>>
+
     @Query("SELECT * FROM event_reminders WHERE eventId = :eventId ORDER BY triggerAtMs ASC")
     suspend fun getRemindersForEvent(eventId: String): List<EventReminder>
 
