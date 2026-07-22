@@ -28,6 +28,7 @@ import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
+import com.dotfield.dotcal.data.insights.OnThisDayMemory
 import com.dotfield.dotcal.data.punchcard.PunchCardStreak
 import com.dotfield.dotcal.sync.CalendarSyncResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -105,6 +106,10 @@ class DotCalViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val agendaEvents: StateFlow<List<CalendarEvent>> = repository.observeUpcomingAgendaEvents(LocalDate.now())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val onThisDayMemories: StateFlow<List<OnThisDayMemory>> = selectedDate
+        .flatMapLatest(repository::observeOnThisDay)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val dayDensityForecast: StateFlow<List<DayDensityForecastItem>> = agendaEvents
@@ -212,6 +217,14 @@ class DotCalViewModel(
 
     fun openEventDetail(event: CalendarEvent) {
         _detailEvent.value = event
+    }
+
+    fun dismissOnThisDay(date: LocalDate) {
+        viewModelScope.launch { repository.dismissOnThisDay(date) }
+    }
+
+    fun openMemoryById(eventId: String) {
+        openEventDetailById(eventId)
     }
 
     fun openEventDetailById(eventId: String, onComplete: () -> Unit = {}) {

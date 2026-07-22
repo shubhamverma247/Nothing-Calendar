@@ -13,6 +13,10 @@ import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.privacy.AppPrivacyManager
 import com.dotfield.dotcal.data.punchcard.PunchCardStreak
+import com.dotfield.dotcal.data.insights.OnThisDayCandidate
+import com.dotfield.dotcal.data.insights.OnThisDayFinder
+import com.dotfield.dotcal.data.insights.OnThisDayMemory
+import com.dotfield.dotcal.data.provider.ContactsProviderDataSource.Companion.BIRTHDAY_BASE_YEAR
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.profiles.FocusProfileStore
@@ -498,6 +502,53 @@ class DotCalRepository(
                 }
                 expanded.withGhostFlags()
             }
+    }
+
+    /**
+     * "On This Day" (FREE): master events from prior years sharing the target's month/day.
+     * Reacts to the event list, Private Vault changes, and the per-day dismissal flag. Returns
+     * empty once the user dismisses the card for [targetDate]. Matching/anniversary math live in
+     * the pure [OnThisDayFinder]; no schema change (dismissal is a single DataStore string).
+     */
+    fun observeOnThisDay(targetDate: LocalDate): Flow<List<OnThisDayMemory>> {
+        val zoneId = ZoneId.systemDefault()
+        val targetDayStartMs = targetDate.atStartMs()
+        val dismissedFlow = context.calendarPreferencesDataStore.data
+            .map { it[CalendarPreferences.KEY_ON_THIS_DAY_DISMISSED_DATE] }
+        return combine(
+            dao.observeOnThisDayCandidates(targetDayStartMs),
+            privacyManager.observePrivateVaultIds(),
+            dismissedFlow,
+        ) { events, privateIds, dismissedDate ->
+            if (dismissedDate == targetDate.toString()) {
+                emptyList()
+            } else {
+                val candidates = events
+                    .filterOutPrivate(privateIds)
+                    .map { event ->
+                        val originalDate = Instant.ofEpochMilli(event.startTimeMs)
+                            .atZone(zoneId)
+                            .toLocalDate()
+                        val isBirthday = event.source == "BIRTHDAY"
+                        OnThisDayCandidate(
+                            eventId = event.baseEventId(),
+                            title = event.title,
+                            originalDate = originalDate,
+                            isBirthday = isBirthday,
+                            // Contact birthdays without a real year are stored at the base year;
+                            // only compute an age when the birth year is genuine.
+                            birthYearKnown = isBirthday && originalDate.year != BIRTHDAY_BASE_YEAR,
+                        )
+                    }
+                withContext(Dispatchers.Default) { OnThisDayFinder.find(targetDate, candidates) }
+            }
+        }
+    }
+
+    suspend fun dismissOnThisDay(date: LocalDate) {
+        context.calendarPreferencesDataStore.edit { preferences ->
+            preferences[CalendarPreferences.KEY_ON_THIS_DAY_DISMISSED_DATE] = date.toString()
+        }
     }
 
     suspend fun findConflictWarnings(

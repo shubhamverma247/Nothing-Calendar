@@ -101,7 +101,9 @@ class ContactsProviderDataSource(private val context: Context) {
     companion object {
         const val BIRTHDAY_ACCOUNT_ID = "birthday-calendar"
         const val BIRTHDAY_COLOR = "#FF3B30"
-        private const val BIRTHDAY_BASE_YEAR = 2000
+        // Contact birthdays with no year are stored at this placeholder year; "On This Day"
+        // uses it to decide whether an age ("turns 27") can be computed.
+        const val BIRTHDAY_BASE_YEAR = 2000
         private val COMPACT_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd", Locale.US)
         private val BIRTHDAY_PROJECTION = arrayOf(
             ContactsContract.Data.CONTACT_ID,

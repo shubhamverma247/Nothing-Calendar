@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.baseEventId
+import com.dotfield.dotcal.data.insights.OnThisDayMemory
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -171,10 +172,13 @@ internal fun AgendaPreview(
     events: List<CalendarEvent>,
     forecast: List<DayDensityForecastItem>,
     palette: DotCalPalette,
+    onThisDayMemories: List<OnThisDayMemory> = emptyList(),
     selectedEventIds: Set<String> = emptySet(),
     onAdd: () -> Unit,
     onDateSelected: (LocalDate) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
+    onMemoryClick: (String) -> Unit = {},
+    onMemoryDismiss: () -> Unit = {},
     onSelectionStart: (CalendarEvent) -> Unit = {},
     onSelectionToggle: (CalendarEvent) -> Unit = {},
     onSelectionClear: () -> Unit = {},
@@ -198,8 +202,10 @@ internal fun AgendaPreview(
         }
     }
     val listState = rememberLazyListState()
-    LaunchedEffect(selectedDate, dateIndex) {
-        val targetIndex = dateIndex[selectedDate] ?: 0
+    // The "On This Day" card occupies index 0 when present, pushing the date headers down by one.
+    val headerOffset = if (onThisDayMemories.isNotEmpty()) 1 else 0
+    LaunchedEffect(selectedDate, dateIndex, headerOffset) {
+        val targetIndex = (dateIndex[selectedDate] ?: 0) + headerOffset
         listState.animateScrollToItem(targetIndex)
     }
     Column(
@@ -227,6 +233,17 @@ internal fun AgendaPreview(
             contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 0.dp, bottom = 90.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            if (onThisDayMemories.isNotEmpty()) {
+                item(key = "on-this-day") {
+                    OnThisDayCard(
+                        memories = onThisDayMemories,
+                        palette = palette,
+                        onMemoryClick = onMemoryClick,
+                        onDismiss = onMemoryDismiss,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+                    )
+                }
+            }
             if (upcomingEvents.isEmpty()) {
                 item {
                     AgendaEndOfDayState(

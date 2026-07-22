@@ -79,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.dotfield.dotcal.data.CalendarEvent
+import com.dotfield.dotcal.data.insights.OnThisDayMemory
 import com.dotfield.dotcal.data.scheduling.EventDragMath
 import com.dotfield.dotcal.data.scheduling.EventTimeRange
 import com.dotfield.dotcal.ui.theme.NWhite
@@ -892,12 +893,15 @@ internal fun DayView(
     palette: DotCalPalette,
     isDayPunched: Boolean,
     punchStreak: Int,
+    onThisDayMemories: List<OnThisDayMemory>,
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onJumpToday: () -> Unit,
     onJumpPickerRequest: () -> Unit,
     onPunchDay: () -> Unit,
     onClearPunchDay: () -> Unit,
+    onMemoryClick: (String) -> Unit,
+    onMemoryDismiss: () -> Unit,
     highlightDate: LocalDate?,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
@@ -945,6 +949,15 @@ internal fun DayView(
             onPunch = onPunchDay,
             onClear = onClearPunchDay,
         )
+        if (onThisDayMemories.isNotEmpty()) {
+            OnThisDayCard(
+                memories = onThisDayMemories,
+                palette = palette,
+                onMemoryClick = onMemoryClick,
+                onDismiss = onMemoryDismiss,
+                modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
+            )
+        }
         if (allDayEvents.isNotEmpty()) {
             LazyColumn(modifier = Modifier.fillMaxWidth().height(44.dp).background(palette.calendarSurface)) {
                 items(allDayEvents.size, key = { allDayEvents[it].id }) { index ->

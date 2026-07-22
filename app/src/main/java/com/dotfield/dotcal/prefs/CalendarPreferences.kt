@@ -38,4 +38,5 @@ object CalendarPreferences {
     val KEY_PRIVATE_VAULT_EVENT_IDS = stringPreferencesKey("private_vault_event_ids")
     val KEY_FREE_TIME_START_HOUR = intPreferencesKey("free_time_start_hour")
     val KEY_FREE_TIME_END_HOUR = intPreferencesKey("free_time_end_hour")
+    val KEY_ON_THIS_DAY_DISMISSED_DATE = stringPreferencesKey("on_this_day_dismissed_date")
 }

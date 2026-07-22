@@ -315,6 +315,7 @@ fun DotCalApp(
     val yearEvents by viewModel.yearEvents.collectAsStateWithLifecycle()
     val agendaEvents by viewModel.agendaEvents.collectAsStateWithLifecycle()
     val dayDensityForecast by viewModel.dayDensityForecast.collectAsStateWithLifecycle()
+    val onThisDayMemories by viewModel.onThisDayMemories.collectAsStateWithLifecycle()
     val punchCardState by viewModel.punchCardState.collectAsStateWithLifecycle()
     val countdownPins by viewModel.countdownPins.collectAsStateWithLifecycle()
     val availabilityState by viewModel.availabilityState.collectAsStateWithLifecycle()
@@ -1399,12 +1400,15 @@ fun DotCalApp(
                                         palette = palette,
                                         isDayPunched = punchCardState.isPunched(selectedDate),
                                         punchStreak = punchCardState.streakEndingAt(selectedDate),
+                                        onThisDayMemories = onThisDayMemories,
                                         onPreviousDay = { viewModel.selectDate(selectedDate.minusDays(1)) },
                                         onNextDay = { viewModel.selectDate(selectedDate.plusDays(1)) },
                                         onJumpToday = { jumpToDate(LocalDate.now()) },
                                         onJumpPickerRequest = { showJumpToDatePicker = true },
                                         onPunchDay = { viewModel.punchDay(selectedDate) },
                                         onClearPunchDay = { viewModel.clearDayPunch(selectedDate) },
+                                        onMemoryClick = { viewModel.openMemoryById(it) },
+                                        onMemoryDismiss = { viewModel.dismissOnThisDay(selectedDate) },
                                         highlightDate = jumpHighlightDate,
                                         onAddAtDate = { date, time ->
                                             viewModel.selectDate(date)
@@ -1435,10 +1439,13 @@ fun DotCalApp(
                                         events = agendaEvents,
                                         forecast = dayDensityForecast,
                                         palette = palette,
+                                        onThisDayMemories = onThisDayMemories,
                                         selectedEventIds = selectedAgendaEventIds,
                                         onAdd = { openAddEditor() },
                                         onDateSelected = viewModel::selectDate,
                                         onEventClick = viewModel::openEventDetail,
+                                        onMemoryClick = { viewModel.openMemoryById(it) },
+                                        onMemoryDismiss = { viewModel.dismissOnThisDay(selectedDate) },
                                         onSelectionStart = { event ->
                                             if (!isPro) {
                                                 showPaywall = true
