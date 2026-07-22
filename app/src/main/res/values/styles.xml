@@ -1,7 +1,7 @@
 <resources>
-    <style name="Theme.DotCal" parent="@style/Theme.DotCal.Light" />
+    <style name="Theme.DotCal" parent="@style/DotCalLight" />
 
-    <style name="Theme.DotCal.Dark" parent="android:style/Theme.Material.NoActionBar">
+    <style name="DotCalDark" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">#000000</item>
@@ -13,7 +13,7 @@
         <item name="android:statusBarColor">#000000</item>
     </style>
 
-    <style name="Theme.DotCal.Light" parent="android:style/Theme.Material.NoActionBar">
+    <style name="DotCalLight" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">#F7F7F7</item>

@@ -85,9 +85,7 @@ internal fun SystemBarColorSync(palette: DotCalPalette) {
             @Suppress("DEPRECATION")
             window.navigationBarColor = android.graphics.Color.TRANSPARENT
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            window.isNavigationBarContrastEnforced = false
-        }
+        window.isNavigationBarContrastEnforced = false
         val controller = WindowCompat.getInsetsController(window, view)
         controller.isAppearanceLightStatusBars = !palette.isDark
         controller.isAppearanceLightNavigationBars = !palette.isDark

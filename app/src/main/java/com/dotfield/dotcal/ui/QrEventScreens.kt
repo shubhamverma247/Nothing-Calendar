@@ -1,6 +1,7 @@
 package com.dotfield.dotcal.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.SystemClock
@@ -309,6 +310,7 @@ internal fun QrEventScannerScreen(
 }
 
 @Composable
+@SuppressLint("UnsafeOptInUsageError")
 private fun CameraQrScanner(
     modifier: Modifier,
     palette: DotCalPalette,

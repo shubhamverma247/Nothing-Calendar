@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.content.ContextCompat
 import androidx.glance.GlanceId
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.currentState
@@ -78,13 +79,13 @@ fun dotCalWidgetPalette(context: Context, settings: DotCalWidgetSettings): DotCa
     if (mode == "System") {
         val solidSurface = if (systemDark) ColorProvider(Color(0xFF1A1A1A)) else ColorProvider(Color(0xFFFFFFFF))
         return DotCalWidgetPalette(
-            background = if (transparent) ColorProvider(Color.Transparent) else ColorProvider(R.color.widget_background),
-            primary = ColorProvider(R.color.widget_primary),
-            secondary = ColorProvider(R.color.widget_secondary),
-            dim = ColorProvider(R.color.widget_dim),
-            border = ColorProvider(R.color.widget_border),
-            inactive = ColorProvider(R.color.widget_inactive),
-            dot = ColorProvider(R.color.widget_dot),
+            background = if (transparent) ColorProvider(Color.Transparent) else context.colorProvider(R.color.widget_background),
+            primary = context.colorProvider(R.color.widget_primary),
+            secondary = context.colorProvider(R.color.widget_secondary),
+            dim = context.colorProvider(R.color.widget_dim),
+            border = context.colorProvider(R.color.widget_border),
+            inactive = context.colorProvider(R.color.widget_inactive),
+            dot = context.colorProvider(R.color.widget_dot),
             surfaceDrawable = when {
                 transparent -> R.drawable.widget_surface_transparent
                 systemDark -> R.drawable.widget_surface_dark
@@ -133,6 +134,10 @@ fun dotCalWidgetPalette(context: Context, settings: DotCalWidgetSettings): DotCa
             accent = ColorProvider(accent),
         )
     }
+}
+
+private fun Context.colorProvider(colorRes: Int): ColorProvider {
+    return ColorProvider(Color(ContextCompat.getColor(this, colorRes)))
 }
 
 private suspend fun readDotCalWidgetSettings(context: Context): DotCalWidgetSettings {

@@ -91,6 +91,7 @@ class ProManager(
         .enablePendingPurchases(
             PendingPurchasesParams.newBuilder().enableOneTimeProducts().build(),
         )
+        .enableAutoServiceReconnection()
         .build()
 
     /** Reads cached entitlement for an instant offline read, then connects to Play Billing. */

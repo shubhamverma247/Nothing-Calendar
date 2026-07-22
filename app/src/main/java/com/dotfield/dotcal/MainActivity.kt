@@ -37,9 +37,9 @@ class MainActivity : ComponentActivity() {
             android.content.res.Configuration.UI_MODE_NIGHT_YES
         setTheme(
             if (bootTheme == "Light" || ((bootTheme == null || bootTheme == "System") && !systemDark)) {
-                R.style.Theme_DotCal_Light
+                R.style.DotCalLight
             } else {
-                R.style.Theme_DotCal_Dark
+                R.style.DotCalDark
             },
         )
         super.onCreate(savedInstanceState)

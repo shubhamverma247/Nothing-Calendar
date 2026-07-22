@@ -7,13 +7,13 @@ plugins {
 
 android {
     namespace = "com.dotfield.dotcal"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.dotfield.dotcal"
         minSdk = 30
-        targetSdk = 35
-        versionCode = 12
+        targetSdk = 36
+        versionCode = 13
         versionName = "1.1.3"
     }
 
