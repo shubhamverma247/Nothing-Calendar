@@ -302,6 +302,7 @@ internal fun SettingsPreview(
     onRequestCalendarAccess: () -> Unit,
     onAddAccount: () -> Unit,
     isPro: Boolean,
+    proPrice: String?,
     onDotCalPro: () -> Unit,
     onRestorePurchase: () -> Unit,
     onDateCalculator: () -> Unit,
@@ -384,6 +385,7 @@ internal fun SettingsPreview(
             onRequestCalendarAccess = onRequestCalendarAccess,
             onAddAccount = { onScreenChange(SettingsScreen.AddAccount) },
             isPro = isPro,
+            proPrice = proPrice,
             onDotCalPro = onDotCalPro,
             onRestorePurchase = onRestorePurchase,
             onDateCalculator = onDateCalculator,
@@ -638,6 +640,7 @@ internal fun SettingsRoot(
     onRequestCalendarAccess: () -> Unit,
     onAddAccount: () -> Unit,
     isPro: Boolean,
+    proPrice: String?,
     onDotCalPro: () -> Unit,
     onRestorePurchase: () -> Unit,
     onDateCalculator: () -> Unit,
@@ -770,6 +773,7 @@ internal fun SettingsRoot(
             item {
                 SettingsProCard(
                     isPro = isPro,
+                    proPrice = proPrice,
                     palette = palette,
                     onClick = onDotCalPro,
                 )
@@ -2565,7 +2569,7 @@ private fun SettingsToolCard(
 }
 
 @Composable
-private fun SettingsProCard(isPro: Boolean, palette: DotCalPalette, onClick: () -> Unit) {
+private fun SettingsProCard(isPro: Boolean, proPrice: String?, palette: DotCalPalette, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2596,7 +2600,11 @@ private fun SettingsProCard(isPro: Boolean, palette: DotCalPalette, onClick: () 
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                if (isPro) "Lifetime unlocked" else "Lifetime tools / INR 149",
+                when {
+                    isPro -> "Lifetime unlocked"
+                    proPrice != null -> "Lifetime tools / $proPrice"
+                    else -> "Lifetime tools"
+                },
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 12.sp,

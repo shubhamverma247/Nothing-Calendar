@@ -203,7 +203,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.ColumnScope
 import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.billing.ProManager
@@ -364,10 +363,13 @@ internal fun PaywallScreen(
 
     val connected = billingState is ProManager.BillingConnectionState.Connected
     val price = productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
-        ?: stringResource(R.string.pro_price_fallback)
-    val priceIsEstimate = productDetails?.oneTimePurchaseOfferDetails?.formattedPrice == null
+    val priceLoaded = price != null
     val buyEnabled = connected && !purchasing
-    val buyLabel = if (connected) "Unlock Pro - $price" else "Connecting..."
+    val buyLabel = when {
+        !connected -> "Connecting..."
+        priceLoaded -> "Unlock Pro - $price"
+        else -> "Unlock Pro"
+    }
     val launchPurchase = {
         val activity = context.findActivity()
         if (activity != null) {
@@ -451,14 +453,20 @@ internal fun PaywallScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Lifetime Pro", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             Text(
-                                if (priceIsEstimate) "One-time purchase. Price may vary by region." else "One-time purchase. No subscription.",
+                                if (priceLoaded) "One-time purchase. No subscription." else "One-time purchase. Price shown by Play Store.",
                                 color = palette.secondaryText,
                                 fontFamily = mono,
                                 fontSize = 11.sp,
                                 lineHeight = 14.sp,
                             )
                         }
-                        Text(price, color = palette.accent, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                        Text(
+                            price ?: "Play Store",
+                            color = palette.accent,
+                            fontFamily = LocalHeadingFont.current,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp,
+                        )
                     }
                 }
             }
@@ -494,7 +502,7 @@ internal fun PaywallScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                if (priceIsEstimate) "One-time purchase. Regional price estimate." else "One-time purchase. No subscription.",
+                if (priceLoaded) "One-time purchase. No subscription." else "Final price appears in Play Store checkout.",
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 11.sp,

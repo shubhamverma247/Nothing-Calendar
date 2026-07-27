@@ -3,7 +3,6 @@
     <string name="widget_small_description">Next Event</string>
     <string name="widget_medium_description">Event Details</string>
     <string name="widget_large_description">Calendar Dashboard</string>
-    <string name="pro_price_fallback">₹149</string>
     <string name="widget_countdown_label">DotCal Countdown</string>
     <string name="widget_countdown_description">Event Countdown</string>
     <string name="widget_agenda_label">DotCal Agenda</string>

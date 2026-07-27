@@ -372,6 +372,8 @@ fun DotCalApp(
     var templatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     var taskTemplatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
+    val productDetails by viewModel.productDetails.collectAsStateWithLifecycle()
+    val proPrice = productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
     val appLockState by viewModel.appLockState.collectAsStateWithLifecycle()
     val privateVaultIds by viewModel.privateVaultIds.collectAsStateWithLifecycle()
     val privateVaultEvents by viewModel.privateVaultEvents.collectAsStateWithLifecycle()
@@ -1778,6 +1780,7 @@ fun DotCalApp(
                     }
                 },
                 isPro = isPro,
+                proPrice = proPrice,
                 onDotCalPro = {
                     if (isPro) {
                         showDotCalToast(context, palette, "You're already Pro!")
