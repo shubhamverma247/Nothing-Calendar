@@ -56,6 +56,8 @@ Always report what to test, how to test, and expected result.
 - DataStore: `calendar_preferences`.
 - Pro entitlement: `KEY_IS_PRO`.
 - Billing product: `dotcal_pro`; one-time purchase; option `dotcal-pro-lifetime`; live INR 149.
+- Paywall price is loaded dynamically from Play Billing via `oneTimePurchaseOfferDetails?.formattedPrice`; normal Play Console base-price changes should show without app changes after billing refresh.
+- Discount offers for one-time products are not fully integrated yet. Current code does not read `getOneTimePurchaseOfferDetailsList()` or pass a selected `offerToken`, so Play Console discount-offer display/checkout behavior is not guaranteed beyond the backward-compatible/default offer.
 - Paywall route: `dotcal://paywall`.
 - Billing library: `billing-ktx` 7.1.1; do not downgrade below v6.
 - Internal-testing billing verification still pending.
@@ -141,6 +143,11 @@ General UI polish:
 2. C1 Life-in-Dots
 3. C7 Year Wrapped
 4. Vault Decoy PIN
+
+## Requested Backlog
+
+- Event color picker in single Add/Edit Event screen. Current app supports event `colorHex` display and Agenda multi-select > Bulk actions > Change color, but no direct per-event color control in the editor. Add a `Color` row/sheet that writes `EventEditorData.colorHex`, with `Use calendar color` setting `null`, and keep existing bulk color behavior unchanged.
+- Full one-time product discount-offer support for DotCal Pro. Update billing to use `ProductDetails.getOneTimePurchaseOfferDetailsList()`, surface eligible discount pricing/metadata in the paywall, and launch purchase flow with the selected offer token. Keep base-price fallback using `oneTimePurchaseOfferDetails?.formattedPrice`.
 
 ## Manual QA
 
