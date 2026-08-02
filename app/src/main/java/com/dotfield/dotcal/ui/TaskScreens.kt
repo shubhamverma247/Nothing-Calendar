@@ -10,7 +10,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.annotation.StringRes
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
@@ -63,8 +64,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -76,6 +75,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -85,6 +85,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.TaskEditorData
@@ -102,7 +103,7 @@ private fun TaskNoDueDateHeader(isFirst: Boolean, palette: DotCalPalette) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "NO DATE",
+            stringResource(R.string.task_no_date_header),
             color = palette.secondaryText,
             fontFamily = mono,
             fontWeight = FontWeight.Medium,
@@ -148,7 +149,7 @@ internal fun TaskDetailScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
             Text(
-                "Task Details",
+                stringResource(R.string.task_details_title),
                 modifier = Modifier.weight(1f),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
@@ -179,30 +180,42 @@ internal fun TaskDetailScreen(
                 Spacer(modifier = Modifier.height(26.dp))
             }
             item {
-                DetailSection(label = "STATUS", palette = palette) {
-                    Text(if (task.isCompleted == 1) "Completed" else "Open", color = palette.primaryText, fontSize = 20.sp, lineHeight = 27.sp)
+                DetailSection(label = stringResource(R.string.task_section_status), palette = palette) {
+                    Text(
+                        stringResource(
+                            if (task.isCompleted == 1) R.string.task_status_completed else R.string.task_status_open,
+                        ),
+                        color = palette.primaryText,
+                        fontSize = 20.sp,
+                        lineHeight = 27.sp,
+                    )
                 }
             }
             item {
                 DetailDivider(palette)
-                DetailSection(label = "DUE", palette = palette) {
+                DetailSection(label = stringResource(R.string.task_section_due), palette = palette) {
                     if (task.hasTaskDate()) {
                         Text(task.taskDueDateLine(), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(task.taskDueTimeLine(), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
                     } else {
-                        Text("None", color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                        Text(stringResource(R.string.task_none), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
                     }
                     task.recurrenceDetailLabel()?.let { label ->
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text(label.toSentenceCase(), color = palette.secondaryText, fontSize = 14.sp, lineHeight = 20.sp)
+                        Text(label, color = palette.secondaryText, fontSize = 14.sp, lineHeight = 20.sp)
                     }
                 }
             }
             item {
                 DetailDivider(palette)
-                DetailSection(label = "REMINDER", palette = palette) {
-                    Text(reminder?.detailLabel()?.toSentenceCase() ?: "None", color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                DetailSection(label = stringResource(R.string.event_section_reminder), palette = palette) {
+                    Text(
+                        reminder?.detailLabel() ?: stringResource(R.string.task_none),
+                        color = palette.primaryText,
+                        fontSize = 16.sp,
+                        lineHeight = 23.sp,
+                    )
                 }
             }
             item {
@@ -214,7 +227,9 @@ internal fun TaskDetailScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        if (task.isCompleted == 1) "Reopen Task" else "Mark Complete",
+                        stringResource(
+                            if (task.isCompleted == 1) R.string.task_reopen else R.string.task_mark_complete,
+                        ),
                         color = palette.accent,
                         fontWeight = FontWeight.Medium,
                         fontSize = 16.sp,
@@ -224,7 +239,7 @@ internal fun TaskDetailScreen(
                             .padding(vertical = 12.dp),
                     )
                     Text(
-                        "Delete Task",
+                        stringResource(R.string.task_delete),
                         color = palette.accent,
                         fontWeight = FontWeight.Medium,
                         fontSize = 16.sp,
@@ -237,18 +252,23 @@ internal fun TaskDetailScreen(
             }
         }
         if (showActions) {
+            val editLabel = stringResource(R.string.action_edit)
+            val addToCalendarLabel = stringResource(R.string.task_add_to_calendar)
+            val vaultLabel = stringResource(
+                if (isPrivate) R.string.vault_restore_from else R.string.vault_move_to,
+            )
             val actions = buildList {
-                add(CompactActionItem("Edit") {
+                add(CompactActionItem(editLabel) {
                     showActions = false
                     onEdit()
                 })
                 if (task.isCompleted != 1) {
-                    add(CompactActionItem("Add to Calendar") {
+                    add(CompactActionItem(addToCalendarLabel) {
                         showActions = false
                         onTimeBlock()
                     })
                 }
-                add(CompactActionItem(if (isPrivate) "Restore From Private Vault" else "Move to Private Vault") {
+                add(CompactActionItem(vaultLabel) {
                     showActions = false
                     if (isPrivate) onRestoreFromPrivate() else onMoveToPrivate()
                 })
@@ -260,7 +280,7 @@ internal fun TaskDetailScreen(
                 dragHandle = { BottomSheetDragHandle(palette) },
             ) {
                 CompactActionSheetContent(
-                    title = "Task Options",
+                    title = stringResource(R.string.task_options),
                     actions = actions,
                     palette = palette,
                 )
@@ -269,11 +289,18 @@ internal fun TaskDetailScreen(
     }
 }
 
-private enum class TaskFilter(val label: String) {
-    All("All"),
-    Today("Today"),
-    Upcoming("Upcoming"),
-    Completed("Completed"),
+/**
+ * Same `@StringRes` + `@Composable` getter pattern as the other converted enums: the property name
+ * stays `label`, so call sites are unchanged.
+ */
+private enum class TaskFilter(@StringRes val labelRes: Int) {
+    All(R.string.task_filter_all),
+    Today(R.string.task_filter_today),
+    Upcoming(R.string.task_filter_upcoming),
+    Completed(R.string.task_filter_completed);
+
+    val label: String
+        @Composable get() = stringResource(labelRes)
 }
 
 @Composable
@@ -374,7 +401,7 @@ private fun TasksTopChrome(
             .background(palette.topBarSurface),
     ) {
         CalendarActionBar(
-            title = "Tasks",
+            title = stringResource(R.string.tasks_title),
             palette = palette,
             onTitleClick = {},
             onTitleLongClick = {},
@@ -603,33 +630,36 @@ private fun taskCardColor(palette: DotCalPalette): Color {
     return if (palette.isDark) palette.dialogSurface else palette.eventCardSurface
 }
 
+@Composable
 private fun taskReminderMetadataLabel(minutes: Int): String {
     return when (minutes) {
-        5 -> "5 min before"
-        10 -> "10 min before"
-        30 -> "30 min before"
-        1440 -> "1 day before"
-        else -> "Reminder"
+        5, 10, 30 -> stringResource(R.string.task_reminder_minutes_before, minutes)
+        1440 -> stringResource(R.string.task_reminder_1_day_before)
+        else -> stringResource(R.string.task_reminder)
     }
 }
 
 @Composable
 private fun TaskEmptyState(filter: TaskFilter, palette: DotCalPalette, onAddClick: () -> Unit) {
-    val title = when (filter) {
-        TaskFilter.All -> "No tasks yet"
-        TaskFilter.Today -> "Nothing due today"
-        TaskFilter.Upcoming -> "All clear"
-        TaskFilter.Completed -> "No completed tasks"
-    }
+    val title = stringResource(
+        when (filter) {
+            TaskFilter.All -> R.string.task_empty_all_title
+            TaskFilter.Today -> R.string.task_empty_today_title
+            TaskFilter.Upcoming -> R.string.task_empty_upcoming_title
+            TaskFilter.Completed -> R.string.task_empty_completed_title
+        },
+    )
     // Only the "All" filter shows the tappable add affordance — other filters are
     // just empty results, not an invitation to create.
     val showAddAffordance = filter == TaskFilter.All
-    val subtitle = when (filter) {
-        TaskFilter.All -> "Tap to create your first task"
-        TaskFilter.Today -> "Enjoy your free time"
-        TaskFilter.Upcoming -> "No upcoming tasks scheduled"
-        TaskFilter.Completed -> "Completed tasks show up here"
-    }
+    val subtitle = stringResource(
+        when (filter) {
+            TaskFilter.All -> R.string.task_empty_all_subtitle
+            TaskFilter.Today -> R.string.task_empty_today_subtitle
+            TaskFilter.Upcoming -> R.string.task_empty_upcoming_subtitle
+            TaskFilter.Completed -> R.string.task_empty_completed_subtitle
+        },
+    )
     Column(
         modifier = Modifier.fillMaxSize().padding(bottom = 80.dp),
         verticalArrangement = Arrangement.Center,
@@ -690,21 +720,24 @@ internal fun TaskEditorSheet(
     var pendingTaskPermissionSave by remember { mutableStateOf<TaskEditorData?>(null) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val focusSinkRequester = remember { FocusRequester() }
     val context = LocalContext.current
+    val savedNoReminderToast = stringResource(R.string.task_saved_no_reminder)
+    val templateSavedToast = stringResource(R.string.event_template_saved)
+    val templateDefaultName = stringResource(R.string.event_template_default_name)
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         pendingTaskPermissionSave?.let { pending ->
             onSave(if (granted) pending else pending.copy(reminderMinutes = null))
             pendingTaskPermissionSave = null
-            if (!granted) showDotCalToast(context, palette, "Task saved without reminder")
+            if (!granted) showDotCalToast(context, palette, savedNoReminderToast)
         }
     }
     val taskSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     fun clearTaskFocus() {
         keyboardController?.hide()
+        // See the matching note in EventScreens: no focus sink, because focusing a Box at the top of
+        // the scroll column dragged the sheet back to the top on every row tap.
         focusManager.clearFocus(force = true)
-        runCatching { focusSinkRequester.requestFocus() }
     }
 
     fun requestNotificationPermissionForTaskReminder() {
@@ -744,12 +777,14 @@ internal fun TaskEditorSheet(
                 }
                 .padding(horizontal = 20.dp)
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(bottom = 22.dp),
         ) {
-            Box(modifier = Modifier.size(1.dp).focusRequester(focusSinkRequester).focusable())
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (task == null) "Add Task" else "Edit Task",
+                    stringResource(
+                        if (task == null) R.string.task_editor_title_add else R.string.task_editor_title_edit,
+                    ),
                     color = palette.primaryText,
                     fontFamily = LocalHeadingFont.current,
                     fontWeight = FontWeight.SemiBold,
@@ -768,7 +803,14 @@ internal fun TaskEditorSheet(
                             containerColor = palette.dialogSurface,
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Save as template", color = palette.primaryText, fontFamily = mono, fontSize = 15.sp) },
+                                text = {
+                                    Text(
+                                        stringResource(R.string.dialog_save_as_template),
+                                        color = palette.primaryText,
+                                        fontFamily = mono,
+                                        fontSize = 15.sp,
+                                    )
+                                },
                                 onClick = {
                                     showTaskMenu = false
                                     clearTaskFocus()
@@ -787,7 +829,7 @@ internal fun TaskEditorSheet(
                     titleError = false
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Title") },
+                label = { Text(stringResource(R.string.task_title_label)) },
                 isError = titleError,
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = palette.secondaryText) },
@@ -795,12 +837,12 @@ internal fun TaskEditorSheet(
                 textStyle = TextStyle(fontFamily = mono, fontSize = 16.sp),
             )
             if (titleError) {
-                Text("Title required", color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                Text(stringResource(R.string.task_title_required), color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
             }
             Spacer(modifier = Modifier.height(12.dp))
             EditorValueRow(
-                title = "Date",
-                value = dueDate?.format(editorDateFormatter) ?: "None",
+                title = stringResource(R.string.task_date),
+                value = dueDate?.format(editorDateFormatter) ?: stringResource(R.string.task_none),
                 palette = palette,
                 leadingIcon = Icons.Default.CalendarMonth,
                 onClick = {
@@ -810,7 +852,7 @@ internal fun TaskEditorSheet(
             )
             if (dueDate != null) {
                 Text(
-                    "Clear date",
+                    stringResource(R.string.task_clear_date),
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 13.sp,
@@ -824,8 +866,8 @@ internal fun TaskEditorSheet(
                 )
             }
             EditorValueRow(
-                title = "Time",
-                value = dueTime?.format(timeFormatter) ?: "None",
+                title = stringResource(R.string.task_time),
+                value = dueTime?.format(timeFormatter) ?: stringResource(R.string.task_none),
                 palette = palette,
                 enabled = dueDate != null,
                 leadingIcon = Icons.Default.AccessTime,
@@ -836,7 +878,7 @@ internal fun TaskEditorSheet(
             )
             if (dueTime != null) {
                 Text(
-                    "Clear time",
+                    stringResource(R.string.task_clear_time),
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 13.sp,
@@ -847,7 +889,7 @@ internal fun TaskEditorSheet(
                 )
             }
             EditorValueRow(
-                title = "Reminder",
+                title = stringResource(R.string.task_reminder),
                 value = reminderLabel(reminderMinutes),
                 palette = palette,
                 enabled = dueDate != null,
@@ -858,7 +900,7 @@ internal fun TaskEditorSheet(
                 },
             )
             EditorValueRow(
-                title = "Repeat",
+                title = stringResource(R.string.task_repeat),
                 value = repeatRowLabel(recurrenceRule),
                 palette = palette,
                 enabled = dueDate != null,
@@ -896,11 +938,11 @@ internal fun TaskEditorSheet(
                 colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
                 shape = RoundedCornerShape(16.dp),
             ) {
-                Text("SAVE TASK", fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text(stringResource(R.string.task_save), fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             }
             onDelete?.let { delete ->
                 Text(
-                    "Delete Task",
+                    stringResource(R.string.task_delete),
                     color = palette.accent,
                     fontFamily = mono,
                     fontWeight = FontWeight.Medium,
@@ -922,7 +964,7 @@ internal fun TaskEditorSheet(
             onConfirm = { name ->
                 val template = EventTemplate(
                     id = EventTemplate.newId(),
-                    name = name.trim().ifBlank { title.trim().ifBlank { "Template" } },
+                    name = name.trim().ifBlank { title.trim().ifBlank { templateDefaultName } },
                     isTask = true,
                     title = title.trim(),
                     description = "",
@@ -937,13 +979,13 @@ internal fun TaskEditorSheet(
                 )
                 onSaveTemplate(template)
                 showSaveTemplateDialog = false
-                showDotCalToast(context, palette, "Template saved")
+                showDotCalToast(context, palette, templateSavedToast)
             },
         )
     }
     if (showDatePicker) {
         DateTimeChoiceSheet(
-            title = "Date",
+            title = stringResource(R.string.task_date),
             selectedDate = dueDate ?: LocalDate.now(),
             selectedTime = dueTime ?: LocalTime.of(9, 0),
             minDate = null,
@@ -958,7 +1000,7 @@ internal fun TaskEditorSheet(
     }
     if (showTimePicker && dueDate != null) {
         TaskTimeChoiceSheet(
-            title = "Time",
+            title = stringResource(R.string.task_time),
             selected = dueTime ?: LocalTime.of(9, 0),
             palette = palette,
             onDismiss = { showTimePicker = false },
@@ -977,7 +1019,7 @@ internal fun TaskEditorSheet(
             dragHandle = { BottomSheetDragHandle(palette) },
         ) {
             ChoiceSheetContent(
-                title = "Reminder",
+                title = stringResource(R.string.task_reminder),
                 items = taskReminderOptions,
                 selected = reminderMinutes,
                 label = { reminderLabel(it) },
@@ -1086,7 +1128,7 @@ private fun TaskTimeChoiceSheet(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("Cancel", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.action_cancel), fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 Button(
@@ -1095,7 +1137,7 @@ private fun TaskTimeChoiceSheet(
                     colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
                     shape = RoundedCornerShape(18.dp),
                 ) {
-                    Text("OK", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.action_ok), fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

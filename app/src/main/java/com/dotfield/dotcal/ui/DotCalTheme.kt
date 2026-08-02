@@ -1,9 +1,11 @@
 package com.dotfield.dotcal.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import com.dotfield.dotcal.prefs.CalendarPreferences
@@ -39,10 +41,13 @@ internal data class DotCalPalette(
     val isDark: Boolean,
 )
 
-internal enum class DotCalThemeMode(val label: String) {
-    Light("Light"),
-    Dark("Dark"),
-    System("System");
+internal enum class DotCalThemeMode(@StringRes val labelRes: Int) {
+    Light(R.string.theme_light),
+    Dark(R.string.theme_dark),
+    System(R.string.theme_system);
+
+    val label: String
+        @Composable get() = stringResource(labelRes)
 
     companion object {
         fun fromStorage(value: String?): DotCalThemeMode {
@@ -51,10 +56,24 @@ internal enum class DotCalThemeMode(val label: String) {
     }
 }
 
-internal enum class AppFont(val id: String, val label: String, val tagline: String) {
-    NDot("ndot", "Ndot", "Monospaced. Technical. Precise."),
-    NType("ntype", "NType 82", "Editorial. Redefined."),
-    System("system", "System", "Your device's own font.");
+/**
+ * [id] is persisted and must stay stable. Ndot and NType 82 are typeface brand names, so their
+ * labels are not translated; only the System label and the taglines are prose.
+ */
+internal enum class AppFont(
+    val id: String,
+    @StringRes val labelRes: Int,
+    @StringRes val taglineRes: Int,
+) {
+    NDot("ndot", R.string.font_ndot_label, R.string.font_ndot_tagline),
+    NType("ntype", R.string.font_ntype_label, R.string.font_ntype_tagline),
+    System("system", R.string.font_system_label, R.string.font_system_tagline);
+
+    val label: String
+        @Composable get() = stringResource(labelRes)
+
+    val tagline: String
+        @Composable get() = stringResource(taglineRes)
 
     companion object {
         fun fromId(id: String?): AppFont = entries.firstOrNull { it.id == id } ?: NDot
@@ -82,7 +101,13 @@ internal fun rememberAppFontFamily(font: AppFont): FontFamily = remember(font) {
  */
 internal sealed interface AccentColor {
     val color: Color
+
+    /**
+     * Display name. Composable because presets resolve a string resource; [Custom] returns its raw
+     * hex, which is a value rather than prose and so is never localized.
+     */
     val label: String
+        @Composable get
 
     /** Text/icon color that stays legible on top of [color]. */
     val onColor: Color
@@ -91,22 +116,25 @@ internal sealed interface AccentColor {
     /** Value persisted to DataStore + boot prefs. */
     val storageValue: String
 
-    enum class Preset(val hex: String, override val label: String) : AccentColor {
+    enum class Preset(val hex: String, @StringRes val labelRes: Int) : AccentColor {
         // Free presets. Order/names are storage-stable; do not rename.
-        RED("#FF3B30", "Red"),
-        BLUE("#0A84FF", "Blue"),
-        GREEN("#30D158", "Green"),
-        PURPLE("#BF5AF2", "Purple"),
-        AMBER("#FF9F0A", "Amber"),
+        RED("#FF3B30", R.string.accent_red),
+        BLUE("#0A84FF", R.string.accent_blue),
+        GREEN("#30D158", R.string.accent_green),
+        PURPLE("#BF5AF2", R.string.accent_purple),
+        AMBER("#FF9F0A", R.string.accent_amber),
         // Pro presets (extra curated palette).
-        TEAL("#2AB8B0", "Teal"),
-        PINK("#FF375F", "Pink"),
-        ORANGE("#FF6B00", "Orange"),
-        CYAN("#32ADE6", "Cyan"),
-        INDIGO("#5E5CE6", "Indigo"),
-        MINT("#66D4A0", "Mint"),
-        ROSE("#F06292", "Rose"),
-        LIME("#B0C948", "Lime");
+        TEAL("#2AB8B0", R.string.accent_teal),
+        PINK("#FF375F", R.string.accent_pink),
+        ORANGE("#FF6B00", R.string.accent_orange),
+        CYAN("#32ADE6", R.string.accent_cyan),
+        INDIGO("#5E5CE6", R.string.accent_indigo),
+        MINT("#66D4A0", R.string.accent_mint),
+        ROSE("#F06292", R.string.accent_rose),
+        LIME("#B0C948", R.string.accent_lime);
+
+        override val label: String
+            @Composable get() = stringResource(labelRes)
 
         override val color: Color get() = Color(android.graphics.Color.parseColor(hex))
         override val storageValue: String get() = name
@@ -116,8 +144,12 @@ internal sealed interface AccentColor {
     /** Pro-only arbitrary hex color chosen from the color picker. */
     data class Custom(val hex: String) : AccentColor {
         override val color: Color get() = Color(android.graphics.Color.parseColor(hex))
-        override val label: String get() = hex.uppercase()
-        override val storageValue: String get() = hex.uppercase()
+
+        // A hex value, not prose: Locale.US keeps the casing stable across locales.
+        override val label: String
+            @Composable get() = hex.uppercase(java.util.Locale.US)
+
+        override val storageValue: String get() = hex.uppercase(java.util.Locale.US)
     }
 
     companion object {

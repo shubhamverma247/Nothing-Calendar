@@ -11,4 +11,1032 @@
     <string name="widget_month_grid_description">Month Grid</string>
     <string name="glyph_toy_name">DotCal</string>
     <string name="glyph_toy_summary">Shows a live countdown to your next DotCal event.</string>
+
+    <!-- Language picker -->
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_system_default">System default</string>
+    <string name="language_sheet_subtitle">Translations apply after the app refreshes.</string>
+
+    <!-- Calendar view tabs. `label` is the long form used in Settings, `short` the segmented control. -->
+    <string name="tab_year_label">Year view</string>
+    <string name="tab_year_short">Year</string>
+    <string name="tab_month_label">Month view</string>
+    <string name="tab_month_short">Month</string>
+    <string name="tab_week_label">Week view</string>
+    <string name="tab_week_short">Week</string>
+    <string name="tab_day_label">Day view</string>
+    <string name="tab_day_short">Day</string>
+    <string name="tab_three_day_label">Three-day view</string>
+    <string name="tab_three_day_short">3 Days</string>
+    <string name="tab_agenda_label">Agenda view</string>
+    <string name="tab_agenda_short">Agenda</string>
+
+    <!-- Action bar overflow menu -->
+    <string name="menu_search">Search</string>
+    <string name="menu_search_subtitle">Find events and tasks</string>
+    <string name="menu_new_event">New Event</string>
+    <string name="menu_new_event_subtitle">Create an event quickly</string>
+    <string name="menu_go_to_date">Go to date</string>
+    <string name="menu_go_to_date_subtitle">Jump without changing views</string>
+    <string name="menu_quick_add">Quick Add</string>
+    <string name="menu_quick_add_subtitle">Type it, we schedule it</string>
+    <string name="menu_share_availability">Share availability</string>
+    <string name="menu_share_availability_subtitle">Copy when you\'re free</string>
+    <string name="menu_templates">Templates</string>
+    <string name="menu_templates_subtitle">Reuse saved events &amp; tasks</string>
+    <string name="menu_calendar_sets">Calendar Sets</string>
+    <string name="menu_calendar_sets_subtitle">Switch saved visibility sets</string>
+    <string name="menu_shift_patterns">Shift Patterns</string>
+    <string name="menu_shift_patterns_subtitle">Build rotating schedules</string>
+    <!-- Product tier name, kept untranslated as a brand term. -->
+    <string name="badge_pro" translatable="false">Pro</string>
+    <string name="badge_pro_caps" translatable="false">PRO</string>
+
+    <!-- Start of the week. Storage keys (MONDAY, REGION_DEFAULT…) are never localized. -->
+    <string name="week_start_region_default">Region default</string>
+    <string name="week_start_saturday">Saturday</string>
+    <string name="week_start_sunday">Sunday</string>
+    <string name="week_start_monday">Monday</string>
+
+    <!-- Theme mode -->
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">System</string>
+
+    <!-- Fonts. Ndot and NType 82 are typeface brand names and stay untranslated; only the
+         System entry and the taglines are user-facing prose. -->
+    <string name="font_ndot_label" translatable="false">Ndot</string>
+    <string name="font_ntype_label" translatable="false">NType 82</string>
+    <string name="font_system_label">System</string>
+    <string name="font_ndot_tagline">Monospaced. Technical. Precise.</string>
+    <string name="font_ntype_tagline">Editorial. Redefined.</string>
+    <string name="font_system_tagline">Your device\'s own font.</string>
+
+    <!-- Accent color names -->
+    <string name="accent_red">Red</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_green">Green</string>
+    <string name="accent_purple">Purple</string>
+    <string name="accent_amber">Amber</string>
+    <string name="accent_teal">Teal</string>
+    <string name="accent_pink">Pink</string>
+    <string name="accent_orange">Orange</string>
+    <string name="accent_cyan">Cyan</string>
+    <string name="accent_indigo">Indigo</string>
+    <string name="accent_mint">Mint</string>
+    <string name="accent_rose">Rose</string>
+    <string name="accent_lime">Lime</string>
+
+    <!-- Settings root -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_panel_accounts">Accounts</string>
+    <string name="settings_calendar_accounts">Calendar Accounts</string>
+    <string name="settings_calendar_preferences">Calendar Preferences</string>
+    <string name="settings_reminder_defaults">Reminder Defaults</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_widgets">Widgets</string>
+    <string name="settings_widgets_value_transparent">Transparent</string>
+    <string name="settings_widgets_value_default">Default</string>
+    <string name="settings_app_lock_vault">App Lock &amp; Private Vault</string>
+    <string name="settings_sync">Sync</string>
+    <string name="settings_data_restore">Data &amp; Restore</string>
+    <string name="settings_value_active">Active</string>
+    <string name="settings_value_off">Off</string>
+    <string name="settings_value_local">Local</string>
+    <string name="settings_panel_about">About</string>
+    <string name="settings_check_updates">Check for updates</string>
+    <string name="settings_privacy_policy">Privacy Policy</string>
+    <string name="settings_rate">Rate DotCal</string>
+    <string name="settings_more_apps">More apps from us</string>
+    <!-- Sibling app's store name — a brand, not copy. -->
+    <string name="settings_more_apps_value" translatable="false">DotFiles — File Manager</string>
+    <string name="settings_send_feedback">Send Feedback</string>
+    <string name="settings_version">Version</string>
+
+    <!-- Calendar preferences -->
+    <string name="settings_panel_calendar">Calendar</string>
+    <string name="settings_week_numbers">Week numbers</string>
+    <string name="settings_week_numbers_subtitle">Show ISO week labels in Month and Week</string>
+    <string name="settings_birthday_calendar">Birthday calendar</string>
+    <string name="settings_birthday_calendar_subtitle">Import contacts\' birthdays</string>
+    <string name="settings_global_holidays">Global Holidays</string>
+    <string name="settings_default_view">Default view</string>
+    <string name="settings_default_event_duration">Default event duration</string>
+    <string name="settings_start_of_week">Start of the week</string>
+
+    <!-- Reminder defaults -->
+    <string name="settings_panel_defaults">Defaults</string>
+    <string name="settings_default_reminder">Default reminder</string>
+    <string name="settings_default_all_day_reminder_time">Default all-day reminder time</string>
+    <string name="duration_1_hour">1 hour</string>
+    <string name="duration_2_hours">2 hours</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="reminder_none">None</string>
+    <string name="reminder_1_hour_before">1 hour before</string>
+    <string name="reminder_1_day_before">1 day before</string>
+    <string name="reminder_minutes_before">%1$d minutes before</string>
+
+    <!-- Widgets -->
+    <string name="settings_panel_widget_style">Widget Style</string>
+    <string name="settings_transparent_widgets">Transparent Widgets</string>
+    <string name="settings_transparent_widgets_subtitle">Let wallpaper show through all DotCal widgets</string>
+    <string name="settings_widget_dot_texture">Widget Dot Texture</string>
+    <string name="settings_widget_dot_texture_subtitle">Show the subtle DotCal dotted surface</string>
+    <string name="settings_widget_dot_texture_subtitle_disabled">Only applies when transparent widgets are off</string>
+
+    <!-- Data &amp; Restore -->
+    <string name="settings_panel_calendar_files">Calendar Files</string>
+    <string name="settings_export_calendar">Export Calendar</string>
+    <string name="settings_export_calendar_subtitle">Save all events &amp; tasks to an .ics file</string>
+    <string name="settings_import_calendar">Import Calendar</string>
+    <string name="settings_import_calendar_subtitle">Load events &amp; tasks from an .ics file</string>
+    <string name="settings_panel_backup_restore">Backup &amp; Restore</string>
+    <string name="settings_back_up_data">Back Up Data</string>
+    <string name="settings_back_up_data_subtitle">Save all events, tasks &amp; reminders to a file</string>
+    <string name="settings_restore_data">Restore Data</string>
+    <string name="settings_restore_data_subtitle">Merge a backup file into this device</string>
+    <string name="settings_recently_deleted">Recently Deleted</string>
+
+    <!-- Sync -->
+    <string name="settings_panel_calendar_sync">Calendar Sync</string>
+    <string name="settings_sync_enabled">Sync enabled</string>
+    <string name="settings_sync_enabled_subtitle">Keep DotCal updated from device calendars</string>
+    <string name="settings_sync_interval">Sync interval</string>
+    <string name="settings_sync_now">Sync Now</string>
+    <string name="settings_syncing">Syncing...</string>
+    <string name="sync_interval_manual">Manual</string>
+    <string name="sync_last_synced">Last synced %1$s</string>
+    <string name="sync_never">never</string>
+    <string name="sync_just_now">just now</string>
+    <string name="sync_yesterday">yesterday</string>
+
+    <!-- App Lock &amp; Private Vault -->
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_panel_app_lock">App Lock</string>
+    <string name="settings_require_pin">Require PIN</string>
+    <string name="settings_require_pin_subtitle_set">Lock DotCal after leaving the app</string>
+    <string name="settings_require_pin_subtitle_unset">Set a 4-8 digit PIN</string>
+    <string name="settings_change_pin">Change PIN</string>
+    <string name="settings_set_pin">Set PIN</string>
+    <string name="settings_remove_pin">Remove PIN</string>
+    <string name="settings_disable_app_lock">Disable App Lock</string>
+    <string name="settings_panel_private_vault">Private Vault</string>
+    <string name="settings_private_vault_blurb">Hidden events and tasks stay off calendars, task lists, widgets, and reminders until restored.</string>
+    <string name="settings_panel_private_items">Private Items</string>
+    <string name="settings_no_private_items">No private items</string>
+    <string name="action_restore">Restore</string>
+    <string name="action_save">Save</string>
+    <string name="action_disable">Disable</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_ok">OK</string>
+    <string name="action_apply">Apply</string>
+    <string name="vault_no_title">(No title)</string>
+    <string name="vault_task_no_due">Task - No due date</string>
+    <string name="vault_type_task">Task</string>
+    <string name="vault_type_event">Event</string>
+    <string name="vault_when">%1$s - %2$s</string>
+
+    <!-- App lock screen and PIN dialog -->
+    <string name="app_lock_title">DotCal Locked</string>
+    <string name="app_lock_subtitle">Enter your PIN to continue</string>
+    <string name="app_lock_incorrect">Incorrect PIN</string>
+    <string name="app_lock_unlock">Unlock</string>
+    <string name="app_lock_use_device">Use Device Lock</string>
+    <string name="pin_field_label">PIN</string>
+    <string name="pin_error">Enter the correct 4-8 digit PIN</string>
+
+    <!-- Appearance -->
+    <string name="settings_appearance_subtitle">Choose app appearance</string>
+    <string name="settings_panel_font">Font</string>
+    <string name="settings_panel_theme">Theme</string>
+    <string name="settings_panel_accent">Accent Color</string>
+    <string name="settings_more_colors">More Colors</string>
+    <string name="settings_tap_to_apply">Tap to apply</string>
+    <string name="settings_custom_color">Custom Color</string>
+    <string name="settings_pick_hex">Pick any hex color</string>
+    <string name="settings_custom_accent">Custom Accent</string>
+    <string name="picker_hue">HUE</string>
+    <string name="picker_saturation">SATURATION</string>
+    <string name="picker_brightness">BRIGHTNESS</string>
+    <!-- Hexadecimal, the same word/abbreviation in every locale we ship. -->
+    <string name="picker_hex" translatable="false">HEX</string>
+
+    <!-- Global holidays -->
+    <string name="settings_selected_caps">SELECTED</string>
+    <string name="settings_available_caps">AVAILABLE</string>
+    <string name="holidays_none_selected">None selected</string>
+
+    <!-- Calendar accounts -->
+    <string name="settings_grant_calendar_access">Grant calendar access</string>
+    <string name="settings_tap_sync_now">Tap Sync Now to load accounts</string>
+    <string name="settings_calendar_access_needed">Calendar access needed</string>
+    <string name="settings_add_an_account">Add an account</string>
+    <string name="settings_add_account">Add Account</string>
+    <string name="accounts_local_only">Local only</string>
+    <string name="accounts_connected">Connected</string>
+    <string name="accounts_selected_ratio">%1$d/%2$d selected</string>
+    <!-- Account provider brand name. -->
+    <string name="provider_google" translatable="false">Google</string>
+
+    <!-- Tools -->
+    <string name="settings_panel_tools">Tools</string>
+    <string name="settings_dead_time">Dead Time</string>
+    <string name="settings_dead_time_caption">Free slots</string>
+    <string name="settings_date_calculator">Date Calculator</string>
+    <string name="settings_date_calculator_caption">Date math</string>
+
+    <!-- DotCal Pro card and row -->
+    <!-- Product name, a brand term. -->
+    <string name="pro_product_name" translatable="false">DotCal Pro</string>
+    <!-- Two-part summary joined by a slash, e.g. "Dark / Red" or "Ndot / Editorial. Redefined." -->
+    <string name="settings_pair_value">%1$s / %2$s</string>
+    <string name="settings_pro_lifetime_unlocked">Lifetime unlocked</string>
+    <string name="settings_pro_lifetime_tools">Lifetime tools</string>
+    <string name="settings_pro_lifetime_tools_price">Lifetime tools / %1$s</string>
+    <string name="settings_pro_active">Active - thank you for your support!</string>
+    <string name="settings_pro_unlock">Unlock Pro features</string>
+    <string name="pro_feature_tag">Pro feature</string>
+
+    <!-- Privacy Policy. The whole policy PAGE stays English on purpose (translatable="false"):
+         machine-translated legal text is a liability, and translating only the headings would leave
+         a mixed-language page. Only the screen title / Settings row label above is translated. -->
+    <string name="privacy_legal_label" translatable="false">LEGAL</string>
+    <string name="privacy_hero" translatable="false">Your data stays on your device.</string>
+    <string name="privacy_intro" translatable="false">DotCal stores your calendar data locally on your device. Your calendar content does not go to Dotfield Studio servers. No account, no cloud sync, no analytics.</string>
+    <string name="privacy_section_01_title" translatable="false">01  Overview</string>
+    <string name="privacy_section_02_title" translatable="false">02  Data We Collect</string>
+    <string name="privacy_section_03_title" translatable="false">03  App Permissions</string>
+    <string name="privacy_section_04_title" translatable="false">04  Google Calendar Sync</string>
+    <string name="privacy_section_05_title" translatable="false">05  Local Storage</string>
+    <string name="privacy_section_06_title" translatable="false">06  Third Parties</string>
+    <string name="privacy_section_07_title" translatable="false">07  Security</string>
+    <string name="privacy_section_08_title" translatable="false">08  Children\'s Privacy</string>
+    <string name="privacy_section_09_title" translatable="false">09  Your Rights</string>
+    <string name="privacy_section_10_title" translatable="false">10  Policy Changes</string>
+    <string name="privacy_section_01_body" translatable="false">DotCal does not collect your calendar content and does not transmit events, tasks, reminders, attachments, or settings to Dotfield Studio. Your calendar data exists only on your Android device.\n\nThis policy covers the DotCal Android app (com.dotfield.dotcal), published by Dotfield Studio, and applies from the date of your first install.\n\nWe built DotCal with a simple rule: data about your life belongs to you. The app has no Dotfield backend, no account system, no advertising, and no analytics SDK embedded anywhere in the code. Google Play services are used only for Play Billing, purchase restore, and in-app update checks.</string>
+    <string name="privacy_section_02_body" translatable="false">DotCal does not collect, store, or transmit your calendar content to Dotfield Studio.\n\nCalendar events, tasks, reminder alarms, voice notes, image attachments, theme and app settings, and any imported contact birthdays or Google Calendar events all live only on your device. None of that content is sent to Dotfield Studio, and we cannot access it.\n\nDotCal stores a local Pro entitlement flag after a successful Google Play purchase or restore. Payment processing, receipts, and account-level purchase data are handled by Google Play, not by Dotfield Studio. No crash analytics. No usage analytics. No advertising identifiers.</string>
+    <string name="privacy_section_03_body" translatable="false">DotCal requests only what it needs to function:\n\n- Calendar (read/write) - only if you enable Google Calendar sync, to read/create events via Android\'s CalendarProvider. Calendar data does not leave the device through DotCal.\n- Contacts - optional, to read contact birthdays as yearly events. Only reads dates, not full contact data.\n- Exact Alarm &amp; Boot - schedule reminder alarms and re-register them after a reboot.\n- Notifications - display event and task reminders (Android 13+).\n- Microphone - optional, to record voice notes. Saved to app-private storage, only when you tap record.\n- Photos - selected via Android Photo Picker only. DotCal never accesses your full gallery.\n- Internet / Network State - used by Google Play Billing and in-app update checks. DotCal does not use this permission to upload calendar data, analytics, or ads.</string>
+    <string name="privacy_section_04_body" translatable="false">DotCal\'s calendar sync does not connect to Google\'s Calendar API. It reads from Android\'s built-in CalendarProvider - the same local database the default Calendar app uses. No Google Calendar credentials are ever seen or stored by DotCal.\n\nThis is different from apps that use the Google Calendar REST API or OAuth. DotCal does not make HTTP requests for calendar sync and never sees your Google credentials.\n\nIf you disable sync, DotCal stops querying CalendarProvider. Previously imported events stay in DotCal\'s local database until you delete them.</string>
+    <string name="privacy_section_05_body" translatable="false">All DotCal data is stored in Android\'s app-private storage, inaccessible to other apps without root access, and deleted automatically when you uninstall.\n\nStored data includes the SQLite database (events, tasks, recurrence rules), local preferences (theme, view, sync toggles), voice note files, and image attachments.\n\nDotCal does not write to shared external storage. If your device\'s Google Backup is enabled at the system level, Android may back up app data - this is outside DotCal\'s control.</string>
+    <string name="privacy_section_06_body" translatable="false">DotCal integrates no third-party SDKs for analytics, advertising, crash reporting, or remote configuration. No Firebase Analytics, no Crashlytics, no advertising networks, no A/B testing.\n\nDotCal uses Google Play Billing for the one-time Pro purchase and restore flow, Google Play In-App Updates for update checks, and the Nothing Glyph SDK for local Glyph Toy integration on supported Nothing devices. These services do not receive your calendar events, tasks, reminders, attachments, voice notes, or settings from DotCal.</string>
+    <string name="privacy_section_07_body" translatable="false">Because DotCal stores calendar data locally and does not upload your calendar content, the main risk is physical device access. Keep your device PIN or biometric lock active.\n\nAndroid\'s app sandbox provides the primary protection. On modern devices with hardware-backed encryption, the OS-level encryption protects DotCal data at rest.</string>
+    <string name="privacy_section_08_body" translatable="false">DotCal does not knowingly collect information from anyone, including children under 13. Because DotCal collects no data at all, there is no children\'s data to protect beyond standard Android privacy protections.</string>
+    <string name="privacy_section_09_body" translatable="false">Because DotCal does not collect or store personal data on any server, all of your data is under your direct control:\n\n- Access - your data is in the app on your device.\n- Delete - uninstall to remove everything, or delete individual events in-app.\n- Export - PDF export of calendar views is a planned feature.\n- Portability - events synced via CalendarProvider remain in Android\'s calendar database.\n\nIf you are in the EU, UK, or California, GDPR and CCPA rights apply - exercised entirely on-device, since we hold no data.</string>
+    <string name="privacy_section_10_body" translatable="false">If this policy changes materially - for example, if DotCal adds cloud sync, analytics, advertising, or a Dotfield server feature - we will update this page and the effective date below, and flag the change in a release note. We commit to never adding advertising, analytics, or cloud storage without updating this policy and prominently notifying users.</string>
+    <string name="privacy_contact_title" translatable="false">Questions? Contact us</string>
+    <string name="privacy_contact_email" translatable="false">dotfieldstudio@gmail.com</string>
+    <string name="privacy_effective" translatable="false">Effective July 14, 2026 / Dotfield Studio</string>
+
+    <!-- Event editor -->
+    <string name="event_editor_title_add">Add event</string>
+    <string name="event_editor_title_edit">Edit event</string>
+    <string name="event_title_placeholder">Event title</string>
+    <string name="event_title_required">Title required</string>
+    <string name="event_location_placeholder">Location</string>
+    <string name="event_description_placeholder">Description</string>
+    <string name="event_pencil_in">Pencil in</string>
+    <string name="event_pencil_in_subtitle">Tentative; can be ignored by free-time tools</string>
+    <string name="event_starts">Starts</string>
+    <string name="event_ends">Ends</string>
+    <string name="event_reminder">Reminder</string>
+    <string name="event_repeat">Repeat</string>
+    <string name="event_repeat_none">None</string>
+    <string name="event_apply_to">Apply to</string>
+    <string name="event_apply_series">Changes apply to the whole series</string>
+    <string name="event_apply_instance">Changes apply only to this event</string>
+    <string name="event_error_end_before_start_date">End date must be on or after start date</string>
+    <string name="event_error_end_before_start_time">End must be after start</string>
+    <string name="event_delete_series_button">Delete series</string>
+    <string name="event_delete_event_button">Delete event</string>
+    <string name="event_template_saved">Template saved</string>
+    <string name="event_template_default_name">Template</string>
+    <string name="event_saved_no_reminder">Event saved without reminder</string>
+    <!-- Conflict warning line: %1$s is the other event's title, %2$s its time range. -->
+    <string name="event_conflict_tentative">Tentatively clashes with %1$s %2$s</string>
+    <string name="event_conflict_overlaps">Overlaps with %1$s %2$s</string>
+    <string name="event_conflict_untitled">Untitled</string>
+    <string name="event_conflict_extra">+%1$d more</string>
+    <string name="event_from">From</string>
+    <string name="event_to">To</string>
+
+    <!-- Event editor: media attachments -->
+    <string name="event_images">Images</string>
+    <string name="event_images_count">%1$d/5</string>
+    <string name="event_image_placeholder">IMG</string>
+    <string name="event_image_unavailable">Image unavailable</string>
+    <string name="event_voice_note">Voice note</string>
+    <string name="event_voice_tap_to_record">TAP TO RECORD</string>
+    <string name="event_voice_permission_denied">MIC PERMISSION DENIED - TAP TO ENABLE</string>
+    <string name="event_voice_stop">STOP</string>
+    <string name="event_voice_pause">PAUSE</string>
+    <string name="event_voice_play">PLAY</string>
+    <string name="event_voice_unavailable">UNAVAILABLE</string>
+    <!-- Recorded length, e.g. "12 SEC". -->
+    <string name="event_voice_seconds">%1$d SEC</string>
+
+    <!-- Repeat options -->
+    <string name="repeat_daily">Daily</string>
+    <string name="repeat_weekly">Weekly</string>
+    <string name="repeat_monthly">Monthly</string>
+    <string name="repeat_yearly">Yearly</string>
+    <string name="repeat_custom">Custom...</string>
+
+    <!-- Custom recurrence builder -->
+    <string name="recurrence_custom_title">Custom Repeat</string>
+    <string name="recurrence_frequency">FREQUENCY</string>
+    <string name="recurrence_freq_day">Day</string>
+    <string name="recurrence_freq_week">Week</string>
+    <string name="recurrence_freq_month">Month</string>
+    <string name="recurrence_freq_year">Year</string>
+    <string name="recurrence_every">EVERY</string>
+    <string name="recurrence_on_days">ON DAYS</string>
+    <string name="recurrence_on">ON</string>
+    <string name="recurrence_day_of_month">Day %1$d of the month</string>
+    <string name="recurrence_nth_weekday">The %1$s</string>
+    <string name="recurrence_ends">ENDS</string>
+    <string name="recurrence_never">Never</string>
+    <string name="recurrence_on_date">On a date</string>
+    <string name="recurrence_on_specific_date">On %1$s</string>
+    <string name="recurrence_after">After</string>
+    <string name="recurrence_a_number_of_times">a number of times</string>
+    <string name="recurrence_ends_on">Ends on</string>
+    <string name="action_done">Done</string>
+    <string name="recurrence_ordinal_last">last</string>
+
+    <!-- Go to date sheet -->
+    <string name="jump_to_date_title">Go to date</string>
+    <string name="action_today">Today</string>
+    <string name="action_jump">Jump</string>
+
+    <!-- Countdown card -->
+    <string name="countdown_share_image">Share as image</string>
+
+    <!-- Calendar picker -->
+    <string name="event_calendar_field">Calendar</string>
+    <string name="event_color">Color</string>
+    <string name="event_color_calendar">Calendar color</string>
+    <string name="event_calendar_personal">Personal</string>
+    <string name="event_choose_calendar">Choose calendar</string>
+    <string name="account_on_this_device">On this device</string>
+    <string name="account_google_calendar">Google calendar</string>
+    <string name="account_device_calendar">Device calendar</string>
+
+    <!-- Event details. Section labels render in caps as a visual style; keep them uppercase. -->
+    <string name="event_details_title">Event Details</string>
+    <string name="event_section_time">TIME</string>
+    <string name="event_section_countdown">COUNTDOWN</string>
+    <string name="event_section_location">LOCATION</string>
+    <string name="event_section_reminder">REMINDER</string>
+    <string name="event_section_calendar">CALENDAR</string>
+    <string name="event_section_description">DESCRIPTION</string>
+    <string name="event_section_images">IMAGES</string>
+    <string name="event_section_voice_note">VOICE NOTE</string>
+    <string name="event_all_day">All-day</string>
+    <string name="event_delete">Delete Event</string>
+    <string name="event_options">Event Options</string>
+    <string name="event_share_qr">Share as QR</string>
+    <string name="event_remove_countdown">Remove Countdown</string>
+    <string name="event_pin_countdown">Pin as Countdown</string>
+    <string name="event_share_countdown_image">Share Countdown Image</string>
+    <string name="event_copy_to_date">Copy to date</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_share">Share</string>
+    <string name="action_duplicate">Duplicate</string>
+    <string name="vault_restore_from">Restore From Private Vault</string>
+    <string name="vault_move_to">Move to Private Vault</string>
+
+    <!-- Tasks tab and task details -->
+    <string name="tasks_title">Tasks</string>
+    <string name="task_details_title">Task Details</string>
+    <string name="task_section_status">STATUS</string>
+    <string name="task_section_due">DUE</string>
+    <string name="task_no_date_header">NO DATE</string>
+    <string name="task_status_completed">Completed</string>
+    <string name="task_status_open">Open</string>
+    <string name="task_none">None</string>
+    <string name="task_reopen">Reopen Task</string>
+    <string name="task_mark_complete">Mark Complete</string>
+    <string name="task_delete">Delete Task</string>
+    <string name="task_options">Task Options</string>
+    <string name="task_add_to_calendar">Add to Calendar</string>
+
+    <!-- Task filter segmented control -->
+    <string name="task_filter_all">All</string>
+    <string name="task_filter_today">Today</string>
+    <string name="task_filter_upcoming">Upcoming</string>
+    <string name="task_filter_completed">Completed</string>
+
+    <!-- Task empty states, one title/subtitle pair per filter -->
+    <string name="task_empty_all_title">No tasks yet</string>
+    <string name="task_empty_all_subtitle">Tap to create your first task</string>
+    <string name="task_empty_today_title">Nothing due today</string>
+    <string name="task_empty_today_subtitle">Enjoy your free time</string>
+    <string name="task_empty_upcoming_title">All clear</string>
+    <string name="task_empty_upcoming_subtitle">No upcoming tasks scheduled</string>
+    <string name="task_empty_completed_title">No completed tasks</string>
+    <string name="task_empty_completed_subtitle">Completed tasks show up here</string>
+
+    <!-- Task reminder metadata chip on the task card -->
+    <string name="task_reminder_minutes_before">%1$d min before</string>
+    <string name="task_reminder_1_day_before">1 day before</string>
+
+    <!-- Task editor -->
+    <string name="task_editor_title_add">Add Task</string>
+    <string name="task_editor_title_edit">Edit Task</string>
+    <string name="task_title_label">Title</string>
+    <string name="task_title_required">Title required</string>
+    <string name="task_date">Date</string>
+    <string name="task_time">Time</string>
+    <string name="task_reminder">Reminder</string>
+    <string name="task_repeat">Repeat</string>
+    <string name="task_save">SAVE TASK</string>
+    <string name="task_saved_no_reminder">Task saved without reminder</string>
+    <string name="task_clear_date">Clear date</string>
+    <string name="task_clear_time">Clear time</string>
+
+    <!-- Shared dialogs -->
+    <string name="dialog_delete_series_title">Delete series?</string>
+    <string name="dialog_delete_event_title">Delete event?</string>
+    <string name="dialog_delete_series_confirm">Delete series</string>
+    <string name="action_delete">Delete</string>
+    <string name="dialog_cannot_be_undone">This cannot be undone.</string>
+    <string name="dialog_schedule_conflict">Schedule conflict</string>
+    <string name="dialog_move_anyway">Move anyway</string>
+    <string name="dialog_save_as_template">Save as template</string>
+    <string name="dialog_template_name">Template name</string>
+    <string name="dialog_update_available">Update available</string>
+    <string name="dialog_update_available_body">A new version of DotCal is available. Update to get the latest improvements.</string>
+    <string name="action_update">Update</string>
+    <string name="action_not_now">Not now</string>
+    <string name="dialog_update_ready">Update ready</string>
+    <string name="dialog_update_ready_body">The update has been downloaded. Restart DotCal to apply it.</string>
+    <string name="action_restart">Restart</string>
+    <string name="action_later">Later</string>
+
+    <!-- Counted strings. Plural forms matter: languages differ in how many categories they need. -->
+    <!-- Countdown caption under the big number. %1$s is the event title, already uppercased. -->
+    <!-- Interval unit next to the stepper, e.g. "2 weeks". %1$d is rendered separately. -->
+    <plurals name="recurrence_unit_day">
+        <item quantity="one">day</item>
+        <item quantity="other">days</item>
+    </plurals>
+    <plurals name="recurrence_unit_week">
+        <item quantity="one">week</item>
+        <item quantity="other">weeks</item>
+    </plurals>
+    <plurals name="recurrence_unit_month">
+        <item quantity="one">month</item>
+        <item quantity="other">months</item>
+    </plurals>
+    <plurals name="recurrence_unit_year">
+        <item quantity="one">year</item>
+        <item quantity="other">years</item>
+    </plurals>
+    <plurals name="recurrence_times">
+        <item quantity="one">time</item>
+        <item quantity="other">times</item>
+    </plurals>
+
+    <!-- Ordinal words for the monthly "The 2nd Tuesday" phrase. -->
+    <string name="recurrence_ordinal_1st">1st</string>
+    <string name="recurrence_ordinal_2nd">2nd</string>
+    <string name="recurrence_ordinal_3rd">3rd</string>
+    <string name="recurrence_ordinal_4th">4th</string>
+    <string name="recurrence_ordinal_5th">5th</string>
+    <plurals name="countdown_days_until">
+        <item quantity="one">DAY UNTIL %1$s</item>
+        <item quantity="other">DAYS UNTIL %1$s</item>
+    </plurals>
+    <plurals name="dialog_conflict_overlaps">
+        <item quantity="one">This time overlaps another event.</item>
+        <item quantity="other">This time overlaps %1$d other events.</item>
+    </plurals>
+    <plurals name="count_selected">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <plurals name="events_updated">
+        <item quantity="one">%1$d event updated</item>
+        <item quantity="other">%1$d events updated</item>
+    </plurals>
+    <plurals name="events_shifted">
+        <item quantity="one">%1$d event shifted</item>
+        <item quantity="other">%1$d events shifted</item>
+    </plurals>
+    <plurals name="events_moved">
+        <item quantity="one">%1$d event moved</item>
+        <item quantity="other">%1$d events moved</item>
+    </plurals>
+    <plurals name="events_copied">
+        <item quantity="one">%1$d event copied</item>
+        <item quantity="other">%1$d events copied</item>
+    </plurals>
+    <plurals name="events_recolored">
+        <item quantity="one">%1$d event recolored</item>
+        <item quantity="other">%1$d events recolored</item>
+    </plurals>
+    <plurals name="events_added">
+        <item quantity="one">%1$d event added</item>
+        <item quantity="other">%1$d events added</item>
+    </plurals>
+    <plurals name="events_deleted">
+        <item quantity="one">%1$d event deleted</item>
+        <item quantity="other">%1$d events deleted</item>
+    </plurals>
+    <plurals name="holiday_countries_selected">
+        <item quantity="one">%1$d country selected</item>
+        <item quantity="other">%1$d countries selected</item>
+    </plurals>
+    <!--
+      Fragments of the recurrence sentence built by recurrenceHumanLabel() (ui/UiModels.kt), e.g.
+      "Every 2 weeks on Mon, Fri · 10 times". The leading spaces are load-bearing: the clauses are
+      concatenated onto the base phrase. Keep them when translating.
+    -->
+    <!--
+      Event/task detail rows. Written in the case they display in: the old code built these ALL-CAPS
+      and then sentence-cased them at the call site, so the caps never reached the screen.
+    -->
+    <string name="event_detail_repeats">Repeats / %1$s</string>
+    <string name="reminder_detail_1_minute_before">1 minute before</string>
+    <string name="reminder_detail_1_hour_before">1 hour before</string>
+    <string name="reminder_detail_1_day_before">1 day before</string>
+
+    <!-- Template summary line, e.g. "Event / 9:00 AM / 1h / Weekly" -->
+    <string name="template_type_task">Task</string>
+    <string name="template_type_event">Event</string>
+    <string name="template_no_time">No time</string>
+    <string name="template_all_day">All-day</string>
+    <string name="template_repeats">Repeats</string>
+    <string name="template_summary_separator" translatable="false"> / </string>
+    <!-- Paywall: the 14 Pro feature rows. "DotCal" in the widget-pack line is a brand term. -->
+    <string name="pro_feature_images">Image Attachments</string>
+    <string name="pro_feature_images_desc">Add up to 5 photos to any event</string>
+    <string name="pro_feature_voice">Voice Notes</string>
+    <string name="pro_feature_voice_desc">Record audio notes on your events</string>
+    <string name="pro_feature_large_widget">Large Widget</string>
+    <string name="pro_feature_large_widget_desc">Full month grid widget for your home screen</string>
+    <string name="pro_feature_widget_pack">Widget Pack Config</string>
+    <string name="pro_feature_widget_pack_desc">Transparent widgets plus DotCal dot texture</string>
+    <string name="pro_feature_date_calc">Date Calculator</string>
+    <string name="pro_feature_date_calc_desc">Calculate days between dates instantly</string>
+    <string name="pro_feature_accents">Custom Accent Colors</string>
+    <string name="pro_feature_accents_desc">Extra palettes plus any custom hex color</string>
+    <string name="pro_feature_recurrence">Advanced Recurrence</string>
+    <string name="pro_feature_recurrence_desc">Every N weeks, nth weekday, end date or count</string>
+    <string name="pro_feature_app_lock">App Lock &amp; Private Vault</string>
+    <string name="pro_feature_app_lock_desc">PIN lock plus hidden events and tasks</string>
+    <string name="pro_feature_templates">Event &amp; Task Templates</string>
+    <string name="pro_feature_templates_desc">Save presets and reuse them from the + button</string>
+    <string name="pro_feature_calendar_sets">Calendar Sets</string>
+    <string name="pro_feature_calendar_sets_desc">Save Work/Personal/Family visibility and switch instantly</string>
+    <string name="pro_feature_shift_patterns">Shift Patterns</string>
+    <string name="pro_feature_shift_patterns_desc">Build rotating shift cycles and generate them in bulk</string>
+    <string name="pro_feature_time_insights">Time Insights</string>
+    <string name="pro_feature_time_insights_desc">See hours, busiest days, and task completion</string>
+    <string name="pro_feature_dead_time">Dead Time Finder</string>
+    <string name="pro_feature_dead_time_desc">Find open blocks across the next seven days</string>
+    <string name="pro_feature_share_availability">Share Availability</string>
+    <string name="pro_feature_share_availability_desc">Turn free time into text you can paste anywhere</string>
+
+    <!-- Paywall. "DotCal Pro" is a brand name and stays untranslated (see the brand list in
+         Docs/HANDOFF.md); paywall_unlock_pro_price takes the Play Store formatted price. -->
+    <string name="paywall_headline">Unlock the power tools</string>
+    <string name="paywall_subhead">Quick capture, templates, calendar sets, widgets, privacy tools, and time insights in one lifetime upgrade.</string>
+    <string name="paywall_lifetime_pro">Lifetime Pro</string>
+    <string name="paywall_one_time_no_subscription">One-time purchase. No subscription.</string>
+    <string name="paywall_one_time_price_from_play">One-time purchase. Price shown by Play Store.</string>
+    <string name="paywall_play_store">Play Store</string>
+    <string name="paywall_metric_pay_once">Pay once</string>
+    <string name="paywall_metric_forever_access">Forever access</string>
+    <string name="paywall_metric_offline_first">Offline-first</string>
+    <string name="paywall_metric_no_cloud_account">No cloud account</string>
+    <string name="paywall_purchase_options">Purchase options</string>
+    <string name="paywall_base_offer">Base offer</string>
+    <string name="paywall_discount_offer">Discount offer</string>
+    <string name="paywall_offer_id">Offer ID: %1$s</string>
+    <string name="paywall_purchase_option_id">Purchase option ID: %1$s</string>
+    <string name="paywall_play_billing_offer">Google Play offer</string>
+    <string name="paywall_final_price_at_checkout">Final price appears in Play Store checkout.</string>
+    <string name="paywall_restore_purchase">Restore Purchase</string>
+    <string name="paywall_restore_success">Purchase restored - enjoy DotCal Pro!</string>
+    <string name="paywall_restore_none_found">No previous purchase found on this account</string>
+    <string name="paywall_connecting">Connecting...</string>
+    <string name="paywall_unlock_pro">Unlock Pro</string>
+    <string name="paywall_unlock_pro_price">Unlock Pro - %1$s</string>
+    <string name="paywall_youre_pro">You\'re Pro!</string>
+
+    <!-- Global Search facets -->
+    <string name="search_facet_type">Type</string>
+    <string name="search_facet_time">Time</string>
+    <string name="search_facet_calendar">Calendar</string>
+    <string name="search_facet_all_calendars">All calendars</string>
+    <string name="search_type_all">All</string>
+    <string name="search_type_events">Events</string>
+    <string name="search_type_tasks">Tasks</string>
+    <string name="search_date_any_time">Any time</string>
+    <string name="search_date_upcoming">Upcoming</string>
+    <string name="search_date_past">Past</string>
+    <string name="search_date_this_month">This month</string>
+    <string name="search_task_when">TASK / %1$s</string>
+
+    <!-- Templates and Calendar Sets -->
+    <string name="template_apply_title">Apply Template</string>
+    <string name="template_apply_subtitle">Choose an event template to stamp onto selected dates.</string>
+    <string name="template_no_event_templates">No event templates yet</string>
+    <string name="template_none_yet">No templates yet</string>
+    <string name="template_none_yet_blurb">Open any event or task, then tap \"Save as template\" to reuse it any time.</string>
+    <string name="template_delete_title">Delete template?</string>
+    <string name="calendar_set_none_yet">No calendar sets yet</string>
+    <string name="calendar_set_none_yet_blurb">Show or hide calendars the way you want, then save that view as a set - Work, Personal, Family - and switch between them any time.</string>
+    <string name="calendar_set_save_current">Save Current as Set</string>
+    <string name="calendar_set_save_dialog_title">Save current calendars as a set</string>
+    <string name="calendar_set_default_name">Set</string>
+    <string name="calendar_set_delete_title">Delete calendar set?</string>
+
+    <!-- Time Insights. Section titles render through SettingsSectionTitle, which does not
+         uppercase, so they are written in the case they display in. -->
+    <string name="insights_title">Time Insights</string>
+    <string name="insights_scheduled_hours">scheduled hours</string>
+    <string name="insights_metric_events">Events</string>
+    <string name="insights_metric_busiest">Busiest</string>
+    <string name="insights_metric_tasks">Tasks</string>
+    <string name="insights_metric_none">None</string>
+    <string name="insights_section_weekday_load">WEEKDAY LOAD</string>
+    <string name="insights_section_calendars">CALENDARS</string>
+    <string name="insights_section_dead_time">DEAD TIME FINDER</string>
+    <string name="insights_no_open_slots">No open slots of 1 hour or longer.</string>
+    <string name="insights_no_timed_events">No scheduled timed events in this range.</string>
+
+    <!-- Date Calculator. The *_section labels go through CalcSectionLabel (no uppercase()
+         any more), so they are stored ALL CAPS; the row labels are sentence case. -->
+    <string name="calc_date_range">DATE RANGE</string>
+    <string name="calc_result">RESULT</string>
+    <string name="calc_start_date">START DATE</string>
+    <string name="calc_operation">OPERATION</string>
+    <string name="calc_number_of_days">NUMBER OF DAYS</string>
+    <string name="calc_start_date_row">Start date</string>
+    <string name="calc_end_date_row">End date</string>
+    <string name="calc_select_date">Select</string>
+    <string name="calc_add">Add</string>
+    <string name="calc_subtract">Subtract</string>
+    <string name="calc_working_days">Working days (Mon-Fri)</string>
+    <string name="calc_weekends">Weekends</string>
+
+    <!-- Availability sharing. -->
+    <string name="availability_next_7_days">Next 7 days · slots of 1 hour or longer</string>
+    <string name="availability_share">Share availability</string>
+
+    <!-- Shift patterns. shift_section_* go through SettingsSectionTitle (no uppercase()),
+         so they are stored in the case they display in. -->
+    <string name="shift_patterns_title">Shift Patterns</string>
+    <string name="shift_section_types">SHIFT TYPES</string>
+    <string name="shift_section_patterns">PATTERNS</string>
+    <string name="shift_types_empty">Create Day, Night, and Off presets first.</string>
+    <string name="shift_patterns_empty">Build a cycle like Day, Day, Night, Night, Off x4.</string>
+    <string name="shift_add_type">Add Shift Type</string>
+    <string name="shift_build_pattern_row">Build Pattern</string>
+    <string name="shift_pattern_delete_title">Delete shift pattern?</string>
+    <string name="shift_type_title">Shift type</string>
+    <string name="shift_type_edit_title">Edit shift type</string>
+    <string name="shift_field_name">Name</string>
+    <string name="shift_off_day">Off day</string>
+    <string name="shift_field_start_hour">Start hour</string>
+    <string name="shift_field_duration_hours">Duration hours</string>
+    <string name="shift_color_title">Shift Color</string>
+    <string name="shift_build_pattern_title">Build pattern</string>
+    <!-- Default name pre-filled in the pattern builder; a common rotation shorthand. -->
+    <string name="shift_pattern_default_name">4 on 4 off</string>
+    <string name="shift_remove_last">Remove Last</string>
+    <string name="shift_pattern_start">Pattern start</string>
+    <string name="shift_generate_title">Generate shifts</string>
+    <string name="shift_generate_from">Generate from</string>
+    <string name="shift_months_ahead">Months ahead</string>
+    <string name="shift_calendar">Calendar</string>
+    <string name="shift_generate_confirm">Generate</string>
+    <string name="shift_color_label">Color</string>
+    <string name="shift_summary_off">Off</string>
+    <string name="shift_summary_all_day">All-day</string>
+    <string name="shift_summary_range">%1$s - %2$s</string>
+    <string name="shift_pattern_summary">%1$s: %2$s</string>
+    <string name="shift_type_missing">Missing</string>
+    <string name="shift_no_shifts_selected">No shifts selected</string>
+
+    <!-- Global Search, Quick Add, Templates, Calendar Sets and Date Calculator headers -->
+    <string name="search_title">Search</string>
+    <string name="search_placeholder">Title, location, notes...</string>
+    <string name="search_hint">Search your events and tasks</string>
+    <string name="search_no_results">No results for \"%1$s\"</string>
+    <string name="quick_add_title">Quick Add</string>
+    <string name="quick_add_continue">Continue</string>
+    <string name="templates_title">Templates</string>
+    <string name="calendar_sets_title">Calendar Sets</string>
+    <string name="calc_title">Date Calculator</string>
+    <string name="calc_mode_days_between">Days Between</string>
+    <string name="calc_mode_add_subtract">Add / Subtract</string>
+
+    <!-- Recently Deleted -->
+    <string name="trash_title">Recently Deleted</string>
+    <string name="trash_empty_action">Empty</string>
+    <string name="trash_nothing_here">Nothing here</string>
+    <string name="trash_nothing_here_blurb">Deleted events and tasks show up here for 30 days, so you can bring them back.</string>
+    <string name="trash_swipe_hint">Swipe left to restore or delete. Kept for 30 days.</string>
+    <string name="trash_delete_permanently_title">Delete permanently?</string>
+    <string name="trash_empty_confirm_title">Empty Recently Deleted?</string>
+    <string name="trash_no_due_date">No due date</string>
+    <string name="trash_just_now">just now</string>
+    <string name="trash_deleted_when">%1$s / deleted %2$s</string>
+
+    <!-- Time Insights range selector -->
+    <string name="insights_range_week">This week</string>
+    <string name="insights_range_month">This month</string>
+    <string name="insights_range_custom">Custom</string>
+
+    <!-- Quick Add preview. The example prompts themselves stay English: the parser only
+         understands English tokens (see the Quick Add hint note). -->
+    <string name="quick_add_preview">Preview</string>
+    <string name="quick_add_try_one">Try one</string>
+    <!-- QuickAdd preview chip labels. Stored ALL CAPS: the chip used to call
+         uppercase(Locale.getDefault()), which breaks Turkish dotless i. -->
+    <string name="quick_add_chip_title">TITLE</string>
+    <string name="quick_add_chip_date">DATE</string>
+    <string name="quick_add_chip_time">TIME</string>
+    <string name="quick_add_chip_repeats">REPEATS</string>
+    <string name="quick_add_untitled">Untitled</string>
+    <string name="quick_add_repeat_custom">Custom</string>
+    <!-- Shown via CalcSectionLabel, which no longer uppercases: written in display case. -->
+    <string name="quick_add_describe_event">DESCRIBE YOUR EVENT</string>
+
+    <string name="recurrence_every_n_units">Every %1$d %2$s</string>
+    <string name="recurrence_label_on_days">" on %1$s"</string>
+    <string name="recurrence_label_on_the">" on the %1$s"</string>
+    <string name="recurrence_label_end_count">" · %1$d %2$s"</string>
+    <string name="recurrence_label_end_until">" · until %1$s"</string>
+    <plurals name="reminder_detail_minutes_before">
+        <item quantity="one">%1$d minute before</item>
+        <item quantity="other">%1$d minutes before</item>
+    </plurals>
+    <plurals name="sync_minutes_ago">
+        <item quantity="one">%1$d min ago</item>
+        <item quantity="other">%1$d min ago</item>
+    </plurals>
+    <plurals name="sync_hours_ago">
+        <item quantity="one">%1$d hr ago</item>
+        <item quantity="other">%1$d hr ago</item>
+    </plurals>
+    <plurals name="sync_days_ago">
+        <item quantity="one">%1$d d ago</item>
+        <item quantity="other">%1$d d ago</item>
+    </plurals>
+
+    <!-- Recently Deleted relative timestamps. Deliberately NOT the sync_*_ago plurals: those
+         render "5 min ago" / "3 hr ago", the trash rows have always used the compact
+         "5m ago" / "3h ago" form. Keep them separate. -->
+    <plurals name="trash_minutes_ago">
+        <item quantity="one">%1$dm ago</item>
+        <item quantity="other">%1$dm ago</item>
+    </plurals>
+    <plurals name="trash_hours_ago">
+        <item quantity="one">%1$dh ago</item>
+        <item quantity="other">%1$dh ago</item>
+    </plurals>
+    <plurals name="trash_days_ago">
+        <item quantity="one">%1$dd ago</item>
+        <item quantity="other">%1$dd ago</item>
+    </plurals>
+
+    <!-- Punch-card streak on the day view, e.g. "3-day streak". -->
+    <plurals name="punch_streak_days">
+        <item quantity="one">%1$d-day streak</item>
+        <item quantity="other">%1$d-day streak</item>
+    </plurals>
+
+    <!-- Shift pattern cycle length, e.g. "4-day cycle". -->
+    <plurals name="shift_day_cycle">
+        <item quantity="one">%1$d-day cycle</item>
+        <item quantity="other">%1$d-day cycle</item>
+    </plurals>
+
+    <!-- Start/end time range shown on event cards, e.g. "09:00 - 10:30". Replaces a Kotlin
+         "${start} - ${end}" interpolation so the separator is translatable. -->
+    <string name="time_range">%1$s - %2$s</string>
+
+    <!-- App shell: device unlock, in-app update, account setup. -->
+    <string name="unlock_device_title">Unlock DotCal</string>
+    <string name="unlock_device_subtitle">Confirm your device lock to continue.</string>
+    <string name="contacts_access_needed">Contacts access needed</string>
+    <string name="birthdays_disabled">Birthdays disabled</string>
+    <plurals name="birthdays_imported">
+        <item quantity="one">%1$d Birthday Imported</item>
+        <item quantity="other">%1$d Birthdays Imported</item>
+    </plurals>
+
+    <!-- Bulk edit: snackbar, undo, and the sheet titles/rows. -->
+    <string name="bulk_undo">UNDO</string>
+    <string name="bulk_edit_undone">Bulk edit undone</string>
+    <string name="bulk_edit_failed">Bulk edit failed</string>
+    <string name="bulk_event_updated">Event updated</string>
+    <string name="bulk_edit_title">Bulk Edit</string>
+    <string name="bulk_move_to_date">Move to date</string>
+    <string name="bulk_copy_to_date">Copy to date</string>
+    <string name="bulk_shift_by">Shift by days/hours</string>
+    <string name="bulk_move_to_calendar">Move to calendar</string>
+    <string name="bulk_change_color">Change color</string>
+    <string name="bulk_toggle_ghost">Toggle ghost</string>
+    <string name="bulk_delete_selected">Delete selected</string>
+    <string name="bulk_shift_title">Shift Selected</string>
+    <!-- Fixed shift offsets. Each is its own key rather than a plural: the number never
+         varies, so translators can write the correct grammatical form per row. -->
+    <string name="bulk_shift_minus_7_days">-7 days</string>
+    <string name="bulk_shift_minus_1_day">-1 day</string>
+    <string name="bulk_shift_plus_1_day">+1 day</string>
+    <string name="bulk_shift_plus_7_days">+7 days</string>
+    <string name="bulk_shift_minus_1_hour">-1 hour</string>
+    <string name="bulk_shift_plus_1_hour">+1 hour</string>
+    <string name="bulk_move_calendar_title">Move to Calendar</string>
+    <string name="bulk_change_color_title">Change Color</string>
+    <string name="bulk_use_calendar_color">Use calendar color</string>
+    <!-- Toast messages fired from non-composable callbacks (see showDotCalToast's
+         @StringRes overload in UiHelpers.kt). -->
+    <string name="toast_device_lock_unavailable">Device lock unavailable</string>
+    <string name="toast_up_to_date">DotCal is up to date</string>
+    <string name="toast_update_check_failed">Couldn\'t check for updates</string>
+    <string name="toast_account_setup_unavailable">Account setup unavailable</string>
+    <string name="toast_calendar_exported">Calendar exported</string>
+    <string name="toast_export_failed">Export failed</string>
+    <string name="toast_file_read_failed">Couldn\'t read file</string>
+    <string name="toast_backup_saved">Backup saved</string>
+    <string name="toast_backup_failed">Backup failed</string>
+    <string name="toast_restore_invalid_backup">Restore failed - not a valid DotCal backup</string>
+    <string name="toast_change_undone">Change undone</string>
+    <string name="toast_move_event_failed">Couldn\'t move event</string>
+    <string name="toast_holidays_add_failed">Could not add holidays</string>
+    <string name="toast_holidays_remove_failed">Could not remove holidays</string>
+    <string name="toast_already_pro">You\'re already Pro!</string>
+    <string name="toast_purchase_restored">Purchase restored - enjoy DotCal Pro!</string>
+    <string name="toast_no_previous_purchase">No previous purchase found on this account</string>
+    <string name="toast_app_lock_disabled">App Lock disabled</string>
+    <string name="toast_pin_removed">PIN removed</string>
+    <string name="toast_restored_from_vault">Restored from Private Vault</string>
+    <string name="toast_moved_to_vault">Moved to Private Vault</string>
+    <string name="toast_shared_without_description">Shared without description</string>
+    <string name="toast_event_too_large_qr">Event is too large to share as QR</string>
+    <string name="toast_countdown_pinned">Countdown pinned</string>
+    <string name="toast_countdown_removed">Countdown removed</string>
+    <string name="toast_countdown_share_failed">Could not share countdown</string>
+    <string name="toast_event_share_failed">Could not share event</string>
+    <string name="toast_qr_share_failed">Could not share QR image</string>
+    <string name="toast_import_invalid_ics">Import failed - not a valid .ics file</string>
+    <!-- Restore/import summaries. Two independent counts, so a plural on either one would be
+         wrong; the counts are formatted into a neutral frame instead. -->
+    <string name="toast_restore_summary">Restored: %1$d new, %2$d updated</string>
+    <string name="toast_import_summary">Imported: %1$d new, %2$d updated</string>
+    <string name="bulk_delete_confirm_title">Delete selected events?</string>
+    <!-- Date-picker sheet headers. Separate from the bulk_move_to_date / bulk_copy_to_date
+         action rows above: those label a menu item, these title a screen. -->
+    <string name="bulk_move_to_date_title">Move to date</string>
+    <string name="bulk_copy_to_date_title">Copy to date</string>
+    <!-- Appended to the bulk-edit snackbar when some events could not be changed. The leading
+         comma and space are load-bearing: this is concatenated onto the count message. -->
+    <plurals name="bulk_skipped_suffix">
+        <item quantity="one">", %1$d skipped"</item>
+        <item quantity="other">", %1$d skipped"</item>
+    </plurals>
+
+    <!-- Sync status toast. The second line is a hint; \n is a real line break. -->
+    <string name="sync_success">Calendars synced</string>
+    <string name="sync_failed_permission">Sync failed\nCheck calendar access</string>
+    <string name="sync_failed_retry">Sync failed\nTry again</string>
+
+    <!-- Sharing an event, countdown, or QR image. -->
+    <string name="share_event_title">Share Event</string>
+    <string name="share_event_as_text">Share as text</string>
+    <string name="share_event_as_ics">Share as .ics</string>
+    <string name="share_no_target">No share target found</string>
+    <string name="share_countdown_chooser">Share Countdown</string>
+    <string name="share_event_qr_chooser">Share Event QR</string>
+    <string name="share_availability_chooser">Share availability</string>
+    <string name="availability_copied">Availability copied</string>
+    <!-- Labels in the plain-text share body. -->
+    <string name="share_field_date">Date: %1$s</string>
+    <string name="share_field_location">Location: %1$s</string>
+    <string name="share_field_notes">Notes: %1$s</string>
+    <!-- All-day event in the share body, e.g. "Mon, 4 Aug 2025 (All-day)". -->
+    <string name="share_date_all_day">%1$s (All-day)</string>
+    <!-- All-day event spanning several days. -->
+    <string name="share_date_all_day_span">%1$s - %2$s (All-day)</string>
+
+    <!-- Scanned QR code rejection reasons. -->
+    <string name="qr_reject_invalid">Not a valid event code</string>
+    <string name="qr_reject_not_dotcal">Not a DotCal event code</string>
+    <string name="qr_reject_unsupported">DotCal event code needs a newer app</string>
+
+    <!-- Countdown pin/remove/swap and the free-tier countdown paywall. -->
+    <string name="countdown_swapped">Countdown swapped</string>
+    <string name="countdown_limit_body">DotCal Pro gives you unlimited countdowns. You can also swap your current free countdown to this event.</string>
+    <string name="countdown_unlock_unlimited">Unlock Unlimited</string>
+    <string name="countdown_swap_to_this">Swap to this countdown</string>
+    <plurals name="countdown_active">
+        <item quantity="one">%1$d countdown active</item>
+        <item quantity="other">%1$d countdowns active</item>
+    </plurals>
+
+    <!-- Calendar sets and shift patterns. -->
+    <string name="calendar_set_applied">Calendar set applied</string>
+    <string name="calendar_set_saved">Calendar set saved</string>
+    <string name="shift_pattern_deleted">Shift pattern deleted</string>
+    <string name="shift_none_added">No shifts added. Check that the pattern uses Day/Night shift types, not only Off.</string>
+    <!-- Shift generator result. %1$d shifts created, %2$d existing shifts overwritten. -->
+    <string name="shift_added_with_replaced">%1$d shifts added, %2$d replaced</string>
+    <string name="shift_added">%1$d shifts added</string>
+
+    <!-- Task delete confirmation. -->
+    <string name="task_delete_series_title">Delete task series?</string>
+    <string name="task_delete_title">Delete task?</string>
+    <string name="task_delete_series_confirm">Delete series</string>
+    <string name="task_delete_confirm">Delete</string>
+
+    <!-- Share Availability screen. -->
+    <string name="availability_title">Share Availability</string>
+    <string name="availability_preset_next_three_days">Next 3 days</string>
+    <string name="availability_preset_this_week">This week</string>
+    <string name="availability_preset_next_week">Next week</string>
+    <string name="availability_preview">Preview</string>
+    <!-- Status pill above the generated text. Stored ALL CAPS: it renders in caps as a
+         visual style and is never passed through uppercase(). -->
+    <string name="availability_status_updating">UPDATING</string>
+    <string name="availability_status_ready">READY</string>
+    <string name="availability_from">From</string>
+    <string name="availability_to">To</string>
+    <string name="availability_working_hours">Working hours</string>
+    <string name="availability_start">Start</string>
+    <string name="availability_end">End</string>
+    <!-- Minimum free-slot length chip, e.g. "30 min". -->
+    <string name="availability_minutes_chip">%1$d min</string>
+    <string name="availability_all_day">All-day</string>
+    <string name="availability_all_day_block">Block</string>
+    <string name="availability_all_day_ignore">Ignore</string>
+    <string name="availability_ghosts">Ghosts</string>
+    <string name="availability_ghosts_busy">Busy</string>
+    <string name="availability_ghosts_free">Free</string>
+    <string name="availability_copy">Copy</string>
+    <string name="availability_share_button">Share</string>
+    <string name="availability_start_date">Start date</string>
+    <string name="availability_end_date">End date</string>
+
+    <!-- Share-as-QR / scan-QR screens. -->
+    <string name="qr_share_title">Share as QR</string>
+    <string name="qr_scan_title">Scan event QR</string>
+    <string name="qr_import_title">Import preview</string>
+    <string name="qr_image_saved">QR image saved</string>
+    <string name="qr_image_save_failed">Could not save QR image</string>
+    <string name="qr_create_failed">Could not create QR code</string>
+    <string name="qr_shared_without_description">Shared without description</string>
+    <string name="qr_save_image">Save image</string>
+    <string name="qr_share">Share</string>
+    <string name="qr_camera_rationale">Camera access lets DotCal scan event QR codes. Frames stay in memory and are never saved.</string>
+    <string name="qr_allow_camera">Allow camera</string>
+    <string name="qr_camera_unavailable">Camera unavailable</string>
+    <string name="qr_point_camera">Point camera at event QR</string>
+    <string name="qr_repeats">Repeats</string>
+    <string name="qr_import_single">Import event</string>
+    <!-- Import button when the scanned QR holds more than one event. -->
+    <plurals name="qr_import_items">
+        <item quantity="one">Import %1$d item</item>
+        <item quantity="other">Import %1$d items</item>
+    </plurals>
+    <string name="qr_no_date">No date</string>
+    <!-- All-day event in the QR import preview, e.g. "Mon, 4 Aug 2025 - All-day". -->
+    <string name="qr_date_all_day">%1$s - All-day</string>
+    <!-- Timed event in the QR import preview: date, start time, end time. -->
+    <string name="qr_date_time_span">%1$s - %2$s to %3$s</string>
+
+    <!-- Calendar grid views. week_number_short is the compact ISO week label on the week-view
+         rail: %1$s is the zero-padded number, so German can render "KW02". -->
+    <string name="week_number_short">W%1$s</string>
+    <string name="calendar_clear">Clear</string>
+    <string name="calendar_apply_template">Apply Template</string>
+    <string name="calendar_tasks">Tasks</string>
+    <string name="calendar_heatmap">Heatmap</string>
+    <string name="calendar_complete_day">Complete day</string>
+
+    <!-- Agenda tab and the day event-list sheet. -->
+    <string name="agenda_no_events">No events</string>
+    <string name="agenda_add_event">+ Add Event</string>
+    <string name="agenda_all_caught_up">You\'re all caught up</string>
+
+    <!-- Date Calculator. calc_days_total is a bare caption under the big number (no format
+         arg); the before/after variants are whole sentences so translators own word order. -->
+    <plurals name="calc_days_total">
+        <item quantity="one">day total</item>
+        <item quantity="other">days total</item>
+    </plurals>
+    <plurals name="calc_days_before_start">
+        <item quantity="one">%1$d day before start date</item>
+        <item quantity="other">%1$d days before start date</item>
+    </plurals>
+    <plurals name="calc_days_after_start">
+        <item quantity="one">%1$d day after start date</item>
+        <item quantity="other">%1$d days after start date</item>
+    </plurals>
 </resources>

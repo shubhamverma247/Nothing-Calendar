@@ -70,6 +70,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -78,6 +80,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.insights.OnThisDayMemory
 import com.dotfield.dotcal.data.scheduling.EventDragMath
@@ -91,7 +94,6 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.temporal.WeekFields
 import java.util.Locale
 
@@ -198,14 +200,20 @@ internal fun MonthView(
                 modifier = Modifier.fillMaxWidth().background(palette.calendarSurface).padding(horizontal = 18.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("${selectedBulkDates.size} selected", color = palette.primaryText, fontFamily = mono, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                TextButton(onClick = onBulkClear) { Text("Clear", color = palette.secondaryText, fontFamily = mono) }
+                Text(
+                    pluralStringResource(R.plurals.count_selected, selectedBulkDates.size, selectedBulkDates.size),
+                    color = palette.primaryText,
+                    fontFamily = mono,
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onBulkClear) { Text(stringResource(R.string.calendar_clear), color = palette.secondaryText, fontFamily = mono) }
                 Button(
                     onClick = onBulkApply,
                     colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
                     shape = RoundedCornerShape(18.dp),
                 ) {
-                    Text("Apply Template", fontFamily = mono, fontSize = 12.sp)
+                    Text(stringResource(R.string.calendar_apply_template), fontFamily = mono, fontSize = 12.sp)
                 }
             }
         }
@@ -457,8 +465,12 @@ private fun WeekNumberCell(
     }
 }
 
+@Composable
 private fun isoWeekNumberLabel(date: LocalDate): String {
-    return "W${date.get(WeekFields.ISO.weekOfWeekBasedYear()).toString().padStart(2, '0')}"
+    return stringResource(
+        R.string.week_number_short,
+        date.get(WeekFields.ISO.weekOfWeekBasedYear()).toString().padStart(2, '0'),
+    )
 }
 
 @Composable
@@ -502,7 +514,7 @@ private fun WeekDayHeader(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(date.dayOfWeek.name.take(3), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+        Text(date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
         Box(
             modifier = Modifier
                 .padding(top = 4.dp)
@@ -881,9 +893,14 @@ private fun DragResizeHandle(
     }
 }
 
+@Composable
 private fun dragTimeLabel(range: EventTimeRange, use24HourFormat: Boolean): String {
-    val formatter = DateTimeFormatter.ofPattern(if (use24HourFormat) "HH:mm" else "h:mm a", Locale.getDefault())
-    return "${range.start.toLocalTime().format(formatter)} - ${range.end.toLocalTime().format(formatter)}"
+    val formatter = localizedFormatter(if (use24HourFormat) "HH:mm" else "h:mm a")
+    return stringResource(
+        R.string.time_range,
+        range.start.toLocalTime().format(formatter),
+        range.end.toLocalTime().format(formatter),
+    )
 }
 
 @Composable
@@ -996,7 +1013,7 @@ internal fun DayView(
                 }
                 if (tasks.isNotEmpty()) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                        Text("Tasks", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                        Text(stringResource(R.string.calendar_tasks), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
                         tasks.forEach { task ->
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Box(modifier = Modifier.size(18.dp).clip(RoundedCornerShape(3.dp)).background(palette.cell))
@@ -1097,7 +1114,7 @@ private fun DayHeader(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                selectedDate.format(dayHeaderFormatter).uppercase(Locale.US),
+                selectedDate.format(dayHeaderFormatter).uppercase(Locale.getDefault()),
                 color = palette.primaryText,
                 fontFamily = mono,
                 fontWeight = FontWeight.SemiBold,
@@ -1164,7 +1181,7 @@ private fun PunchCardStrip(
         }
         Spacer(modifier = Modifier.width(10.dp))
         Text(
-            text = if (streak > 0) "${streak}-day streak" else "Complete day",
+            text = if (streak > 0) pluralStringResource(R.plurals.punch_streak_days, streak, streak) else stringResource(R.string.calendar_complete_day),
             color = if (isPunched) palette.accent else palette.secondaryText,
             fontFamily = mono,
             fontSize = 12.sp,
@@ -1516,7 +1533,7 @@ private fun YearHeatmapBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("Heatmap", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(stringResource(R.string.calendar_heatmap), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 listOf(0, 1, 2, 3).forEach { intensity ->
                     Box(
@@ -1566,7 +1583,7 @@ private fun YearMonthCell(
             .padding(horizontal = 6.dp, vertical = 7.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(month.month.name.take(3), color = if (isCurrentMonth) palette.accent else palette.yearMonthLabel, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            Text(month.month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()), color = if (isCurrentMonth) palette.accent else palette.yearMonthLabel, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
             Text(month.monthValue.toString().padStart(2, '0'), color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp)
         }
         Spacer(modifier = Modifier.height(5.dp))
@@ -1734,6 +1751,6 @@ private fun weekDays(date: LocalDate, weekStart: DayOfWeek): List<LocalDate> {
 
 private fun weekDayLabels(weekStart: DayOfWeek): List<String> {
     return List(7) { index ->
-        weekStart.plus(index.toLong()).name.take(3)
+        weekStart.plus(index.toLong()).getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault())
     }
 }

@@ -20,6 +20,7 @@ import android.os.SystemClock
 import android.util.Size
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.annotation.StringRes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -194,6 +195,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.zIndex
 import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -206,6 +209,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.foundation.layout.ColumnScope
 import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.billing.ProManager
+import com.dotfield.dotcal.data.billing.ProPurchaseOffer
 import com.dotfield.dotcal.presentation.datecalculator.DateCalculatorViewModel
 import androidx.datastore.preferences.core.edit
 import androidx.core.content.ContextCompat
@@ -258,29 +262,45 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 
-private data class ProFeature(val name: String, val description: String)
+/**
+ * Paywall feature list. Same `@StringRes` + `@Composable` getter pattern as the converted enums:
+ * the list itself stays a plain top-level `val` (no Context at construction), and the text is only
+ * resolved when a composable reads [name] / [description].
+ */
+private data class ProFeature(
+    @StringRes val nameRes: Int,
+    @StringRes val descriptionRes: Int,
+) {
+    val name: String
+        @Composable get() = stringResource(nameRes)
+    val description: String
+        @Composable get() = stringResource(descriptionRes)
+}
 
 private val PRO_FEATURES = listOf(
-    ProFeature("Image Attachments", "Add up to 5 photos to any event"),
-    ProFeature("Voice Notes", "Record audio notes on your events"),
-    ProFeature("Large Widget", "Full month grid widget for your home screen"),
-    ProFeature("Widget Pack Config", "Transparent widgets plus DotCal dot texture"),
-    ProFeature("Date Calculator", "Calculate days between dates instantly"),
-    ProFeature("Custom Accent Colors", "Extra palettes plus any custom hex color"),
-    ProFeature("Advanced Recurrence", "Every N weeks, nth weekday, end date or count"),
-    ProFeature("App Lock & Private Vault", "PIN lock plus hidden events and tasks"),
-    ProFeature("Event & Task Templates", "Save presets and reuse them from the + button"),
-    ProFeature("Calendar Sets", "Save Work/Personal/Family visibility and switch instantly"),
-    ProFeature("Shift Patterns", "Build rotating shift cycles and generate them in bulk"),
-    ProFeature("Time Insights", "See hours, busiest days, and task completion"),
-    ProFeature("Dead Time Finder", "Find open blocks across the next seven days"),
-    ProFeature("Share Availability", "Turn free time into text you can paste anywhere"),
+    ProFeature(R.string.pro_feature_images, R.string.pro_feature_images_desc),
+    ProFeature(R.string.pro_feature_voice, R.string.pro_feature_voice_desc),
+    ProFeature(R.string.pro_feature_large_widget, R.string.pro_feature_large_widget_desc),
+    ProFeature(R.string.pro_feature_widget_pack, R.string.pro_feature_widget_pack_desc),
+    ProFeature(R.string.pro_feature_date_calc, R.string.pro_feature_date_calc_desc),
+    ProFeature(R.string.pro_feature_accents, R.string.pro_feature_accents_desc),
+    ProFeature(R.string.pro_feature_recurrence, R.string.pro_feature_recurrence_desc),
+    ProFeature(R.string.pro_feature_app_lock, R.string.pro_feature_app_lock_desc),
+    ProFeature(R.string.pro_feature_templates, R.string.pro_feature_templates_desc),
+    ProFeature(R.string.pro_feature_calendar_sets, R.string.pro_feature_calendar_sets_desc),
+    ProFeature(R.string.pro_feature_shift_patterns, R.string.pro_feature_shift_patterns_desc),
+    ProFeature(R.string.pro_feature_time_insights, R.string.pro_feature_time_insights_desc),
+    ProFeature(R.string.pro_feature_dead_time, R.string.pro_feature_dead_time_desc),
+    ProFeature(R.string.pro_feature_share_availability, R.string.pro_feature_share_availability_desc),
 )
 
-private enum class TimeInsightRange(val label: String) {
-    Week("This week"),
-    Month("This month"),
-    Custom("Custom"),
+private enum class TimeInsightRange(@StringRes val labelRes: Int) {
+    Week(R.string.insights_range_week),
+    Month(R.string.insights_range_month),
+    Custom(R.string.insights_range_custom);
+
+    val label: String
+        @Composable get() = stringResource(labelRes)
 }
 
 private data class CalendarHourStat(
@@ -302,7 +322,9 @@ private data class TimeInsightsStats(
     val weekdayHours: List<Double>,
 )
 
-private val timeInsightDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
+// timeInsightDateFormatter removed: a top-level val caches Locale.getDefault() at class-init
+// time and survives an in-app language change. compactDateFormatter is the same "MMM d"
+// pattern routed through localizedFormatter().
 
 @Composable
 internal fun PaywallScreen(
@@ -312,10 +334,12 @@ internal fun PaywallScreen(
 ) {
     val context = LocalContext.current
     val productDetails by viewModel.productDetails.collectAsStateWithLifecycle()
+    val purchaseOffers by viewModel.purchaseOffers.collectAsStateWithLifecycle()
     val billingState by viewModel.billingState.collectAsStateWithLifecycle()
     val purchaseResult by viewModel.purchaseResult.collectAsStateWithLifecycle()
     var purchasing by remember { mutableStateOf(false) }
     var showSuccess by remember { mutableStateOf(false) }
+    var selectedOfferToken by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(purchaseResult) {
         when (val result = purchaseResult) {
@@ -356,25 +380,30 @@ internal fun PaywallScreen(
                 modifier = Modifier.size(64.dp),
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Text("You're Pro!", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            Text(stringResource(R.string.paywall_youre_pro), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 24.sp)
         }
         return
     }
 
     val connected = billingState is ProManager.BillingConnectionState.Connected
-    val price = productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
+    LaunchedEffect(purchaseOffers) {
+        val currentStillEligible = purchaseOffers.any { it.offerToken == selectedOfferToken }
+        if (!currentStillEligible) selectedOfferToken = purchaseOffers.firstOrNull()?.offerToken
+    }
+    val selectedOffer = purchaseOffers.firstOrNull { it.offerToken == selectedOfferToken } ?: purchaseOffers.firstOrNull()
+    val price = selectedOffer?.formattedPrice ?: productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
     val priceLoaded = price != null
     val buyEnabled = connected && !purchasing
     val buyLabel = when {
-        !connected -> "Connecting..."
-        priceLoaded -> "Unlock Pro - $price"
-        else -> "Unlock Pro"
+        !connected -> stringResource(R.string.paywall_connecting)
+        price != null -> stringResource(R.string.paywall_unlock_pro_price, price)
+        else -> stringResource(R.string.paywall_unlock_pro)
     }
     val launchPurchase = {
         val activity = context.findActivity()
         if (activity != null) {
             purchasing = true
-            viewModel.purchasePro(activity)
+            viewModel.purchasePro(activity, selectedOffer?.offerToken)
         }
     }
 
@@ -388,7 +417,7 @@ internal fun PaywallScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
             Text(
-                "DotCal Pro",
+                stringResource(R.string.pro_product_name),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
@@ -424,7 +453,7 @@ internal fun PaywallScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        "Unlock the power tools",
+                        stringResource(R.string.paywall_headline),
                         color = palette.primaryText,
                         fontFamily = LocalHeadingFont.current,
                         fontWeight = FontWeight.Bold,
@@ -433,7 +462,7 @@ internal fun PaywallScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        "Quick capture, templates, calendar sets, widgets, privacy tools, and time insights in one lifetime upgrade.",
+                        stringResource(R.string.paywall_subhead),
                         color = palette.secondaryText,
                         fontFamily = mono,
                         fontSize = 13.sp,
@@ -451,9 +480,13 @@ internal fun PaywallScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Lifetime Pro", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(stringResource(R.string.paywall_lifetime_pro), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             Text(
-                                if (priceLoaded) "One-time purchase. No subscription." else "One-time purchase. Price shown by Play Store.",
+                                if (priceLoaded) {
+                                    stringResource(R.string.paywall_one_time_no_subscription)
+                                } else {
+                                    stringResource(R.string.paywall_one_time_price_from_play)
+                                },
                                 color = palette.secondaryText,
                                 fontFamily = mono,
                                 fontSize = 11.sp,
@@ -461,7 +494,7 @@ internal fun PaywallScreen(
                             )
                         }
                         Text(
-                            price ?: "Play Store",
+                            price ?: stringResource(R.string.paywall_play_store),
                             color = palette.accent,
                             fontFamily = LocalHeadingFont.current,
                             fontWeight = FontWeight.Bold,
@@ -472,8 +505,48 @@ internal fun PaywallScreen(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    PaywallMetricCard("Pay once", "Forever access", palette, Modifier.weight(1f))
-                    PaywallMetricCard("Offline-first", "No cloud account", palette, Modifier.weight(1f))
+                    PaywallMetricCard(
+                        stringResource(R.string.paywall_metric_pay_once),
+                        stringResource(R.string.paywall_metric_forever_access),
+                        palette,
+                        Modifier.weight(1f),
+                    )
+                    PaywallMetricCard(
+                        stringResource(R.string.paywall_metric_offline_first),
+                        stringResource(R.string.paywall_metric_no_cloud_account),
+                        palette,
+                        Modifier.weight(1f),
+                    )
+                }
+            }
+            if (purchaseOffers.isNotEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(palette.eventCardSurface)
+                            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(20.dp))
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.paywall_purchase_options),
+                            color = palette.primaryText,
+                            fontFamily = mono,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                        )
+                        purchaseOffers.forEachIndexed { index, offer ->
+                            PaywallOfferRow(
+                                offer = offer,
+                                index = index,
+                                selected = offer.offerToken == selectedOffer?.offerToken,
+                                palette = palette,
+                                onClick = { selectedOfferToken = offer.offerToken },
+                            )
+                        }
+                    }
                 }
             }
             item {
@@ -502,7 +575,11 @@ internal fun PaywallScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                if (priceLoaded) "One-time purchase. No subscription." else "Final price appears in Play Store checkout.",
+                if (priceLoaded) {
+                    stringResource(R.string.paywall_one_time_no_subscription)
+                } else {
+                    stringResource(R.string.paywall_final_price_at_checkout)
+                },
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 11.sp,
@@ -525,24 +602,64 @@ internal fun PaywallScreen(
                 }
             }
             Spacer(modifier = Modifier.height(6.dp))
+            // The two toast strings are hoisted out of the click lambda: it is not composable.
+            val restoredToast = stringResource(R.string.paywall_restore_success)
+            val noPurchaseToast = stringResource(R.string.paywall_restore_none_found)
             Text(
-                "Restore Purchase",
+                stringResource(R.string.paywall_restore_purchase),
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 12.sp,
                 modifier = Modifier
                     .noRippleClickable {
                         viewModel.restorePro { restored ->
-                            val message = if (restored) {
-                                "Purchase restored - enjoy DotCal Pro!"
-                            } else {
-                                "No previous purchase found on this account"
-                            }
-                            showDotCalToast(context, palette, message)
+                            showDotCalToast(
+                                context,
+                                palette,
+                                if (restored) restoredToast else noPurchaseToast,
+                            )
                         }
                     }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun PaywallOfferRow(
+    offer: ProPurchaseOffer,
+    index: Int,
+    selected: Boolean,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    val name = offer.offerId?.takeIf { it.isNotBlank() }
+        ?: offer.purchaseOptionId?.takeIf { it.isNotBlank() }
+        ?: stringResource(if (index == 0) R.string.paywall_base_offer else R.string.paywall_discount_offer)
+    val detail = when {
+        !offer.offerId.isNullOrBlank() -> stringResource(R.string.paywall_offer_id, offer.offerId)
+        !offer.purchaseOptionId.isNullOrBlank() -> stringResource(R.string.paywall_purchase_option_id, offer.purchaseOptionId)
+        else -> stringResource(R.string.paywall_play_billing_offer)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) palette.accent.copy(alpha = 0.12f) else palette.cell)
+            .border(1.dp, if (selected) palette.accent else palette.line, RoundedCornerShape(14.dp))
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(detail, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Text(offer.formattedPrice, color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        if (selected) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(Icons.Default.Check, contentDescription = null, tint = palette.accent, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -585,10 +702,23 @@ private fun PaywallFeatureRow(feature: ProFeature, palette: DotCalPalette) {
     }
 }
 
-private enum class SearchTypeFilter(val label: String) { All("All"), Events("Events"), Tasks("Tasks") }
+private enum class SearchTypeFilter(@StringRes val labelRes: Int) {
+    All(R.string.search_type_all),
+    Events(R.string.search_type_events),
+    Tasks(R.string.search_type_tasks);
 
-private enum class SearchDatePreset(val label: String) {
-    AnyTime("Any time"), Upcoming("Upcoming"), Past("Past"), ThisMonth("This month")
+    val label: String
+        @Composable get() = stringResource(labelRes)
+}
+
+private enum class SearchDatePreset(@StringRes val labelRes: Int) {
+    AnyTime(R.string.search_date_any_time),
+    Upcoming(R.string.search_date_upcoming),
+    Past(R.string.search_date_past),
+    ThisMonth(R.string.search_date_this_month);
+
+    val label: String
+        @Composable get() = stringResource(labelRes)
 }
 
 /**
@@ -652,7 +782,7 @@ internal fun SearchScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
             Text(
-                "Search",
+                stringResource(R.string.search_title),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
@@ -686,7 +816,7 @@ internal fun SearchScreen(
                         decorationBox = { inner ->
                             if (query.isEmpty()) {
                                 Text(
-                                    "Title, location, notes...",
+                                    stringResource(R.string.search_placeholder),
                                     color = palette.disabledText,
                                     fontFamily = mono,
                                     fontWeight = FontWeight.Bold,
@@ -711,7 +841,7 @@ internal fun SearchScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 SearchFilterDropdown(
-                    label = "Type",
+                    label = stringResource(R.string.search_facet_type),
                     value = typeFilter.label,
                     palette = palette,
                     modifier = Modifier.weight(1f),
@@ -729,7 +859,7 @@ internal fun SearchScreen(
                     }
                 }
                 SearchFilterDropdown(
-                    label = "Time",
+                    label = stringResource(R.string.search_facet_time),
                     value = datePreset.label,
                     palette = palette,
                     modifier = Modifier.weight(1f),
@@ -746,15 +876,16 @@ internal fun SearchScreen(
                         )
                     }
                 }
-                val calendarLabel = accounts.firstOrNull { it.id == accountId }?.displayName ?: "All calendars"
+                val allCalendarsLabel = stringResource(R.string.search_facet_all_calendars)
+                val calendarLabel = accounts.firstOrNull { it.id == accountId }?.displayName ?: allCalendarsLabel
                 SearchFilterDropdown(
-                    label = "Calendar",
+                    label = stringResource(R.string.search_facet_calendar),
                     value = calendarLabel,
                     palette = palette,
                     modifier = Modifier.weight(1f),
                 ) { close ->
                     SearchDropdownItem(
-                        label = "All calendars",
+                        label = allCalendarsLabel,
                         selected = accountId == null,
                         palette = palette,
                         onClick = {
@@ -780,8 +911,8 @@ internal fun SearchScreen(
         HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
 
         when {
-            trimmed.isEmpty() -> SearchHintBox("Search your events and tasks", palette)
-            filtered.isEmpty() -> SearchHintBox("No results for \"$trimmed\"", palette)
+            trimmed.isEmpty() -> SearchHintBox(stringResource(R.string.search_hint), palette)
+            filtered.isEmpty() -> SearchHintBox(stringResource(R.string.search_no_results, trimmed), palette)
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp),
@@ -914,7 +1045,7 @@ private fun SearchHintBox(message: String, palette: DotCalPalette) {
 @Composable
 private fun SearchTaskResultRow(task: CalendarEvent, palette: DotCalPalette, onClick: () -> Unit) {
     val whenLabel = Instant.ofEpochMilli(task.startTimeMs).atZone(ZoneId.systemDefault()).toLocalDate()
-        .format(DateTimeFormatter.ofPattern("EEE, dd MMM yyyy", Locale.US))
+        .format(detailDateFormatter)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -926,7 +1057,7 @@ private fun SearchTaskResultRow(task: CalendarEvent, palette: DotCalPalette, onC
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("TASK / $whenLabel", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 1)
+            Text(stringResource(R.string.search_task_when, whenLabel), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 1)
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 task.title,
@@ -971,7 +1102,7 @@ internal fun QuickAddScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
             Text(
-                "Quick Add",
+                stringResource(R.string.quick_add_title),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
@@ -988,7 +1119,7 @@ internal fun QuickAddScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp, vertical = 16.dp),
         ) {
-            CalcSectionLabel("Describe your event", palette)
+            CalcSectionLabel(stringResource(R.string.quick_add_describe_event), palette)
             Spacer(modifier = Modifier.height(10.dp))
             CalcFieldGroup(palette) {
                 BasicTextField(
@@ -1026,21 +1157,44 @@ internal fun QuickAddScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             if (parsed != null) {
-                CalcSectionLabel("Preview", palette)
+                CalcSectionLabel(stringResource(R.string.quick_add_preview), palette)
                 Spacer(modifier = Modifier.height(10.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    QuickAddPreviewChip("Title", parsed.title.ifBlank { "Untitled" }, palette, onClick = ::submit)
-                    QuickAddPreviewChip("Date", parsed.date.format(editorDateFormatter), palette, onClick = ::submit)
+                    val untitledLabel = stringResource(R.string.quick_add_untitled)
                     QuickAddPreviewChip(
-                        "Time",
-                        if (parsed.isAllDay || parsed.startTime == null) "All-day" else quickAddTimeLabel(parsed),
+                        stringResource(R.string.quick_add_chip_title),
+                        parsed.title.ifBlank { untitledLabel },
                         palette,
                         onClick = ::submit,
                     )
-                    QuickAddPreviewChip("Repeats", parsed.rrule?.let(::quickAddRepeatLabel) ?: "None", palette, onClick = ::submit)
+                    QuickAddPreviewChip(
+                        stringResource(R.string.quick_add_chip_date),
+                        parsed.date.format(editorDateFormatter),
+                        palette,
+                        onClick = ::submit,
+                    )
+                    QuickAddPreviewChip(
+                        stringResource(R.string.quick_add_chip_time),
+                        if (parsed.isAllDay || parsed.startTime == null) {
+                            stringResource(R.string.template_all_day)
+                        } else {
+                            quickAddTimeLabel(parsed)
+                        },
+                        palette,
+                        onClick = ::submit,
+                    )
+                    QuickAddPreviewChip(
+                        stringResource(R.string.quick_add_chip_repeats),
+                        // Not `::quickAddRepeatLabel` — Kotlin rejects function references to
+                        // @Composable lambdas.
+                        parsed.rrule?.let { quickAddRepeatLabel(it) }
+                            ?: stringResource(R.string.event_repeat_none),
+                        palette,
+                        onClick = ::submit,
+                    )
                 }
             } else {
-                CalcSectionLabel("Try one", palette)
+                CalcSectionLabel(stringResource(R.string.quick_add_try_one), palette)
                 Spacer(modifier = Modifier.height(10.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     examples.forEach { example ->
@@ -1077,7 +1231,7 @@ internal fun QuickAddScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "Continue",
+                    stringResource(R.string.quick_add_continue),
                     color = if (enabled) NWhite else palette.disabledText,
                     fontFamily = mono,
                     fontWeight = FontWeight.Bold,
@@ -1106,7 +1260,8 @@ private fun QuickAddPreviewChip(label: String, value: String, palette: DotCalPal
             .noRippleClickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp),
     ) {
-        Text(label.uppercase(Locale.US), color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, maxLines = 1)
+        // Callers pass already-uppercase resources; an uppercase() here breaks Turkish dotless i.
+        Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, maxLines = 1)
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             value,
@@ -1120,24 +1275,28 @@ private fun QuickAddPreviewChip(label: String, value: String, palette: DotCalPal
     }
 }
 
+@Composable
 private fun quickAddWhenLabel(result: QuickAddResult): String {
     val date = result.date.format(editorDateFormatter)
     val time = result.startTime
-    return if (result.isAllDay || time == null) {
-        "$date / All-day"
+    val value = if (result.isAllDay || time == null) {
+        stringResource(R.string.template_all_day)
     } else {
-        "$date / ${time.format(editorTimeFormatter)}"
+        time.format(editorTimeFormatter)
     }
+    return stringResource(R.string.settings_pair_value, date, value)
 }
 
+@Composable
 private fun quickAddTimeLabel(result: QuickAddResult): String {
-    val start = result.startTime?.format(editorTimeFormatter) ?: return "All-day"
+    val start = result.startTime?.format(editorTimeFormatter) ?: return stringResource(R.string.template_all_day)
     val end = result.endTime?.format(editorTimeFormatter)
     return if (end == null) start else "$start-${end}"
 }
 
+@Composable
 private fun quickAddRepeatLabel(rrule: String): String =
-    RecurrenceRule.parse(rrule)?.humanLabel() ?: "Custom"
+    recurrenceHumanLabel(rrule) ?: stringResource(R.string.quick_add_repeat_custom)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1154,12 +1313,12 @@ internal fun BulkTemplatePickerSheet(
         dragHandle = null,
     ) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 22.dp, vertical = 18.dp)) {
-            Text("Apply Template", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(stringResource(R.string.template_apply_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(6.dp))
-            Text("Choose an event template to stamp onto selected dates.", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            Text(stringResource(R.string.template_apply_subtitle), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(14.dp))
             if (templates.isEmpty()) {
-                Text("No event templates yet", color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), textAlign = TextAlign.Center)
+                Text(stringResource(R.string.template_no_event_templates), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), textAlign = TextAlign.Center)
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
@@ -1196,7 +1355,7 @@ internal fun TemplatesScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
             Text(
-                "Templates",
+                stringResource(R.string.templates_title),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
@@ -1211,10 +1370,10 @@ internal fun TemplatesScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("No templates yet", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text(stringResource(R.string.template_none_yet), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    "Open any event or task, then tap \"Save as template\" to reuse it any time.",
+                    stringResource(R.string.template_none_yet_blurb),
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 13.sp,
@@ -1242,8 +1401,8 @@ internal fun TemplatesScreen(
     }
     deleteTarget?.let { target ->
         ConfirmDeleteDialog(
-            title = "Delete template?",
-            confirmLabel = "Delete",
+            title = stringResource(R.string.template_delete_title),
+            confirmLabel = stringResource(R.string.action_delete),
             palette = palette,
             onDismiss = { deleteTarget = null },
             onConfirm = {
@@ -1293,19 +1452,31 @@ private fun TemplateCard(
     }
 }
 
+@Composable
 private fun templateSummaryLabel(t: EventTemplate): String {
-    val type = if (t.isTask) "Task" else "Event"
+    // Every fragment is hoisted into a val before the list is built: `mutableListOf`/`add` run in
+    // ordinary (non-composable) code, so a stringResource call cannot live inside them.
+    val type = if (t.isTask) {
+        stringResource(R.string.template_type_task)
+    } else {
+        stringResource(R.string.template_type_event)
+    }
+    val noTimeLabel = stringResource(R.string.template_no_time)
+    val allDayLabel = stringResource(R.string.template_all_day)
     val timeLabel = if (t.startMinuteOfDay == null) {
-        if (t.isTask) "No time" else "All-day"
+        if (t.isTask) noTimeLabel else allDayLabel
     } else {
         LocalTime.of(t.startMinuteOfDay / 60, t.startMinuteOfDay % 60).format(editorTimeFormatter)
     }
+    val repeatsFallback = stringResource(R.string.template_repeats)
+    val recurrenceLabel = t.rrule?.let { recurrenceHumanLabel(it) ?: repeatsFallback }
+    val separator = stringResource(R.string.template_summary_separator)
     val parts = mutableListOf(type, timeLabel)
     if (!t.isTask && t.startMinuteOfDay != null && t.durationMinutes > 0) {
         parts.add(formatDurationShort(t.durationMinutes))
     }
-    t.rrule?.let { parts.add(RecurrenceRule.parse(it)?.humanLabel() ?: "Repeats") }
-    return parts.joinToString(" / ")
+    recurrenceLabel?.let { parts.add(it) }
+    return parts.joinToString(separator)
 }
 
 private fun formatDurationShort(minutes: Int): String {
@@ -1336,7 +1507,7 @@ internal fun FocusProfilesScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
             Text(
-                "Calendar Sets",
+                stringResource(R.string.calendar_sets_title),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
@@ -1351,10 +1522,10 @@ internal fun FocusProfilesScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("No calendar sets yet", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text(stringResource(R.string.calendar_set_none_yet), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    "Show or hide calendars the way you want, then save that view as a set - Work, Personal, Family - and switch between them any time.",
+                    stringResource(R.string.calendar_set_none_yet_blurb),
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 13.sp,
@@ -1383,26 +1554,28 @@ internal fun FocusProfilesScreen(
         CalendarAddAccountRow(
             palette = palette,
             onClick = { showSaveDialog = true },
-            label = "Save Current as Set",
+            label = stringResource(R.string.calendar_set_save_current),
         )
         Spacer(modifier = Modifier.height(40.dp))
     }
     if (showSaveDialog) {
+        // Hoisted: the onConfirm lambda is not composable, so stringResource cannot be called inside it.
+        val fallbackSetName = stringResource(R.string.calendar_set_default_name)
         TemplateNameDialog(
-            title = "Save current calendars as a set",
+            title = stringResource(R.string.calendar_set_save_dialog_title),
             defaultName = "",
             palette = palette,
             onDismiss = { showSaveDialog = false },
             onConfirm = { name ->
-                onSaveCurrent(name.trim().ifBlank { "Set" })
+                onSaveCurrent(name.trim().ifBlank { fallbackSetName })
                 showSaveDialog = false
             },
         )
     }
     deleteTarget?.let { target ->
         ConfirmDeleteDialog(
-            title = "Delete calendar set?",
-            confirmLabel = "Delete",
+            title = stringResource(R.string.calendar_set_delete_title),
+            confirmLabel = stringResource(R.string.action_delete),
             palette = palette,
             onDismiss = { deleteTarget = null },
             onConfirm = {
@@ -1500,7 +1673,7 @@ internal fun TimeInsightsScreen(
             IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
-            Text("Time Insights", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center))
+            Text(stringResource(R.string.insights_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center))
             HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.align(Alignment.BottomCenter))
         }
         LazyColumn(
@@ -1524,8 +1697,8 @@ internal fun TimeInsightsScreen(
             if (range == TimeInsightRange.Custom) {
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                        TimeInsightDateRow("From", rangeStart, palette, Modifier.weight(1f)) { pickingStart = true }
-                        TimeInsightDateRow("To", rangeEnd, palette, Modifier.weight(1f)) { pickingEnd = true }
+                        TimeInsightDateRow(stringResource(R.string.event_from), rangeStart, palette, Modifier.weight(1f)) { pickingStart = true }
+                        TimeInsightDateRow(stringResource(R.string.event_to), rangeEnd, palette, Modifier.weight(1f)) { pickingEnd = true }
                     }
                 }
             }
@@ -1533,17 +1706,19 @@ internal fun TimeInsightsScreen(
                 Column(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(palette.eventCardSurface).border(1.dp, palette.eventCardBorder, RoundedCornerShape(24.dp)).padding(18.dp),
                 ) {
-                    Text("${rangeStart.format(timeInsightDateFormatter)} - ${rangeEnd.format(timeInsightDateFormatter)}", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                    Text("${rangeStart.format(compactDateFormatter)} - ${rangeEnd.format(compactDateFormatter)}", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
                     Spacer(Modifier.height(8.dp))
                     Text(formatInsightHours(stats.totalHours), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 34.sp)
-                    Text("scheduled hours", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                    Text(stringResource(R.string.insights_scheduled_hours), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
                 }
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    TimeInsightMetricCard("Events", stats.eventCount.toString(), palette, Modifier.weight(1f))
-                    TimeInsightMetricCard("Busiest", stats.busiestDay?.dayOfWeek?.name?.take(3) ?: "None", palette, Modifier.weight(1f), footer = if (stats.busiestDayHours > 0.0) formatInsightHours(stats.busiestDayHours) else "")
-                    TimeInsightMetricCard("Tasks", stats.taskCompletionRate?.let { "$it%" } ?: "None", palette, Modifier.weight(1f), footer = if (stats.totalTasks > 0) "${stats.completedTasks}/${stats.totalTasks}" else "")
+                    val noneLabel = stringResource(R.string.insights_metric_none)
+                    TimeInsightMetricCard(stringResource(R.string.insights_metric_events), stats.eventCount.toString(), palette, Modifier.weight(1f))
+                    // Was dayOfWeek.name.take(3) — the raw English enum constant. Same fix as pass 1.
+                    TimeInsightMetricCard(stringResource(R.string.insights_metric_busiest), stats.busiestDay?.dayOfWeek?.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()) ?: noneLabel, palette, Modifier.weight(1f), footer = if (stats.busiestDayHours > 0.0) formatInsightHours(stats.busiestDayHours) else "")
+                    TimeInsightMetricCard(stringResource(R.string.insights_metric_tasks), stats.taskCompletionRate?.let { "$it%" } ?: noneLabel, palette, Modifier.weight(1f), footer = if (stats.totalTasks > 0) "${stats.completedTasks}/${stats.totalTasks}" else "")
                 }
             }
             item {
@@ -1565,7 +1740,7 @@ internal fun TimeInsightsScreen(
                     ShiftEmptyText(deadTimeState.error, palette)
                 }
                 deadTimeState.slots.isEmpty() -> item {
-                    ShiftEmptyText("No open slots of 1 hour or longer.", palette)
+                    ShiftEmptyText(stringResource(R.string.insights_no_open_slots), palette)
                 }
                 else -> lazyItems(
                     items = deadTimeState.slots,
@@ -1575,13 +1750,13 @@ internal fun TimeInsightsScreen(
                 }
             }
             item {
-                SettingsSectionTitle("WEEKDAY LOAD", palette)
+                SettingsSectionTitle(stringResource(R.string.insights_section_weekday_load), palette)
                 WeekdayHoursChart(hours = stats.weekdayHours, palette = palette)
             }
             item {
-                SettingsSectionTitle("CALENDARS", palette)
+                SettingsSectionTitle(stringResource(R.string.insights_section_calendars), palette)
                 if (stats.accountHours.isEmpty()) {
-                    ShiftEmptyText("No scheduled timed events in this range.", palette)
+                    ShiftEmptyText(stringResource(R.string.insights_no_timed_events), palette)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         val maxHours = stats.accountHours.maxOfOrNull { it.hours }?.coerceAtLeast(0.1) ?: 0.1
@@ -1596,7 +1771,7 @@ internal fun TimeInsightsScreen(
 
     if (pickingStart) {
         DateTimeChoiceSheet(
-            title = "Start date",
+            title = stringResource(R.string.calc_start_date_row),
             selectedDate = customStart,
             selectedTime = LocalTime.NOON,
             minDate = null,
@@ -1611,7 +1786,7 @@ internal fun TimeInsightsScreen(
     }
     if (pickingEnd) {
         DateTimeChoiceSheet(
-            title = "End date",
+            title = stringResource(R.string.calc_end_date_row),
             selectedDate = customEnd,
             selectedTime = LocalTime.NOON,
             minDate = null,
@@ -1640,7 +1815,7 @@ private fun DeadTimeControls(
     val pendingStart = pendingBounds.start.roundToInt().coerceIn(0, 22)
     val pendingEnd = pendingBounds.endInclusive.roundToInt().coerceIn(pendingStart + 1, 23)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SettingsSectionTitle("DEAD TIME FINDER", palette)
+        SettingsSectionTitle(stringResource(R.string.insights_section_dead_time), palette)
         Column(
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
                 .background(palette.eventCardSurface)
@@ -1663,7 +1838,7 @@ private fun DeadTimeControls(
                     inactiveTrackColor = palette.line,
                 ),
             )
-            Text("Next 7 days · slots of 1 hour or longer", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+            Text(stringResource(R.string.availability_next_7_days), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
         }
     }
 }
@@ -1687,7 +1862,7 @@ private fun DeadTimeSlotRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "${slot.date.format(DateTimeFormatter.ofPattern("EEE, MMM d"))} · ${formatDeadTime(slot.start, use24HourFormat)}-${formatDeadTime(slot.end, use24HourFormat)}",
+                "${slot.date.format(localizedFormatter("EEE, MMM d"))} · ${formatDeadTime(slot.start, use24HourFormat)}-${formatDeadTime(slot.end, use24HourFormat)}",
                 color = palette.primaryText,
                 fontFamily = mono,
                 fontWeight = FontWeight.SemiBold,
@@ -1698,14 +1873,14 @@ private fun DeadTimeSlotRow(
             Text(formatDeadTimeDuration(minutes), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
         }
         TextButton(onClick = { onShareDay(slot.date) }) {
-            Text("Share availability", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+            Text(stringResource(R.string.availability_share), color = palette.accent, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
         }
         Icon(Icons.Default.ChevronRight, contentDescription = "Create event in this slot", tint = palette.secondaryText, modifier = Modifier.size(18.dp))
     }
 }
 
 private fun formatDeadTime(time: LocalTime, use24HourFormat: Boolean): String =
-    time.format(DateTimeFormatter.ofPattern(if (use24HourFormat) "HH:mm" else "h:mm a"))
+    time.format(localizedFormatter(if (use24HourFormat) "HH:mm" else "h:mm a"))
 
 private fun formatDeadTimeHour(hour: Int, use24HourFormat: Boolean): String =
     formatDeadTime(LocalTime.of(hour, 0), use24HourFormat)
@@ -1741,7 +1916,7 @@ private fun TimeInsightDateRow(label: String, date: LocalDate, palette: DotCalPa
     ) {
         Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
         Spacer(Modifier.height(4.dp))
-        Text(date.format(timeInsightDateFormatter), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Text(date.format(compactDateFormatter), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
     }
 }
 
@@ -1894,7 +2069,7 @@ internal fun ShiftPatternsScreen(
             IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
-            Text("Shift Patterns", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center))
+            Text(stringResource(R.string.shift_patterns_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center))
             HorizontalDivider(color = palette.line.copy(alpha = 0.55f), thickness = 1.dp, modifier = Modifier.align(Alignment.BottomCenter))
         }
         LazyColumn(
@@ -1903,9 +2078,9 @@ internal fun ShiftPatternsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                SettingsSectionTitle("SHIFT TYPES", palette)
+                SettingsSectionTitle(stringResource(R.string.shift_section_types), palette)
                 if (shiftTypes.isEmpty()) {
-                    ShiftEmptyText("Create Day, Night, and Off presets first.", palette)
+                    ShiftEmptyText(stringResource(R.string.shift_types_empty), palette)
                 }
             }
             lazyItems(shiftTypes, key = { it.id }) { type ->
@@ -1917,11 +2092,11 @@ internal fun ShiftPatternsScreen(
                 )
             }
             item {
-                CalendarAddAccountRow(palette = palette, onClick = { showTypeEditor = true }, label = "Add Shift Type")
+                CalendarAddAccountRow(palette = palette, onClick = { showTypeEditor = true }, label = stringResource(R.string.shift_add_type))
                 Spacer(modifier = Modifier.height(10.dp))
-                SettingsSectionTitle("PATTERNS", palette)
+                SettingsSectionTitle(stringResource(R.string.shift_section_patterns), palette)
                 if (patterns.isEmpty()) {
-                    ShiftEmptyText("Build a cycle like Day, Day, Night, Night, Off x4.", palette)
+                    ShiftEmptyText(stringResource(R.string.shift_patterns_empty), palette)
                 }
             }
             lazyItems(patterns, key = { it.id }) { pattern ->
@@ -1937,7 +2112,7 @@ internal fun ShiftPatternsScreen(
                 CalendarAddAccountRow(
                     palette = palette,
                     onClick = { showPatternEditor = true },
-                    label = "Build Pattern",
+                    label = stringResource(R.string.shift_build_pattern_row),
                 )
                 Spacer(modifier = Modifier.height(32.dp))
             }
@@ -1990,8 +2165,8 @@ internal fun ShiftPatternsScreen(
     }
     deletePattern?.let { pattern ->
         ConfirmDeleteDialog(
-            title = "Delete shift pattern?",
-            confirmLabel = "Delete",
+            title = stringResource(R.string.shift_pattern_delete_title),
+            confirmLabel = stringResource(R.string.action_delete),
             palette = palette,
             onDismiss = { deletePattern = null },
             onConfirm = {
@@ -2072,14 +2247,14 @@ private fun ShiftTypeEditorDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
-        title = { Text(if (existing == null) "Shift type" else "Edit shift type", color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
+        title = { Text(stringResource(if (existing == null) R.string.shift_type_title else R.string.shift_type_edit_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
-                SettingsToggleRow(title = "Off day", checked = isOff, palette = palette, onCheckedChange = { isOff = it })
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.shift_field_name)) }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                SettingsToggleRow(title = stringResource(R.string.shift_off_day), checked = isOff, palette = palette, onCheckedChange = { isOff = it })
                 if (!isOff) {
-                    OutlinedTextField(value = startHour, onValueChange = { startHour = it.filter(Char::isDigit).take(2) }, label = { Text("Start hour") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
-                    OutlinedTextField(value = durationHours, onValueChange = { durationHours = it.filter(Char::isDigit).take(2) }, label = { Text("Duration hours") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                    OutlinedTextField(value = startHour, onValueChange = { startHour = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.shift_field_start_hour)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                    OutlinedTextField(value = durationHours, onValueChange = { durationHours = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.shift_field_duration_hours)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
                     ShiftColorRow(colorHex = color, palette = palette, onClick = { showColorPicker = true })
                 }
             }
@@ -2103,15 +2278,15 @@ private fun ShiftTypeEditorDialog(
                         ),
                     )
                 },
-            ) { Text("Save", color = if (name.isNotBlank()) palette.accent else palette.disabledText) }
+            ) { Text(stringResource(R.string.action_save), color = if (name.isNotBlank()) palette.accent else palette.disabledText) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = palette.primaryText) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = palette.primaryText) } },
     )
     if (showColorPicker) {
         CustomAccentPickerDialog(
             initial = Color(parseColor(color)),
             palette = palette,
-            title = "Shift Color",
+            title = stringResource(R.string.shift_color_title),
             onDismiss = { showColorPicker = false },
             onConfirm = {
                 color = it
@@ -2128,18 +2303,20 @@ private fun ShiftPatternEditorDialog(
     onDismiss: () -> Unit,
     onSave: (ShiftPattern) -> Unit,
 ) {
-    var name by remember { mutableStateOf("4 on 4 off") }
+    // Hoisted: the remember {} lambda is not composable.
+    val defaultPatternName = stringResource(R.string.shift_pattern_default_name)
+    var name by remember { mutableStateOf(defaultPatternName) }
     var cycle by remember { mutableStateOf<List<String>>(emptyList()) }
     var startDate by remember { mutableStateOf(LocalDate.now()) }
     var showStartDatePicker by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
-        title = { Text("Build pattern", color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
+        title = { Text(stringResource(R.string.shift_build_pattern_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
-                ShiftDateRow(label = "Start date", date = startDate, palette = palette, onClick = { showStartDatePicker = true })
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.shift_field_name)) }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                ShiftDateRow(label = stringResource(R.string.calc_start_date_row), date = startDate, palette = palette, onClick = { showStartDatePicker = true })
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     lazyItems(shiftTypes, key = { it.id }) { type ->
                         ShiftChip(type.name, palette, onClick = { cycle = cycle + type.id })
@@ -2147,7 +2324,7 @@ private fun ShiftPatternEditorDialog(
                 }
                 Text(shiftCycleLabel(cycle, shiftTypes.associateBy { it.id }), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, lineHeight = 17.sp)
                 if (cycle.isNotEmpty()) {
-                    TextButton(onClick = { cycle = cycle.dropLast(1) }) { Text("Remove Last", color = palette.accent, fontFamily = mono) }
+                    TextButton(onClick = { cycle = cycle.dropLast(1) }) { Text(stringResource(R.string.shift_remove_last), color = palette.accent, fontFamily = mono) }
                 }
             }
         },
@@ -2165,13 +2342,13 @@ private fun ShiftPatternEditorDialog(
                         ),
                     )
                 },
-            ) { Text("Save", color = palette.accent) }
+            ) { Text(stringResource(R.string.action_save), color = palette.accent) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = palette.primaryText) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = palette.primaryText) } },
     )
     if (showStartDatePicker) {
         DateTimeChoiceSheet(
-            title = "Pattern start",
+            title = stringResource(R.string.shift_pattern_start),
             selectedDate = startDate,
             selectedTime = LocalTime.NOON,
             minDate = null,
@@ -2201,13 +2378,13 @@ private fun ShiftGenerateDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
-        title = { Text("Generate shifts", color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
+        title = { Text(stringResource(R.string.shift_generate_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(pattern.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold)
-                ShiftDateRow(label = "Generate from", date = startDate, palette = palette, onClick = { showStartDatePicker = true })
-                OutlinedTextField(value = months, onValueChange = { months = it.filter(Char::isDigit).take(2) }, label = { Text("Months ahead") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
-                Text("Calendar", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                ShiftDateRow(label = stringResource(R.string.shift_generate_from), date = startDate, palette = palette, onClick = { showStartDatePicker = true })
+                OutlinedTextField(value = months, onValueChange = { months = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.shift_months_ahead)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                Text(stringResource(R.string.shift_calendar), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     lazyItems(accounts, key = { it.id }) { account ->
                         ShiftChip(account.displayName.readableCalendarLabel(), palette, selected = account.id == accountId, onClick = { accountId = account.id })
@@ -2217,14 +2394,14 @@ private fun ShiftGenerateDialog(
         },
         confirmButton = {
             TextButton(onClick = { onGenerate(startDate, months.toIntOrNull()?.coerceIn(1, 24) ?: 6, accountId) }) {
-                Text("Generate", color = palette.accent)
+                Text(stringResource(R.string.shift_generate_confirm), color = palette.accent)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = palette.primaryText) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = palette.primaryText) } },
     )
     if (showStartDatePicker) {
         DateTimeChoiceSheet(
-            title = "Generate from",
+            title = stringResource(R.string.shift_generate_from),
             selectedDate = startDate,
             selectedTime = LocalTime.NOON,
             minDate = null,
@@ -2274,7 +2451,7 @@ private fun ShiftColorRow(colorHex: String, palette: DotCalPalette, onClick: () 
         Box(Modifier.size(28.dp).clip(CircleShape).background(swatchColor))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text("Color", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            Text(stringResource(R.string.shift_color_label), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
             Spacer(Modifier.height(2.dp))
             Text(colorHex.uppercase(Locale.US), color = palette.primaryText, fontFamily = mono, fontSize = 15.sp)
         }
@@ -2293,18 +2470,30 @@ private fun ShiftChip(label: String, palette: DotCalPalette, selected: Boolean =
     )
 }
 
+@Composable
 private fun shiftTypeSummary(type: ShiftType): String {
-    if (!type.generatesEvent) return "Off"
-    val start = type.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60).format(editorTimeFormatter) } ?: "All-day"
-    val duration = type.durationMinutes?.let { formatDurationShort(it) } ?: "All-day"
-    return "$start - $duration"
+    if (!type.generatesEvent) return stringResource(R.string.shift_summary_off)
+    val allDay = stringResource(R.string.shift_summary_all_day)
+    val start = type.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60).format(editorTimeFormatter) } ?: allDay
+    val duration = type.durationMinutes?.let { formatDurationShort(it) } ?: allDay
+    return stringResource(R.string.shift_summary_range, start, duration)
 }
 
+@Composable
 private fun shiftPatternSummary(pattern: ShiftPattern, types: Map<String, ShiftType>): String =
-    "${pattern.cycleShiftTypeIds.size}-day cycle: " + shiftCycleLabel(pattern.cycleShiftTypeIds, types)
+    stringResource(
+        R.string.shift_pattern_summary,
+        pluralStringResource(R.plurals.shift_day_cycle, pattern.cycleShiftTypeIds.size, pattern.cycleShiftTypeIds.size),
+        shiftCycleLabel(pattern.cycleShiftTypeIds, types),
+    )
 
-private fun shiftCycleLabel(ids: List<String>, types: Map<String, ShiftType>): String =
-    ids.map { types[it]?.name ?: "Missing" }.joinToString(", ").ifBlank { "No shifts selected" }
+@Composable
+private fun shiftCycleLabel(ids: List<String>, types: Map<String, ShiftType>): String {
+    // Hoisted: joinToString / map / ifBlank lambdas are not composable.
+    val missing = stringResource(R.string.shift_type_missing)
+    val none = stringResource(R.string.shift_no_shifts_selected)
+    return ids.map { types[it]?.name ?: missing }.joinToString(", ").ifBlank { none }
+}
 
 @Composable
 internal fun RecentlyDeletedScreen(
@@ -2326,7 +2515,7 @@ internal fun RecentlyDeletedScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
             Text(
-                "Recently Deleted",
+                stringResource(R.string.trash_title),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
@@ -2335,7 +2524,7 @@ internal fun RecentlyDeletedScreen(
             )
             if (items.isNotEmpty()) {
                 Text(
-                    "Empty",
+                    stringResource(R.string.trash_empty_action),
                     color = palette.accent,
                     fontFamily = mono,
                     fontSize = 14.sp,
@@ -2354,14 +2543,14 @@ internal fun RecentlyDeletedScreen(
             Box(modifier = Modifier.fillMaxSize().padding(horizontal = 40.dp), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "Nothing here",
+                        stringResource(R.string.trash_nothing_here),
                         color = palette.secondaryText,
                         fontFamily = LocalHeadingFont.current,
                         fontSize = 16.sp,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Deleted events and tasks show up here for 30 days, so you can bring them back.",
+                        stringResource(R.string.trash_nothing_here_blurb),
                         color = palette.dimText,
                         fontFamily = mono,
                         fontSize = 13.sp,
@@ -2376,7 +2565,7 @@ internal fun RecentlyDeletedScreen(
             ) {
                 item {
                     Text(
-                        "Swipe left to restore or delete. Kept for 30 days.",
+                        stringResource(R.string.trash_swipe_hint),
                         color = palette.dimText,
                         fontFamily = mono,
                         fontSize = 12.sp,
@@ -2405,8 +2594,8 @@ internal fun RecentlyDeletedScreen(
 
     purgeTarget?.let { snap ->
         ConfirmDeleteDialog(
-            title = "Delete permanently?",
-            confirmLabel = "Delete",
+            title = stringResource(R.string.trash_delete_permanently_title),
+            confirmLabel = stringResource(R.string.action_delete),
             palette = palette,
             onDismiss = { purgeTarget = null },
             onConfirm = {
@@ -2417,8 +2606,8 @@ internal fun RecentlyDeletedScreen(
     }
     if (confirmEmpty) {
         ConfirmDeleteDialog(
-            title = "Empty Recently Deleted?",
-            confirmLabel = "Empty",
+            title = stringResource(R.string.trash_empty_confirm_title),
+            confirmLabel = stringResource(R.string.trash_empty_action),
             palette = palette,
             onDismiss = { confirmEmpty = false },
             onConfirm = {
@@ -2441,6 +2630,8 @@ private fun SwipeableDeletedRow(
     onDelete: () -> Unit,
 ) {
     val event = snapshot.event
+    // Hoisted: the ifBlank {} lambda below is not composable.
+    val noTitleLabel = stringResource(R.string.vault_no_title)
     val density = LocalDensity.current
     val actionButtonWidth = 92.dp
     val revealPx = with(density) { (actionButtonWidth * 2).toPx() }
@@ -2468,7 +2659,7 @@ private fun SwipeableDeletedRow(
                     .clickable { onRestore() },
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Restore", color = palette.background, fontFamily = mono, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.action_restore), color = palette.background, fontFamily = mono, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             }
             Box(
                 modifier = Modifier
@@ -2478,7 +2669,7 @@ private fun SwipeableDeletedRow(
                     .clickable { onDelete() },
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Delete", color = Color.White, fontFamily = mono, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.action_delete), color = Color.White, fontFamily = mono, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             }
         }
         // Foreground content - drag left to reveal actions, tap to close when open.
@@ -2504,7 +2695,7 @@ private fun SwipeableDeletedRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = event.title.ifBlank { "(No title)" },
+                    text = event.title.ifBlank { noTitleLabel },
                     color = palette.primaryText,
                     fontFamily = mono,
                     fontSize = 16.sp,
@@ -2514,7 +2705,7 @@ private fun SwipeableDeletedRow(
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = "${deletedWhenLabel(event)} / deleted ${deletedAgoLabel(snapshot.deletedAtMs, nowMs)}",
+                    text = stringResource(R.string.trash_deleted_when, deletedWhenLabel(event), deletedAgoLabel(snapshot.deletedAtMs, nowMs)),
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 12.sp,
@@ -2527,30 +2718,33 @@ private fun SwipeableDeletedRow(
 }
 
 /** Human-readable "when" line for a deleted event or task snapshot. */
+@Composable
 private fun deletedWhenLabel(event: CalendarEvent): String {
-    val prefix = if (event.isTask == 1) "Task" else "Event"
+    val prefix = stringResource(if (event.isTask == 1) R.string.vault_type_task else R.string.vault_type_event)
     // Tasks with no due date store startTimeMs = 0.
-    if (event.isTask == 1 && event.startTimeMs <= 0L) return "$prefix / No due date"
+    if (event.isTask == 1 && event.startTimeMs <= 0L) {
+        return stringResource(R.string.settings_pair_value, prefix, stringResource(R.string.trash_no_due_date))
+    }
     val zone = runCatching { java.time.ZoneId.of(event.timeZone) }.getOrDefault(java.time.ZoneId.systemDefault())
     val start = java.time.Instant.ofEpochMilli(event.startTimeMs).atZone(zone)
-    val dateFmt = java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault())
-    val timeFmt = java.time.format.DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
-    val date = start.format(dateFmt)
-    return if (event.isAllDay == 1) "$prefix / $date" else "$prefix / $date, ${start.format(timeFmt)}"
+    val date = start.format(localizedFormatter("MMM d, yyyy"))
+    val value = if (event.isAllDay == 1) date else "$date, ${start.format(localizedFormatter("h:mm a"))}"
+    return stringResource(R.string.settings_pair_value, prefix, value)
 }
 
 /** Relative "deleted X ago" phrasing from a deletion timestamp. */
+@Composable
 private fun deletedAgoLabel(deletedAtMs: Long, nowMs: Long): String {
     val diff = (nowMs - deletedAtMs).coerceAtLeast(0L)
     val minutes = diff / 60_000L
     val hours = diff / 3_600_000L
     val days = diff / 86_400_000L
     return when {
-        minutes < 1 -> "just now"
-        minutes < 60 -> "${minutes}m ago"
-        hours < 24 -> "${hours}h ago"
-        days < 30 -> "${days}d ago"
-        else -> "30d ago"
+        minutes < 1 -> stringResource(R.string.trash_just_now)
+        minutes < 60 -> pluralStringResource(R.plurals.trash_minutes_ago, minutes.toInt(), minutes.toInt())
+        hours < 24 -> pluralStringResource(R.plurals.trash_hours_ago, hours.toInt(), hours.toInt())
+        days < 30 -> pluralStringResource(R.plurals.trash_days_ago, days.toInt(), days.toInt())
+        else -> pluralStringResource(R.plurals.trash_days_ago, 30, 30)
     }
 }
 
@@ -2577,7 +2771,7 @@ internal fun DateCalculatorScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
             Text(
-                "Date Calculator",
+                stringResource(R.string.calc_title),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
@@ -2595,7 +2789,7 @@ internal fun DateCalculatorScreen(
         ) {
             // ? Mode segmented control.
             TwoOptionSegmentedControl(
-                options = listOf("Days Between", "Add / Subtract"),
+                options = listOf(stringResource(R.string.calc_mode_days_between), stringResource(R.string.calc_mode_add_subtract)),
                 selectedIndex = if (mode == DateCalculatorViewModel.Mode.DAYS_BETWEEN) 0 else 1,
                 palette = palette,
                 onSelected = {
@@ -2607,45 +2801,45 @@ internal fun DateCalculatorScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             if (mode == DateCalculatorViewModel.Mode.DAYS_BETWEEN) {
-                CalcSectionLabel("Date range", palette)
+                CalcSectionLabel(stringResource(R.string.calc_date_range), palette)
                 Spacer(modifier = Modifier.height(10.dp))
                 CalcFieldGroup(palette) {
-                    CalcDateRow("From", fromDate, palette) { picker = CalcDateField.From }
+                    CalcDateRow(stringResource(R.string.event_from), fromDate, palette) { picker = CalcDateField.From }
                     HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
-                    CalcDateRow("To", toDate, palette) { picker = CalcDateField.To }
+                    CalcDateRow(stringResource(R.string.event_to), toDate, palette) { picker = CalcDateField.To }
                 }
                 Spacer(modifier = Modifier.height(24.dp))
                 (result as? DateCalculatorViewModel.CalculatorResult.DaysBetween)?.let { r ->
-                    CalcSectionLabel("Result", palette)
+                    CalcSectionLabel(stringResource(R.string.calc_result), palette)
                     Spacer(modifier = Modifier.height(10.dp))
                     CalcResultCard(palette) {
-                        CalcResultHero("${r.totalDays}", if (r.totalDays == 1) "day total" else "days total", palette)
+                        CalcResultHero("${r.totalDays}", pluralStringResource(R.plurals.calc_days_total, r.totalDays), palette)
                         Spacer(modifier = Modifier.height(16.dp))
                         HorizontalDivider(color = palette.eventCardBorder, thickness = 1.dp)
                         Spacer(modifier = Modifier.height(12.dp))
-                        CalcResultLine("Working days (Mon-Fri)", "${r.workingDays}", palette)
-                        CalcResultLine("Weekends", "${r.weekends}", palette)
+                        CalcResultLine(stringResource(R.string.calc_working_days), "${r.workingDays}", palette)
+                        CalcResultLine(stringResource(R.string.calc_weekends), "${r.weekends}", palette)
                     }
                 }
             } else {
-                CalcSectionLabel("Start date", palette)
+                CalcSectionLabel(stringResource(R.string.calc_start_date), palette)
                 Spacer(modifier = Modifier.height(10.dp))
                 CalcFieldGroup(palette) {
-                    CalcDateRow("Start date", startDate, palette) { picker = CalcDateField.Start }
+                    CalcDateRow(stringResource(R.string.calc_start_date_row), startDate, palette) { picker = CalcDateField.Start }
                 }
                 Spacer(modifier = Modifier.height(24.dp))
 
-                CalcSectionLabel("Operation", palette)
+                CalcSectionLabel(stringResource(R.string.calc_operation), palette)
                 Spacer(modifier = Modifier.height(10.dp))
                 TwoOptionSegmentedControl(
-                    options = listOf("Add", "Subtract"),
+                    options = listOf(stringResource(R.string.calc_add), stringResource(R.string.calc_subtract)),
                     selectedIndex = if (isSubtract) 1 else 0,
                     palette = palette,
                     onSelected = { calcViewModel.setSubtract(it == 1) },
                 )
                 Spacer(modifier = Modifier.height(24.dp))
 
-                CalcSectionLabel("Number of days", palette)
+                CalcSectionLabel(stringResource(R.string.calc_number_of_days), palette)
                 Spacer(modifier = Modifier.height(10.dp))
                 CalcDaysStepper(
                     days = daysCount,
@@ -2655,11 +2849,17 @@ internal fun DateCalculatorScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 (result as? DateCalculatorViewModel.CalculatorResult.AddSubtractResult)?.let { r ->
-                    CalcSectionLabel("Result", palette)
+                    CalcSectionLabel(stringResource(R.string.calc_result), palette)
                     Spacer(modifier = Modifier.height(10.dp))
                     CalcResultCard(palette) {
                         Text(
-                            "$daysCount ${if (daysCount == 1) "day" else "days"} ${if (isSubtract) "before" else "after"} start date",
+                            // Whole sentence per plural so translators control word order,
+                            // rather than concatenating "N days" + "before"/"after" in Kotlin.
+                            pluralStringResource(
+                                if (isSubtract) R.plurals.calc_days_before_start else R.plurals.calc_days_after_start,
+                                daysCount,
+                                daysCount,
+                            ),
                             color = palette.secondaryText,
                             fontFamily = mono,
                             fontSize = 13.sp,
@@ -2686,9 +2886,9 @@ internal fun DateCalculatorScreen(
         } ?: LocalDate.now()
         DateTimeChoiceSheet(
             title = when (field) {
-                CalcDateField.From -> "From"
-                CalcDateField.To -> "To"
-                CalcDateField.Start -> "Start date"
+                CalcDateField.From -> stringResource(R.string.event_from)
+                CalcDateField.To -> stringResource(R.string.event_to)
+                CalcDateField.Start -> stringResource(R.string.calc_start_date_row)
             },
             selectedDate = current,
             selectedTime = LocalTime.of(9, 0),
@@ -2712,7 +2912,7 @@ private enum class CalcDateField { From, To, Start }
 
 @Composable
 private fun CalcDateRow(label: String, date: LocalDate?, palette: DotCalPalette, onClick: () -> Unit) {
-    val formatter = remember { java.time.format.DateTimeFormatter.ofPattern("EEE, dd MMM yyyy", java.util.Locale.getDefault()) }
+    val formatter = detailDateFormatter
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2723,7 +2923,9 @@ private fun CalcDateRow(label: String, date: LocalDate?, palette: DotCalPalette,
     ) {
         Text(label, color = palette.primaryText, fontFamily = mono, fontSize = 16.sp)
         Text(
-            date?.format(formatter)?.uppercase(java.util.Locale.getDefault()) ?: "Select",
+            // The old uppercase(Locale.getDefault()) is gone: locale-hostile (Turkish dotless i)
+            // and the formatter already yields the locale's own casing.
+            date?.format(formatter) ?: stringResource(R.string.calc_select_date),
             color = if (date != null) palette.accent else palette.secondaryText,
             fontFamily = mono,
             fontSize = 14.sp,
@@ -2759,7 +2961,9 @@ private fun CalcResultLine(label: String, value: String, palette: DotCalPalette)
 @Composable
 private fun CalcSectionLabel(text: String, palette: DotCalPalette) {
     Text(
-        text.uppercase(java.util.Locale.getDefault()),
+        // Callers pass an already-uppercase resource: an uppercase() here would break Turkish
+        // dotless i. Same rule as recurrenceDetailLabel — write the resource in its display case.
+        text,
         color = palette.secondaryText,
         fontFamily = mono,
         fontWeight = FontWeight.SemiBold,
@@ -2922,4 +3126,3 @@ internal fun TwoOptionSegmentedControl(
         }
     }
 }
-

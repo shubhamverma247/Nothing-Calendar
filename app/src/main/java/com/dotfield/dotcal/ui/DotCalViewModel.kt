@@ -140,6 +140,7 @@ class DotCalViewModel(
     val lastSelectedEventAccountId: StateFlow<String?> = _lastSelectedEventAccountId
 
     private var conflictWarningJob: Job? = null
+    private var conflictWarningSessionKey: String? = null
     private val _conflictWarnings = MutableStateFlow<List<CalendarEvent>>(emptyList())
     val conflictWarnings: StateFlow<List<CalendarEvent>> = _conflictWarnings
 
@@ -173,11 +174,12 @@ class DotCalViewModel(
 
     // ----- Pro / Billing -----
     val productDetails = proManager.productDetails
+    val purchaseOffers = proManager.purchaseOffers
     val purchaseResult = proManager.purchaseResultFlow
 
-    fun purchasePro(activity: android.app.Activity) {
+    fun purchasePro(activity: android.app.Activity, selectedOfferToken: String? = null) {
         viewModelScope.launch {
-            val result = proManager.launchPurchaseFlow(activity)
+            val result = proManager.launchPurchaseFlow(activity, selectedOfferToken)
             // Pre-flight failures surface immediately; the real purchase outcome
             // (Success/Cancelled) arrives later through purchaseResult.
             if (result is ProManager.PurchaseResult.Error) {
@@ -251,6 +253,7 @@ class DotCalViewModel(
     }
 
     fun refreshConflictWarnings(
+        sessionKey: String,
         existing: CalendarEvent?,
         startDate: LocalDate,
         endDate: LocalDate,
@@ -259,9 +262,21 @@ class DotCalViewModel(
         isAllDay: Boolean,
     ) {
         conflictWarningJob?.cancel()
+        // `conflictWarnings` is shared ViewModel state, so an opening editor would otherwise render
+        // the *previous* session's hits, hold them through the debounce below, then swap them out —
+        // which read as a half-drawn warning flashing at the bottom of the screen and vanishing.
+        // Only a new editor session clears: within one session the last result is held across the
+        // debounce window, so nudging the start/end time of an event that really does overlap never
+        // blinks its warning out and back.
+        val isNewSession = sessionKey != conflictWarningSessionKey
+        conflictWarningSessionKey = sessionKey
         if (isAllDay || !endDate.atTime(endTime).isAfter(startDate.atTime(startTime))) {
+            // No lookup follows this branch, so nothing downstream would replace a stale list.
             _conflictWarnings.value = emptyList()
             return
+        }
+        if (isNewSession) {
+            _conflictWarnings.value = emptyList()
         }
         conflictWarningJob = viewModelScope.launch {
             delay(300)
@@ -277,6 +292,7 @@ class DotCalViewModel(
 
     fun clearConflictWarnings() {
         conflictWarningJob?.cancel()
+        conflictWarningSessionKey = null
         _conflictWarnings.value = emptyList()
     }
 

@@ -2,6 +2,7 @@
 
 import android.app.Activity
 import android.os.Build
+import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -64,6 +65,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -71,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import com.dotfield.dotcal.R
 import com.dotfield.dotcal.ui.theme.NWhite
 
 @Composable
@@ -262,8 +265,8 @@ internal fun CalendarActionBar(
                     ) {
                         if (onSearch != null) {
                             ActionBarMenuItem(
-                                label = "Search",
-                                subtitle = "Find events and tasks",
+                                label = stringResource(R.string.menu_search),
+                                subtitle = stringResource(R.string.menu_search_subtitle),
                                 icon = Icons.Default.Search,
                                 palette = palette,
                                 onClick = {
@@ -273,8 +276,8 @@ internal fun CalendarActionBar(
                             )
                         }
                         ActionBarMenuItem(
-                            label = "New Event",
-                            subtitle = "Create an event quickly",
+                            label = stringResource(R.string.menu_new_event),
+                            subtitle = stringResource(R.string.menu_new_event_subtitle),
                             icon = Icons.Default.Add,
                             palette = palette,
                             onClick = {
@@ -284,8 +287,8 @@ internal fun CalendarActionBar(
                         )
                         if (onJumpToDate != null) {
                             ActionBarMenuItem(
-                                label = "Go to date",
-                                subtitle = "Jump without changing views",
+                                label = stringResource(R.string.menu_go_to_date),
+                                subtitle = stringResource(R.string.menu_go_to_date_subtitle),
                                 icon = Icons.Default.CalendarMonth,
                                 palette = palette,
                                 onClick = {
@@ -296,8 +299,8 @@ internal fun CalendarActionBar(
                         }
                         if (onQuickAdd != null) {
                             ActionBarMenuItem(
-                                label = "Quick Add",
-                                subtitle = "Type it, we schedule it",
+                                label = stringResource(R.string.menu_quick_add),
+                                subtitle = stringResource(R.string.menu_quick_add_subtitle),
                                 icon = Icons.Default.AutoAwesome,
                                 palette = palette,
                                 onClick = {
@@ -308,8 +311,8 @@ internal fun CalendarActionBar(
                         }
                         if (onAvailability != null) {
                             ActionBarMenuItem(
-                                label = "Share availability",
-                                subtitle = "Copy when you're free",
+                                label = stringResource(R.string.menu_share_availability),
+                                subtitle = stringResource(R.string.menu_share_availability_subtitle),
                                 icon = Icons.Default.Share,
                                 isPro = showProBadges,
                                 palette = palette,
@@ -321,8 +324,8 @@ internal fun CalendarActionBar(
                         }
                         if (onTemplates != null) {
                             ActionBarMenuItem(
-                                label = "Templates",
-                                subtitle = "Reuse saved events & tasks",
+                                label = stringResource(R.string.menu_templates),
+                                subtitle = stringResource(R.string.menu_templates_subtitle),
                                 icon = Icons.Default.Description,
                                 isPro = showProBadges,
                                 palette = palette,
@@ -334,8 +337,8 @@ internal fun CalendarActionBar(
                         }
                         if (onCalendarSets != null) {
                             ActionBarMenuItem(
-                                label = "Calendar Sets",
-                                subtitle = "Switch saved visibility sets",
+                                label = stringResource(R.string.menu_calendar_sets),
+                                subtitle = stringResource(R.string.menu_calendar_sets_subtitle),
                                 icon = Icons.Default.CalendarMonth,
                                 isPro = showProBadges,
                                 palette = palette,
@@ -347,8 +350,8 @@ internal fun CalendarActionBar(
                         }
                         if (onShiftPatterns != null) {
                             ActionBarMenuItem(
-                                label = "Shift Patterns",
-                                subtitle = "Build rotating schedules",
+                                label = stringResource(R.string.menu_shift_patterns),
+                                subtitle = stringResource(R.string.menu_shift_patterns_subtitle),
                                 icon = Icons.Default.EventRepeat,
                                 isPro = showProBadges,
                                 palette = palette,
@@ -402,7 +405,7 @@ private fun ActionBarMenuItem(
                     )
                     if (isPro) {
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Pro", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 10.sp, maxLines = 1)
+                        Text(stringResource(R.string.badge_pro), color = palette.accent, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 10.sp, maxLines = 1)
                     }
                 }
                 Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
@@ -624,13 +627,27 @@ internal fun Modifier.noRippleClickable(
     )
 }
 
-internal enum class CalendarTab(val label: String, val shortLabel: String) {
-    Year("Year view", "Year"),
-    Month("Month view", "Month"),
-    Week("Week view", "Week"),
-    Day("Day view", "Day"),
-    ThreeDay("Three-day view", "3 Days"),
-    Agenda("Agenda view", "Agenda");
+/**
+ * Display text lives as resource ids, not literals: these entries are declared outside any
+ * composable, so they cannot call [stringResource] themselves. [label] and [shortLabel] resolve
+ * them at the call site. [name] stays the persisted value — never localize it.
+ */
+internal enum class CalendarTab(
+    @StringRes val labelRes: Int,
+    @StringRes val shortLabelRes: Int,
+) {
+    Year(R.string.tab_year_label, R.string.tab_year_short),
+    Month(R.string.tab_month_label, R.string.tab_month_short),
+    Week(R.string.tab_week_label, R.string.tab_week_short),
+    Day(R.string.tab_day_label, R.string.tab_day_short),
+    ThreeDay(R.string.tab_three_day_label, R.string.tab_three_day_short),
+    Agenda(R.string.tab_agenda_label, R.string.tab_agenda_short);
+
+    val label: String
+        @Composable get() = stringResource(labelRes)
+
+    val shortLabel: String
+        @Composable get() = stringResource(shortLabelRes)
 
     companion object {
         val pickerEntries = listOf(Year, Month, Week, Day, Agenda)
