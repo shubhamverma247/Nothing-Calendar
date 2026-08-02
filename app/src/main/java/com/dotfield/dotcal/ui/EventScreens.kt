@@ -1550,7 +1550,16 @@ internal fun EventEditorScreen(
                 onVoiceNoteChanged = { voiceNotePath = it },
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .drawBehind {
+                        drawLine(palette.line.copy(alpha = 0.55f), Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Edit, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(10.dp))
@@ -1573,7 +1582,16 @@ internal fun EventEditorScreen(
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .drawBehind {
+                        drawLine(palette.line.copy(alpha = 0.55f), Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
                 Text(stringResource(R.string.event_all_day), color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
                 DotCalSwitch(
                     checked = allDay,
@@ -1904,6 +1922,11 @@ private fun CalendarFieldPill(
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1f).padding(start = 12.dp),
         )
+        if (enabled) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(18.dp))
+        }
+        Spacer(modifier = Modifier.width(8.dp))
         Box(
             modifier = Modifier
                 .size(32.dp)
@@ -1917,10 +1940,6 @@ private fun CalendarFieldPill(
                 tint = eventColor,
                 modifier = Modifier.size(20.dp),
             )
-        }
-        if (enabled) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(18.dp))
         }
     }
 }
