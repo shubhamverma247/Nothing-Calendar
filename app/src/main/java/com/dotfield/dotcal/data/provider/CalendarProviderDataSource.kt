@@ -142,9 +142,15 @@ class CalendarProviderDataSource(private val context: Context) {
             put(CalendarContract.Events.DESCRIPTION, event.description)
             put(CalendarContract.Events.EVENT_LOCATION, event.location)
             put(CalendarContract.Events.DTSTART, event.startTimeMs)
-            put(CalendarContract.Events.DTEND, event.endTimeMs)
             put(CalendarContract.Events.EVENT_TIMEZONE, event.timeZone)
             put(CalendarContract.Events.ALL_DAY, event.isAllDay)
+            if (event.rrule.isNullOrBlank()) {
+                put(CalendarContract.Events.DTEND, event.endTimeMs)
+                putNull(CalendarContract.Events.DURATION)
+            } else {
+                putNull(CalendarContract.Events.DTEND)
+                put(CalendarContract.Events.DURATION, event.providerDuration())
+            }
             event.colorHex?.toProviderColor()?.let { put(CalendarContract.Events.EVENT_COLOR, it) }
                 ?: putNull(CalendarContract.Events.EVENT_COLOR)
             event.rrule?.takeUnless { it.isBlank() }?.let { put(CalendarContract.Events.RRULE, it) }
@@ -263,4 +269,9 @@ private fun colorIntToHex(color: Int): String = "#%06X".format(0xFFFFFF and colo
 private fun String.toProviderColor(): Int? {
     val hex = removePrefix("#")
     return hex.toLongOrNull(16)?.toInt()
+}
+
+private fun CalendarEvent.providerDuration(): String {
+    val seconds = ((endTimeMs - startTimeMs).coerceAtLeast(60_000L)) / 1000L
+    return "P${seconds}S"
 }
