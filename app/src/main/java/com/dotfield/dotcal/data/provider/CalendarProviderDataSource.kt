@@ -1,7 +1,9 @@
 package com.dotfield.dotcal.data.provider
 
 import android.Manifest
+import android.content.ContentUris
 import android.content.ContentResolver
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.database.Cursor
@@ -16,6 +18,10 @@ class CalendarProviderDataSource(private val context: Context) {
 
     fun hasCalendarReadPermission(): Boolean {
         return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun hasCalendarWritePermission(): Boolean {
+        return ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED
     }
 
     fun getDeviceCalendars(): List<CalendarAccount> {
@@ -71,6 +77,78 @@ class CalendarProviderDataSource(private val context: Context) {
                     events.toCalendarEvent(calendarId, startMs, endMs)?.let(::add)
                 }
             }
+        }
+    }
+
+    fun saveEvent(calendarId: Long, event: CalendarEvent): CalendarEvent? {
+        if (!hasCalendarWritePermission()) return null
+        val existingProviderId = event.googleEventId?.toLongOrNull()
+        val savedProviderId = if (existingProviderId == null) {
+            insertEvent(calendarId, event)
+        } else {
+            updateEvent(existingProviderId, calendarId, event).takeIf { it }?.let { existingProviderId }
+                ?: insertEvent(calendarId, event)
+        } ?: return null
+        return getEvent(calendarId, savedProviderId.toString())
+    }
+
+    fun deleteEvent(googleEventId: String): Boolean {
+        if (!hasCalendarWritePermission()) return false
+        val providerEventId = googleEventId.toLongOrNull() ?: return false
+        val eventUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, providerEventId)
+        return runCatching { contentResolver.delete(eventUri, null, null) > 0 }.getOrDefault(false)
+    }
+
+    private fun insertEvent(calendarId: Long, event: CalendarEvent): Long? {
+        val uri = runCatching {
+            contentResolver.insert(CalendarContract.Events.CONTENT_URI, eventValues(calendarId, event, includeCalendarId = true))
+        }.getOrNull() ?: return null
+        return ContentUris.parseId(uri).takeIf { it >= 0L }
+    }
+
+    private fun updateEvent(providerEventId: Long, calendarId: Long, event: CalendarEvent): Boolean {
+        val eventUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, providerEventId)
+        return runCatching {
+            contentResolver.update(eventUri, eventValues(calendarId, event, includeCalendarId = false), null, null) > 0
+        }.getOrDefault(false)
+    }
+
+    private fun getEvent(calendarId: Long, googleEventId: String): CalendarEvent? {
+        if (!hasCalendarReadPermission()) return null
+        val cursor = runCatching {
+            contentResolver.query(
+                CalendarContract.Events.CONTENT_URI,
+                EVENT_PROJECTION,
+                "${CalendarContract.Events.CALENDAR_ID} = ? AND ${CalendarContract.Events._ID} = ? AND ${CalendarContract.Events.DELETED} = 0",
+                arrayOf(calendarId.toString(), googleEventId),
+                null,
+            )
+        }.getOrNull() ?: return null
+        return cursor.use { events ->
+            if (events.moveToFirst()) {
+                events.toCalendarEvent(calendarId, Long.MIN_VALUE, Long.MAX_VALUE)
+            } else {
+                null
+            }
+        }
+    }
+
+    private fun eventValues(calendarId: Long, event: CalendarEvent, includeCalendarId: Boolean): ContentValues {
+        return ContentValues().apply {
+            if (includeCalendarId) {
+                put(CalendarContract.Events.CALENDAR_ID, calendarId)
+            }
+            put(CalendarContract.Events.TITLE, event.title)
+            put(CalendarContract.Events.DESCRIPTION, event.description)
+            put(CalendarContract.Events.EVENT_LOCATION, event.location)
+            put(CalendarContract.Events.DTSTART, event.startTimeMs)
+            put(CalendarContract.Events.DTEND, event.endTimeMs)
+            put(CalendarContract.Events.EVENT_TIMEZONE, event.timeZone)
+            put(CalendarContract.Events.ALL_DAY, event.isAllDay)
+            event.colorHex?.toProviderColor()?.let { put(CalendarContract.Events.EVENT_COLOR, it) }
+                ?: putNull(CalendarContract.Events.EVENT_COLOR)
+            event.rrule?.takeUnless { it.isBlank() }?.let { put(CalendarContract.Events.RRULE, it) }
+                ?: putNull(CalendarContract.Events.RRULE)
         }
     }
 
@@ -176,6 +254,13 @@ class CalendarProviderDataSource(private val context: Context) {
 
 fun providerAccountId(calendarId: Long): String = "provider-calendar-$calendarId"
 
+fun providerCalendarId(accountId: String): Long? = accountId.substringAfter("provider-calendar-", "").toLongOrNull()
+
 fun providerEventRoomId(calendarId: Long, eventId: String): String = "provider-calendar-$calendarId-event-$eventId"
 
 private fun colorIntToHex(color: Int): String = "#%06X".format(0xFFFFFF and color)
+
+private fun String.toProviderColor(): Int? {
+    val hex = removePrefix("#")
+    return hex.toLongOrNull(16)?.toInt()
+}
