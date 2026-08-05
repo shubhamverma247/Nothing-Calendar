@@ -16,6 +16,7 @@ import com.dotfield.dotcal.data.punchcard.PunchCardStreak
 import com.dotfield.dotcal.data.insights.OnThisDayCandidate
 import com.dotfield.dotcal.data.insights.OnThisDayFinder
 import com.dotfield.dotcal.data.insights.OnThisDayMemory
+import com.dotfield.dotcal.data.provider.providerCalendarId
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource.Companion.BIRTHDAY_BASE_YEAR
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import com.dotfield.dotcal.data.profiles.FocusProfile
@@ -126,10 +127,11 @@ class DotCalRepository(
     private val shiftPatternStore = ShiftPatternStore(context)
     private val sideStore = SharedSideStore(context)
     private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
+    private val calendarProviderDataSource = CalendarProviderDataSource(context.applicationContext)
     private val holidayDataSource = HolidayDataSource(context.applicationContext)
     private val syncRepository = CalendarSyncRepository(
         dao = dao,
-        providerDataSource = CalendarProviderDataSource(context.applicationContext),
+        providerDataSource = calendarProviderDataSource,
     )
 
     fun observeIsPro(): Flow<Boolean> =
@@ -802,7 +804,7 @@ class DotCalRepository(
         require(end > start) { "END MUST BE AFTER START" }
         val now = System.currentTimeMillis()
         val targetAccountId = data.accountId ?: existingMaster?.accountId ?: existing?.accountId ?: LOCAL_ACCOUNT_ID
-        val event = existingMaster?.copy(
+        val draftEvent = existingMaster?.copy(
             id = eventId,
             accountId = targetAccountId,
             title = data.title.trim(),
@@ -838,10 +840,17 @@ class DotCalRepository(
                 createdAtMs = now,
                 updatedAtMs = now,
             )
-        dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        val event = syncProviderBackedEvent(existingMaster ?: existing, draftEvent)
+        if (event.id != eventId) {
+            dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+            dao.deleteRemindersForEvent(eventId)
+            dao.deleteEvent(eventId)
+            writeGhostFlag(eventId, false)
+        }
+        dao.getRemindersForEvent(event.id).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
         dao.upsertEvent(event)
-        writeGhostFlag(eventId, data.isGhost)
-        dao.deleteRemindersForEvent(eventId)
+        writeGhostFlag(event.id, data.isGhost)
+        dao.deleteRemindersForEvent(event.id)
         val reminderMinutes = data.reminderMinutesList
             ?.distinct()
             ?.sorted()
@@ -849,10 +858,10 @@ class DotCalRepository(
             ?: emptyList()
         reminderMinutes.forEach { minutes ->
             val reminder = EventReminder(
-                eventId = eventId,
+                eventId = event.id,
                 minutesBefore = minutes,
                 triggerAtMs = start - minutes * 60_000L,
-                alarmRequestCode = "$eventId-$minutes".hashCode().absoluteValue,
+                alarmRequestCode = "${event.id}-$minutes".hashCode().absoluteValue,
             )
             dao.insertReminders(listOf(reminder))
             reminderScheduler.scheduleReminder(reminder, event)
@@ -874,6 +883,9 @@ class DotCalRepository(
         val master = dao.getEvent(eventId) ?: event
         recentlyDeletedStore.save(master, reminders, System.currentTimeMillis())
         event.googleEventId?.let { googleEventId ->
+            withContext(Dispatchers.IO) {
+                calendarProviderDataSource.deleteEvent(googleEventId)
+            }
             dao.insertDeletedEventLog(
                 DeletedEventLog(
                     googleEventId = googleEventId,
@@ -884,6 +896,46 @@ class DotCalRepository(
         dao.deleteRemindersForEvent(eventId)
         dao.deleteEvent(eventId)
         updateWidgets()
+    }
+
+    private suspend fun syncProviderBackedEvent(previous: CalendarEvent?, event: CalendarEvent): CalendarEvent {
+        val targetCalendarId = providerCalendarId(event.accountId)
+        if (targetCalendarId == null) {
+            previous?.googleEventId?.let { googleEventId ->
+                withContext(Dispatchers.IO) {
+                    calendarProviderDataSource.deleteEvent(googleEventId)
+                }
+            }
+            return event.copy(
+                source = "LOCAL",
+                googleEventId = null,
+                googleCalendarId = null,
+                syncVersion = 0,
+            )
+        }
+
+        val previousCalendarId = previous?.googleCalendarId
+        val providerDraft = event.copy(
+            source = "GOOGLE",
+            googleEventId = previous?.googleEventId.takeIf { previousCalendarId == targetCalendarId.toString() },
+            googleCalendarId = targetCalendarId.toString(),
+        )
+        val providerEvent = withContext(Dispatchers.IO) {
+            calendarProviderDataSource.saveEvent(targetCalendarId, providerDraft)
+        } ?: return event
+        if (previous?.googleEventId != null && previousCalendarId != targetCalendarId.toString()) {
+            withContext(Dispatchers.IO) {
+                calendarProviderDataSource.deleteEvent(previous.googleEventId)
+            }
+        }
+        return event.copy(
+            id = providerEvent.id,
+            accountId = providerEvent.accountId,
+            source = "GOOGLE",
+            googleEventId = providerEvent.googleEventId,
+            googleCalendarId = providerEvent.googleCalendarId,
+            syncVersion = providerEvent.syncVersion,
+        )
     }
 
     suspend fun addLocalEvent(title: String, date: LocalDate, startTime: LocalTime = LocalTime.of(9, 0)) {

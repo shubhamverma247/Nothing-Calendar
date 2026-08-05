@@ -4,6 +4,24 @@ Updated: 2026-07-17
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full history: `Docs/HANDOFF.original.md`. Feature spec: `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. Do not touch `Docs/HANDOFF - Copy.md`.
 
+## Latest Continuation
+
+Google Calendar outbound sync issue confirmed and fixed on `feature/google-calendar-outbound-sync`:
+
+- Inbound provider sync already worked: events added on Google Calendar desktop are imported from
+  Android CalendarProvider into DotCal during sync.
+- Outbound provider sync was missing: DotCal event saves only wrote Room rows, so events created in
+  DotCal under a Google/provider calendar did not appear in Google Calendar.
+- `CalendarProviderDataSource` now supports `WRITE_CALENDAR` save/delete for provider events and
+  exposes provider account-id parsing.
+- `DotCalRepository.saveLocalEvent` now writes provider-backed events to CalendarProvider first,
+  stores the returned provider identity/version in Room, moves events cleanly between local/provider
+  accounts, and deletes provider events when a provider-backed event is deleted or moved local.
+- Verification:
+  `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug`
+  returned `BUILD SUCCESSFUL`.
+- No device was attached during this pass, so debug APK was not installed.
+
 ## Resume Prompt
 
 Continue DotCal in `D:\Caveman\caveman\Nothing-Calendar` on branch `pro-features`. Read `Docs/HANDOFF.md` and `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. QR Event Share, Availability Text Generator, and C4 Dead Time Finder complete. Next: C6 Ghost Events / Pencil-In using shared side-store namespace `ghost_flags` and existing `FreeSlotEngine` ghost policy. Keep Room at 5 tables; no package/deep-link/DB filename changes, Hilt, or Compose Nav. After app changes run required tests/build, then install debug APK when device connected. Report exact manual QA steps and expected results.
