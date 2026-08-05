@@ -48,11 +48,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.insights.OnThisDayMemory
@@ -62,7 +65,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val sheetDateFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMM", Locale.US)
+private val sheetDateFormatter: DateTimeFormatter
+    get() = DateTimeFormatter.ofPattern("EEEE, dd MMM", Locale.getDefault())
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +90,7 @@ internal fun EventListSheet(
             Text(selectedDate.format(sheetDateFormatter), fontFamily = mono, fontSize = 16.sp, color = palette.primaryText)
             Spacer(modifier = Modifier.height(16.dp))
             if (events.isEmpty()) {
-                Text("No events", modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp), fontFamily = mono, fontSize = 14.sp, color = palette.dimText, textAlign = TextAlign.Center)
+                Text(stringResource(R.string.agenda_no_events), modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp), fontFamily = mono, fontSize = 14.sp, color = palette.dimText, textAlign = TextAlign.Center)
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().height(260.dp),
@@ -102,7 +106,7 @@ internal fun EventListSheet(
                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp).height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
                 shape = RoundedCornerShape(16.dp),
-            ) { Text("+ Add Event", fontFamily = mono) }
+            ) { Text(stringResource(R.string.agenda_add_event), fontFamily = mono) }
         }
     }
 }
@@ -303,7 +307,7 @@ private fun AgendaSelectionBar(
             Icon(Icons.Default.Close, contentDescription = "Clear selection", tint = palette.primaryText)
         }
         Text(
-            "$count selected",
+            pluralStringResource(R.plurals.count_selected, count, count),
             color = palette.primaryText,
             fontFamily = LocalHeadingFont.current,
             fontWeight = FontWeight.SemiBold,
@@ -372,7 +376,7 @@ private fun DayDensityDot(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            item.date.dayOfWeek.name.take(1),
+            item.date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault()),
             color = if (selected) palette.primaryText else palette.secondaryText,
             fontFamily = mono,
             fontWeight = FontWeight.SemiBold,
@@ -520,7 +524,7 @@ internal fun AgendaDateHeader(date: LocalDate, isFirst: Boolean, palette: DotCal
         Spacer(modifier = Modifier.width(8.dp))
         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(
-                date.dayOfWeek.name.take(3),
+                date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()),
                 color = palette.accent,
                 fontFamily = mono,
                 fontWeight = FontWeight.SemiBold,
@@ -528,7 +532,7 @@ internal fun AgendaDateHeader(date: LocalDate, isFirst: Boolean, palette: DotCal
                 letterSpacing = 1.sp,
             )
             Text(
-                date.month.name.take(3),
+                date.month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()),
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontWeight = FontWeight.Medium,
@@ -560,7 +564,7 @@ private fun AgendaEndOfDayState(
         AgendaCalendarOutlineIcon(tint = palette.dimText)
         Spacer(modifier = Modifier.height(18.dp))
         Text(
-            "You're all caught up",
+            stringResource(R.string.agenda_all_caught_up),
             color = palette.dimText,
             fontFamily = mono,
             fontSize = 15.sp,
@@ -568,7 +572,7 @@ private fun AgendaEndOfDayState(
         )
         Spacer(modifier = Modifier.height(14.dp))
         Text(
-            "+ Add Event",
+            stringResource(R.string.agenda_add_event),
             color = palette.accent,
             fontFamily = mono,
             fontSize = 16.sp,
@@ -606,16 +610,18 @@ private fun AgendaCalendarOutlineIcon(tint: Color) {
     }
 }
 
+@Composable
 private fun CalendarEvent.timeRange(): String {
-    if (isAllDay == 1) return "All-day"
+    if (isAllDay == 1) return stringResource(R.string.event_all_day)
     val start = Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
     val end = Instant.ofEpochMilli(endTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
-    return "${start.format(timeFormatter)} - ${end.format(timeFormatter)}"
+    return stringResource(R.string.time_range, start.format(timeFormatter), end.format(timeFormatter))
 }
 
+@Composable
 private fun CalendarEvent.agendaTimeRange(): String {
-    if (isAllDay == 1) return "All-day"
+    if (isAllDay == 1) return stringResource(R.string.event_all_day)
     val start = Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
     val end = Instant.ofEpochMilli(endTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
-    return "${start.format(timeFormatter)} - ${end.format(timeFormatter)}"
+    return stringResource(R.string.time_range, start.format(timeFormatter), end.format(timeFormatter))
 }

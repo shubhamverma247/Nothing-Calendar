@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,22 +43,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 import kotlin.math.roundToInt
 
-private enum class AvailabilityPreset(val label: String) {
-    NextThreeDays("Next 3 days"),
-    ThisWeek("This week"),
-    NextWeek("Next week"),
+private enum class AvailabilityPreset(@StringRes val labelRes: Int) {
+    NextThreeDays(R.string.availability_preset_next_three_days),
+    ThisWeek(R.string.availability_preset_this_week),
+    NextWeek(R.string.availability_preset_next_week),
+    ;
+
+    val label: String
+        @Composable get() = stringResource(labelRes)
 }
 
 @Composable
@@ -121,7 +127,7 @@ internal fun AvailabilityScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
             Text(
-                "Share Availability",
+                stringResource(R.string.availability_title),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
@@ -158,14 +164,20 @@ internal fun AvailabilityScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            "Preview",
+                            stringResource(R.string.availability_preview),
                             color = palette.secondaryText,
                             fontFamily = mono,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            if (state.isLoading) "UPDATING" else "READY",
+                            stringResource(
+                                if (state.isLoading) {
+                                    R.string.availability_status_updating
+                                } else {
+                                    R.string.availability_status_ready
+                                },
+                            ),
                             color = palette.accent,
                             fontFamily = mono,
                             fontSize = 10.sp,
@@ -255,11 +267,11 @@ internal fun AvailabilityScreen(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                AvailabilityDateRow("From", rangeStart, palette, Modifier.weight(1f)) {
+                AvailabilityDateRow(stringResource(R.string.availability_from), rangeStart, palette, Modifier.weight(1f)) {
                     selectedPreset = null
                     pickingStart = true
                 }
-                AvailabilityDateRow("To", rangeEnd, palette, Modifier.weight(1f)) {
+                AvailabilityDateRow(stringResource(R.string.availability_to), rangeEnd, palette, Modifier.weight(1f)) {
                     selectedPreset = null
                     pickingEnd = true
                 }
@@ -270,14 +282,18 @@ internal fun AvailabilityScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "Working hours",
+                    stringResource(R.string.availability_working_hours),
                     color = palette.primaryText,
                     fontFamily = mono,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    "${formatAvailabilityTime(request.workingStart, use24HourFormat)} - ${formatAvailabilityTime(request.workingEnd, use24HourFormat)}",
+                    stringResource(
+                        R.string.time_range,
+                        formatAvailabilityTime(request.workingStart, use24HourFormat),
+                        formatAvailabilityTime(request.workingEnd, use24HourFormat),
+                    ),
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 11.sp,
@@ -286,7 +302,7 @@ internal fun AvailabilityScreen(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 AvailabilityHourStepper(
-                    label = "Start",
+                    label = stringResource(R.string.availability_start),
                     value = request.workingStart,
                     use24HourFormat = use24HourFormat,
                     palette = palette,
@@ -301,7 +317,7 @@ internal fun AvailabilityScreen(
                     },
                 )
                 AvailabilityHourStepper(
-                    label = "End",
+                    label = stringResource(R.string.availability_end),
                     value = request.workingEnd,
                     use24HourFormat = use24HourFormat,
                     palette = palette,
@@ -319,7 +335,7 @@ internal fun AvailabilityScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                 listOf(15, 30, 45, 60).forEach { minutes ->
                     AvailabilityChoiceChip(
-                        label = "$minutes min",
+                        label = stringResource(R.string.availability_minutes_chip, minutes),
                         selected = minimumMinutes == minutes,
                         palette = palette,
                         modifier = Modifier.weight(1f),
@@ -329,16 +345,28 @@ internal fun AvailabilityScreen(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 AvailabilityCompactToggle(
-                    title = "All-day",
-                    subtitle = if (blockAllDayEvents) "Block" else "Ignore",
+                    title = stringResource(R.string.availability_all_day),
+                    subtitle = stringResource(
+                        if (blockAllDayEvents) {
+                            R.string.availability_all_day_block
+                        } else {
+                            R.string.availability_all_day_ignore
+                        },
+                    ),
                     checked = blockAllDayEvents,
                     palette = palette,
                     modifier = Modifier.weight(1f),
                     onCheckedChange = { blockAllDayEvents = it },
                 )
                 AvailabilityCompactToggle(
-                    title = "Ghosts",
-                    subtitle = if (treatGhostsAsBusy) "Busy" else "Free",
+                    title = stringResource(R.string.availability_ghosts),
+                    subtitle = stringResource(
+                        if (treatGhostsAsBusy) {
+                            R.string.availability_ghosts_busy
+                        } else {
+                            R.string.availability_ghosts_free
+                        },
+                    ),
                     checked = treatGhostsAsBusy,
                     palette = palette,
                     modifier = Modifier.weight(1f),
@@ -369,7 +397,7 @@ internal fun AvailabilityScreen(
             ) {
                 Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Copy", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.availability_copy), fontWeight = FontWeight.SemiBold)
             }
             Button(
                 onClick = { onShare(state.text) },
@@ -384,14 +412,14 @@ internal fun AvailabilityScreen(
             ) {
                 Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Share", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.availability_share_button), fontWeight = FontWeight.SemiBold)
             }
         }
     }
 
     if (pickingStart) {
         DateTimeChoiceSheet(
-            title = "Start date",
+            title = stringResource(R.string.availability_start_date),
             selectedDate = rangeStart,
             selectedTime = LocalTime.NOON,
             minDate = null,
@@ -407,7 +435,7 @@ internal fun AvailabilityScreen(
     }
     if (pickingEnd) {
         DateTimeChoiceSheet(
-            title = "End date",
+            title = stringResource(R.string.availability_end_date),
             selectedDate = rangeEnd,
             selectedTime = LocalTime.NOON,
             minDate = rangeStart,
@@ -471,7 +499,7 @@ private fun AvailabilityDateRow(
         Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp, lineHeight = 14.sp)
         Spacer(Modifier.height(5.dp))
         Text(
-            date.format(DateTimeFormatter.ofPattern("d MMM")),
+            date.format(localizedFormatter("d MMM")),
             color = palette.primaryText,
             fontFamily = mono,
             fontWeight = FontWeight.SemiBold,
@@ -598,5 +626,5 @@ private fun AvailabilityCompactToggle(
 private fun formatAvailabilityTime(time: LocalTime, use24HourFormat: Boolean): String {
     if (time == LocalTime.MAX) return "24:00"
     val pattern = if (use24HourFormat) "HH:mm" else "h:mm a"
-    return time.format(DateTimeFormatter.ofPattern(pattern))
+    return time.format(localizedFormatter(pattern))
 }

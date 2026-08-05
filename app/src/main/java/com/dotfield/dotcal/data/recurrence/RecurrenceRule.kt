@@ -3,11 +3,14 @@ package com.dotfield.dotcal.data.recurrence
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
 import java.util.Locale
 
 /**
  * Pure-Kotlin RRULE model for DotCal. No dependency, mirrors QuickAddParser / BackupSerializer style.
+ *
+ * Display formatting deliberately lives **outside** this file: `recurrenceHumanLabel()` in
+ * `ui/UiModels.kt` builds the human sentence through string resources. This class stays Context-free
+ * and English-free so it remains a pure, unit-testable model.
  *
  * Supports the subset DotCal's expander can actually honor:
  *   FREQ = DAILY | WEEKLY | MONTHLY | YEARLY
@@ -43,31 +46,6 @@ data class RecurrenceRule(
         count?.let { parts += "COUNT=$it" }
         until?.let { parts += "UNTIL=" + it.format(UNTIL_FORMAT) }
         return parts.joinToString(";")
-    }
-
-    /** Short human sentence for pickers / detail rows. e.g. "Every 2 weeks on Mon, Fri · 10 times". */
-    fun humanLabel(): String {
-        val base = when (freq) {
-            RecurrenceFreq.DAILY -> if (interval <= 1) "Daily" else "Every $interval days"
-            RecurrenceFreq.WEEKLY -> if (interval <= 1) "Weekly" else "Every $interval weeks"
-            RecurrenceFreq.MONTHLY -> if (interval <= 1) "Monthly" else "Every $interval months"
-            RecurrenceFreq.YEARLY -> if (interval <= 1) "Yearly" else "Every $interval years"
-        }
-        val onClause = when {
-            freq == RecurrenceFreq.WEEKLY && byDay.isNotEmpty() ->
-                " on " + byDay.sortedBy { it.day.value }.joinToString(", ") { it.day.shortName() }
-            freq == RecurrenceFreq.MONTHLY && byDay.isNotEmpty() -> {
-                val bd = byDay.first()
-                " on the " + ordinalWord(bd.ordinal) + " " + bd.day.shortName()
-            }
-            else -> ""
-        }
-        val endClause = when {
-            count != null -> " · " + if (count == 1) "1 time" else "$count times"
-            until != null -> " · until " + until.format(DISPLAY_FORMAT)
-            else -> ""
-        }
-        return base + onClause + endClause
     }
 
     private fun ByDay.toToken(): String = (ordinal?.toString() ?: "") + day.rruleCode()
@@ -132,7 +110,6 @@ data class RecurrenceRule(
 
     companion object {
         private val UNTIL_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd", Locale.US)
-        private val DISPLAY_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 
         /** Tolerant parse. Returns null for null/blank or a missing/unknown FREQ. Never throws. */
         fun parse(raw: String?): RecurrenceRule? {
@@ -201,15 +178,6 @@ data class RecurrenceRule(
             else -> null
         }
 
-        private fun ordinalWord(ordinal: Int?): String = when (ordinal) {
-            null, 1 -> "1st"
-            2 -> "2nd"
-            3 -> "3rd"
-            4 -> "4th"
-            5 -> "5th"
-            -1 -> "last"
-            else -> "${ordinal}th"
-        }
     }
 }
 
@@ -222,9 +190,6 @@ internal fun DayOfWeek.rruleCode(): String = when (this) {
     DayOfWeek.SATURDAY -> "SA"
     DayOfWeek.SUNDAY -> "SU"
 }
-
-private fun DayOfWeek.shortName(): String =
-    getDisplayName(TextStyle.SHORT, Locale.US)
 
 private fun weekMonday(date: LocalDate): LocalDate =
     date.minusDays((date.dayOfWeek.value - 1).toLong())

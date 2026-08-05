@@ -48,7 +48,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.animation.core.Animatable
@@ -77,6 +76,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
@@ -115,6 +115,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings as SettingsGearIcon
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
@@ -166,8 +167,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -197,6 +196,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.ColumnScope
 import com.dotfield.dotcal.R
@@ -291,7 +291,7 @@ internal fun EventDetailScreen(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
                 }
                 Text(
-                    "Event Details",
+                    stringResource(R.string.event_details_title),
                     modifier = Modifier.weight(1f),
                     color = palette.primaryText,
                     fontFamily = LocalHeadingFont.current,
@@ -324,9 +324,14 @@ internal fun EventDetailScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
                 item {
-                    DetailSection(label = "TIME", palette = palette) {
+                    DetailSection(label = stringResource(R.string.event_section_time), palette = palette) {
                         if (event.isAllDay == 1) {
-                            Text("All-day", color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                            Text(
+                                stringResource(R.string.event_all_day),
+                                color = palette.primaryText,
+                                fontSize = 16.sp,
+                                lineHeight = 23.sp,
+                            )
                         } else {
                             Text(event.detailDateLine(), color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
                             Spacer(modifier = Modifier.height(6.dp))
@@ -334,14 +339,14 @@ internal fun EventDetailScreen(
                         }
                         event.recurrenceDetailLabel()?.let { label ->
                             Spacer(modifier = Modifier.height(6.dp))
-                            Text(label.toSentenceCase(), color = palette.secondaryText, fontSize = 14.sp, lineHeight = 20.sp)
+                            Text(label, color = palette.secondaryText, fontSize = 14.sp, lineHeight = 20.sp)
                         }
                     }
                 }
                 if (isCountdownPinned) {
                     item {
                         DetailDivider(palette)
-                        DetailSection(label = "COUNTDOWN", palette = palette) {
+                        DetailSection(label = stringResource(R.string.event_section_countdown), palette = palette) {
                             CountdownDetailCard(event = event, palette = palette, onShare = onShareCountdownImage)
                         }
                     }
@@ -349,7 +354,7 @@ internal fun EventDetailScreen(
                 if (event.location.isNotBlank()) {
                     item {
                         DetailDivider(palette)
-                        DetailSection(label = "LOCATION", palette = palette) {
+                        DetailSection(label = stringResource(R.string.event_section_location), palette = palette) {
                             Text(event.location, color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
                         }
                     }
@@ -357,9 +362,9 @@ internal fun EventDetailScreen(
                 if (reminders.isNotEmpty()) {
                     item {
                         DetailDivider(palette)
-                        DetailSection(label = "REMINDER", palette = palette) {
+                        DetailSection(label = stringResource(R.string.event_section_reminder), palette = palette) {
                             Text(
-                                reminders.sortedBy { it.minutesBefore }.joinToString { it.detailLabel().toSentenceCase() },
+                                remindersDetailLine(reminders),
                                 color = palette.primaryText,
                                 fontSize = 16.sp,
                                 lineHeight = 23.sp,
@@ -369,7 +374,7 @@ internal fun EventDetailScreen(
                 }
                 item {
                     DetailDivider(palette)
-                    DetailSection(label = "CALENDAR", palette = palette) {
+                    DetailSection(label = stringResource(R.string.event_section_calendar), palette = palette) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
@@ -385,7 +390,7 @@ internal fun EventDetailScreen(
                 if (event.description.isNotBlank()) {
                     item {
                         DetailDivider(palette)
-                        DetailSection(label = "DESCRIPTION", palette = palette) {
+                        DetailSection(label = stringResource(R.string.event_section_description), palette = palette) {
                             SelectionContainer {
                                 Text(
                                     event.description,
@@ -400,7 +405,7 @@ internal fun EventDetailScreen(
                 if (imageUris.isNotEmpty()) {
                     item {
                         DetailDivider(palette)
-                        DetailSection(label = "IMAGES", palette = palette) {
+                        DetailSection(label = stringResource(R.string.event_section_images), palette = palette) {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 lazyItems(imageUris.take(5), key = { it }) { uri ->
                                     DetailImageThumb(uri = uri, palette = palette, onClick = { previewImageUri = uri })
@@ -412,7 +417,7 @@ internal fun EventDetailScreen(
                 event.voiceNotePath?.takeIf { it.isNotBlank() }?.let { path ->
                     item {
                         DetailDivider(palette)
-                        DetailSection(label = "VOICE NOTE", palette = palette) {
+                        DetailSection(label = stringResource(R.string.event_section_voice_note), palette = palette) {
                             DetailVoiceNotePlayer(path = path, palette = palette)
                         }
                     }
@@ -422,7 +427,7 @@ internal fun EventDetailScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                     if (!isReadOnly) {
                         Text(
-                            "Delete Event",
+                            stringResource(R.string.event_delete),
                             color = palette.accent,
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp,
@@ -440,43 +445,55 @@ internal fun EventDetailScreen(
             FullscreenImagePreview(uri = uri, palette = palette, onDismiss = { previewImageUri = null })
         }
         if (showActions) {
+            val editLabel = stringResource(R.string.action_edit)
+            val shareLabel = stringResource(R.string.action_share)
+            val shareQrLabel = stringResource(R.string.event_share_qr)
+            val countdownLabel = stringResource(
+                if (isCountdownPinned) R.string.event_remove_countdown else R.string.event_pin_countdown,
+            )
+            val shareCountdownLabel = stringResource(R.string.event_share_countdown_image)
+            val duplicateLabel = stringResource(R.string.action_duplicate)
+            val copyToDateLabel = stringResource(R.string.event_copy_to_date)
+            val vaultLabel = stringResource(
+                if (isPrivate) R.string.vault_restore_from else R.string.vault_move_to,
+            )
             val actions = buildList {
                 if (!isReadOnly) {
-                    add(CompactActionItem("Edit") {
+                    add(CompactActionItem(editLabel) {
                         showActions = false
                         onEdit()
                     })
                 }
-                add(CompactActionItem("Share") {
+                add(CompactActionItem(shareLabel) {
                     showActions = false
                     onShare()
                 })
-                add(CompactActionItem("Share as QR") {
+                add(CompactActionItem(shareQrLabel) {
                     showActions = false
                     onShareQr()
                 })
                 if (!isReadOnly) {
-                    add(CompactActionItem(if (isCountdownPinned) "Remove Countdown" else "Pin as Countdown") {
+                    add(CompactActionItem(countdownLabel) {
                         showActions = false
                         if (isCountdownPinned) onUnpinCountdown() else onPinCountdown()
                     })
                 }
                 if (isCountdownPinned) {
-                    add(CompactActionItem("Share Countdown Image") {
+                    add(CompactActionItem(shareCountdownLabel) {
                         showActions = false
                         onShareCountdownImage()
                     })
                 }
                 if (!isReadOnly) {
-                    add(CompactActionItem("Duplicate") {
+                    add(CompactActionItem(duplicateLabel) {
                         showActions = false
                         onDuplicate()
                     })
-                    add(CompactActionItem("Copy to date") {
+                    add(CompactActionItem(copyToDateLabel) {
                         showActions = false
                         onCopyToDate()
                     })
-                    add(CompactActionItem(if (isPrivate) "Restore From Private Vault" else "Move to Private Vault") {
+                    add(CompactActionItem(vaultLabel) {
                         showActions = false
                         if (isPrivate) onRestoreFromPrivate() else onMoveToPrivate()
                     })
@@ -489,7 +506,7 @@ internal fun EventDetailScreen(
                 dragHandle = { BottomSheetDragHandle(palette) },
             ) {
                 CompactActionSheetContent(
-                    title = "Event Options",
+                    title = stringResource(R.string.event_options),
                     actions = actions,
                     palette = palette,
                 )
@@ -585,7 +602,7 @@ private fun DetailImageThumb(uri: String, palette: DotCalPalette, onClick: () ->
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-        } ?: Text("IMG", color = palette.secondaryText, fontSize = 11.sp)
+        } ?: Text(stringResource(R.string.event_image_placeholder), color = palette.secondaryText, fontSize = 11.sp)
     }
 }
 
@@ -718,9 +735,10 @@ private fun VoiceNoteRow(path: String, palette: DotCalPalette) {
             .padding(horizontal = 14.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(if (playing) "PAUSE" else "PLAY", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Text(stringResource(if (playing) R.string.event_voice_pause else R.string.event_voice_play), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
         Text(
-            mediaPlayer?.duration?.let { "${(it / 1000).coerceAtLeast(1)} SEC" } ?: "UNAVAILABLE",
+            mediaPlayer?.duration?.let { stringResource(R.string.event_voice_seconds, (it / 1000).coerceAtLeast(1)) }
+                ?: stringResource(R.string.event_voice_unavailable),
             color = palette.secondaryText,
             fontFamily = mono,
             fontSize = 12.sp,
@@ -759,14 +777,14 @@ private fun ImageAttachmentSection(
             verticalAlignment = Alignment.Top,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Images", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(stringResource(R.string.event_images), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 if (!isPro) {
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Pro feature", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
+                    Text(stringResource(R.string.pro_feature_tag), color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
                 }
             }
             if (imageUris.isNotEmpty()) {
-                Text("${imageUris.size}/5", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                Text(stringResource(R.string.event_images_count, imageUris.size), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
             }
         }
         Spacer(modifier = Modifier.height(10.dp))
@@ -814,7 +832,7 @@ private fun ImageAttachmentThumb(uri: String, palette: DotCalPalette, onRemove: 
                 contentScale = ContentScale.Crop,
             )
         } ?: Box(modifier = Modifier.fillMaxSize().background(palette.cell), contentAlignment = Alignment.Center) {
-            Text("IMG", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+            Text(stringResource(R.string.event_image_placeholder), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
         }
         Box(
             modifier = Modifier
@@ -854,7 +872,7 @@ private fun ImageDisplayThumb(uri: String, palette: DotCalPalette, onClick: (() 
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-        } ?: Text("IMG", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+        } ?: Text(stringResource(R.string.event_image_placeholder), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
     }
 }
 
@@ -884,7 +902,7 @@ private fun FullscreenImagePreview(uri: String, palette: DotCalPalette, onDismis
                     .aspectRatio(image.width.toFloat() / image.height.toFloat()),
                 contentScale = ContentScale.Fit,
             )
-        } ?: Text("Image unavailable", color = Color.White, fontFamily = mono, fontSize = 14.sp)
+        } ?: Text(stringResource(R.string.event_image_unavailable), color = Color.White, fontFamily = mono, fontSize = 14.sp)
         IconButton(
             onClick = onDismiss,
             modifier = Modifier
@@ -956,10 +974,10 @@ private fun VoiceNoteEditorSection(
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Voice note", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(stringResource(R.string.event_voice_note), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             if (!isPro) {
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Pro feature", color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
+                Text(stringResource(R.string.pro_feature_tag), color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 11.sp)
             }
         }
         Spacer(modifier = Modifier.height(10.dp))
@@ -1019,7 +1037,9 @@ private fun EmptyVoiceNoteRow(palette: DotCalPalette, onRecord: () -> Unit, perm
     ) {
         MicGlyph(tint = if (permissionDenied) palette.secondaryText else palette.primaryText)
         Text(
-            if (permissionDenied) "MIC PERMISSION DENIED - TAP TO ENABLE" else "TAP TO RECORD",
+            stringResource(
+                if (permissionDenied) R.string.event_voice_permission_denied else R.string.event_voice_tap_to_record,
+            ),
             color = palette.secondaryText,
             fontFamily = mono,
             fontSize = 13.sp,
@@ -1041,7 +1061,7 @@ private fun RecordingVoiceNoteRow(seconds: Int, palette: DotCalPalette, onStop: 
         Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(palette.accent))
         Text(formatVoiceDuration(seconds), color = palette.primaryText, fontFamily = mono, fontSize = 14.sp, modifier = Modifier.padding(start = 12.dp).weight(1f))
         Text(
-            "STOP",
+            stringResource(R.string.event_voice_stop),
             color = palette.accent,
             fontFamily = mono,
             fontWeight = FontWeight.SemiBold,
@@ -1091,7 +1111,7 @@ private fun ExistingVoiceNoteRow(path: String, palette: DotCalPalette, onDelete:
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            if (playing) "PAUSE" else "PLAY",
+            stringResource(if (playing) R.string.event_voice_pause else R.string.event_voice_play),
             color = palette.primaryText,
             fontFamily = mono,
             fontWeight = FontWeight.SemiBold,
@@ -1159,7 +1179,7 @@ internal fun EventEditorScreen(
     isPro: Boolean,
     conflictWarnings: List<CalendarEvent> = emptyList(),
     use24HourFormat: Boolean = true,
-    onConflictRangeChanged: (CalendarEvent?, LocalDate, LocalDate, LocalTime, LocalTime, Boolean) -> Unit = { _, _, _, _, _, _ -> },
+    onConflictRangeChanged: (String, CalendarEvent?, LocalDate, LocalDate, LocalTime, LocalTime, Boolean) -> Unit = { _, _, _, _, _, _, _ -> },
     onRequestPro: () -> Unit,
     onDismiss: () -> Unit,
     onSave: (EventEditorData, RecurringEditScope) -> Unit,
@@ -1207,6 +1227,7 @@ internal fun EventEditorScreen(
     }
     var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule ?: draft?.rrule ?: seed?.rrule ?: tpl?.rrule) }
     var isGhost by remember(editorStateKey) { mutableStateOf(event?.isGhost ?: draft?.isGhost ?: false) }
+    var colorHex by remember(editorStateKey) { mutableStateOf(event?.colorHex ?: draft?.colorHex) }
     var imageUris by remember(editorStateKey) { mutableStateOf(parseJsonStringArray(event?.imageUris ?: "[]")) }
     var voiceNotePath by remember(editorStateKey) { mutableStateOf(event?.voiceNotePath) }
     val writableAccounts = accounts
@@ -1220,6 +1241,7 @@ internal fun EventEditorScreen(
             ?: DotCalRepository.LOCAL_ACCOUNT_ID)
     }
     var showCalendarPicker by remember { mutableStateOf(false) }
+    var showEventColorPicker by remember { mutableStateOf(false) }
     var dateTimePicker by remember { mutableStateOf<DateTimeField?>(null) }
     var showReminderPicker by remember { mutableStateOf(false) }
     var showRepeatPicker by remember { mutableStateOf(false) }
@@ -1230,14 +1252,16 @@ internal fun EventEditorScreen(
     var showEditorMenu by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val focusSinkRequester = remember { FocusRequester() }
     val context = LocalContext.current
+    val savedNoReminderToast = stringResource(R.string.event_saved_no_reminder)
+    val templateSavedToast = stringResource(R.string.event_template_saved)
+    val templateDefaultName = stringResource(R.string.event_template_default_name)
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         pendingPermissionSave?.let { pending ->
             val data = if (granted) pending.first else pending.first.copy(reminderMinutes = null, reminderMinutesList = null)
             onSave(data, pending.second)
             pendingPermissionSave = null
-            if (!granted) showDotCalToast(context, palette, "Event saved without reminder")
+            if (!granted) showDotCalToast(context, palette, savedNoReminderToast)
         }
     }
     val imagePicker = rememberLauncherForActivityResult(
@@ -1261,8 +1285,11 @@ internal fun EventEditorScreen(
         recurringEditScope == RecurringEditScope.WholeSeries
     fun clearEditorFocus() {
         keyboardController?.hide()
+        // No focus "sink" here on purpose: requesting focus on a 1.dp Box parked at the top of the
+        // scrolling column made Compose scroll that Box back into view, so tapping any row near the
+        // bottom of the form jumped the user to the top. force = true already drops focus from the
+        // text fields without moving the scroll position.
         focusManager.clearFocus(force = true)
-        runCatching { focusSinkRequester.requestFocus() }
     }
     fun requestNotificationPermissionForReminder() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -1293,7 +1320,7 @@ internal fun EventEditorScreen(
             rrule = recurrenceRule,
             imageUris = imageUris.toJsonStringArray(),
             voiceNotePath = voiceNotePath,
-            colorHex = draft?.colorHex ?: event?.colorHex,
+            colorHex = colorHex,
             isGhost = isGhost,
         )
     }
@@ -1307,7 +1334,7 @@ internal fun EventEditorScreen(
         }
         return EventTemplate(
             id = EventTemplate.newId(),
-            name = name.trim().ifBlank { title.trim().ifBlank { "Template" } },
+            name = name.trim().ifBlank { title.trim().ifBlank { templateDefaultName } },
             isTask = false,
             title = title.trim(),
             description = description.trim(),
@@ -1335,8 +1362,8 @@ internal fun EventEditorScreen(
             }
         }
     }
-    LaunchedEffect(event?.id, startDate, endDate, startTime, endTime, allDay) {
-        onConflictRangeChanged(event, startDate, endDate, startTime, endTime, allDay)
+    LaunchedEffect(editorStateKey, startDate, endDate, startTime, endTime, allDay) {
+        onConflictRangeChanged(editorStateKey, event, startDate, endDate, startTime, endTime, allDay)
     }
     Column(
         modifier = Modifier
@@ -1355,7 +1382,9 @@ internal fun EventEditorScreen(
                 Icon(Icons.Default.Close, contentDescription = "Close", tint = palette.primaryText)
             }
             Text(
-                if (event == null) "Add event" else "Edit event",
+                stringResource(
+                    if (event == null) R.string.event_editor_title_add else R.string.event_editor_title_edit,
+                ),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.SemiBold,
@@ -1378,7 +1407,14 @@ internal fun EventEditorScreen(
                         containerColor = palette.dialogSurface,
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Save as template", color = palette.primaryText, fontFamily = mono, fontSize = 15.sp) },
+                            text = {
+                                Text(
+                                    stringResource(R.string.dialog_save_as_template),
+                                    color = palette.primaryText,
+                                    fontFamily = mono,
+                                    fontSize = 15.sp,
+                                )
+                            },
                             onClick = {
                                 showEditorMenu = false
                                 clearEditorFocus()
@@ -1404,17 +1440,25 @@ internal fun EventEditorScreen(
                     }
                 }
                 .verticalScroll(rememberScrollState())
+                // Keeps the bottom of the form — including the conflict warning under Starts/Ends —
+                // above the soft keyboard instead of behind it.
+                .imePadding()
                 .padding(20.dp),
         ) {
-            Box(modifier = Modifier.size(1.dp).focusRequester(focusSinkRequester).focusable())
             Spacer(modifier = Modifier.height(16.dp))
+            val selectedAccount = writableAccounts.firstOrNull { it.id == selectedAccountId }
             CalendarFieldPill(
-                account = writableAccounts.firstOrNull { it.id == selectedAccountId },
+                account = selectedAccount,
+                colorHex = colorHex,
                 palette = palette,
                 enabled = writableAccounts.size > 1,
                 onClick = {
                     clearEditorFocus()
                     showCalendarPicker = true
+                },
+                onColorClick = {
+                    clearEditorFocus()
+                    showEventColorPicker = true
                 },
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -1422,19 +1466,38 @@ internal fun EventEditorScreen(
                 value = title,
                 onValueChange = { title = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Event title", fontFamily = mono, color = palette.secondaryText) },
+                placeholder = {
+                    Text(
+                        stringResource(R.string.event_title_placeholder),
+                        fontFamily = mono,
+                        color = palette.secondaryText,
+                    )
+                },
                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null, tint = palette.secondaryText) },
                 colors = dotCalTextFieldColors(palette),
                 textStyle = TextStyle(color = palette.primaryText, fontFamily = mono),
                 singleLine = true,
             )
-            if (submitted && title.isBlank()) Text("Title required", color = palette.accent, fontFamily = mono, fontSize = 12.sp)
+            if (submitted && title.isBlank()) {
+                Text(
+                    stringResource(R.string.event_title_required),
+                    color = palette.accent,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                )
+            }
             Spacer(modifier = Modifier.height(10.dp))
             OutlinedTextField(
                 value = location,
                 onValueChange = { location = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Location", fontFamily = mono, color = palette.secondaryText) },
+                placeholder = {
+                    Text(
+                        stringResource(R.string.event_location_placeholder),
+                        fontFamily = mono,
+                        color = palette.secondaryText,
+                    )
+                },
                 leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = palette.secondaryText) },
                 colors = dotCalTextFieldColors(palette),
                 textStyle = TextStyle(color = palette.primaryText, fontFamily = mono),
@@ -1445,7 +1508,13 @@ internal fun EventEditorScreen(
                 value = description,
                 onValueChange = { description = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Description", fontFamily = mono, color = palette.secondaryText) },
+                placeholder = {
+                    Text(
+                        stringResource(R.string.event_description_placeholder),
+                        fontFamily = mono,
+                        color = palette.secondaryText,
+                    )
+                },
                 leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, tint = palette.secondaryText) },
                 colors = dotCalTextFieldColors(palette),
                 textStyle = TextStyle(color = palette.primaryText, fontFamily = mono),
@@ -1481,13 +1550,22 @@ internal fun EventEditorScreen(
                 onVoiceNoteChanged = { voiceNotePath = it },
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .drawBehind {
+                        drawLine(palette.line.copy(alpha = 0.55f), Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Edit, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Pencil in", color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
-                        Text("Tentative; can be ignored by free-time tools", color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+                        Text(stringResource(R.string.event_pencil_in), color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
+                        Text(stringResource(R.string.event_pencil_in_subtitle), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
                     }
                 }
                 DotCalSwitch(
@@ -1504,8 +1582,17 @@ internal fun EventEditorScreen(
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("All-day", color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .drawBehind {
+                        drawLine(palette.line.copy(alpha = 0.55f), Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(stringResource(R.string.event_all_day), color = palette.primaryText, fontFamily = mono, fontSize = 14.sp)
                 DotCalSwitch(
                     checked = allDay,
                     palette = palette,
@@ -1516,7 +1603,7 @@ internal fun EventEditorScreen(
                 )
             }
             EditorValueRow(
-                title = "Starts",
+                title = stringResource(R.string.event_starts),
                 value = if (allDay) startDate.format(editorDateFormatter) else dateTimeLabel(startDate, startTime),
                 palette = palette,
                 onClick = {
@@ -1525,7 +1612,7 @@ internal fun EventEditorScreen(
                 },
             )
             EditorValueRow(
-                title = "Ends",
+                title = stringResource(R.string.event_ends),
                 value = if (allDay) endDate.format(editorDateFormatter) else dateTimeLabel(endDate, endTime),
                 palette = palette,
                 onClick = {
@@ -1541,7 +1628,7 @@ internal fun EventEditorScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
             EditorValueRow(
-                title = "Reminder",
+                title = stringResource(R.string.event_reminder),
                 value = reminderLabel(reminderMinutes),
                 palette = palette,
                 onClick = {
@@ -1550,8 +1637,12 @@ internal fun EventEditorScreen(
                 },
             )
             EditorValueRow(
-                title = "Repeat",
-                value = if (recurringEditScope == RecurringEditScope.ThisEvent) "None" else repeatRowLabel(recurrenceRule),
+                title = stringResource(R.string.event_repeat),
+                value = if (recurringEditScope == RecurringEditScope.ThisEvent) {
+                    stringResource(R.string.event_repeat_none)
+                } else {
+                    repeatRowLabel(recurrenceRule)
+                },
                 palette = palette,
                 onClick = {
                     clearEditorFocus()
@@ -1561,7 +1652,7 @@ internal fun EventEditorScreen(
             )
             if (canChooseRecurrenceScope) {
                 EditorValueRow(
-                    title = "Apply to",
+                    title = stringResource(R.string.event_apply_to),
                     value = recurringEditScope.label(),
                     palette = palette,
                     onClick = {
@@ -1572,7 +1663,9 @@ internal fun EventEditorScreen(
             }
             if (canChooseRecurrenceScope) {
                 Text(
-                    if (editsWholeSeries) "Changes apply to the whole series" else "Changes apply only to this event",
+                    stringResource(
+                        if (editsWholeSeries) R.string.event_apply_series else R.string.event_apply_instance,
+                    ),
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 12.sp,
@@ -1580,14 +1673,16 @@ internal fun EventEditorScreen(
                 )
             }
             if (submitted && allDay && endDate < startDate) {
-                Text("End date must be on or after start date", color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                Text(stringResource(R.string.event_error_end_before_start_date), color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
             }
             if (submitted && !allDay && !endDate.atTime(endTime).isAfter(startDate.atTime(startTime))) {
-                Text("End must be after start", color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                Text(stringResource(R.string.event_error_end_before_start_time), color = palette.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
             }
             if (event != null && onDelete != null) {
                 Text(
-                    if (editsWholeSeries) "Delete series" else "Delete event",
+                    stringResource(
+                        if (editsWholeSeries) R.string.event_delete_series_button else R.string.event_delete_event_button,
+                    ),
                     color = palette.accent,
                     fontFamily = mono,
                     fontWeight = FontWeight.Medium,
@@ -1609,13 +1704,13 @@ internal fun EventEditorScreen(
             onConfirm = { name ->
                 onSaveTemplate(buildTemplate(name))
                 showSaveTemplateDialog = false
-                showDotCalToast(context, palette, "Template saved")
+                showDotCalToast(context, palette, templateSavedToast)
             },
         )
     }
     dateTimePicker?.let { field ->
         DateTimeChoiceSheet(
-            title = if (field == DateTimeField.Start) "From" else "To",
+            title = stringResource(if (field == DateTimeField.Start) R.string.event_from else R.string.event_to),
             selectedDate = if (field == DateTimeField.Start) startDate else endDate,
             selectedTime = if (field == DateTimeField.Start) startTime else endTime,
             minDate = if (field == DateTimeField.End) startDate else null,
@@ -1693,6 +1788,18 @@ internal fun EventEditorScreen(
             },
         )
     }
+    if (showEventColorPicker) {
+        EventColorChoiceSheet(
+            selectedColorHex = colorHex,
+            calendarColorHex = writableAccounts.firstOrNull { it.id == selectedAccountId }?.color,
+            palette = palette,
+            onDismiss = { showEventColorPicker = false },
+            onSelected = {
+                colorHex = it
+                showEventColorPicker = false
+            },
+        )
+    }
 }
 
 @Composable
@@ -1723,9 +1830,18 @@ private fun ConflictWarningSection(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        val untitledLabel = stringResource(R.string.event_conflict_untitled)
         visibleConflicts.forEach { conflict ->
             Text(
-                text = "${if (currentIsGhost || conflict.isGhost) "Tentatively clashes with" else "Overlaps with"} ${conflict.title.ifBlank { "Untitled" }} ${conflict.conflictTimeRangeLabel(use24HourFormat)}",
+                text = stringResource(
+                    if (currentIsGhost || conflict.isGhost) {
+                        R.string.event_conflict_tentative
+                    } else {
+                        R.string.event_conflict_overlaps
+                    },
+                    conflict.title.ifBlank { untitledLabel },
+                    conflict.conflictTimeRangeLabel(use24HourFormat),
+                ),
                 color = palette.primaryText,
                 fontFamily = mono,
                 fontSize = 12.sp,
@@ -1734,7 +1850,7 @@ private fun ConflictWarningSection(
         }
         if (extraCount > 0) {
             Text(
-                text = "+$extraCount more",
+                text = stringResource(R.string.event_conflict_extra, extraCount),
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 12.sp,
@@ -1749,17 +1865,22 @@ private fun CalendarEvent.conflictTimeRangeLabel(use24HourFormat: Boolean): Stri
     val end = Instant.ofEpochMilli(normalizedEndTimeMs()).atZone(ZoneId.systemDefault())
     val startLabel = start.toLocalTime().format(formatter)
     val endLabel = end.toLocalTime().format(formatter)
-    return if (use24HourFormat) "$startLabel-$endLabel" else "$startLabel-$endLabel".lowercase(Locale.US)
+    return if (use24HourFormat) "$startLabel-$endLabel" else "$startLabel-$endLabel".lowercase(Locale.getDefault())
 }
 
 @Composable
 private fun CalendarFieldPill(
     account: CalendarAccount?,
+    colorHex: String?,
     palette: DotCalPalette,
     enabled: Boolean,
     onClick: () -> Unit,
+    onColorClick: () -> Unit,
 ) {
     val swatch = account?.color?.let { Color(parseColor(it)) } ?: palette.accent
+    val eventColor = remember(colorHex, swatch) {
+        colorHex?.let { Color(parseColor(it)) } ?: swatch
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1784,14 +1905,14 @@ private fun CalendarFieldPill(
                 .background(swatch),
         )
         Text(
-            "Calendar",
+            stringResource(R.string.event_calendar_field),
             color = palette.secondaryText,
             fontFamily = mono,
             fontSize = 13.sp,
             modifier = Modifier.padding(start = 10.dp),
         )
         Text(
-            account?.displayName?.readableCalendarLabel() ?: "Personal",
+            account?.displayName?.readableCalendarLabel() ?: stringResource(R.string.event_calendar_personal),
             color = palette.primaryText,
             fontFamily = mono,
             fontSize = 14.sp,
@@ -1802,7 +1923,214 @@ private fun CalendarFieldPill(
             modifier = Modifier.weight(1f).padding(start = 12.dp),
         )
         if (enabled) {
+            Spacer(modifier = Modifier.width(8.dp))
             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(18.dp))
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .noRippleClickable(onClick = onColorClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Palette,
+                contentDescription = stringResource(R.string.event_color),
+                tint = eventColor,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EventColorChoiceSheet(
+    selectedColorHex: String?,
+    calendarColorHex: String?,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (String?) -> Unit,
+) {
+    val fallbackColor = remember(calendarColorHex, palette.accent) {
+        calendarColorHex?.let { Color(parseColor(it)) } ?: palette.accent
+    }
+    val initialColor = remember(selectedColorHex, fallbackColor) {
+        selectedColorHex?.let { Color(parseColor(it)) } ?: fallbackColor
+    }
+    val initialHsv = remember(initialColor) {
+        FloatArray(3).also { hsv -> android.graphics.Color.colorToHSV(initialColor.toArgb(), hsv) }
+    }
+    var hue by remember { mutableFloatStateOf(initialHsv[0]) }
+    var sat by remember { mutableFloatStateOf(initialHsv[1]) }
+    var value by remember { mutableFloatStateOf(initialHsv[2]) }
+    val current = remember(hue, sat, value) {
+        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value)))
+    }
+    val currentHex = remember(current) {
+        AccentColor.normalizeHex("#%06X".format(0xFFFFFF and current.toArgb())) ?: "#FF3B30"
+    }
+    var hexField by remember { mutableStateOf(currentHex) }
+    LaunchedEffect(currentHex) { hexField = currentHex }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(palette.dialogSurface)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 22.dp),
+        ) {
+            Text(
+                stringResource(R.string.event_color),
+                color = palette.primaryText,
+                fontFamily = LocalHeadingFont.current,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 18.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp),
+            )
+            EventColorChoiceRow(
+                label = stringResource(R.string.bulk_use_calendar_color),
+                swatchColor = fallbackColor,
+                selected = selectedColorHex == null,
+                palette = palette,
+                onClick = { onSelected(null) },
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(76.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(current),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    currentHex,
+                    color = if (current.luminanceApprox() > 0.5f) Color(0xFF101010) else Color.White,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                )
+            }
+            Spacer(modifier = Modifier.height(18.dp))
+            CalcSectionLabelSafe(stringResource(R.string.picker_hue), palette)
+            Spacer(modifier = Modifier.height(8.dp))
+            HueSlider(hue = hue, palette = palette, onHueChange = { hue = it })
+            Spacer(modifier = Modifier.height(18.dp))
+            CalcSectionLabelSafe(stringResource(R.string.picker_saturation), palette)
+            Spacer(modifier = Modifier.height(8.dp))
+            ValueSlider(
+                fraction = sat,
+                track = Brush.horizontalGradient(
+                    listOf(
+                        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0f, value))),
+                        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, value))),
+                    ),
+                ),
+                palette = palette,
+                onChange = { sat = it },
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            CalcSectionLabelSafe(stringResource(R.string.picker_brightness), palette)
+            Spacer(modifier = Modifier.height(8.dp))
+            ValueSlider(
+                fraction = value,
+                track = Brush.horizontalGradient(
+                    listOf(
+                        Color.Black,
+                        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, 1f))),
+                    ),
+                ),
+                palette = palette,
+                onChange = { value = it },
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            CalcSectionLabelSafe(stringResource(R.string.picker_hex), palette)
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, palette.textFieldBorder, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+            ) {
+                BasicTextField(
+                    value = hexField,
+                    onValueChange = { raw ->
+                        hexField = raw
+                        AccentColor.normalizeHex(raw)?.let { normalized ->
+                            val hsv = FloatArray(3)
+                            android.graphics.Color.colorToHSV(android.graphics.Color.parseColor(normalized), hsv)
+                            hue = hsv[0]
+                            sat = hsv[1]
+                            value = hsv[2]
+                        }
+                    },
+                    singleLine = true,
+                    textStyle = TextStyle(color = palette.primaryText, fontFamily = mono, fontSize = 15.sp),
+                    cursorBrush = SolidColor(palette.accent),
+                )
+            }
+            Spacer(modifier = Modifier.height(18.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(stringResource(R.string.action_cancel), color = palette.secondaryText, fontFamily = mono)
+                }
+                Button(
+                    onClick = { onSelected(currentHex) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+                ) {
+                    Text(stringResource(R.string.action_apply), fontFamily = mono, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EventColorChoiceRow(
+    label: String,
+    swatchColor: Color,
+    selected: Boolean,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) palette.accent.copy(alpha = 0.10f) else Color.Transparent)
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(swatchColor))
+        Text(
+            label,
+            color = palette.primaryText,
+            fontFamily = mono,
+            fontSize = 15.sp,
+            modifier = Modifier.weight(1f).padding(start = 12.dp),
+        )
+        if (selected) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = palette.accent, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -1819,7 +2147,7 @@ private fun CalendarChoiceDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
         title = {
-            Text("Choose calendar", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.event_choose_calendar), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold)
         },
         text = {
             LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
@@ -1857,7 +2185,7 @@ private fun CalendarChoiceDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = palette.primaryText, fontFamily = mono)
+                Text(stringResource(R.string.action_cancel), color = palette.primaryText, fontFamily = mono)
             }
         },
     )
@@ -1877,11 +2205,13 @@ private fun CalendarAccountSubtitle(account: CalendarAccount, palette: DotCalPal
     )
 }
 
+@Composable
 private fun CalendarAccount.cleanPickerSubtitle(): String {
     return when {
-        id == DotCalRepository.LOCAL_ACCOUNT_ID || accountType.equals("LOCAL", ignoreCase = true) -> "On this device"
-        accountType.equals("GOOGLE", ignoreCase = true) -> "Google calendar"
-        accountType.equals("DEVICE", ignoreCase = true) -> "Device calendar"
+        id == DotCalRepository.LOCAL_ACCOUNT_ID || accountType.equals("LOCAL", ignoreCase = true) ->
+            stringResource(R.string.account_on_this_device)
+        accountType.equals("GOOGLE", ignoreCase = true) -> stringResource(R.string.account_google_calendar)
+        accountType.equals("DEVICE", ignoreCase = true) -> stringResource(R.string.account_device_calendar)
         accountType.isNotBlank() -> accountType.readableCalendarLabel()
         else -> ""
     }
@@ -1943,7 +2273,7 @@ internal fun JumpToDateSheet(
         List(731) { start.plusDays(it.toLong()) }
     }
     val weekLabels = remember(weekStart) {
-        List(7) { index -> weekStart.plus(index.toLong()).name.take(3) }
+        List(7) { index -> weekStart.plus(index.toLong()).getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()) }
     }
     var pickedDate by remember(selectedDate) { mutableStateOf(selectedDate) }
     ModalBottomSheet(
@@ -1962,9 +2292,9 @@ internal fun JumpToDateSheet(
                 .padding(top = 4.dp, bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Go to date", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.jump_to_date_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Text(
-                pickedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy", Locale.US)),
+                pickedDate.format(localizedFormatter("EEEE, MMM d, yyyy")),
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 14.sp,
@@ -1981,7 +2311,7 @@ internal fun JumpToDateSheet(
             WheelColumn(
                 items = dates,
                 selected = pickedDate,
-                label = { it.format(DateTimeFormatter.ofPattern("EEE, MMM d yyyy", Locale.US)) },
+                label = { it.format(localizedFormatter("EEE, MMM d yyyy")) },
                 palette = palette,
                 modifier = Modifier.fillMaxWidth(),
                 onSelected = { pickedDate = it },
@@ -2002,7 +2332,7 @@ internal fun JumpToDateSheet(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("Today", fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.action_today), fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 Button(
@@ -2011,7 +2341,7 @@ internal fun JumpToDateSheet(
                     colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
                     shape = RoundedCornerShape(18.dp),
                 ) {
-                    Text("Jump", fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.action_jump), fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -2040,7 +2370,11 @@ private fun CountdownDetailCard(event: CalendarEvent, palette: DotCalPalette, on
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            if (days == 1L) "DAY UNTIL ${event.title.uppercase(Locale.getDefault())}" else "DAYS UNTIL ${event.title.uppercase(Locale.getDefault())}",
+            pluralStringResource(
+                R.plurals.countdown_days_until,
+                days.toInt(),
+                event.title.uppercase(Locale.getDefault()),
+            ),
             color = palette.primaryText,
             fontFamily = mono,
             fontWeight = FontWeight.SemiBold,
@@ -2051,7 +2385,7 @@ private fun CountdownDetailCard(event: CalendarEvent, palette: DotCalPalette, on
         )
         Spacer(modifier = Modifier.height(14.dp))
         Text(
-            "Share as image",
+            stringResource(R.string.countdown_share_image),
             color = palette.accent,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
@@ -2161,7 +2495,7 @@ internal fun DateTimeChoiceSheet(
                 WheelColumn(
                     items = dates,
                     selected = pickedDate,
-                    label = { it.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)) },
+                    label = { it.format(localizedFormatter("EEE, MMM d")) },
                     palette = palette,
                     modifier = Modifier.weight(1.8f),
                     onSelected = { pickedDate = it },
@@ -2206,7 +2540,7 @@ internal fun DateTimeChoiceSheet(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("Cancel", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.action_cancel), fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 Button(
@@ -2215,7 +2549,7 @@ internal fun DateTimeChoiceSheet(
                     colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
                     shape = RoundedCornerShape(18.dp),
                 ) {
-                    Text("OK", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.action_ok), fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -2361,7 +2695,7 @@ internal fun ReminderChoiceSheet(selected: Int?, palette: DotCalPalette, onDismi
         dragHandle = { BottomSheetDragHandle(palette) },
     ) {
         ChoiceSheetContent(
-            title = "Reminder",
+            title = stringResource(R.string.event_reminder),
             items = reminderOptions,
             selected = selected,
             label = { reminderLabel(it) },
@@ -2395,7 +2729,7 @@ internal fun RepeatChoiceSheet(
     ) {
         Column(modifier = Modifier.fillMaxWidth().background(palette.dialogSurface).padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
             Spacer(modifier = Modifier.height(12.dp))
-            Text("Repeat", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+            Text(stringResource(R.string.event_repeat), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(4.dp))
             recurrenceOptions.forEach { option ->
                 RepeatOptionRow(
@@ -2410,7 +2744,13 @@ internal fun RepeatChoiceSheet(
                 HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
             }
             RepeatOptionRow(
-                label = if (isCustomSelected) (selectedRule?.humanLabel() ?: "Custom...") else "Custom...",
+                label = stringResource(R.string.repeat_custom).let { customLabel ->
+                    if (isCustomSelected) {
+                        (selectedRule?.let { recurrenceHumanLabel(it) } ?: customLabel)
+                    } else {
+                        customLabel
+                    }
+                },
                 selected = isCustomSelected,
                 palette = palette,
                 locked = !isPro,
@@ -2542,22 +2882,27 @@ private fun CustomRecurrenceSheet(
                     .padding(bottom = 96.dp),
             ) {
             Spacer(modifier = Modifier.height(4.dp))
-            Text("Custom Repeat", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+            Text(stringResource(R.string.recurrence_custom_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(6.dp))
-            Text(buildRule().humanLabel(), color = palette.accent, fontFamily = mono, fontSize = 14.sp)
+            Text(recurrenceHumanLabel(buildRule()), color = palette.accent, fontFamily = mono, fontSize = 14.sp)
 
             Spacer(modifier = Modifier.height(18.dp))
-            CalcSectionLabelSafe("FREQUENCY", palette)
+            CalcSectionLabelSafe(stringResource(R.string.recurrence_frequency), palette)
             Spacer(modifier = Modifier.height(8.dp))
             TwoOptionSegmentedControl(
-                options = listOf("Day", "Week", "Month", "Year"),
+                options = listOf(
+                    stringResource(R.string.recurrence_freq_day),
+                    stringResource(R.string.recurrence_freq_week),
+                    stringResource(R.string.recurrence_freq_month),
+                    stringResource(R.string.recurrence_freq_year),
+                ),
                 selectedIndex = freqOrder.indexOf(freq).coerceAtLeast(0),
                 palette = palette,
                 onSelected = { freq = freqOrder[it] },
             )
 
             Spacer(modifier = Modifier.height(18.dp))
-            CalcSectionLabelSafe("EVERY", palette)
+            CalcSectionLabelSafe(stringResource(R.string.recurrence_every), palette)
             Spacer(modifier = Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CalcStepperButton("-", palette) { interval = (interval - 1).coerceAtLeast(1) }
@@ -2575,7 +2920,7 @@ private fun CustomRecurrenceSheet(
 
             if (freq == RecurrenceFreq.WEEKLY) {
                 Spacer(modifier = Modifier.height(18.dp))
-                CalcSectionLabelSafe("ON DAYS", palette)
+                CalcSectionLabelSafe(stringResource(R.string.recurrence_on_days), palette)
                 Spacer(modifier = Modifier.height(8.dp))
                 WeekdayPickerRow(
                     selected = weekdays,
@@ -2588,17 +2933,17 @@ private fun CustomRecurrenceSheet(
 
             if (freq == RecurrenceFreq.MONTHLY) {
                 Spacer(modifier = Modifier.height(18.dp))
-                CalcSectionLabelSafe("ON", palette)
+                CalcSectionLabelSafe(stringResource(R.string.recurrence_on), palette)
                 Spacer(modifier = Modifier.height(8.dp))
                 RepeatOptionRow(
-                    label = "Day ${anchorDate.dayOfMonth} of the month",
+                    label = stringResource(R.string.recurrence_day_of_month, anchorDate.dayOfMonth),
                     selected = !monthlyByWeekday,
                     palette = palette,
                     onClick = { monthlyByWeekday = false },
                 )
                 HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
                 RepeatOptionRow(
-                    label = "The ${nthWeekdayPhrase(anchorNthByDay)}",
+                    label = stringResource(R.string.recurrence_nth_weekday, nthWeekdayPhrase(anchorNthByDay)),
                     selected = monthlyByWeekday,
                     palette = palette,
                     onClick = { monthlyByWeekday = true },
@@ -2606,17 +2951,21 @@ private fun CustomRecurrenceSheet(
             }
 
             Spacer(modifier = Modifier.height(18.dp))
-            CalcSectionLabelSafe("ENDS", palette)
+            CalcSectionLabelSafe(stringResource(R.string.recurrence_ends), palette)
             Spacer(modifier = Modifier.height(8.dp))
             RepeatOptionRow(
-                label = "Never",
+                label = stringResource(R.string.recurrence_never),
                 selected = endMode == RecurrenceEndMode.Never,
                 palette = palette,
                 onClick = { endMode = RecurrenceEndMode.Never },
             )
             HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
             RepeatOptionRow(
-                label = if (endMode == RecurrenceEndMode.OnDate) "On ${untilDate.format(editorDateFormatter)}" else "On a date",
+                label = if (endMode == RecurrenceEndMode.OnDate) {
+                    stringResource(R.string.recurrence_on_specific_date, untilDate.format(editorDateFormatter))
+                } else {
+                    stringResource(R.string.recurrence_on_date)
+                },
                 selected = endMode == RecurrenceEndMode.OnDate,
                 palette = palette,
                 onClick = {
@@ -2632,7 +2981,7 @@ private fun CustomRecurrenceSheet(
                     .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("After", color = palette.primaryText, fontFamily = mono, fontSize = 15.sp)
+                Text(stringResource(R.string.recurrence_after), color = palette.primaryText, fontFamily = mono, fontSize = 15.sp)
                 Spacer(modifier = Modifier.width(12.dp))
                 if (endMode == RecurrenceEndMode.AfterCount) {
                     CalcStepperButton("-", palette) { countN = (countN - 1).coerceAtLeast(1) }
@@ -2647,9 +2996,9 @@ private fun CustomRecurrenceSheet(
                     )
                     CalcStepperButton("+", palette) { countN = (countN + 1).coerceAtMost(999) }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (countN == 1) "time" else "times", color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+                    Text(pluralStringResource(R.plurals.recurrence_times, countN), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
                 } else {
-                    Text("a number of times", color = palette.secondaryText, fontFamily = mono, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.recurrence_a_number_of_times), color = palette.secondaryText, fontFamily = mono, fontSize = 15.sp, modifier = Modifier.weight(1f))
                     Icon(Icons.Default.Check, contentDescription = null, tint = Color.Transparent, modifier = Modifier.size(18.dp))
                 }
             }
@@ -2665,7 +3014,7 @@ private fun CustomRecurrenceSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onDismiss) { Text("Cancel", color = palette.primaryText, fontFamily = mono) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = palette.primaryText, fontFamily = mono) }
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
@@ -2673,7 +3022,7 @@ private fun CustomRecurrenceSheet(
                         .noRippleClickable { onConfirm(buildRule().toRRule()) }
                         .padding(horizontal = 28.dp, vertical = 12.dp),
                 ) {
-                    Text("Done", color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.action_done), color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -2681,7 +3030,7 @@ private fun CustomRecurrenceSheet(
 
     if (showUntilPicker) {
         DateTimeChoiceSheet(
-            title = "Ends on",
+            title = stringResource(R.string.recurrence_ends_on),
             selectedDate = untilDate,
             selectedTime = LocalTime.NOON,
             minDate = anchorDate,
@@ -2716,7 +3065,7 @@ private fun WeekdayPickerRow(selected: Set<DayOfWeek>, palette: DotCalPalette, o
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    day.getDisplayName(java.time.format.TextStyle.NARROW, Locale.US),
+                    day.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault()),
                     color = if (isOn) palette.onAccent else palette.secondaryText,
                     fontFamily = mono,
                     fontWeight = if (isOn) FontWeight.Bold else FontWeight.Normal,
@@ -2727,32 +3076,21 @@ private fun WeekdayPickerRow(selected: Set<DayOfWeek>, palette: DotCalPalette, o
     }
 }
 
+@Composable
 private fun freqUnitLabel(freq: RecurrenceFreq, interval: Int): String {
-    val plural = interval != 1
-    return when (freq) {
-        RecurrenceFreq.DAILY -> if (plural) "days" else "day"
-        RecurrenceFreq.WEEKLY -> if (plural) "weeks" else "week"
-        RecurrenceFreq.MONTHLY -> if (plural) "months" else "month"
-        RecurrenceFreq.YEARLY -> if (plural) "years" else "year"
+    val plurals = when (freq) {
+        RecurrenceFreq.DAILY -> R.plurals.recurrence_unit_day
+        RecurrenceFreq.WEEKLY -> R.plurals.recurrence_unit_week
+        RecurrenceFreq.MONTHLY -> R.plurals.recurrence_unit_month
+        RecurrenceFreq.YEARLY -> R.plurals.recurrence_unit_year
     }
+    return pluralStringResource(plurals, interval)
 }
 
 /** The nth (or last) weekday of the month containing this date, as a BYDAY token. */
 private fun LocalDate.nthWeekdayByDay(): ByDay {
     val ordinal = if (dayOfMonth > lengthOfMonth() - 7) -1 else ((dayOfMonth - 1) / 7) + 1
     return ByDay(ordinal, dayOfWeek)
-}
-
-private fun nthWeekdayPhrase(byDay: ByDay): String {
-    val ord = when (byDay.ordinal) {
-        -1 -> "last"
-        2 -> "2nd"
-        3 -> "3rd"
-        4 -> "4th"
-        5 -> "5th"
-        else -> "1st"
-    }
-    return "$ord ${byDay.day.getDisplayName(java.time.format.TextStyle.FULL, Locale.US)}"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2771,7 +3109,7 @@ internal fun ApplyScopeChoiceSheet(
         dragHandle = { BottomSheetDragHandle(palette) },
     ) {
         ChoiceSheetContent(
-            title = "Apply to",
+            title = stringResource(R.string.event_apply_to),
             items = listOf(RecurringEditScope.ThisEvent, RecurringEditScope.WholeSeries),
             selected = selected,
             label = { it.label() },
@@ -2786,7 +3124,8 @@ internal fun <T> ChoiceSheetContent(
     title: String,
     items: List<T>,
     selected: T,
-    label: (T) -> String,
+    // @Composable so callers can pass labels that resolve string resources.
+    label: @Composable (T) -> String,
     palette: DotCalPalette,
     onSelected: (T) -> Unit,
 ) {
@@ -2795,7 +3134,9 @@ internal fun <T> ChoiceSheetContent(
         Text(title, color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
         Spacer(modifier = Modifier.height(12.dp))
         LazyColumn(modifier = Modifier.fillMaxWidth().height(320.dp)) {
-            lazyItems(items, key = { label(it) }) { item ->
+            // No `key`: it used to be `label(it)`, which a @Composable label cannot supply from a
+            // LazyListScope lambda. These option lists are short, static, and hold no row state.
+            lazyItems(items) { item ->
                 val isSelected = item == selected
                 Row(
                     modifier = Modifier

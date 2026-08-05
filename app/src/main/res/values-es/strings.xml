@@ -1,0 +1,968 @@
+<resources>
+    <string name="app_name">DotCal</string>
+    <string name="widget_small_description">Próximo evento</string>
+    <string name="widget_medium_description">Detalles del evento</string>
+    <string name="widget_large_description">Panel del calendario</string>
+    <string name="widget_countdown_label">Cuenta regresiva de DotCal</string>
+    <string name="widget_countdown_description">Cuenta regresiva del evento</string>
+    <string name="widget_agenda_label">Agenda de DotCal</string>
+    <string name="widget_agenda_description">Lista de agenda</string>
+    <string name="widget_month_grid_label">Cuadricula mensual de DotCal</string>
+    <string name="widget_month_grid_description">Cuadricula mensual</string>
+    <string name="glyph_toy_name">DotCal</string>
+    <string name="glyph_toy_summary">Muestra una cuenta regresiva en vivo hasta tu proximo evento de DotCal.</string>
+    <!-- Spanish is the first language being judged on-device. Every user-facing string extracted
+         through pass 3a-ii is translated here. Strings marked translatable="false" in
+         values/strings.xml (brands, storage values, the Privacy Policy body) are absent on purpose
+         and must stay absent — see Docs/HANDOFF.md. -->
+
+    <!-- Language picker -->
+    <string name="settings_language_title">Idioma</string>
+    <string name="settings_language_system_default">Predeterminado del sistema</string>
+    <string name="language_sheet_subtitle">Las traducciones se aplican al actualizar la app.</string>
+
+    <!-- Calendar view tabs -->
+    <string name="tab_year_label">Vista de año</string>
+    <string name="tab_year_short">Año</string>
+    <string name="tab_month_label">Vista de mes</string>
+    <string name="tab_month_short">Mes</string>
+    <string name="tab_week_label">Vista de semana</string>
+    <string name="tab_week_short">Semana</string>
+    <string name="tab_day_label">Vista de día</string>
+    <string name="tab_day_short">Día</string>
+    <string name="tab_three_day_label">Vista de tres días</string>
+    <string name="tab_three_day_short">3 días</string>
+    <string name="tab_agenda_label">Vista de agenda</string>
+    <string name="tab_agenda_short">Agenda</string>
+
+    <!-- Action bar overflow menu -->
+    <string name="menu_search">Buscar</string>
+    <string name="menu_search_subtitle">Encuentra eventos y tareas</string>
+    <string name="menu_new_event">Nuevo evento</string>
+    <string name="menu_new_event_subtitle">Crea un evento rápidamente</string>
+    <string name="menu_go_to_date">Ir a una fecha</string>
+    <string name="menu_go_to_date_subtitle">Salta sin cambiar de vista</string>
+    <string name="menu_quick_add">Añadir rápido</string>
+    <string name="menu_quick_add_subtitle">Escríbelo y lo programamos</string>
+    <string name="menu_share_availability">Compartir disponibilidad</string>
+    <string name="menu_share_availability_subtitle">Copia cuándo estás libre</string>
+    <string name="menu_templates">Plantillas</string>
+    <string name="menu_templates_subtitle">Reutiliza eventos y tareas guardados</string>
+    <string name="menu_calendar_sets">Conjuntos de calendarios</string>
+    <string name="menu_calendar_sets_subtitle">Cambia entre conjuntos guardados</string>
+    <string name="menu_shift_patterns">Patrones de turnos</string>
+    <string name="menu_shift_patterns_subtitle">Crea horarios rotativos</string>
+
+    <!-- Start of the week -->
+    <string name="week_start_region_default">Predeterminado de la región</string>
+    <string name="week_start_saturday">Sábado</string>
+    <string name="week_start_sunday">Domingo</string>
+    <string name="week_start_monday">Lunes</string>
+
+    <!-- Theme mode -->
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
+    <string name="theme_system">Sistema</string>
+
+    <!-- Fonts -->
+    <string name="font_system_label">Sistema</string>
+    <string name="font_ndot_tagline">Monoespaciada. Técnica. Precisa.</string>
+    <string name="font_ntype_tagline">Editorial. Redefinida.</string>
+    <string name="font_system_tagline">La fuente propia de tu dispositivo.</string>
+
+    <!-- Accent color names -->
+    <string name="accent_red">Rojo</string>
+    <string name="accent_blue">Azul</string>
+    <string name="accent_green">Verde</string>
+    <string name="accent_purple">Morado</string>
+    <string name="accent_amber">Ámbar</string>
+    <string name="accent_teal">Verde azulado</string>
+    <string name="accent_pink">Rosa</string>
+    <string name="accent_orange">Naranja</string>
+    <string name="accent_cyan">Cian</string>
+    <string name="accent_indigo">Índigo</string>
+    <string name="accent_mint">Menta</string>
+    <string name="accent_rose">Rosado</string>
+    <string name="accent_lime">Lima</string>
+
+    <!-- Settings root -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_panel_accounts">Cuentas</string>
+    <string name="settings_calendar_accounts">Cuentas de calendario</string>
+    <string name="settings_calendar_preferences">Preferencias del calendario</string>
+    <string name="settings_reminder_defaults">Recordatorios predeterminados</string>
+    <string name="settings_appearance">Apariencia</string>
+    <string name="settings_widgets">Widgets</string>
+    <string name="settings_widgets_value_transparent">Transparente</string>
+    <string name="settings_widgets_value_default">Predeterminado</string>
+    <string name="settings_app_lock_vault">Bloqueo de app y bóveda privada</string>
+    <string name="settings_sync">Sincronización</string>
+    <string name="settings_data_restore">Datos y restauración</string>
+    <string name="settings_value_active">Activo</string>
+    <string name="settings_value_off">Desactivada</string>
+    <string name="settings_value_local">Local</string>
+    <string name="settings_panel_about">Acerca de</string>
+    <string name="settings_check_updates">Buscar actualizaciones</string>
+    <string name="settings_privacy_policy">Política de privacidad</string>
+    <string name="settings_rate">Valorar DotCal</string>
+    <string name="settings_more_apps">Más apps nuestras</string>
+    <string name="settings_send_feedback">Enviar comentarios</string>
+    <string name="settings_version">Versión</string>
+
+    <!-- Calendar preferences -->
+    <string name="settings_panel_calendar">Calendario</string>
+    <string name="settings_week_numbers">Números de semana</string>
+    <string name="settings_week_numbers_subtitle">Muestra las semanas ISO en Mes y Semana</string>
+    <string name="settings_birthday_calendar">Calendario de cumpleaños</string>
+    <string name="settings_birthday_calendar_subtitle">Importa los cumpleaños de tus contactos</string>
+    <string name="settings_global_holidays">Festivos internacionales</string>
+    <string name="settings_default_view">Vista predeterminada</string>
+    <string name="settings_default_event_duration">Duración predeterminada del evento</string>
+    <string name="settings_start_of_week">Inicio de la semana</string>
+
+    <!-- Reminder defaults -->
+    <string name="settings_panel_defaults">Predeterminados</string>
+    <string name="settings_default_reminder">Recordatorio predeterminado</string>
+    <string name="settings_default_all_day_reminder_time">Hora del recordatorio de todo el día</string>
+    <string name="duration_1_hour">1 hora</string>
+    <string name="duration_2_hours">2 horas</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="reminder_none">Ninguno</string>
+    <string name="reminder_1_hour_before">1 hora antes</string>
+    <string name="reminder_1_day_before">1 día antes</string>
+    <string name="reminder_minutes_before">%1$d minutos antes</string>
+
+    <!-- Widgets -->
+    <string name="settings_panel_widget_style">Estilo de widget</string>
+    <string name="settings_transparent_widgets">Widgets transparentes</string>
+    <string name="settings_transparent_widgets_subtitle">Deja que el fondo se vea a través de los widgets</string>
+    <string name="settings_widget_dot_texture">Textura de puntos</string>
+    <string name="settings_widget_dot_texture_subtitle">Muestra la sutil superficie punteada de DotCal</string>
+    <string name="settings_widget_dot_texture_subtitle_disabled">Solo se aplica si los widgets transparentes están desactivados</string>
+
+    <!-- Data and restore -->
+    <string name="settings_panel_calendar_files">Archivos de calendario</string>
+    <string name="settings_export_calendar">Exportar calendario</string>
+    <string name="settings_export_calendar_subtitle">Guarda todos los eventos y tareas en un archivo .ics</string>
+    <string name="settings_import_calendar">Importar calendario</string>
+    <string name="settings_import_calendar_subtitle">Carga eventos y tareas desde un archivo .ics</string>
+    <string name="settings_panel_backup_restore">Copia y restauración</string>
+    <string name="settings_back_up_data">Crear copia de seguridad</string>
+    <string name="settings_back_up_data_subtitle">Guarda eventos, tareas y recordatorios en un archivo</string>
+    <string name="settings_restore_data">Restaurar datos</string>
+    <string name="settings_restore_data_subtitle">Combina un archivo de copia con este dispositivo</string>
+    <string name="settings_recently_deleted">Eliminados recientemente</string>
+
+    <!-- Sync -->
+    <string name="settings_panel_calendar_sync">Sincronización de calendario</string>
+    <string name="settings_sync_enabled">Sincronización activada</string>
+    <string name="settings_sync_enabled_subtitle">Mantén DotCal al día con los calendarios del dispositivo</string>
+    <string name="settings_sync_interval">Intervalo de sincronización</string>
+    <string name="settings_sync_now">Sincronizar ahora</string>
+    <string name="settings_syncing">Sincronizando...</string>
+    <string name="sync_interval_manual">Manual</string>
+    <string name="sync_last_synced">Última sincronización: %1$s</string>
+    <string name="sync_never">nunca</string>
+    <string name="sync_just_now">ahora mismo</string>
+    <string name="sync_yesterday">ayer</string>
+
+    <!-- App lock and private vault -->
+    <string name="settings_privacy">Privacidad</string>
+    <string name="settings_panel_app_lock">Bloqueo de la app</string>
+    <string name="settings_require_pin">Solicitar PIN</string>
+    <string name="settings_require_pin_subtitle_set">Bloquea DotCal al salir de la app</string>
+    <string name="settings_require_pin_subtitle_unset">Define un PIN de 4 a 8 dígitos</string>
+    <string name="settings_change_pin">Cambiar PIN</string>
+    <string name="settings_set_pin">Definir PIN</string>
+    <string name="settings_remove_pin">Eliminar PIN</string>
+    <string name="settings_disable_app_lock">Desactivar bloqueo de la app</string>
+    <string name="settings_panel_private_vault">Bóveda privada</string>
+    <string name="settings_private_vault_blurb">Los eventos y tareas ocultos no aparecen en calendarios, listas de tareas, widgets ni recordatorios hasta que los restaures.</string>
+    <string name="settings_panel_private_items">Elementos privados</string>
+    <string name="settings_no_private_items">No hay elementos privados</string>
+    <string name="action_restore">Restaurar</string>
+    <string name="action_save">Guardar</string>
+    <string name="action_disable">Desactivar</string>
+    <string name="action_remove">Eliminar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_ok">Aceptar</string>
+    <string name="action_apply">Aplicar</string>
+    <string name="vault_no_title">(Sin título)</string>
+    <string name="vault_task_no_due">Tarea - Sin fecha límite</string>
+    <string name="vault_type_task">Tarea</string>
+    <string name="vault_type_event">Evento</string>
+    <string name="vault_when">%1$s - %2$s</string>
+
+    <!-- App lock screen and PIN dialog -->
+    <string name="app_lock_title">DotCal bloqueado</string>
+    <string name="app_lock_subtitle">Introduce tu PIN para continuar</string>
+    <string name="app_lock_incorrect">PIN incorrecto</string>
+    <string name="app_lock_unlock">Desbloquear</string>
+    <string name="app_lock_use_device">Usar bloqueo del dispositivo</string>
+    <string name="pin_field_label">PIN</string>
+    <string name="pin_error">Introduce el PIN correcto de 4 a 8 dígitos</string>
+
+    <!-- Appearance -->
+    <string name="settings_appearance_subtitle">Elige la apariencia de la app</string>
+    <string name="settings_panel_font">Fuente</string>
+    <string name="settings_panel_theme">Tema</string>
+    <string name="settings_panel_accent">Color de acento</string>
+    <string name="settings_more_colors">Más colores</string>
+    <string name="settings_tap_to_apply">Toca para aplicar</string>
+    <string name="settings_custom_color">Color personalizado</string>
+    <string name="settings_pick_hex">Elige cualquier color hexadecimal</string>
+    <string name="settings_custom_accent">Acento personalizado</string>
+    <string name="picker_hue">TONO</string>
+    <string name="picker_saturation">SATURACIÓN</string>
+    <string name="picker_brightness">BRILLO</string>
+
+    <!-- Global holidays -->
+    <string name="settings_selected_caps">SELECCIONADOS</string>
+    <string name="settings_available_caps">DISPONIBLES</string>
+    <string name="holidays_none_selected">Ninguno seleccionado</string>
+
+    <!-- Calendar accounts -->
+    <string name="settings_grant_calendar_access">Conceder acceso al calendario</string>
+    <string name="settings_tap_sync_now">Toca Sincronizar ahora para cargar las cuentas</string>
+    <string name="settings_calendar_access_needed">Se necesita acceso al calendario</string>
+    <string name="settings_add_an_account">Añadir una cuenta</string>
+    <string name="settings_add_account">Añadir cuenta</string>
+    <string name="accounts_local_only">Solo local</string>
+    <string name="accounts_connected">Conectado</string>
+    <string name="accounts_selected_ratio">%1$d/%2$d seleccionadas</string>
+
+    <!-- Tools -->
+    <string name="settings_panel_tools">Herramientas</string>
+    <string name="settings_dead_time">Tiempo muerto</string>
+    <string name="settings_dead_time_caption">Huecos libres</string>
+    <string name="settings_date_calculator">Calculadora de fechas</string>
+    <string name="settings_date_calculator_caption">Cálculo de fechas</string>
+
+    <!-- DotCal Pro -->
+    <string name="settings_pair_value">%1$s / %2$s</string>
+    <string name="settings_pro_lifetime_unlocked">Desbloqueado de por vida</string>
+    <string name="settings_pro_lifetime_tools">Herramientas de por vida</string>
+    <string name="settings_pro_lifetime_tools_price">Herramientas de por vida / %1$s</string>
+    <string name="settings_pro_active">Activo: ¡gracias por tu apoyo!</string>
+    <string name="settings_pro_unlock">Desbloquea las funciones Pro</string>
+    <string name="pro_feature_tag">Función Pro</string>
+
+    <!-- Counted strings. Spanish uses the same one/other split as English. -->
+    <plurals name="count_selected">
+        <item quantity="one">%1$d seleccionado</item>
+        <item quantity="other">%1$d seleccionados</item>
+    </plurals>
+    <plurals name="events_updated">
+        <item quantity="one">%1$d evento actualizado</item>
+        <item quantity="other">%1$d eventos actualizados</item>
+    </plurals>
+    <plurals name="events_shifted">
+        <item quantity="one">%1$d evento desplazado</item>
+        <item quantity="other">%1$d eventos desplazados</item>
+    </plurals>
+    <plurals name="events_moved">
+        <item quantity="one">%1$d evento movido</item>
+        <item quantity="other">%1$d eventos movidos</item>
+    </plurals>
+    <plurals name="events_copied">
+        <item quantity="one">%1$d evento copiado</item>
+        <item quantity="other">%1$d eventos copiados</item>
+    </plurals>
+    <plurals name="events_recolored">
+        <item quantity="one">%1$d evento recoloreado</item>
+        <item quantity="other">%1$d eventos recoloreados</item>
+    </plurals>
+    <plurals name="events_added">
+        <item quantity="one">%1$d evento añadido</item>
+        <item quantity="other">%1$d eventos añadidos</item>
+    </plurals>
+    <plurals name="events_deleted">
+        <item quantity="one">%1$d evento eliminado</item>
+        <item quantity="other">%1$d eventos eliminados</item>
+    </plurals>
+    <plurals name="holiday_countries_selected">
+        <item quantity="one">%1$d país seleccionado</item>
+        <item quantity="other">%1$d países seleccionados</item>
+    </plurals>
+    <plurals name="sync_minutes_ago">
+        <item quantity="one">hace %1$d min</item>
+        <item quantity="other">hace %1$d min</item>
+    </plurals>
+    <plurals name="sync_hours_ago">
+        <item quantity="one">hace %1$d h</item>
+        <item quantity="other">hace %1$d h</item>
+    </plurals>
+    <plurals name="sync_days_ago">
+        <item quantity="one">hace %1$d d</item>
+        <item quantity="other">hace %1$d d</item>
+    </plurals>
+
+    <!-- Pass 4: shared actions -->
+    <string name="action_edit">Editar</string>
+    <string name="action_delete">Eliminar</string>
+    <string name="action_share">Compartir</string>
+    <string name="action_duplicate">Duplicar</string>
+    <string name="action_done">Listo</string>
+    <string name="action_today">Hoy</string>
+    <string name="action_jump">Saltar</string>
+    <string name="action_update">Actualizar</string>
+    <string name="action_restart">Reiniciar</string>
+    <string name="action_later">Más tarde</string>
+    <string name="action_not_now">Ahora no</string>
+
+    <!-- Calendar account subtitles -->
+    <string name="account_on_this_device">En este dispositivo</string>
+    <string name="account_google_calendar">Calendario de Google</string>
+    <string name="account_device_calendar">Calendario del dispositivo</string>
+
+    <!-- Private Vault actions -->
+    <string name="vault_move_to">Mover a la bóveda privada</string>
+    <string name="vault_restore_from">Restaurar de la bóveda privada</string>
+
+    <!-- Shared dialogs -->
+    <string name="dialog_delete_event_title">¿Eliminar evento?</string>
+    <string name="dialog_delete_series_title">¿Eliminar serie?</string>
+    <string name="dialog_delete_series_confirm">Eliminar serie</string>
+    <string name="dialog_cannot_be_undone">Esto no se puede deshacer.</string>
+    <string name="dialog_schedule_conflict">Conflicto de horario</string>
+    <string name="dialog_move_anyway">Mover de todas formas</string>
+    <string name="dialog_save_as_template">Guardar como plantilla</string>
+    <string name="dialog_template_name">Nombre de la plantilla</string>
+    <string name="dialog_update_available">Actualización disponible</string>
+    <string name="dialog_update_available_body">Hay una nueva versión de DotCal disponible. Actualiza para obtener las últimas mejoras.</string>
+    <string name="dialog_update_ready">Actualización lista</string>
+    <string name="dialog_update_ready_body">La actualización se ha descargado. Reinicia DotCal para aplicarla.</string>
+    <plurals name="dialog_conflict_overlaps">
+        <item quantity="one">Este horario se superpone con otro evento.</item>
+        <item quantity="other">Este horario se superpone con %1$d eventos más.</item>
+    </plurals>
+
+    <!-- Event details -->
+    <string name="event_details_title">Detalles del evento</string>
+    <string name="event_section_time">HORA</string>
+    <string name="event_section_countdown">CUENTA ATRÁS</string>
+    <string name="event_section_location">UBICACIÓN</string>
+    <string name="event_section_reminder">RECORDATORIO</string>
+    <string name="event_section_calendar">CALENDARIO</string>
+    <string name="event_section_description">DESCRIPCIÓN</string>
+    <string name="event_section_images">IMÁGENES</string>
+    <string name="event_section_voice_note">NOTA DE VOZ</string>
+    <string name="event_all_day">Todo el día</string>
+    <string name="event_delete">Eliminar evento</string>
+    <string name="event_options">Opciones del evento</string>
+    <string name="event_share_qr">Compartir como QR</string>
+    <string name="event_pin_countdown">Fijar como cuenta atrás</string>
+    <string name="event_remove_countdown">Quitar cuenta atrás</string>
+    <string name="event_share_countdown_image">Compartir imagen de cuenta atrás</string>
+    <string name="event_copy_to_date">Copiar a una fecha</string>
+
+    <!-- Countdown card -->
+    <string name="countdown_share_image">Compartir como imagen</string>
+    <plurals name="countdown_days_until">
+        <item quantity="one">DÍA HASTA %1$s</item>
+        <item quantity="other">DÍAS HASTA %1$s</item>
+    </plurals>
+
+    <!-- Calendar picker -->
+    <string name="event_calendar_field">Calendario</string>
+    <string name="event_color">Color</string>
+    <string name="event_color_calendar">Color del calendario</string>
+    <string name="event_calendar_personal">Personal</string>
+    <string name="event_choose_calendar">Elegir calendario</string>
+
+    <!-- Go to date sheet -->
+    <string name="jump_to_date_title">Ir a la fecha</string>
+    <!-- Event editor -->
+    <string name="event_editor_title_add">Añadir evento</string>
+    <string name="event_editor_title_edit">Editar evento</string>
+    <string name="event_title_placeholder">Título del evento</string>
+    <string name="event_title_required">Título obligatorio</string>
+    <string name="event_location_placeholder">Ubicación</string>
+    <string name="event_description_placeholder">Descripción</string>
+    <string name="event_pencil_in">Marcar como tentativo</string>
+    <string name="event_pencil_in_subtitle">Tentativo; las herramientas de tiempo libre pueden ignorarlo</string>
+    <string name="event_starts">Comienza</string>
+    <string name="event_ends">Termina</string>
+    <string name="event_reminder">Recordatorio</string>
+    <string name="event_repeat">Repetir</string>
+    <string name="event_repeat_none">Ninguno</string>
+    <string name="event_apply_to">Aplicar a</string>
+    <string name="event_apply_series">Los cambios se aplican a toda la serie</string>
+    <string name="event_apply_instance">Los cambios se aplican solo a este evento</string>
+    <string name="event_error_end_before_start_date">La fecha de fin debe ser igual o posterior a la de inicio</string>
+    <string name="event_error_end_before_start_time">El fin debe ser posterior al inicio</string>
+    <string name="event_delete_series_button">Eliminar serie</string>
+    <string name="event_delete_event_button">Eliminar evento</string>
+    <string name="event_template_saved">Plantilla guardada</string>
+    <string name="event_template_default_name">Plantilla</string>
+    <string name="event_saved_no_reminder">Evento guardado sin recordatorio</string>
+    <string name="event_from">Desde</string>
+    <string name="event_to">Hasta</string>
+
+    <!-- Conflict warnings. Placeholder order matches the base strings. -->
+    <string name="event_conflict_tentative">Choca tentativamente con %1$s %2$s</string>
+    <string name="event_conflict_overlaps">Se superpone con %1$s %2$s</string>
+    <string name="event_conflict_untitled">Sin título</string>
+    <string name="event_conflict_extra">+%1$d más</string>
+
+    <!-- Event editor: media attachments -->
+    <string name="event_images">Imágenes</string>
+    <string name="event_images_count">%1$d/5</string>
+    <string name="event_image_placeholder">IMG</string>
+    <string name="event_image_unavailable">Imagen no disponible</string>
+    <string name="event_voice_note">Nota de voz</string>
+    <string name="event_voice_tap_to_record">TOCA PARA GRABAR</string>
+    <string name="event_voice_permission_denied">PERMISO DE MICRÓFONO DENEGADO - TOCA PARA ACTIVAR</string>
+    <string name="event_voice_stop">PARAR</string>
+    <string name="event_voice_pause">PAUSA</string>
+    <string name="event_voice_play">REPRODUCIR</string>
+    <string name="event_voice_unavailable">NO DISPONIBLE</string>
+    <string name="event_voice_seconds">%1$d SEG</string>
+    <!-- Repeat options -->
+    <string name="repeat_daily">Diario</string>
+    <string name="repeat_weekly">Semanal</string>
+    <string name="repeat_monthly">Mensual</string>
+    <string name="repeat_yearly">Anual</string>
+    <string name="repeat_custom">Personalizado...</string>
+
+    <!-- Custom recurrence builder -->
+    <string name="recurrence_custom_title">Repetición personalizada</string>
+    <string name="recurrence_frequency">FRECUENCIA</string>
+    <string name="recurrence_freq_day">Día</string>
+    <string name="recurrence_freq_week">Semana</string>
+    <string name="recurrence_freq_month">Mes</string>
+    <string name="recurrence_freq_year">Año</string>
+    <string name="recurrence_every">CADA</string>
+    <string name="recurrence_on_days">EN LOS DÍAS</string>
+    <string name="recurrence_on">EL</string>
+    <string name="recurrence_day_of_month">Día %1$d del mes</string>
+    <string name="recurrence_nth_weekday">El %1$s</string>
+    <string name="recurrence_ends">TERMINA</string>
+    <string name="recurrence_never">Nunca</string>
+    <string name="recurrence_on_date">En una fecha</string>
+    <string name="recurrence_on_specific_date">El %1$s</string>
+    <string name="recurrence_after">Después de</string>
+    <string name="recurrence_a_number_of_times">un número de veces</string>
+    <string name="recurrence_ends_on">Termina el</string>
+    <!-- Ordinals agree with the masculine weekday nouns (lunes, martes…). -->
+    <string name="recurrence_ordinal_1st">1.º</string>
+    <string name="recurrence_ordinal_2nd">2.º</string>
+    <string name="recurrence_ordinal_3rd">3.º</string>
+    <string name="recurrence_ordinal_4th">4.º</string>
+    <string name="recurrence_ordinal_5th">5.º</string>
+    <string name="recurrence_ordinal_last">último</string>
+    <plurals name="recurrence_unit_day">
+        <item quantity="one">día</item>
+        <item quantity="other">días</item>
+    </plurals>
+    <plurals name="recurrence_unit_week">
+        <item quantity="one">semana</item>
+        <item quantity="other">semanas</item>
+    </plurals>
+    <plurals name="recurrence_unit_month">
+        <item quantity="one">mes</item>
+        <item quantity="other">meses</item>
+    </plurals>
+    <plurals name="recurrence_unit_year">
+        <item quantity="one">año</item>
+        <item quantity="other">años</item>
+    </plurals>
+    <plurals name="recurrence_times">
+        <item quantity="one">vez</item>
+        <item quantity="other">veces</item>
+    </plurals>
+    <!-- Tasks tab and task details -->
+    <string name="tasks_title">Tareas</string>
+    <string name="task_details_title">Detalles de la tarea</string>
+    <string name="task_section_status">ESTADO</string>
+    <string name="task_section_due">VENCE</string>
+    <string name="task_no_date_header">SIN FECHA</string>
+    <string name="task_status_completed">Completada</string>
+    <string name="task_status_open">Abierta</string>
+    <string name="task_none">Ninguno</string>
+    <string name="task_reopen">Reabrir tarea</string>
+    <string name="task_mark_complete">Marcar como completada</string>
+    <string name="task_delete">Eliminar tarea</string>
+    <string name="task_options">Opciones de tarea</string>
+    <string name="task_add_to_calendar">Añadir al calendario</string>
+
+    <!-- Task filter segmented control -->
+    <string name="task_filter_all">Todas</string>
+    <string name="task_filter_today">Hoy</string>
+    <string name="task_filter_upcoming">Próximas</string>
+    <string name="task_filter_completed">Completadas</string>
+
+    <!-- Task empty states -->
+    <string name="task_empty_all_title">Aún no hay tareas</string>
+    <string name="task_empty_all_subtitle">Toca para crear tu primera tarea</string>
+    <string name="task_empty_today_title">Nada vence hoy</string>
+    <string name="task_empty_today_subtitle">Disfruta de tu tiempo libre</string>
+    <string name="task_empty_upcoming_title">Todo despejado</string>
+    <string name="task_empty_upcoming_subtitle">No hay tareas próximas programadas</string>
+    <string name="task_empty_completed_title">No hay tareas completadas</string>
+    <string name="task_empty_completed_subtitle">Las tareas completadas aparecen aquí</string>
+
+    <!-- Task reminder metadata -->
+    <string name="task_reminder_minutes_before">%1$d min antes</string>
+    <string name="task_reminder_1_day_before">1 día antes</string>
+
+    <!-- Task editor -->
+    <string name="task_editor_title_add">Añadir tarea</string>
+    <string name="task_editor_title_edit">Editar tarea</string>
+    <string name="task_title_label">Título</string>
+    <string name="task_title_required">Título obligatorio</string>
+    <string name="task_date">Fecha</string>
+    <string name="task_time">Hora</string>
+    <string name="task_reminder">Recordatorio</string>
+    <string name="task_repeat">Repetir</string>
+    <string name="task_save">GUARDAR TAREA</string>
+    <string name="task_saved_no_reminder">Tarea guardada sin recordatorio</string>
+    <string name="task_clear_date">Borrar fecha</string>
+    <string name="task_clear_time">Borrar hora</string>
+
+    <!-- ===== Pass 5a: recurrence + reminder detail labels ===== -->
+    <!-- Written in the case they display in: the Kotlin uppercase()/toSentenceCase()
+         round-trip was removed (locale-hostile for Turkish). -->
+    <string name="event_detail_repeats">Se repite / %1$s</string>
+    <string name="reminder_detail_1_minute_before">1 minuto antes</string>
+    <string name="reminder_detail_1_hour_before">1 hora antes</string>
+    <string name="reminder_detail_1_day_before">1 día antes</string>
+
+    <!-- Recurrence sentence fragments. The leading spaces in the quoted strings are
+         load-bearing: these clauses concatenate onto the base phrase. recurrence_times is
+         a bare unit, the count is formatted by the wrapper. -->
+    <string name="recurrence_every_n_units">Cada %1$d %2$s</string>
+    <string name="recurrence_label_on_days">" los %1$s"</string>
+    <string name="recurrence_label_on_the">" el %1$s"</string>
+    <string name="recurrence_label_end_count">" · %1$d %2$s"</string>
+    <string name="recurrence_label_end_until">" · hasta el %1$s"</string>
+
+    <!-- Template summary chips -->
+    <string name="template_type_task">Tarea</string>
+    <string name="template_type_event">Evento</string>
+    <string name="template_no_time">Sin hora</string>
+    <string name="template_all_day">Todo el día</string>
+    <string name="template_repeats">Se repite</string>
+
+    <!-- ===== Pass 5b: ProFeatureScreens.kt ===== -->
+    <!-- Paywall feature list -->
+    <string name="pro_feature_images">Imágenes adjuntas</string>
+    <string name="pro_feature_images_desc">Añade hasta 5 fotos a cualquier evento</string>
+    <string name="pro_feature_voice">Notas de voz</string>
+    <string name="pro_feature_voice_desc">Graba notas de audio en tus eventos</string>
+    <string name="pro_feature_large_widget">Widget grande</string>
+    <string name="pro_feature_large_widget_desc">Widget de mes completo para tu pantalla de inicio</string>
+    <string name="pro_feature_widget_pack">Config. del pack de widgets</string>
+    <string name="pro_feature_widget_pack_desc">Widgets transparentes y textura de puntos DotCal</string>
+    <string name="pro_feature_date_calc">Calculadora de fechas</string>
+    <string name="pro_feature_date_calc_desc">Calcula al instante los días entre dos fechas</string>
+    <string name="pro_feature_accents">Colores de acento personalizados</string>
+    <string name="pro_feature_accents_desc">Paletas extra y cualquier color hex personalizado</string>
+    <string name="pro_feature_recurrence">Repetición avanzada</string>
+    <string name="pro_feature_recurrence_desc">Cada N semanas, día n.º de la semana, fecha o número de fin</string>
+    <string name="pro_feature_app_lock">Bloqueo de app y bóveda privada</string>
+    <string name="pro_feature_app_lock_desc">Bloqueo con PIN más eventos y tareas ocultos</string>
+    <string name="pro_feature_templates">Plantillas de eventos y tareas</string>
+    <string name="pro_feature_templates_desc">Guarda ajustes y reutilízalos desde el botón +</string>
+    <string name="pro_feature_calendar_sets">Conjuntos de calendarios</string>
+    <string name="pro_feature_calendar_sets_desc">Guarda la visibilidad de Trabajo/Personal/Familia y cambia al instante</string>
+    <string name="pro_feature_shift_patterns">Patrones de turnos</string>
+    <string name="pro_feature_shift_patterns_desc">Crea ciclos de turnos rotativos y genéralos en bloque</string>
+    <string name="pro_feature_time_insights">Estadísticas de tiempo</string>
+    <string name="pro_feature_time_insights_desc">Consulta horas, días más ocupados y tareas completadas</string>
+    <string name="pro_feature_dead_time">Buscador de huecos</string>
+    <string name="pro_feature_dead_time_desc">Encuentra bloques libres en los próximos siete días</string>
+    <string name="pro_feature_share_availability">Compartir disponibilidad</string>
+    <string name="pro_feature_share_availability_desc">Convierte tu tiempo libre en texto que puedes pegar donde quieras</string>
+
+    <!-- Paywall. "DotCal Pro" is a brand name and stays untranslated. -->
+    <string name="paywall_headline">Desbloquea las herramientas avanzadas</string>
+    <string name="paywall_subhead">Captura rápida, plantillas, conjuntos de calendarios, widgets, herramientas de privacidad y estadísticas de tiempo en una sola mejora de por vida.</string>
+    <string name="paywall_lifetime_pro">Pro de por vida</string>
+    <string name="paywall_one_time_no_subscription">Pago único. Sin suscripción.</string>
+    <string name="paywall_one_time_price_from_play">Pago único. Precio mostrado por Play Store.</string>
+    <string name="paywall_play_store">Play Store</string>
+    <string name="paywall_metric_pay_once">Paga una vez</string>
+    <string name="paywall_metric_forever_access">Acceso para siempre</string>
+    <string name="paywall_metric_offline_first">Sin conexión primero</string>
+    <string name="paywall_metric_no_cloud_account">Sin cuenta en la nube</string>
+    <string name="paywall_purchase_options">Opciones de compra</string>
+    <string name="paywall_base_offer">Oferta base</string>
+    <string name="paywall_discount_offer">Oferta con descuento</string>
+    <string name="paywall_offer_id">ID de oferta: %1$s</string>
+    <string name="paywall_purchase_option_id">ID de opción: %1$s</string>
+    <string name="paywall_play_billing_offer">Oferta de Google Play</string>
+    <string name="paywall_final_price_at_checkout">El precio final aparece al pagar en Play Store.</string>
+    <string name="paywall_restore_purchase">Restaurar compra</string>
+    <string name="paywall_restore_success">Compra restaurada: ¡disfruta de DotCal Pro!</string>
+    <string name="paywall_restore_none_found">No se encontró ninguna compra previa en esta cuenta</string>
+    <string name="paywall_connecting">Conectando...</string>
+    <string name="paywall_unlock_pro">Desbloquear Pro</string>
+    <string name="paywall_unlock_pro_price">Desbloquear Pro - %1$s</string>
+    <string name="paywall_youre_pro">¡Ya eres Pro!</string>
+
+    <!-- Global Search facets -->
+    <string name="search_facet_type">Tipo</string>
+    <string name="search_facet_time">Fecha</string>
+    <string name="search_facet_calendar">Calendario</string>
+    <string name="search_facet_all_calendars">Todos los calendarios</string>
+    <string name="search_type_all">Todo</string>
+    <string name="search_type_events">Eventos</string>
+    <string name="search_type_tasks">Tareas</string>
+    <string name="search_date_any_time">Cualquier fecha</string>
+    <string name="search_date_upcoming">Próximos</string>
+    <string name="search_date_past">Pasados</string>
+    <string name="search_date_this_month">Este mes</string>
+    <!-- Uppercase in the source row; kept uppercase here (no runtime uppercase()). -->
+    <string name="search_task_when">TAREA / %1$s</string>
+
+    <!-- Templates and Calendar Sets -->
+    <string name="template_apply_title">Aplicar plantilla</string>
+    <string name="template_apply_subtitle">Elige una plantilla de evento para aplicarla a las fechas seleccionadas.</string>
+    <string name="template_no_event_templates">Aún no hay plantillas de eventos</string>
+    <string name="template_none_yet">Aún no hay plantillas</string>
+    <string name="template_none_yet_blurb">Abre cualquier evento o tarea y toca \"Guardar como plantilla\" para reutilizarlo cuando quieras.</string>
+    <string name="template_delete_title">¿Eliminar plantilla?</string>
+    <string name="calendar_set_none_yet">Aún no hay conjuntos de calendarios</string>
+    <string name="calendar_set_none_yet_blurb">Muestra u oculta los calendarios como quieras, guarda esa vista como un conjunto - Trabajo, Personal, Familia - y cambia entre ellos cuando quieras.</string>
+    <string name="calendar_set_save_current">Guardar actual como conjunto</string>
+    <string name="calendar_set_save_dialog_title">Guardar los calendarios actuales como conjunto</string>
+    <string name="calendar_set_default_name">Conjunto</string>
+    <string name="calendar_set_delete_title">¿Eliminar conjunto de calendarios?</string>
+
+    <!-- Time Insights. Section titles render through SettingsSectionTitle, which does not
+         uppercase, so they are written in the case they display in. -->
+    <string name="insights_title">Estadísticas de tiempo</string>
+    <string name="insights_scheduled_hours">horas programadas</string>
+    <string name="insights_metric_events">Eventos</string>
+    <string name="insights_metric_busiest">Más ocupado</string>
+    <string name="insights_metric_tasks">Tareas</string>
+    <string name="insights_metric_none">Ninguno</string>
+    <string name="insights_section_weekday_load">CARGA POR DÍA</string>
+    <string name="insights_section_calendars">CALENDARIOS</string>
+    <string name="insights_section_dead_time">BUSCADOR DE HUECOS</string>
+    <string name="insights_no_open_slots">No hay huecos libres de 1 hora o más.</string>
+    <string name="insights_no_timed_events">No hay eventos con hora programados en este periodo.</string>
+    <string name="insights_range_week">Esta semana</string>
+    <string name="insights_range_month">Este mes</string>
+    <string name="insights_range_custom">Personalizado</string>
+
+    <!-- Availability sharing -->
+    <string name="availability_next_7_days">Próximos 7 días · huecos de 1 hora o más</string>
+    <string name="availability_share">Compartir disponibilidad</string>
+
+    <!-- Shift patterns. shift_section_* go through SettingsSectionTitle (no uppercase()),
+         so they are stored in the case they display in. -->
+    <string name="shift_patterns_title">Patrones de turnos</string>
+    <string name="shift_section_types">TIPOS DE TURNO</string>
+    <string name="shift_section_patterns">PATRONES</string>
+    <string name="shift_types_empty">Crea primero los ajustes de Día, Noche y Libre.</string>
+    <string name="shift_patterns_empty">Crea un ciclo como Día, Día, Noche, Noche, Libre x4.</string>
+    <string name="shift_add_type">Añadir tipo de turno</string>
+    <string name="shift_build_pattern_row">Crear patrón</string>
+    <string name="shift_pattern_delete_title">¿Eliminar patrón de turnos?</string>
+    <string name="shift_type_title">Tipo de turno</string>
+    <string name="shift_type_edit_title">Editar tipo de turno</string>
+    <string name="shift_field_name">Nombre</string>
+    <string name="shift_off_day">Día libre</string>
+    <string name="shift_field_start_hour">Hora de inicio</string>
+    <string name="shift_field_duration_hours">Horas de duración</string>
+    <string name="shift_color_title">Color del turno</string>
+    <string name="shift_build_pattern_title">Crear patrón</string>
+    <!-- Default name pre-filled in the pattern builder; a common rotation shorthand. -->
+    <string name="shift_pattern_default_name">4 de trabajo, 4 libres</string>
+    <string name="shift_remove_last">Quitar el último</string>
+    <string name="shift_pattern_start">Inicio del patrón</string>
+    <string name="shift_generate_title">Generar turnos</string>
+    <string name="shift_generate_from">Generar desde</string>
+    <string name="shift_months_ahead">Meses por delante</string>
+    <string name="shift_calendar">Calendario</string>
+    <string name="shift_generate_confirm">Generar</string>
+    <string name="shift_color_label">Color</string>
+    <string name="shift_summary_off">Libre</string>
+    <string name="shift_summary_all_day">Todo el día</string>
+    <string name="shift_summary_range">%1$s - %2$s</string>
+    <string name="shift_pattern_summary">%1$s: %2$s</string>
+    <string name="shift_type_missing">Falta</string>
+    <string name="shift_no_shifts_selected">Ningún turno seleccionado</string>
+
+    <!-- Global Search, Quick Add, Templates, Calendar Sets and Date Calculator headers -->
+    <string name="search_title">Buscar</string>
+    <string name="search_placeholder">Título, ubicación, notas...</string>
+    <string name="search_hint">Busca en tus eventos y tareas</string>
+    <string name="search_no_results">Sin resultados para \"%1$s\"</string>
+    <string name="quick_add_title">Añadir rápido</string>
+    <string name="quick_add_continue">Continuar</string>
+    <string name="templates_title">Plantillas</string>
+    <string name="calendar_sets_title">Conjuntos de calendarios</string>
+
+    <!-- Quick Add preview. The example prompts themselves stay English: the parser only
+         understands English tokens. Chip labels are stored ALL CAPS (no runtime uppercase). -->
+    <string name="quick_add_preview">Vista previa</string>
+    <string name="quick_add_try_one">Prueba uno</string>
+    <string name="quick_add_chip_title">TÍTULO</string>
+    <string name="quick_add_chip_date">FECHA</string>
+    <string name="quick_add_chip_time">HORA</string>
+    <string name="quick_add_chip_repeats">REPETIR</string>
+    <string name="quick_add_untitled">Sin título</string>
+    <string name="quick_add_repeat_custom">Personalizado</string>
+    <string name="quick_add_describe_event">DESCRIBE TU EVENTO</string>
+
+    <!-- Date Calculator. The *_section labels go through CalcSectionLabel (no uppercase()
+         any more), so they are stored ALL CAPS; the row labels are sentence case. -->
+    <string name="calc_title">Calculadora de fechas</string>
+    <string name="calc_mode_days_between">Días entre</string>
+    <string name="calc_mode_add_subtract">Sumar / Restar</string>
+    <string name="calc_date_range">RANGO DE FECHAS</string>
+    <string name="calc_result">RESULTADO</string>
+    <string name="calc_start_date">FECHA DE INICIO</string>
+    <string name="calc_operation">OPERACIÓN</string>
+    <string name="calc_number_of_days">NÚMERO DE DÍAS</string>
+    <string name="calc_start_date_row">Fecha de inicio</string>
+    <string name="calc_end_date_row">Fecha de fin</string>
+    <string name="calc_select_date">Seleccionar</string>
+    <string name="calc_add">Sumar</string>
+    <string name="calc_subtract">Restar</string>
+    <string name="calc_working_days">Días laborables (lun-vie)</string>
+    <string name="calc_weekends">Fines de semana</string>
+
+    <!-- Recently Deleted -->
+    <string name="trash_title">Eliminados recientemente</string>
+    <string name="trash_empty_action">Vaciar</string>
+    <string name="trash_nothing_here">Aquí no hay nada</string>
+    <string name="trash_nothing_here_blurb">Los eventos y tareas eliminados aparecen aquí durante 30 días, para que puedas recuperarlos.</string>
+    <string name="trash_swipe_hint">Desliza a la izquierda para restaurar o eliminar. Se guardan 30 días.</string>
+    <string name="trash_delete_permanently_title">¿Eliminar permanentemente?</string>
+    <string name="trash_empty_confirm_title">¿Vaciar Eliminados recientemente?</string>
+    <string name="trash_no_due_date">Sin fecha límite</string>
+    <string name="trash_just_now">ahora mismo</string>
+    <string name="trash_deleted_when">%1$s / eliminado %2$s</string>
+
+    <!-- ===== Plurals added in pass 5 ===== -->
+    <plurals name="reminder_detail_minutes_before">
+        <item quantity="one">%1$d minuto antes</item>
+        <item quantity="other">%1$d minutos antes</item>
+    </plurals>
+    <!-- Compact form, deliberately distinct from the sync_*_ago plurals. -->
+    <plurals name="trash_minutes_ago">
+        <item quantity="one">hace %1$d min</item>
+        <item quantity="other">hace %1$d min</item>
+    </plurals>
+    <plurals name="trash_hours_ago">
+        <item quantity="one">hace %1$d h</item>
+        <item quantity="other">hace %1$d h</item>
+    </plurals>
+    <plurals name="trash_days_ago">
+        <item quantity="one">hace %1$d d</item>
+        <item quantity="other">hace %1$d d</item>
+    </plurals>
+    <plurals name="shift_day_cycle">
+        <item quantity="one">ciclo de %1$d día</item>
+        <item quantity="other">ciclo de %1$d días</item>
+    </plurals>
+    <plurals name="calc_days_total">
+        <item quantity="one">día en total</item>
+        <item quantity="other">días en total</item>
+    </plurals>
+    <plurals name="calc_days_before_start">
+        <item quantity="one">%1$d día antes de la fecha de inicio</item>
+        <item quantity="other">%1$d días antes de la fecha de inicio</item>
+    </plurals>
+    <plurals name="calc_days_after_start">
+        <item quantity="one">%1$d día después de la fecha de inicio</item>
+        <item quantity="other">%1$d días después de la fecha de inicio</item>
+    </plurals>
+
+    <!-- Agenda empty states -->
+    <string name="agenda_add_event">Añadir evento</string>
+    <string name="agenda_all_caught_up">Todo al día</string>
+    <string name="agenda_no_events">Sin eventos</string>
+
+    <!-- Share Availability screen -->
+    <string name="availability_all_day">Todo el día</string>
+    <string name="availability_all_day_block">Bloquear</string>
+    <string name="availability_all_day_ignore">Ignorar</string>
+    <string name="availability_copied">Disponibilidad copiada</string>
+    <string name="availability_copy">Copiar</string>
+    <string name="availability_end">Fin</string>
+    <string name="availability_end_date">Fecha de fin</string>
+    <string name="availability_from">Desde</string>
+    <string name="availability_ghosts">Fantasmas</string>
+    <string name="availability_ghosts_busy">Ocupado</string>
+    <string name="availability_ghosts_free">Libre</string>
+    <string name="availability_minutes_chip">%1$d min</string>
+    <string name="availability_preset_next_three_days">Próximos 3 días</string>
+    <string name="availability_preset_next_week">Próxima semana</string>
+    <string name="availability_preset_this_week">Esta semana</string>
+    <string name="availability_preview">Vista previa</string>
+    <string name="availability_share_button">Compartir</string>
+    <string name="availability_start">Inicio</string>
+    <string name="availability_start_date">Fecha de inicio</string>
+    <string name="availability_status_ready">LISTO</string>
+    <string name="availability_status_updating">ACTUALIZANDO</string>
+    <string name="availability_title">Compartir disponibilidad</string>
+    <string name="availability_to">Hasta</string>
+    <string name="availability_working_hours">Horas de trabajo</string>
+
+    <!-- QR -->
+    <string name="qr_allow_camera">Permitir cámara</string>
+    <string name="qr_camera_rationale">DotCal necesita acceso a la cámara para escanear códigos QR de eventos.</string>
+    <string name="qr_camera_unavailable">Cámara no disponible</string>
+    <string name="qr_create_failed">No se pudo crear el código QR</string>
+    <string name="qr_date_all_day">%1$s - Todo el día</string>
+    <string name="qr_date_time_span">%1$s - %2$s a %3$s</string>
+    <string name="qr_image_save_failed">No se pudo guardar la imagen</string>
+    <string name="qr_image_saved">Imagen guardada</string>
+    <string name="qr_import_single">Importar 1 evento</string>
+    <string name="qr_import_title">Importar eventos</string>
+    <string name="qr_no_date">Sin fecha</string>
+    <string name="qr_point_camera">Apunta la cámara a un código QR de DotCal</string>
+    <string name="qr_reject_invalid">No es un código de evento válido</string>
+    <string name="qr_reject_not_dotcal">No es un código de evento de DotCal</string>
+    <string name="qr_reject_unsupported">El código necesita una versión más reciente de la app</string>
+    <string name="qr_repeats">Se repite</string>
+    <string name="qr_save_image">Guardar imagen</string>
+    <string name="qr_scan_title">Escanear QR</string>
+    <string name="qr_share">Compartir</string>
+    <string name="qr_share_title">Compartir como QR</string>
+    <string name="qr_shared_without_description">Compartido sin descripción</string>
+
+    <!-- Share -->
+    <string name="share_availability_chooser">Compartir disponibilidad</string>
+    <string name="share_countdown_chooser">Compartir cuenta regresiva</string>
+    <string name="share_date_all_day">%1$s (Todo el día)</string>
+    <string name="share_date_all_day_span">%1$s - %2$s (Todo el día)</string>
+    <string name="share_event_as_ics">Compartir como .ics</string>
+    <string name="share_event_as_text">Compartir como texto</string>
+    <string name="share_event_qr_chooser">Compartir QR del evento</string>
+    <string name="share_event_title">Compartir evento</string>
+    <string name="share_field_date">Fecha: %1$s</string>
+    <string name="share_field_location">Ubicación: %1$s</string>
+    <string name="share_field_notes">Notas: %1$s</string>
+    <string name="share_no_target">No se encontró app para compartir</string>
+
+    <!-- Sync -->
+    <string name="sync_failed_permission">Sincronización fallida\nVerifica el acceso al calendario</string>
+    <string name="sync_failed_retry">Sincronización fallida\nIntenta de nuevo</string>
+    <string name="sync_success">Calendarios sincronizados</string>
+
+    <!-- Bulk edit -->
+    <string name="bulk_change_color">Cambiar color</string>
+    <string name="bulk_change_color_title">Cambiar color</string>
+    <string name="bulk_copy_to_date">Copiar a fecha</string>
+    <string name="bulk_copy_to_date_title">Copiar a fecha</string>
+    <string name="bulk_delete_confirm_title">¿Eliminar eventos seleccionados?</string>
+    <string name="bulk_delete_selected">Eliminar seleccionados</string>
+    <string name="bulk_edit_failed">Error en edición masiva</string>
+    <string name="bulk_edit_title">Edición masiva</string>
+    <string name="bulk_edit_undone">Edición masiva deshecha</string>
+    <string name="bulk_event_updated">Evento actualizado</string>
+    <string name="bulk_move_calendar_title">Mover a calendario</string>
+    <string name="bulk_move_to_calendar">Mover a calendario</string>
+    <string name="bulk_move_to_date">Mover a fecha</string>
+    <string name="bulk_move_to_date_title">Mover a fecha</string>
+    <string name="bulk_shift_by">Desplazar por días/horas</string>
+    <string name="bulk_shift_minus_1_day">-1 día</string>
+    <string name="bulk_shift_minus_1_hour">-1 hora</string>
+    <string name="bulk_shift_minus_7_days">-7 días</string>
+    <string name="bulk_shift_plus_1_day">+1 día</string>
+    <string name="bulk_shift_plus_1_hour">+1 hora</string>
+    <string name="bulk_shift_plus_7_days">+7 días</string>
+    <string name="bulk_shift_title">Desplazar seleccionados</string>
+    <string name="bulk_toggle_ghost">Alternar fantasma</string>
+    <string name="bulk_undo">DESHACER</string>
+    <string name="bulk_use_calendar_color">Usar color del calendario</string>
+
+    <!-- Toasts -->
+    <string name="toast_account_setup_unavailable">Configuración de cuenta no disponible</string>
+    <string name="toast_already_pro">¡Ya eres Pro!</string>
+    <string name="toast_app_lock_disabled">Bloqueo de app desactivado</string>
+    <string name="toast_backup_failed">Copia de seguridad fallida</string>
+    <string name="toast_backup_saved">Copia de seguridad guardada</string>
+    <string name="toast_calendar_exported">Calendario exportado</string>
+    <string name="toast_change_undone">Cambio deshecho</string>
+    <string name="toast_countdown_pinned">Cuenta regresiva fijada</string>
+    <string name="toast_countdown_removed">Cuenta regresiva eliminada</string>
+    <string name="toast_countdown_share_failed">No se pudo compartir la cuenta regresiva</string>
+    <string name="toast_device_lock_unavailable">Bloqueo de dispositivo no disponible</string>
+    <string name="toast_event_share_failed">No se pudo compartir el evento</string>
+    <string name="toast_event_too_large_qr">El evento es demasiado grande para compartir como QR</string>
+    <string name="toast_export_failed">Exportación fallida</string>
+    <string name="toast_file_read_failed">No se pudo leer el archivo</string>
+    <string name="toast_holidays_add_failed">No se pudieron añadir los festivos</string>
+    <string name="toast_holidays_remove_failed">No se pudieron eliminar los festivos</string>
+    <string name="toast_import_invalid_ics">Importación fallida - no es un archivo .ics válido</string>
+    <string name="toast_import_summary">Importados: %1$d nuevos, %2$d actualizados</string>
+    <string name="toast_move_event_failed">No se pudo mover el evento</string>
+    <string name="toast_moved_to_vault">Movido a la Caja Fuerte Privada</string>
+    <string name="toast_no_previous_purchase">No se encontró una compra previa en esta cuenta</string>
+    <string name="toast_pin_removed">PIN eliminado</string>
+    <string name="toast_purchase_restored">Compra restaurada - ¡disfruta DotCal Pro!</string>
+    <string name="toast_qr_share_failed">No se pudo compartir la imagen QR</string>
+    <string name="toast_restore_invalid_backup">Restauración fallida - no es una copia de seguridad válida de DotCal</string>
+    <string name="toast_restore_summary">Restaurados: %1$d nuevos, %2$d actualizados</string>
+    <string name="toast_restored_from_vault">Restaurado de la Caja Fuerte Privada</string>
+    <string name="toast_shared_without_description">Compartido sin descripción</string>
+    <string name="toast_up_to_date">DotCal está actualizado</string>
+    <string name="toast_update_check_failed">No se pudo buscar actualizaciones</string>
+
+    <!-- Calendar UI -->
+    <string name="calendar_apply_template">Aplicar plantilla</string>
+    <string name="calendar_clear">Limpiar</string>
+    <string name="calendar_complete_day">Día completo</string>
+    <string name="calendar_heatmap">Mapa de calor</string>
+    <string name="calendar_set_applied">Conjunto de calendarios aplicado</string>
+    <string name="calendar_set_saved">Conjunto de calendarios guardado</string>
+    <string name="calendar_tasks">Tareas</string>
+
+    <!-- Contacts / Birthdays -->
+    <string name="contacts_access_needed">Se necesita acceso a contactos</string>
+    <string name="birthdays_disabled">Cumpleaños desactivados</string>
+
+    <!-- Countdown -->
+    <string name="countdown_limit_body">DotCal Pro te da cuentas regresivas ilimitadas. También puedes intercambiar tu cuenta regresiva gratuita actual por este evento.</string>
+    <string name="countdown_swap_to_this">Intercambiar por esta cuenta regresiva</string>
+    <string name="countdown_swapped">Cuenta regresiva intercambiada</string>
+    <string name="countdown_unlock_unlimited">Desbloquear ilimitadas</string>
+
+    <!-- Shift patterns -->
+    <string name="shift_added">%1$d turnos añadidos</string>
+    <string name="shift_added_with_replaced">%1$d turnos añadidos, %2$d reemplazados</string>
+    <string name="shift_none_added">No se añadieron turnos. Verifica que el patrón use tipos de turno Día/Noche, no solo Descanso.</string>
+    <string name="shift_pattern_deleted">Patrón de turnos eliminado</string>
+
+    <!-- Tasks -->
+    <string name="task_delete_confirm">Eliminar</string>
+    <string name="task_delete_series_confirm">Eliminar serie</string>
+    <string name="task_delete_series_title">¿Eliminar serie de tareas?</string>
+    <string name="task_delete_title">¿Eliminar tarea?</string>
+
+    <!-- Misc -->
+    <!-- Start-end time range, e.g. "9:00 - 10:30". Both args are required. -->
+    <string name="time_range">%1$s - %2$s</string>
+    <string name="week_number_short">S%1$s</string>
+    <string name="unlock_device_subtitle">Confirma el bloqueo de tu dispositivo para continuar.</string>
+    <string name="unlock_device_title">Desbloquear DotCal</string>
+
+    <!-- Plurals -->
+    <plurals name="birthdays_imported">
+        <item quantity="one">%1$d cumpleaños importado</item>
+        <item quantity="other">%1$d cumpleaños importados</item>
+    </plurals>
+    <plurals name="bulk_skipped_suffix">
+        <item quantity="one">, %1$d omitido</item>
+        <item quantity="other">, %1$d omitidos</item>
+    </plurals>
+    <plurals name="countdown_active">
+        <item quantity="one">%1$d cuenta regresiva activa</item>
+        <item quantity="other">%1$d cuentas regresivas activas</item>
+    </plurals>
+    <plurals name="punch_streak_days">
+        <item quantity="one">%1$d día de racha</item>
+        <item quantity="other">%1$d días de racha</item>
+    </plurals>
+    <plurals name="qr_import_items">
+        <item quantity="one">Importar %1$d elemento</item>
+        <item quantity="other">Importar %1$d elementos</item>
+    </plurals>
+</resources>

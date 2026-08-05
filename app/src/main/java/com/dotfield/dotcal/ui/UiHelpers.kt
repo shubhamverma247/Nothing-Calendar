@@ -10,13 +10,18 @@ import android.util.Size
 import android.view.Gravity
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.PluralsRes
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventReminder
@@ -65,6 +70,42 @@ internal fun showDotCalToast(
         }
     }
     toast.show()
+}
+
+/**
+ * Resource-id overload. Most toasts fire from non-composable lambdas (coroutines, callbacks,
+ * `onFailure` blocks) where [stringResource] is unavailable; resolving through [Context] keeps
+ * those call sites a one-liner instead of forcing a hoisted `val` per message.
+ */
+internal fun showDotCalToast(
+    context: Context,
+    palette: DotCalPalette,
+    @StringRes messageRes: Int,
+    vararg formatArgs: Any,
+    duration: Int = Toast.LENGTH_SHORT,
+) {
+    val message = if (formatArgs.isEmpty()) {
+        context.getString(messageRes)
+    } else {
+        context.getString(messageRes, *formatArgs)
+    }
+    showDotCalToast(context, palette, message, duration)
+}
+
+/** Plural counterpart of the [showDotCalToast] resource overload. */
+internal fun showDotCalToastPlural(
+    context: Context,
+    palette: DotCalPalette,
+    @PluralsRes pluralRes: Int,
+    count: Int,
+    duration: Int = Toast.LENGTH_SHORT,
+) {
+    showDotCalToast(
+        context,
+        palette,
+        context.resources.getQuantityString(pluralRes, count, count),
+        duration,
+    )
 }
 
 @Composable
@@ -130,7 +171,7 @@ internal fun CalendarEvent.taskDueDetailLabel(): String {
 internal fun CalendarEvent.taskDueDateLine(): String {
     return Instant.ofEpochMilli(startTimeMs)
         .atZone(ZoneId.systemDefault())
-        .format(DateTimeFormatter.ofPattern("EEEE, d MMM yyyy", Locale.US))
+        .format(DateTimeFormatter.ofPattern("EEEE, d MMM yyyy", Locale.getDefault()))
 }
 
 internal fun CalendarEvent.taskDueTimeLine(): String {
@@ -138,7 +179,7 @@ internal fun CalendarEvent.taskDueTimeLine(): String {
 }
 
 internal fun taskDateHeaderFormatter(): DateTimeFormatter {
-    return DateTimeFormatter.ofPattern("EEE, dd MMM", Locale.US)
+    return DateTimeFormatter.ofPattern("EEE, dd MMM", Locale.getDefault())
 }
 
 internal fun CalendarEvent.startLocalTime(): LocalTime {
@@ -181,12 +222,13 @@ internal fun coerceEndAfterStart(start: LocalTime, end: LocalTime): LocalTime {
     }
 }
 
+@Composable
 internal fun reminderLabel(minutes: Int?): String {
     return when (minutes) {
-        null -> "None"
-        60 -> "1 hour before"
-        1440 -> "1 day before"
-        else -> "$minutes minutes before"
+        null -> stringResource(R.string.reminder_none)
+        60 -> stringResource(R.string.reminder_1_hour_before)
+        1440 -> stringResource(R.string.reminder_1_day_before)
+        else -> stringResource(R.string.reminder_minutes_before, minutes)
     }
 }
 
@@ -198,49 +240,60 @@ internal fun RecurringEditScope.label(): String {
 }
 
 internal fun dateTimeLabel(date: LocalDate, time: LocalTime): String {
-    return "${date.format(editorDateFormatter)} ${time.format(editorTimeFormatter).lowercase(Locale.US)}"
+    return "${date.format(editorDateFormatter)} ${time.format(editorTimeFormatter).lowercase(Locale.getDefault())}"
 }
 
+@Composable
 internal fun syncIntervalLabel(minutes: Int): String {
     return when (minutes) {
-        0 -> "Manual"
-        60 -> "1 hour"
-        120 -> "2 hours"
-        else -> "$minutes min"
+        0 -> stringResource(R.string.sync_interval_manual)
+        60 -> stringResource(R.string.duration_1_hour)
+        120 -> stringResource(R.string.duration_2_hours)
+        else -> stringResource(R.string.duration_minutes, minutes)
     }
 }
 
+@Composable
 internal fun calendarAccountsLabel(accounts: List<CalendarAccount>, hasCalendarPermission: Boolean): String {
-    if (!hasCalendarPermission) return "Local only"
+    if (!hasCalendarPermission) return stringResource(R.string.accounts_local_only)
     val providerCount = accounts.count { it.id != "local-primary" }
-    if (providerCount == 0) return "Connected"
+    if (providerCount == 0) return stringResource(R.string.accounts_connected)
     val selectedCount = accounts.count { it.id != "local-primary" && it.isVisible == 1 }
-    return "$selectedCount/$providerCount selected"
+    return stringResource(R.string.accounts_selected_ratio, selectedCount, providerCount)
 }
 
+@Composable
 internal fun selectedHolidayCountriesLabel(countries: List<HolidayCountryUiItem>): String {
     val count = countries.count { it.isSelected }
-    return when (count) {
-        0 -> "None selected"
-        1 -> "1 country selected"
-        else -> "$count countries selected"
+    return if (count == 0) {
+        stringResource(R.string.holidays_none_selected)
+    } else {
+        pluralStringResource(R.plurals.holiday_countries_selected, count, count)
     }
 }
 
+@Composable
 internal fun List<SyncMetadata>.lastSyncedSubtitle(): String {
-    return "Last synced ${lastSyncedRelativeLabel()}"
+    return stringResource(R.string.sync_last_synced, lastSyncedRelativeLabel())
 }
 
+@Composable
 private fun List<SyncMetadata>.lastSyncedRelativeLabel(): String {
     val lastSyncMs = maxOfOrNull { it.lastSyncMs } ?: 0L
-    if (lastSyncMs <= 0L) return "never"
+    if (lastSyncMs <= 0L) return stringResource(R.string.sync_never)
     val elapsedMinutes = ((System.currentTimeMillis() - lastSyncMs) / 60_000L).coerceAtLeast(0L)
     return when {
-        elapsedMinutes < 1L -> "just now"
-        elapsedMinutes < 60L -> "$elapsedMinutes min ago"
-        elapsedMinutes < 24L * 60L -> "${elapsedMinutes / 60L} hr ago"
-        elapsedMinutes < 48L * 60L -> "yesterday"
-        else -> "${elapsedMinutes / (24L * 60L)} d ago"
+        elapsedMinutes < 1L -> stringResource(R.string.sync_just_now)
+        elapsedMinutes < 60L -> pluralStringResource(R.plurals.sync_minutes_ago, elapsedMinutes.toInt(), elapsedMinutes.toInt())
+        elapsedMinutes < 24L * 60L -> {
+            val hours = (elapsedMinutes / 60L).toInt()
+            pluralStringResource(R.plurals.sync_hours_ago, hours, hours)
+        }
+        elapsedMinutes < 48L * 60L -> stringResource(R.string.sync_yesterday)
+        else -> {
+            val days = (elapsedMinutes / (24L * 60L)).toInt()
+            pluralStringResource(R.plurals.sync_days_ago, days, days)
+        }
     }
 }
 
@@ -249,14 +302,17 @@ internal fun String.readableCalendarLabel(): String {
     if (trimmed.isBlank()) return "Calendar"
     if (trimmed.contains("@")) return trimmed
     if (trimmed.any { it.isLowerCase() }) return trimmed
+    // Account names come from CalendarProvider and are proper nouns, not translated copy. Stays on
+    // Locale.US on purpose: Turkish casing would render "GMAIL" as "gmaıl" with a dotless i.
     return trimmed.lowercase(Locale.US).replaceFirstChar { char ->
         if (char.isLowerCase()) char.titlecase(Locale.US) else char.toString()
     }
 }
 
+@Composable
 internal fun CalendarAccount.secondaryCalendarLabel(): String {
     val raw = accountName.ifBlank { accountType }.trim()
-    if (raw.isBlank()) return "Local"
+    if (raw.isBlank()) return stringResource(R.string.settings_value_local)
     return raw.readableCalendarLabel()
 }
 
@@ -279,7 +335,7 @@ internal fun CalendarEvent.normalizedEndTimeMs(): Long {
 
 internal fun CalendarEvent.detailDateLine(): String {
     val start = Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault())
-    return start.format(DateTimeFormatter.ofPattern("EEEE, d MMM yyyy", Locale.US))
+    return start.format(DateTimeFormatter.ofPattern("EEEE, d MMM yyyy", Locale.getDefault()))
 }
 
 internal fun CalendarEvent.detailTimeLine(): String {
@@ -288,23 +344,45 @@ internal fun CalendarEvent.detailTimeLine(): String {
     return "${start.toLocalTime().format(timeFormatter)} - ${end.toLocalTime().format(timeFormatter)}"
 }
 
+/**
+ * The event-detail "Repeats / …" row.
+ *
+ * This used to be `"REPEATS / " + rule.humanLabel().uppercase()` and was then pushed through a
+ * `toSentenceCase()` at both call sites, so the caps never reached the screen — the visible text was
+ * always "Repeats / daily". The resource is therefore written in the case it displays in, and both
+ * the `uppercase()` and the sentence-case round-trip are gone. That also removes a latent Turkish
+ * casing bug: `uppercase()` with no locale turns "i" into a dotless "ı".
+ */
+@Composable
 internal fun CalendarEvent.recurrenceDetailLabel(): String? {
-    val rule = RecurrenceRule.parse(rrule) ?: return null
-    return "REPEATS / " + rule.humanLabel().uppercase()
+    val label = recurrenceHumanLabel(rrule) ?: return null
+    return stringResource(R.string.event_detail_repeats, label)
 }
 
-internal fun EventReminder.detailLabel(): String {
-    return when (minutesBefore) {
-        1 -> "1 MINUTE BEFORE"
-        60 -> "1 HOUR BEFORE"
-        1440 -> "1 DAY BEFORE"
-        else -> "$minutesBefore MINUTES BEFORE"
+/**
+ * Reminder offsets for the detail rows. Same story as above: these were hardcoded ALL-CAPS and
+ * sentence-cased at every call site, so the resources now carry the displayed casing directly.
+ */
+@Composable
+internal fun EventReminder.detailLabel(): String = when (minutesBefore) {
+    1 -> stringResource(R.string.reminder_detail_1_minute_before)
+    60 -> stringResource(R.string.reminder_detail_1_hour_before)
+    1440 -> stringResource(R.string.reminder_detail_1_day_before)
+    else -> pluralStringResource(R.plurals.reminder_detail_minutes_before, minutesBefore, minutesBefore)
+}
+
+/**
+ * Comma-joined reminder offsets for the event-detail row. A `@Composable` [detailLabel] cannot be
+ * called from `joinToString`/`map` (their lambdas are not composable), so the labels are resolved in
+ * a composable `for` loop and joined afterwards.
+ */
+@Composable
+internal fun remindersDetailLine(reminders: List<EventReminder>): String {
+    val labels = ArrayList<String>(reminders.size)
+    for (reminder in reminders.sortedBy { it.minutesBefore }) {
+        labels += reminder.detailLabel()
     }
-}
-
-internal fun String.toSentenceCase(): String {
-    val lower = lowercase(Locale.US)
-    return lower.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(Locale.US) else char.toString() }
+    return labels.joinToString()
 }
 
 internal fun parseJsonStringArray(value: String): List<String> {

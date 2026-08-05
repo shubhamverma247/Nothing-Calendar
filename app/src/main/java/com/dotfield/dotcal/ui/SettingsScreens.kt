@@ -228,6 +228,7 @@ import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
+import com.dotfield.dotcal.prefs.AppLanguage
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
@@ -256,6 +257,7 @@ internal fun SettingsPreview(
     themeMode: DotCalThemeMode,
     accentColor: AccentColor,
     appFont: AppFont,
+    appLanguage: AppLanguage,
     palette: DotCalPalette,
     screen: SettingsScreen,
     onBack: () -> Unit,
@@ -263,6 +265,7 @@ internal fun SettingsPreview(
     onThemeSelected: (DotCalThemeMode) -> Unit,
     onAccentSelected: (AccentColor) -> Unit,
     onAppFontSelected: (AppFont) -> Unit,
+    onAppLanguageSelected: (AppLanguage) -> Unit,
     syncEnabled: Boolean,
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
@@ -410,12 +413,14 @@ internal fun SettingsPreview(
                 themeMode = themeMode,
                 accentColor = accentColor,
                 appFont = appFont,
+                appLanguage = appLanguage,
                 palette = palette,
                 isPro = isPro,
                 onBack = { onScreenChange(SettingsScreen.Root) },
                 onThemeSelected = onThemeSelected,
                 onAccentSelected = onAccentSelected,
                 onAppFontSelected = onAppFontSelected,
+                onAppLanguageSelected = onAppLanguageSelected,
                 onRequestPro = onDotCalPro,
             )
         }
@@ -671,9 +676,9 @@ internal fun SettingsRoot(
                 )
             }
             item {
-                SettingsPanel(title = "Accounts", palette = palette) {
+                SettingsPanel(title = stringResource(R.string.settings_panel_accounts), palette = palette) {
                     SettingsIconMenuRow(
-                        title = "Calendar Accounts",
+                        title = stringResource(R.string.settings_calendar_accounts),
                         value = calendarAccountsLabel(accounts, hasCalendarPermission),
                         icon = Icons.Default.CalendarMonth,
                         palette = palette,
@@ -682,9 +687,9 @@ internal fun SettingsRoot(
                 }
             }
             item {
-                SettingsPanel(title = "Settings", palette = palette) {
+                SettingsPanel(title = stringResource(R.string.settings_title), palette = palette) {
                     SettingsIconMenuRow(
-                        title = "Calendar Preferences",
+                        title = stringResource(R.string.settings_calendar_preferences),
                         value = defaultCalendarTab.label,
                         icon = Icons.Default.CalendarMonth,
                         palette = palette,
@@ -692,7 +697,7 @@ internal fun SettingsRoot(
                     )
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(
-                        title = "Reminder Defaults",
+                        title = stringResource(R.string.settings_reminder_defaults),
                         value = reminderLabel(defaultReminderMinutes),
                         icon = Icons.Default.Notifications,
                         palette = palette,
@@ -700,24 +705,28 @@ internal fun SettingsRoot(
                     )
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(
-                        title = "Appearance",
-                        value = "${themeMode.label} / ${accentColor.label}",
+                        title = stringResource(R.string.settings_appearance),
+                        value = stringResource(R.string.settings_pair_value, themeMode.label, accentColor.label),
                         icon = Icons.Default.AutoAwesome,
                         palette = palette,
                         onClick = onThemeSettings,
                     )
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(
-                        title = "Widgets",
-                        value = if (widgetTransparent) "Transparent" else "Default",
+                        title = stringResource(R.string.settings_widgets),
+                        value = if (widgetTransparent) {
+                            stringResource(R.string.settings_widgets_value_transparent)
+                        } else {
+                            stringResource(R.string.settings_widgets_value_default)
+                        },
                         icon = Icons.Default.Widgets,
                         palette = palette,
                         onClick = onWidgetSettings,
                     )
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(
-                        title = "App Lock & Private Vault",
-                        value = if (isPro) "Active" else "",
+                        title = stringResource(R.string.settings_app_lock_vault),
+                        value = if (isPro) stringResource(R.string.settings_value_active) else "",
                         icon = Icons.Default.Lock,
                         isProLocked = !isPro,
                         palette = palette,
@@ -725,16 +734,20 @@ internal fun SettingsRoot(
                     )
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(
-                        title = "Sync",
-                        value = if (syncEnabled) syncIntervalLabel(syncIntervalMins) else "Off",
+                        title = stringResource(R.string.settings_sync),
+                        value = if (syncEnabled) {
+                            syncIntervalLabel(syncIntervalMins)
+                        } else {
+                            stringResource(R.string.settings_value_off)
+                        },
                         icon = Icons.Default.AccessTime,
                         palette = palette,
                         onClick = onSyncSettings,
                     )
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(
-                        title = "Data & Restore",
-                        value = "Local",
+                        title = stringResource(R.string.settings_data_restore),
+                        value = stringResource(R.string.settings_value_local),
                         icon = Icons.AutoMirrored.Filled.Article,
                         palette = palette,
                         onClick = onDataSettings,
@@ -750,16 +763,16 @@ internal fun SettingsRoot(
                 )
             }
             item {
-                SettingsPanel(title = "About", palette = palette) {
-                    SettingsIconMenuRow(title = "Check for updates", value = "", icon = Icons.Default.AutoAwesome, palette = palette, onClick = onCheckForUpdates)
+                SettingsPanel(title = stringResource(R.string.settings_panel_about), palette = palette) {
+                    SettingsIconMenuRow(title = stringResource(R.string.settings_check_updates), value = "", icon = Icons.Default.AutoAwesome, palette = palette, onClick = onCheckForUpdates)
                     SettingsContentDivider(palette)
-                    SettingsIconMenuRow(title = "Privacy Policy", value = "", icon = Icons.Default.Description, palette = palette, onClick = onPrivacyPolicy)
+                    SettingsIconMenuRow(title = stringResource(R.string.settings_privacy_policy), value = "", icon = Icons.Default.Description, palette = palette, onClick = onPrivacyPolicy)
                     SettingsContentDivider(palette)
-                    SettingsIconMenuRow(title = "Rate DotCal", value = "", icon = Icons.Default.Star, palette = palette, onClick = onRateDotCal)
+                    SettingsIconMenuRow(title = stringResource(R.string.settings_rate), value = "", icon = Icons.Default.Star, palette = palette, onClick = onRateDotCal)
                     SettingsContentDivider(palette)
-                    SettingsIconMenuRow(title = "More apps from us", value = "DotFiles — File Manager", icon = Icons.Default.Apps, palette = palette, onClick = onMoreApps)
+                    SettingsIconMenuRow(title = stringResource(R.string.settings_more_apps), value = stringResource(R.string.settings_more_apps_value), icon = Icons.Default.Apps, palette = palette, onClick = onMoreApps)
                     SettingsContentDivider(palette)
-                    SettingsIconMenuRow(title = "Send Feedback", value = "", icon = Icons.Default.Edit, palette = palette, onClick = {
+                    SettingsIconMenuRow(title = stringResource(R.string.settings_send_feedback), value = "", icon = Icons.Default.Edit, palette = palette, onClick = {
                         context.startActivity(
                             Intent(Intent.ACTION_SENDTO).apply {
                                 data = Uri.parse("mailto:dotfieldstudio@gmail.com?subject=DotCal%20Feedback")
@@ -767,7 +780,7 @@ internal fun SettingsRoot(
                         )
                     })
                     SettingsContentDivider(palette)
-                    SettingsIconMenuRow(title = "Version", value = BuildConfig.VERSION_NAME, icon = Icons.Default.Description, palette = palette, showChevron = false, onClick = {})
+                    SettingsIconMenuRow(title = stringResource(R.string.settings_version), value = BuildConfig.VERSION_NAME, icon = Icons.Default.Description, palette = palette, showChevron = false, onClick = {})
                 }
             }
             item {
@@ -781,7 +794,7 @@ internal fun SettingsRoot(
             }
         }
         if (showCompactHeader) {
-            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Settings", showBack = false)
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_title), showBack = false)
         }
     }
 }
@@ -807,10 +820,10 @@ private fun CalendarPreferencesSettings(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Calendar Preferences")
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_calendar_preferences))
         }
         item {
-            SettingsPanel(title = "Calendar", palette = palette, framed = false) {
+            SettingsPanel(title = stringResource(R.string.settings_panel_calendar), palette = palette, framed = false) {
                 SettingsWeekStartRow(
                     selectedOption = weekStartOption,
                     palette = palette,
@@ -824,23 +837,23 @@ private fun CalendarPreferencesSettings(
                 )
                 SettingsContentDivider(palette)
                 SettingsToggleRow(
-                    title = "Week numbers",
-                    subtitle = "Show ISO week labels in Month and Week",
+                    title = stringResource(R.string.settings_week_numbers),
+                    subtitle = stringResource(R.string.settings_week_numbers_subtitle),
                     checked = showWeekNumbers,
                     palette = palette,
                     onCheckedChange = onShowWeekNumbersChange,
                 )
                 SettingsContentDivider(palette)
                 SettingsToggleRow(
-                    title = "Birthday calendar",
-                    subtitle = "Import contacts' birthdays",
+                    title = stringResource(R.string.settings_birthday_calendar),
+                    subtitle = stringResource(R.string.settings_birthday_calendar_subtitle),
                     checked = birthdayEnabled,
                     palette = palette,
                     onCheckedChange = onBirthdayEnabledChange,
                 )
                 SettingsContentDivider(palette)
                 SettingsMenuRow(
-                    title = "Global Holidays",
+                    title = stringResource(R.string.settings_global_holidays),
                     value = selectedHolidayCountriesLabel(holidayCountries),
                     palette = palette,
                     onClick = onGlobalHolidays,
@@ -867,10 +880,10 @@ private fun ReminderDefaultsSettings(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Reminder Defaults")
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_reminder_defaults))
         }
         item {
-            SettingsPanel(title = "Defaults", palette = palette, framed = false) {
+            SettingsPanel(title = stringResource(R.string.settings_panel_defaults), palette = palette, framed = false) {
                 SettingsDefaultReminderRow(
                     selectedMinutes = defaultReminderMinutes,
                     palette = palette,
@@ -909,13 +922,13 @@ private fun WidgetSettings(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Widgets")
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_widgets))
         }
         item {
-            SettingsPanel(title = "Widget Style", palette = palette, framed = false) {
+            SettingsPanel(title = stringResource(R.string.settings_panel_widget_style), palette = palette, framed = false) {
                 SettingsWidgetToggleRow(
-                    title = "Transparent Widgets",
-                    subtitle = "Let wallpaper show through all DotCal widgets",
+                    title = stringResource(R.string.settings_transparent_widgets),
+                    subtitle = stringResource(R.string.settings_transparent_widgets_subtitle),
                     checked = widgetTransparent,
                     isPro = isPro,
                     palette = palette,
@@ -923,8 +936,12 @@ private fun WidgetSettings(
                 )
                 SettingsContentDivider(palette)
                 SettingsWidgetToggleRow(
-                    title = "Widget Dot Texture",
-                    subtitle = if (widgetTransparent) "Only applies when transparent widgets are off" else "Show the subtle DotCal dotted surface",
+                    title = stringResource(R.string.settings_widget_dot_texture),
+                    subtitle = if (widgetTransparent) {
+                        stringResource(R.string.settings_widget_dot_texture_subtitle_disabled)
+                    } else {
+                        stringResource(R.string.settings_widget_dot_texture_subtitle)
+                    },
                     checked = !widgetTransparent && widgetDotTexture,
                     enabled = !widgetTransparent,
                     isPro = isPro,
@@ -952,21 +969,21 @@ private fun DataRestoreSettings(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Data & Restore")
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_data_restore))
         }
         item {
-            SettingsPanel(title = "Calendar Files", palette = palette, framed = false) {
+            SettingsPanel(title = stringResource(R.string.settings_panel_calendar_files), palette = palette, framed = false) {
                 SettingsImportExportRow(
-                    title = "Export Calendar",
-                    subtitle = "Save all events & tasks to an .ics file",
+                    title = stringResource(R.string.settings_export_calendar),
+                    subtitle = stringResource(R.string.settings_export_calendar_subtitle),
                     isPro = true,
                     palette = palette,
                     onClick = onExportIcs,
                 )
                 SettingsContentDivider(palette)
                 SettingsImportExportRow(
-                    title = "Import Calendar",
-                    subtitle = "Load events & tasks from an .ics file",
+                    title = stringResource(R.string.settings_import_calendar),
+                    subtitle = stringResource(R.string.settings_import_calendar_subtitle),
                     isPro = true,
                     palette = palette,
                     onClick = onImportIcs,
@@ -974,25 +991,25 @@ private fun DataRestoreSettings(
             }
         }
         item {
-            SettingsPanel(title = "Backup & Restore", palette = palette, framed = false) {
+            SettingsPanel(title = stringResource(R.string.settings_panel_backup_restore), palette = palette, framed = false) {
                 SettingsImportExportRow(
-                    title = "Back Up Data",
-                    subtitle = "Save all events, tasks & reminders to a file",
+                    title = stringResource(R.string.settings_back_up_data),
+                    subtitle = stringResource(R.string.settings_back_up_data_subtitle),
                     isPro = true,
                     palette = palette,
                     onClick = onBackup,
                 )
                 SettingsContentDivider(palette)
                 SettingsImportExportRow(
-                    title = "Restore Data",
-                    subtitle = "Merge a backup file into this device",
+                    title = stringResource(R.string.settings_restore_data),
+                    subtitle = stringResource(R.string.settings_restore_data_subtitle),
                     isPro = true,
                     palette = palette,
                     onClick = onRestore,
                 )
                 SettingsContentDivider(palette)
                 SettingsMenuRow(
-                    title = "Recently Deleted",
+                    title = stringResource(R.string.settings_recently_deleted),
                     value = "",
                     palette = palette,
                     onClick = onRecentlyDeleted,
@@ -1020,13 +1037,13 @@ private fun SyncSettings(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Sync")
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_sync))
         }
         item {
-            SettingsPanel(title = "Calendar Sync", palette = palette, framed = false) {
+            SettingsPanel(title = stringResource(R.string.settings_panel_calendar_sync), palette = palette, framed = false) {
                 SettingsToggleRow(
-                    title = "Sync enabled",
-                    subtitle = "Keep DotCal updated from device calendars",
+                    title = stringResource(R.string.settings_sync_enabled),
+                    subtitle = stringResource(R.string.settings_sync_enabled_subtitle),
                     checked = syncEnabled,
                     palette = palette,
                     onCheckedChange = onSyncEnabledChange,
@@ -1071,13 +1088,17 @@ private fun AppPrivacySettings(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            SettingsLargeHeader(palette = palette, onBack = onBack, title = "Privacy")
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_privacy))
         }
         item {
-            SettingsPanel(title = "App Lock", palette = palette, framed = false) {
+            SettingsPanel(title = stringResource(R.string.settings_panel_app_lock), palette = palette, framed = false) {
                 SettingsWidgetToggleRow(
-                    title = "Require PIN",
-                    subtitle = if (appLockState.hasPin) "Lock DotCal after leaving the app" else "Set a 4-8 digit PIN",
+                    title = stringResource(R.string.settings_require_pin),
+                    subtitle = if (appLockState.hasPin) {
+                        stringResource(R.string.settings_require_pin_subtitle_set)
+                    } else {
+                        stringResource(R.string.settings_require_pin_subtitle_unset)
+                    },
                     checked = appLockState.enabled,
                     isPro = true,
                     palette = palette,
@@ -1091,7 +1112,11 @@ private fun AppPrivacySettings(
                 )
                 SettingsContentDivider(palette)
                 SettingsMenuRow(
-                    title = if (appLockState.hasPin) "Change PIN" else "Set PIN",
+                    title = if (appLockState.hasPin) {
+                        stringResource(R.string.settings_change_pin)
+                    } else {
+                        stringResource(R.string.settings_set_pin)
+                    },
                     value = "",
                     palette = palette,
                     onClick = { showSetPin = true },
@@ -1099,7 +1124,7 @@ private fun AppPrivacySettings(
                 if (appLockState.hasPin) {
                     SettingsContentDivider(palette)
                     SettingsMenuRow(
-                        title = "Remove PIN",
+                        title = stringResource(R.string.settings_remove_pin),
                         value = "",
                         palette = palette,
                         onClick = { showClearConfirm = true },
@@ -1108,9 +1133,9 @@ private fun AppPrivacySettings(
             }
         }
         item {
-            SettingsPanel(title = "Private Vault", palette = palette, framed = false) {
+            SettingsPanel(title = stringResource(R.string.settings_panel_private_vault), palette = palette, framed = false) {
             Text(
-                "Hidden events and tasks stay off calendars, task lists, widgets, and reminders until restored.",
+                stringResource(R.string.settings_private_vault_blurb),
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 13.sp,
@@ -1121,9 +1146,9 @@ private fun AppPrivacySettings(
         }
         if (privateVaultEvents.isEmpty()) {
             item {
-                SettingsPanel(title = "Private Items", palette = palette, framed = false) {
+                SettingsPanel(title = stringResource(R.string.settings_panel_private_items), palette = palette, framed = false) {
                     Text(
-                        "No private items",
+                        stringResource(R.string.settings_no_private_items),
                         color = palette.secondaryText,
                         fontFamily = mono,
                         fontSize = 15.sp,
@@ -1134,7 +1159,7 @@ private fun AppPrivacySettings(
             }
         } else {
             item {
-                SettingsPanel(title = "Private Items", palette = palette, framed = false) {
+                SettingsPanel(title = stringResource(R.string.settings_panel_private_items), palette = palette, framed = false) {
                     privateVaultEvents.forEachIndexed { index, event ->
                         PrivateVaultRow(
                             event = event,
@@ -1151,8 +1176,12 @@ private fun AppPrivacySettings(
     }
     if (showSetPin) {
         AppPinDialog(
-            title = if (appLockState.hasPin) "Change PIN" else "Set PIN",
-            confirmLabel = "Save",
+            title = if (appLockState.hasPin) {
+                stringResource(R.string.settings_change_pin)
+            } else {
+                stringResource(R.string.settings_set_pin)
+            },
+            confirmLabel = stringResource(R.string.action_save),
             palette = palette,
             onDismiss = { showSetPin = false },
             onConfirm = { pin, onResult ->
@@ -1165,8 +1194,8 @@ private fun AppPrivacySettings(
     }
     if (showDisableConfirm) {
         AppPinDialog(
-            title = "Disable App Lock",
-            confirmLabel = "Disable",
+            title = stringResource(R.string.settings_disable_app_lock),
+            confirmLabel = stringResource(R.string.action_disable),
             palette = palette,
             onDismiss = { showDisableConfirm = false },
             onConfirm = { pin, onResult ->
@@ -1182,8 +1211,8 @@ private fun AppPrivacySettings(
     }
     if (showClearConfirm) {
         AppPinDialog(
-            title = "Remove PIN",
-            confirmLabel = "Remove",
+            title = stringResource(R.string.settings_remove_pin),
+            confirmLabel = stringResource(R.string.action_remove),
             palette = palette,
             onDismiss = { showClearConfirm = false },
             onConfirm = { pin, onResult ->
@@ -1211,7 +1240,7 @@ private fun PrivateVaultRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                event.title.ifBlank { "(No title)" },
+                event.title.ifBlank { stringResource(R.string.vault_no_title) },
                 color = palette.primaryText,
                 fontFamily = mono,
                 fontWeight = FontWeight.SemiBold,
@@ -1230,7 +1259,7 @@ private fun PrivateVaultRow(
             )
         }
         Text(
-            "Restore",
+            stringResource(R.string.action_restore),
             color = palette.accent,
             fontFamily = mono,
             fontWeight = FontWeight.Medium,
@@ -1245,12 +1274,17 @@ private fun PrivateVaultDivider(palette: DotCalPalette) {
     HorizontalDivider(color = palette.line, thickness = 1.dp, modifier = Modifier.fillMaxWidth())
 }
 
+@Composable
 private fun privateVaultWhenLabel(event: CalendarEvent): String {
-    if (event.isTask == 1 && event.startTimeMs <= 0L) return "Task - No due date"
+    if (event.isTask == 1 && event.startTimeMs <= 0L) return stringResource(R.string.vault_task_no_due)
     val zone = runCatching { ZoneId.of(event.timeZone) }.getOrDefault(ZoneId.systemDefault())
     val start = Instant.ofEpochMilli(event.startTimeMs).atZone(zone)
-    val type = if (event.isTask == 1) "Task" else "Event"
-    return "$type - ${start.format(compactDateFormatter)}"
+    val type = if (event.isTask == 1) {
+        stringResource(R.string.vault_type_task)
+    } else {
+        stringResource(R.string.vault_type_event)
+    }
+    return stringResource(R.string.vault_when, type, start.format(compactDateFormatter))
 }
 
 @Composable
@@ -1286,9 +1320,9 @@ internal fun AppLockScreen(
                 Icon(Icons.Default.Lock, contentDescription = null, tint = palette.accent, modifier = Modifier.size(30.dp))
             }
             Spacer(modifier = Modifier.height(22.dp))
-            Text("DotCal Locked", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            Text(stringResource(R.string.app_lock_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontWeight = FontWeight.Bold, fontSize = 24.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Enter your PIN to continue", color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+            Text(stringResource(R.string.app_lock_subtitle), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
             Spacer(modifier = Modifier.height(24.dp))
             OutlinedTextField(
                 value = pin,
@@ -1312,7 +1346,7 @@ internal fun AppLockScreen(
             )
             if (showError) {
                 Spacer(modifier = Modifier.height(10.dp))
-                Text("Incorrect PIN", color = palette.accent, fontFamily = mono, fontSize = 13.sp)
+                Text(stringResource(R.string.app_lock_incorrect), color = palette.accent, fontFamily = mono, fontSize = 13.sp)
             }
             Spacer(modifier = Modifier.height(18.dp))
             Button(
@@ -1321,12 +1355,12 @@ internal fun AppLockScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
                 shape = RoundedCornerShape(18.dp),
             ) {
-                Text("Unlock", fontFamily = mono, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.app_lock_unlock), fontFamily = mono, fontWeight = FontWeight.SemiBold)
             }
             if (canUseDeviceLock) {
                 Spacer(modifier = Modifier.height(10.dp))
                 TextButton(onClick = onDeviceUnlock) {
-                    Text("Use Device Lock", color = palette.primaryText, fontFamily = mono)
+                    Text(stringResource(R.string.app_lock_use_device), color = palette.primaryText, fontFamily = mono)
                 }
             }
         }
@@ -1358,7 +1392,7 @@ private fun AppPinDialog(
                         showError = false
                     },
                     singleLine = true,
-                    label = { Text("PIN") },
+                    label = { Text(stringResource(R.string.pin_field_label)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = {
@@ -1376,7 +1410,7 @@ private fun AppPinDialog(
                 )
                 if (showError) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Enter the correct 4-8 digit PIN", color = palette.accent, fontFamily = mono, fontSize = 12.sp)
+                    Text(stringResource(R.string.pin_error), color = palette.accent, fontFamily = mono, fontSize = 12.sp)
                 }
             }
         },
@@ -1387,7 +1421,7 @@ private fun AppPinDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = palette.primaryText)
+                Text(stringResource(R.string.action_cancel), color = palette.primaryText)
             }
         },
     )
@@ -1397,7 +1431,7 @@ private fun AppPinDialog(
 private fun SettingsLargeHeader(
     palette: DotCalPalette,
     onBack: () -> Unit,
-    title: String = "Calendar",
+    title: String,
     showBack: Boolean = true,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp)) {
@@ -1421,7 +1455,7 @@ private fun SettingsLargeHeader(
 private fun SettingsCompactHeader(
     palette: DotCalPalette,
     onBack: () -> Unit,
-    title: String = "Calendar",
+    title: String,
     showBack: Boolean = true,
 ) {
     Box(
@@ -1452,16 +1486,19 @@ private fun ThemeSettings(
     themeMode: DotCalThemeMode,
     accentColor: AccentColor,
     appFont: AppFont,
+    appLanguage: AppLanguage,
     palette: DotCalPalette,
     isPro: Boolean,
     onBack: () -> Unit,
     onThemeSelected: (DotCalThemeMode) -> Unit,
     onAccentSelected: (AccentColor) -> Unit,
     onAppFontSelected: (AppFont) -> Unit,
+    onAppLanguageSelected: (AppLanguage) -> Unit,
     onRequestPro: () -> Unit,
 ) {
     var showCustomPicker by remember { mutableStateOf(false) }
     var showFontSheet by remember { mutableStateOf(false) }
+    var showLanguageSheet by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
@@ -1472,11 +1509,11 @@ private fun ThemeSettings(
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             item {
-                SettingsLargeHeader(palette = palette, onBack = onBack, title = "Appearance")
-                Text("Choose app appearance", color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(bottom = 16.dp))
+                SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_appearance))
+                Text(stringResource(R.string.settings_appearance_subtitle), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(bottom = 16.dp))
             }
             item {
-                SettingsPanel(title = "Font", palette = palette, framed = false) {
+                SettingsPanel(title = stringResource(R.string.settings_panel_font), palette = palette, framed = false) {
                     SettingsFontRow(
                         font = appFont,
                         palette = palette,
@@ -1485,7 +1522,16 @@ private fun ThemeSettings(
                 }
             }
             item {
-                SettingsPanel(title = "Theme", palette = palette, framed = false) {
+                SettingsPanel(title = stringResource(R.string.settings_language_title), palette = palette, framed = false) {
+                    SettingsLanguageRow(
+                        language = appLanguage,
+                        palette = palette,
+                        onClick = { showLanguageSheet = true },
+                    )
+                }
+            }
+            item {
+                SettingsPanel(title = stringResource(R.string.settings_panel_theme), palette = palette, framed = false) {
                     DotCalThemeMode.entries.forEachIndexed { index, mode ->
                         ThemeOptionRow(
                             mode = mode,
@@ -1501,7 +1547,7 @@ private fun ThemeSettings(
                 }
             }
             item {
-                SettingsPanel(title = "Accent Color", palette = palette, framed = false) {
+                SettingsPanel(title = stringResource(R.string.settings_panel_accent), palette = palette, framed = false) {
                     AccentColorSwatches(
                         accents = AccentColor.freePresets,
                         selectedAccent = accentColor,
@@ -1513,7 +1559,7 @@ private fun ThemeSettings(
                     Spacer(modifier = Modifier.height(24.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "More Colors",
+                            stringResource(R.string.settings_more_colors),
                             color = palette.primaryText,
                             fontFamily = LocalHeadingFont.current,
                             fontWeight = FontWeight.Bold,
@@ -1522,7 +1568,7 @@ private fun ThemeSettings(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         if (!isPro) {
-                            Text("Pro", color = palette.accent, fontFamily = mono, fontSize = 11.sp)
+                            Text(stringResource(R.string.badge_pro), color = palette.accent, fontFamily = mono, fontSize = 11.sp)
                         }
                     }
                     Spacer(modifier = Modifier.height(14.dp))
@@ -1546,7 +1592,7 @@ private fun ThemeSettings(
             item { Spacer(modifier = Modifier.height(720.dp)) }
         }
         if (showCompactHeader) {
-            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Appearance")
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_appearance))
         }
     }
     if (showFontSheet) {
@@ -1557,6 +1603,17 @@ private fun ThemeSettings(
             onSelect = { font ->
                 showFontSheet = false
                 onAppFontSelected(font)
+            },
+        )
+    }
+    if (showLanguageSheet) {
+        LanguagePickerSheet(
+            current = appLanguage,
+            palette = palette,
+            onDismiss = { showLanguageSheet = false },
+            onSelect = { language ->
+                showLanguageSheet = false
+                onAppLanguageSelected(language)
             },
         )
     }
@@ -1588,11 +1645,11 @@ private fun GlobalHolidaysSettings(
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 150.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
             item {
-                SettingsLargeHeader(palette = palette, onBack = onBack, title = "Global Holidays")
+                SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_global_holidays))
                 Spacer(modifier = Modifier.height(10.dp))
             }
             if (selected.isNotEmpty()) {
-                item { SettingsSectionTitle("SELECTED", palette) }
+                item { SettingsSectionTitle(stringResource(R.string.settings_selected_caps), palette) }
                 lazyItems(selected, key = { it.code }) { country ->
                     HolidayCountryRow(
                         country = country,
@@ -1605,7 +1662,7 @@ private fun GlobalHolidaysSettings(
                 item { Spacer(modifier = Modifier.height(16.dp)) }
             }
             if (available.isNotEmpty()) {
-                item { SettingsSectionTitle("AVAILABLE", palette) }
+                item { SettingsSectionTitle(stringResource(R.string.settings_available_caps), palette) }
                 lazyItems(available, key = { it.code }) { country ->
                     HolidayCountryRow(
                         country = country,
@@ -1619,7 +1676,7 @@ private fun GlobalHolidaysSettings(
             item { Spacer(modifier = Modifier.height(960.dp)) }
         }
         if (showCompactHeader) {
-            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Global Holidays")
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_global_holidays))
         }
     }
 }
@@ -1674,11 +1731,11 @@ private fun CalendarAccountsSettings(
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 150.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
             item {
-                SettingsLargeHeader(palette = palette, onBack = onBack, title = "Calendar Accounts")
+                SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_calendar_accounts))
                 Spacer(modifier = Modifier.height(10.dp))
             if (!hasCalendarPermission) {
                 SettingsMenuRow(
-                    title = "Grant calendar access",
+                    title = stringResource(R.string.settings_grant_calendar_access),
                     value = "",
                     palette = palette,
                     onClick = onRequestCalendarAccess,
@@ -1697,7 +1754,11 @@ private fun CalendarAccountsSettings(
             if (sortedAccounts.isEmpty()) {
                 item {
                     Text(
-                        if (hasCalendarPermission) "Tap Sync Now to load accounts" else "Calendar access needed",
+                        if (hasCalendarPermission) {
+                            stringResource(R.string.settings_tap_sync_now)
+                        } else {
+                            stringResource(R.string.settings_calendar_access_needed)
+                        },
                         color = palette.secondaryText,
                         fontFamily = mono,
                         fontSize = 13.sp,
@@ -1720,7 +1781,7 @@ private fun CalendarAccountsSettings(
             item { Spacer(modifier = Modifier.height(28.dp)) }
         }
         if (showCompactHeader) {
-            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Calendar Accounts")
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_calendar_accounts))
         }
     }
 }
@@ -1736,7 +1797,7 @@ private fun AddAccountSettings(
     Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 150.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
             item {
-                SettingsLargeHeader(palette = palette, onBack = onBack, title = "Add an account")
+                SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_add_an_account))
                 Spacer(modifier = Modifier.height(10.dp))
                 GoogleAccountProviderRow(palette = palette, onClick = onGoogleAccount)
                 HorizontalDivider(color = palette.line, thickness = 1.dp)
@@ -1744,7 +1805,7 @@ private fun AddAccountSettings(
             item { Spacer(modifier = Modifier.height(960.dp)) }
         }
         if (showCompactHeader) {
-            SettingsCompactHeader(palette = palette, onBack = onBack, title = "Add an account")
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_add_an_account))
         }
     }
 }
@@ -1767,7 +1828,7 @@ private fun GoogleAccountProviderRow(palette: DotCalPalette, onClick: () -> Unit
             )
             Spacer(modifier = Modifier.width(14.dp))
             Text(
-                "Google",
+                stringResource(R.string.provider_google),
                 color = palette.primaryText,
                 fontFamily = mono,
                 fontWeight = FontWeight.SemiBold,
@@ -1790,7 +1851,7 @@ private fun PrivacyPolicySettings(
 ) {
     val context = LocalContext.current
     Column(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
-        SettingsCompactHeader(palette = palette, onBack = onBack, title = "Privacy Policy")
+        SettingsCompactHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_privacy_policy))
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 40.dp),
@@ -1800,7 +1861,7 @@ private fun PrivacyPolicySettings(
             item {
                 Column {
                     Text(
-                        "LEGAL",
+                        stringResource(R.string.privacy_legal_label),
                         color = palette.accent,
                         fontFamily = mono,
                         fontSize = 11.sp,
@@ -1808,7 +1869,7 @@ private fun PrivacyPolicySettings(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        "Your data stays on your device.",
+                        stringResource(R.string.privacy_hero),
                         color = palette.primaryText,
                         fontFamily = LocalHeadingFont.current,
                         fontWeight = FontWeight.Bold,
@@ -1817,7 +1878,7 @@ private fun PrivacyPolicySettings(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        "DotCal stores your calendar data locally on your device. Your calendar content does not go to Dotfield Studio servers. No account, no cloud sync, no analytics.",
+                        stringResource(R.string.privacy_intro),
                         color = palette.secondaryText,
                         fontFamily = mono,
                         fontSize = 13.sp,
@@ -1828,71 +1889,71 @@ private fun PrivacyPolicySettings(
 
             item {
                 PrivacySection(
-                    "01  Overview",
-                    "DotCal does not collect your calendar content and does not transmit events, tasks, reminders, attachments, or settings to Dotfield Studio. Your calendar data exists only on your Android device.\n\nThis policy covers the DotCal Android app (com.dotfield.dotcal), published by Dotfield Studio, and applies from the date of your first install.\n\nWe built DotCal with a simple rule: data about your life belongs to you. The app has no Dotfield backend, no account system, no advertising, and no analytics SDK embedded anywhere in the code. Google Play services are used only for Play Billing, purchase restore, and in-app update checks.",
+                    stringResource(R.string.privacy_section_01_title),
+                    stringResource(R.string.privacy_section_01_body),
                     palette,
                 )
             }
             item {
                 PrivacySection(
-                    "02  Data We Collect",
-                    "DotCal does not collect, store, or transmit your calendar content to Dotfield Studio.\n\nCalendar events, tasks, reminder alarms, voice notes, image attachments, theme and app settings, and any imported contact birthdays or Google Calendar events all live only on your device. None of that content is sent to Dotfield Studio, and we cannot access it.\n\nDotCal stores a local Pro entitlement flag after a successful Google Play purchase or restore. Payment processing, receipts, and account-level purchase data are handled by Google Play, not by Dotfield Studio. No crash analytics. No usage analytics. No advertising identifiers.",
+                    stringResource(R.string.privacy_section_02_title),
+                    stringResource(R.string.privacy_section_02_body),
                     palette,
                 )
             }
             item {
                 PrivacySection(
-                    "03  App Permissions",
-                    "DotCal requests only what it needs to function:\n\n- Calendar (read/write) - only if you enable Google Calendar sync, to read/create events via Android's CalendarProvider. Calendar data does not leave the device through DotCal.\n- Contacts - optional, to read contact birthdays as yearly events. Only reads dates, not full contact data.\n- Exact Alarm & Boot - schedule reminder alarms and re-register them after a reboot.\n- Notifications - display event and task reminders (Android 13+).\n- Microphone - optional, to record voice notes. Saved to app-private storage, only when you tap record.\n- Photos - selected via Android Photo Picker only. DotCal never accesses your full gallery.\n- Internet / Network State - used by Google Play Billing and in-app update checks. DotCal does not use this permission to upload calendar data, analytics, or ads.",
+                    stringResource(R.string.privacy_section_03_title),
+                    stringResource(R.string.privacy_section_03_body),
                     palette,
                 )
             }
             item {
                 PrivacySection(
-                    "04  Google Calendar Sync",
-                    "DotCal's calendar sync does not connect to Google's Calendar API. It reads from Android's built-in CalendarProvider - the same local database the default Calendar app uses. No Google Calendar credentials are ever seen or stored by DotCal.\n\nThis is different from apps that use the Google Calendar REST API or OAuth. DotCal does not make HTTP requests for calendar sync and never sees your Google credentials.\n\nIf you disable sync, DotCal stops querying CalendarProvider. Previously imported events stay in DotCal's local database until you delete them.",
+                    stringResource(R.string.privacy_section_04_title),
+                    stringResource(R.string.privacy_section_04_body),
                     palette,
                 )
             }
             item {
                 PrivacySection(
-                    "05  Local Storage",
-                    "All DotCal data is stored in Android's app-private storage, inaccessible to other apps without root access, and deleted automatically when you uninstall.\n\nStored data includes the SQLite database (events, tasks, recurrence rules), local preferences (theme, view, sync toggles), voice note files, and image attachments.\n\nDotCal does not write to shared external storage. If your device's Google Backup is enabled at the system level, Android may back up app data - this is outside DotCal's control.",
+                    stringResource(R.string.privacy_section_05_title),
+                    stringResource(R.string.privacy_section_05_body),
                     palette,
                 )
             }
             item {
                 PrivacySection(
-                    "06  Third Parties",
-                    "DotCal integrates no third-party SDKs for analytics, advertising, crash reporting, or remote configuration. No Firebase Analytics, no Crashlytics, no advertising networks, no A/B testing.\n\nDotCal uses Google Play Billing for the one-time Pro purchase and restore flow, Google Play In-App Updates for update checks, and the Nothing Glyph SDK for local Glyph Toy integration on supported Nothing devices. These services do not receive your calendar events, tasks, reminders, attachments, voice notes, or settings from DotCal.",
+                    stringResource(R.string.privacy_section_06_title),
+                    stringResource(R.string.privacy_section_06_body),
                     palette,
                 )
             }
             item {
                 PrivacySection(
-                    "07  Security",
-                    "Because DotCal stores calendar data locally and does not upload your calendar content, the main risk is physical device access. Keep your device PIN or biometric lock active.\n\nAndroid's app sandbox provides the primary protection. On modern devices with hardware-backed encryption, the OS-level encryption protects DotCal data at rest.",
+                    stringResource(R.string.privacy_section_07_title),
+                    stringResource(R.string.privacy_section_07_body),
                     palette,
                 )
             }
             item {
                 PrivacySection(
-                    "08  Children's Privacy",
-                    "DotCal does not knowingly collect information from anyone, including children under 13. Because DotCal collects no data at all, there is no children's data to protect beyond standard Android privacy protections.",
+                    stringResource(R.string.privacy_section_08_title),
+                    stringResource(R.string.privacy_section_08_body),
                     palette,
                 )
             }
             item {
                 PrivacySection(
-                    "09  Your Rights",
-                    "Because DotCal does not collect or store personal data on any server, all of your data is under your direct control:\n\n- Access - your data is in the app on your device.\n- Delete - uninstall to remove everything, or delete individual events in-app.\n- Export - PDF export of calendar views is a planned feature.\n- Portability - events synced via CalendarProvider remain in Android's calendar database.\n\nIf you are in the EU, UK, or California, GDPR and CCPA rights apply - exercised entirely on-device, since we hold no data.",
+                    stringResource(R.string.privacy_section_09_title),
+                    stringResource(R.string.privacy_section_09_body),
                     palette,
                 )
             }
             item {
                 PrivacySection(
-                    "10  Policy Changes",
-                    "If this policy changes materially - for example, if DotCal adds cloud sync, analytics, advertising, or a Dotfield server feature - we will update this page and the effective date below, and flag the change in a release note. We commit to never adding advertising, analytics, or cloud storage without updating this policy and prominently notifying users.",
+                    stringResource(R.string.privacy_section_10_title),
+                    stringResource(R.string.privacy_section_10_body),
                     palette,
                 )
             }
@@ -1916,14 +1977,14 @@ private fun PrivacyPolicySettings(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "Questions? Contact us",
+                            stringResource(R.string.privacy_contact_title),
                             color = palette.primaryText,
                             fontFamily = mono,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp,
                         )
                         Text(
-                            "dotfieldstudio@gmail.com",
+                            stringResource(R.string.privacy_contact_email),
                             color = palette.accent,
                             fontFamily = mono,
                             fontSize = 12.sp,
@@ -1940,7 +2001,7 @@ private fun PrivacyPolicySettings(
             }
             item {
                 Text(
-                    "Effective July 14, 2026 / Dotfield Studio",
+                    stringResource(R.string.privacy_effective),
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 11.sp,
@@ -1972,7 +2033,7 @@ private fun PrivacySection(title: String, content: String, palette: DotCalPalett
 }
 
 @Composable
-internal fun CalendarAddAccountRow(palette: DotCalPalette, onClick: () -> Unit, label: String = "Add Account") {
+internal fun CalendarAddAccountRow(palette: DotCalPalette, onClick: () -> Unit, label: String = stringResource(R.string.settings_add_account)) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -2072,7 +2133,7 @@ private fun SettingsDefaultViewRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text("Default view", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Text(stringResource(R.string.settings_default_view), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(selectedTab.shortLabel, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
             Spacer(modifier = Modifier.width(8.dp))
@@ -2081,7 +2142,7 @@ private fun SettingsDefaultViewRow(
     }
     if (showSheet) {
         SettingsOptionSheet(
-            title = "Default view",
+            title = stringResource(R.string.settings_default_view),
             options = CalendarTab.pickerEntries,
             selected = selectedTab,
             palette = palette,
@@ -2111,7 +2172,7 @@ private fun SettingsDefaultEventDurationRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text("Default event duration", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Text(stringResource(R.string.settings_default_event_duration), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(eventDurationLabel(selectedMinutes), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
             Spacer(modifier = Modifier.width(8.dp))
@@ -2120,11 +2181,11 @@ private fun SettingsDefaultEventDurationRow(
     }
     if (showSheet) {
         SettingsOptionSheet(
-            title = "Default event duration",
+            title = stringResource(R.string.settings_default_event_duration),
             options = defaultEventDurationOptions,
             selected = selectedMinutes,
             palette = palette,
-            label = ::eventDurationLabel,
+            label = { eventDurationLabel(it) },
             onDismiss = { showSheet = false },
             onSelected = {
                 onDurationSelected(it)
@@ -2134,11 +2195,12 @@ private fun SettingsDefaultEventDurationRow(
     }
 }
 
+@Composable
 private fun eventDurationLabel(minutes: Int): String {
     return when (minutes) {
-        60 -> "1 hour"
-        120 -> "2 hours"
-        else -> "$minutes min"
+        60 -> stringResource(R.string.duration_1_hour)
+        120 -> stringResource(R.string.duration_2_hours)
+        else -> stringResource(R.string.duration_minutes, minutes)
     }
 }
 
@@ -2158,7 +2220,7 @@ private fun SettingsWeekStartRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text("Start of the week", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Text(stringResource(R.string.settings_start_of_week), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(selectedOption.label, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
             Spacer(modifier = Modifier.width(8.dp))
@@ -2167,7 +2229,7 @@ private fun SettingsWeekStartRow(
     }
     if (showSheet) {
         SettingsOptionSheet(
-            title = "Start of the week",
+            title = stringResource(R.string.settings_start_of_week),
             options = WeekStartOption.entries,
             selected = selectedOption,
             palette = palette,
@@ -2197,7 +2259,7 @@ private fun SettingsDefaultReminderRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text("Default reminder", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Text(stringResource(R.string.settings_default_reminder), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(reminderLabel(selectedMinutes), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
             Spacer(modifier = Modifier.width(8.dp))
@@ -2206,11 +2268,11 @@ private fun SettingsDefaultReminderRow(
     }
     if (showSheet) {
         SettingsOptionSheet(
-            title = "Default reminder",
+            title = stringResource(R.string.settings_default_reminder),
             options = reminderOptions,
             selected = selectedMinutes,
             palette = palette,
-            label = ::reminderLabel,
+            label = { reminderLabel(it) },
             onDismiss = { showSheet = false },
             onSelected = {
                 onReminderSelected(it)
@@ -2236,7 +2298,7 @@ private fun SettingsAllDayReminderTimeRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text("Default all-day reminder time", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Text(stringResource(R.string.settings_default_all_day_reminder_time), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(allDayReminderTimeLabel(selectedTime), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
             Spacer(modifier = Modifier.width(8.dp))
@@ -2290,7 +2352,7 @@ private fun AllDayReminderTimeSheet(
                 .padding(top = 4.dp, bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Default all-day reminder time", color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontSize = 20.sp)
+            Text(stringResource(R.string.settings_default_all_day_reminder_time), color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontSize = 20.sp)
             Text(
                 allDayReminderTimeLabel(pickedTime),
                 color = palette.secondaryText,
@@ -2350,7 +2412,7 @@ private fun AllDayReminderTimeSheet(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("Cancel", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.action_cancel), fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 Button(
@@ -2359,7 +2421,7 @@ private fun AllDayReminderTimeSheet(
                     colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
                     shape = RoundedCornerShape(18.dp),
                 ) {
-                    Text("OK", fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.action_ok), fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -2376,7 +2438,7 @@ private fun SettingsNothingHero(
             .padding(top = 16.dp, bottom = 2.dp),
     ) {
         Text(
-            "Settings",
+            stringResource(R.string.settings_title),
             color = palette.primaryText,
             fontFamily = LocalHeadingFont.current,
             fontWeight = FontWeight.Normal,
@@ -2457,7 +2519,7 @@ private fun SettingsIconMenuRow(
         Spacer(modifier = Modifier.width(10.dp))
         if (isProLocked) {
             Text(
-                "Pro",
+                stringResource(R.string.badge_pro),
                 color = palette.accent,
                 fontFamily = mono,
                 fontWeight = FontWeight.SemiBold,
@@ -2497,11 +2559,11 @@ private fun SettingsToolsPanel(
     onDateCalculator: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        SettingsSectionTitle("Tools", palette)
+        SettingsSectionTitle(stringResource(R.string.settings_panel_tools), palette)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             SettingsToolCard(
-                title = "Dead Time",
-                caption = "Free slots",
+                title = stringResource(R.string.settings_dead_time),
+                caption = stringResource(R.string.settings_dead_time_caption),
                 icon = Icons.Default.AccessTime,
                 isPro = isPro,
                 palette = palette,
@@ -2509,8 +2571,8 @@ private fun SettingsToolsPanel(
                 onClick = onTimeInsights,
             )
             SettingsToolCard(
-                title = "Date Calculator",
-                caption = "Date math",
+                title = stringResource(R.string.settings_date_calculator),
+                caption = stringResource(R.string.settings_date_calculator_caption),
                 icon = Icons.Default.CalendarMonth,
                 isPro = isPro,
                 palette = palette,
@@ -2544,7 +2606,7 @@ private fun SettingsToolCard(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             SettingsIconCell(icon = icon, palette = palette, active = !isPro)
             Text(
-                if (isPro) "" else "Pro",
+                if (isPro) "" else stringResource(R.string.badge_pro),
                 color = palette.accent,
                 fontFamily = mono,
                 fontWeight = FontWeight.SemiBold,
@@ -2592,7 +2654,7 @@ private fun SettingsProCard(isPro: Boolean, proPrice: String?, palette: DotCalPa
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "DotCal Pro",
+                stringResource(R.string.pro_product_name),
                 color = palette.primaryText,
                 fontFamily = mono,
                 fontWeight = FontWeight.Bold,
@@ -2601,9 +2663,9 @@ private fun SettingsProCard(isPro: Boolean, proPrice: String?, palette: DotCalPa
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 when {
-                    isPro -> "Lifetime unlocked"
-                    proPrice != null -> "Lifetime tools / $proPrice"
-                    else -> "Lifetime tools"
+                    isPro -> stringResource(R.string.settings_pro_lifetime_unlocked)
+                    proPrice != null -> stringResource(R.string.settings_pro_lifetime_tools_price, proPrice)
+                    else -> stringResource(R.string.settings_pro_lifetime_tools)
                 },
                 color = palette.secondaryText,
                 fontFamily = mono,
@@ -2699,7 +2761,7 @@ private fun SettingsFontRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "Font",
+                stringResource(R.string.settings_panel_font),
                 color = palette.primaryText,
                 fontFamily = mono,
                 fontWeight = FontWeight.Normal,
@@ -2709,7 +2771,7 @@ private fun SettingsFontRow(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                "${font.label} / ${font.tagline}",
+                stringResource(R.string.settings_pair_value, font.label, font.tagline),
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 12.sp,
@@ -2719,6 +2781,137 @@ private fun SettingsFontRow(
         }
         Spacer(modifier = Modifier.width(12.dp))
         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun SettingsLanguageRow(
+    language: AppLanguage,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .noRippleClickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                stringResource(R.string.settings_language_title),
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontWeight = FontWeight.Normal,
+                fontSize = 16.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                localizedLanguageLabel(language),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+    }
+}
+
+/** "System default" is itself translated; every other entry shows its own native name. */
+@Composable
+private fun localizedLanguageLabel(language: AppLanguage): String =
+    if (language == AppLanguage.System) {
+        stringResource(R.string.settings_language_system_default)
+    } else {
+        language.native
+    }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LanguagePickerSheet(
+    current: AppLanguage,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelect: (AppLanguage) -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        dragHandle = null,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                stringResource(R.string.settings_language_title),
+                color = palette.primaryText,
+                fontFamily = LocalHeadingFont.current,
+                fontWeight = FontWeight.Bold,
+                fontSize = 22.sp,
+            )
+            Text(
+                stringResource(R.string.language_sheet_subtitle),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+            )
+            // 14 options overflow the sheet on shorter screens, so the list scrolls on its own.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AppLanguage.entries.forEach { language ->
+                    val selected = language == current
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) palette.accent.copy(alpha = 0.10f) else palette.cancelSurface)
+                            .border(1.dp, if (selected) palette.accent else palette.cancelBorder, RoundedCornerShape(10.dp))
+                            .noRippleClickable { onSelect(language) }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                localizedLanguageLabel(language),
+                                color = palette.primaryText,
+                                fontFamily = LocalHeadingFont.current,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                            )
+                            if (language != AppLanguage.System) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    language.label,
+                                    color = palette.secondaryText,
+                                    fontFamily = mono,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        if (selected) {
+                            Icon(Icons.Default.Check, contentDescription = "Selected", tint = palette.accent, modifier = Modifier.size(22.dp))
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2744,7 +2937,7 @@ private fun FontPickerSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                "Font",
+                stringResource(R.string.settings_panel_font),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
@@ -2803,14 +2996,14 @@ private fun ProBadge(palette: DotCalPalette) {
             .background(palette.accent)
             .padding(horizontal = 4.dp, vertical = 2.dp),
     ) {
-        Text("PRO", color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        Text(stringResource(R.string.badge_pro_caps), color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 10.sp)
     }
 }
 
 @Composable
 private fun ProFeatureTag(palette: DotCalPalette) {
     Text(
-        "Pro feature",
+        stringResource(R.string.pro_feature_tag),
         color = palette.accent,
         fontFamily = mono,
         fontWeight = FontWeight.Normal,
@@ -2830,9 +3023,13 @@ private fun SettingsProRow(isPro: Boolean, palette: DotCalPalette, onClick: () -
         Icon(Icons.Default.Star, contentDescription = null, tint = palette.accent, modifier = Modifier.size(22.dp))
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text("DotCal Pro", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(stringResource(R.string.pro_product_name), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Text(
-                if (isPro) "Active - thank you for your support!" else "Unlock Pro features",
+                if (isPro) {
+                    stringResource(R.string.settings_pro_active)
+                } else {
+                    stringResource(R.string.settings_pro_unlock)
+                },
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 12.sp,
@@ -2922,7 +3119,11 @@ private fun SettingsSyncNowRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                if (isSyncing) "Syncing..." else "Sync Now",
+                if (isSyncing) {
+                    stringResource(R.string.settings_syncing)
+                } else {
+                    stringResource(R.string.settings_sync_now)
+                },
                 color = palette.primaryText,
                 fontFamily = mono,
                 fontWeight = FontWeight.Normal,
@@ -3037,7 +3238,7 @@ private fun SettingsSyncIntervalRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text("Sync interval", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Text(stringResource(R.string.settings_sync_interval), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(syncIntervalLabel(intervalMins), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
             Spacer(modifier = Modifier.width(8.dp))
@@ -3046,11 +3247,11 @@ private fun SettingsSyncIntervalRow(
     }
     if (showSheet) {
         SettingsOptionSheet(
-            title = "Sync interval",
+            title = stringResource(R.string.settings_sync_interval),
             options = options,
             selected = intervalMins,
             palette = palette,
-            label = ::syncIntervalLabel,
+            label = { syncIntervalLabel(it) },
             onDismiss = { showSheet = false },
             onSelected = {
                 onIntervalSelected(it)
@@ -3067,7 +3268,8 @@ private fun <T> SettingsOptionSheet(
     options: List<T>,
     selected: T,
     palette: DotCalPalette,
-    label: (T) -> String,
+    // @Composable so callers can pass enum label getters that resolve string resources.
+    label: @Composable (T) -> String,
     onDismiss: () -> Unit,
     onSelected: (T) -> Unit,
 ) {
@@ -3171,7 +3373,16 @@ private fun ThemeOptionRow(
             ThemePreview(mode = mode, accentColor = accentColor)
             Column {
                 Text(mode.label, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(if (selected) "Active" else "Tap to apply", color = if (selected) palette.accent else palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                Text(
+                    if (selected) {
+                        stringResource(R.string.settings_value_active)
+                    } else {
+                        stringResource(R.string.settings_tap_to_apply)
+                    },
+                    color = if (selected) palette.accent else palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                )
             }
         }
         Box(
@@ -3281,14 +3492,14 @@ private fun CustomAccentRow(
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Custom Color", color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(stringResource(R.string.settings_custom_color), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 if (!isPro) {
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Pro", color = palette.accent, fontFamily = mono, fontSize = 11.sp)
+                    Text(stringResource(R.string.badge_pro), color = palette.accent, fontFamily = mono, fontSize = 11.sp)
                 }
             }
             Text(
-                if (isCustom) accentColor.label else "Pick any hex color",
+                if (isCustom) accentColor.label else stringResource(R.string.settings_pick_hex),
                 color = if (isCustom) palette.accent else palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 12.sp,
@@ -3302,7 +3513,7 @@ private fun CustomAccentRow(
 internal fun CustomAccentPickerDialog(
     initial: Color,
     palette: DotCalPalette,
-    title: String = "Custom Accent",
+    title: String = stringResource(R.string.settings_custom_accent),
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
@@ -3348,11 +3559,11 @@ internal fun CustomAccentPickerDialog(
                     )
                 }
                 Spacer(modifier = Modifier.height(18.dp))
-                CalcSectionLabelSafe("HUE", palette)
+                CalcSectionLabelSafe(stringResource(R.string.picker_hue), palette)
                 Spacer(modifier = Modifier.height(8.dp))
                 HueSlider(hue = hue, palette = palette, onHueChange = { hue = it })
                 Spacer(modifier = Modifier.height(18.dp))
-                CalcSectionLabelSafe("SATURATION", palette)
+                CalcSectionLabelSafe(stringResource(R.string.picker_saturation), palette)
                 Spacer(modifier = Modifier.height(8.dp))
                 ValueSlider(
                     fraction = sat,
@@ -3366,7 +3577,7 @@ internal fun CustomAccentPickerDialog(
                     onChange = { sat = it },
                 )
                 Spacer(modifier = Modifier.height(18.dp))
-                CalcSectionLabelSafe("BRIGHTNESS", palette)
+                CalcSectionLabelSafe(stringResource(R.string.picker_brightness), palette)
                 Spacer(modifier = Modifier.height(8.dp))
                 ValueSlider(
                     fraction = value,
@@ -3380,7 +3591,7 @@ internal fun CustomAccentPickerDialog(
                     onChange = { value = it },
                 )
                 Spacer(modifier = Modifier.height(18.dp))
-                CalcSectionLabelSafe("HEX", palette)
+                CalcSectionLabelSafe(stringResource(R.string.picker_hex), palette)
                 Spacer(modifier = Modifier.height(8.dp))
                 Box(
                     modifier = Modifier
@@ -3408,7 +3619,7 @@ internal fun CustomAccentPickerDialog(
         },
         confirmButton = {
             Text(
-                "Apply",
+                stringResource(R.string.action_apply),
                 color = palette.accent,
                 fontFamily = mono,
                 fontWeight = FontWeight.Bold,
@@ -3418,7 +3629,7 @@ internal fun CustomAccentPickerDialog(
         },
         dismissButton = {
             Text(
-                "Cancel",
+                stringResource(R.string.action_cancel),
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 15.sp,
@@ -3435,7 +3646,7 @@ internal fun CalcSectionLabelSafe(text: String, palette: DotCalPalette) {
 
 /** Rainbow hue slider (0..360). */
 @Composable
-private fun HueSlider(hue: Float, palette: DotCalPalette, onHueChange: (Float) -> Unit) {
+internal fun HueSlider(hue: Float, palette: DotCalPalette, onHueChange: (Float) -> Unit) {
     var widthPx by remember { mutableStateOf(1) }
     val hueBrush = remember {
         Brush.horizontalGradient(
@@ -3465,7 +3676,7 @@ private fun HueSlider(hue: Float, palette: DotCalPalette, onHueChange: (Float) -
 
 /** Generic 0..1 slider with a custom gradient [track]. */
 @Composable
-private fun ValueSlider(fraction: Float, track: Brush, palette: DotCalPalette, onChange: (Float) -> Unit) {
+internal fun ValueSlider(fraction: Float, track: Brush, palette: DotCalPalette, onChange: (Float) -> Unit) {
     var widthPx by remember { mutableStateOf(1) }
     Box(
         modifier = Modifier
@@ -3489,7 +3700,7 @@ private fun ValueSlider(fraction: Float, track: Brush, palette: DotCalPalette, o
 }
 
 @Composable
-private fun SliderThumb(fraction: Float, widthPx: Int) {
+internal fun SliderThumb(fraction: Float, widthPx: Int) {
     val thumb = 22.dp
     val density = LocalDensity.current
     val trackWidthDp = with(density) { widthPx.toDp() }

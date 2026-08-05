@@ -53,6 +53,8 @@ class ProManager(
     private var cachedProductDetails: ProductDetails? = null
     private val _productDetails = MutableStateFlow<ProductDetails?>(null)
     val productDetails: StateFlow<ProductDetails?> = _productDetails.asStateFlow()
+    private val _purchaseOffers = MutableStateFlow<List<ProPurchaseOffer>>(emptyList())
+    val purchaseOffers: StateFlow<List<ProPurchaseOffer>> = _purchaseOffers.asStateFlow()
 
     private val purchaseResults = MutableStateFlow<PurchaseResult?>(null)
 
@@ -205,12 +207,13 @@ class ProManager(
         if (details != null) {
             cachedProductDetails = details
             _productDetails.value = details
+            _purchaseOffers.value = details.proPurchaseOffers()
         }
         return details
     }
 
     /** Launches the Play purchase flow. Result is delivered through [purchaseResults]. */
-    suspend fun launchPurchaseFlow(activity: Activity): PurchaseResult {
+    suspend fun launchPurchaseFlow(activity: Activity, selectedOfferToken: String? = null): PurchaseResult {
         if (_billingState.value != BillingConnectionState.Connected) {
             return PurchaseResult.Error("Billing not available. Please try again.")
         }
@@ -218,9 +221,11 @@ class ProManager(
         if (details == null) {
             return PurchaseResult.Error("Product not found. Please update the app or try again later.")
         }
-        val productParams = BillingFlowParams.ProductDetailsParams.newBuilder()
+        val selectedOffer = selectProPurchaseOffer(details.proPurchaseOffers(), selectedOfferToken)
+        val productParamsBuilder = BillingFlowParams.ProductDetailsParams.newBuilder()
             .setProductDetails(details)
-            .build()
+        selectedOffer?.offerToken?.takeIf { it.isNotBlank() }?.let(productParamsBuilder::setOfferToken)
+        val productParams = productParamsBuilder.build()
         val flowParams = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(listOf(productParams))
             .build()
@@ -280,5 +285,20 @@ class ProManager(
         const val PRODUCT_ID_PRO = "dotcal_pro"
         private const val MAX_CONNECT_ATTEMPTS = 3
         private const val GENERIC_ERROR = "Something went wrong. Please try again."
+    }
+}
+
+private fun ProductDetails.proPurchaseOffers(): List<ProPurchaseOffer> {
+    val offers = oneTimePurchaseOfferDetailsList.orEmpty().ifEmpty {
+        oneTimePurchaseOfferDetails?.let(::listOf).orEmpty()
+    }
+    return offers.mapNotNull { offer ->
+        val token = offer.offerToken ?: return@mapNotNull null
+        ProPurchaseOffer(
+            formattedPrice = offer.formattedPrice,
+            offerToken = token,
+            offerId = offer.offerId,
+            purchaseOptionId = offer.purchaseOptionId,
+        )
     }
 }

@@ -56,6 +56,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -63,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.ics.ParsedIcsItem
 import com.dotfield.dotcal.share.QrEventImageExporter
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -71,7 +74,6 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -110,6 +112,9 @@ internal fun QrEventShareScreen(
         }
     }
     var pendingSaveBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    // Hoisted: the toast fires inside scope.launch, which is not a composable scope.
+    val savedMessage = stringResource(R.string.qr_image_saved)
+    val saveFailedMessage = stringResource(R.string.qr_image_save_failed)
     val saveLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("image/png"),
     ) { uri ->
@@ -124,13 +129,13 @@ internal fun QrEventShareScreen(
                         } == true
                     }.getOrDefault(false)
                 }
-                showDotCalToast(context, palette, if (saved) "QR image saved" else "Could not save QR image")
+                showDotCalToast(context, palette, if (saved) savedMessage else saveFailedMessage)
             }
         }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
-        QrTopBar(title = "Share as QR", palette = palette, onBack = onBack)
+        QrTopBar(title = stringResource(R.string.qr_share_title), palette = palette, onBack = onBack)
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -156,7 +161,7 @@ internal fun QrEventShareScreen(
                     },
                     onFailure = {
                         Text(
-                            "Could not create QR code",
+                            stringResource(R.string.qr_create_failed),
                             color = palette.accent,
                             textAlign = TextAlign.Center,
                         )
@@ -197,7 +202,7 @@ internal fun QrEventShareScreen(
             }
             if (sharedWithoutDescription) {
                 Text(
-                    "Shared without description",
+                    stringResource(R.string.qr_shared_without_description),
                     color = palette.accent,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 10.dp),
@@ -232,7 +237,7 @@ internal fun QrEventShareScreen(
             ) {
                 Icon(Icons.Default.FileDownload, contentDescription = null)
                 Spacer(modifier = Modifier.size(8.dp))
-                Text("Save image", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.qr_save_image), fontWeight = FontWeight.SemiBold)
             }
             Button(
                 onClick = { exportBitmapResult?.getOrNull()?.let(onShare) },
@@ -247,7 +252,7 @@ internal fun QrEventShareScreen(
             ) {
                 Icon(Icons.Default.Share, contentDescription = null)
                 Spacer(modifier = Modifier.size(8.dp))
-                Text("Share", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.qr_share), fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -269,7 +274,7 @@ internal fun QrEventScannerScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
-        QrTopBar(title = "Scan event QR", palette = palette, onBack = onBack)
+        QrTopBar(title = stringResource(R.string.qr_scan_title), palette = palette, onBack = onBack)
         if (!hasCameraPermission) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(28.dp),
@@ -284,7 +289,7 @@ internal fun QrEventScannerScreen(
                 )
                 Spacer(modifier = Modifier.height(18.dp))
                 Text(
-                    "Camera access lets DotCal scan event QR codes. Frames stay in memory and are never saved.",
+                    stringResource(R.string.qr_camera_rationale),
                     color = palette.primaryText,
                     fontSize = 16.sp,
                     lineHeight = 23.sp,
@@ -296,7 +301,7 @@ internal fun QrEventScannerScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
                     shape = RoundedCornerShape(8.dp),
                 ) {
-                    Text("Allow camera")
+                    Text(stringResource(R.string.qr_allow_camera))
                 }
             }
         } else {
@@ -328,6 +333,8 @@ private fun CameraQrScanner(
         )
     }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    // Hoisted: assigned from DisposableEffect callbacks, which are not composable scopes.
+    val cameraUnavailableMessage = stringResource(R.string.qr_camera_unavailable)
     val handlingFrame = remember { AtomicBoolean(false) }
     val lastValue = remember { AtomicReference<String?>(null) }
     val lastScanAt = remember { AtomicLong(0L) }
@@ -346,7 +353,7 @@ private fun CameraQrScanner(
             {
                 if (!active.get()) return@addListener
                 val provider = runCatching { providerFuture.get() }
-                    .onFailure { errorMessage = "Camera unavailable" }
+                    .onFailure { errorMessage = cameraUnavailableMessage }
                     .getOrNull()
                     ?: return@addListener
                 cameraProvider = provider
@@ -383,7 +390,7 @@ private fun CameraQrScanner(
                     provider.unbindAll()
                     provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
                 }.onFailure {
-                    errorMessage = "Camera unavailable"
+                    errorMessage = cameraUnavailableMessage
                 }
             },
             mainExecutor,
@@ -405,7 +412,7 @@ private fun CameraQrScanner(
                 .border(2.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(8.dp)),
         )
         Text(
-            errorMessage ?: "Point camera at event QR",
+            errorMessage ?: stringResource(R.string.qr_point_camera),
             color = if (errorMessage == null) Color.White else palette.accent,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
@@ -427,7 +434,7 @@ internal fun IcsImportPreviewScreen(
     onImport: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
-        QrTopBar(title = "Import preview", palette = palette, onBack = onBack)
+        QrTopBar(title = stringResource(R.string.qr_import_title), palette = palette, onBack = onBack)
         LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
@@ -450,7 +457,7 @@ internal fun IcsImportPreviewScreen(
                         Text(item.location, color = palette.secondaryText, fontSize = 14.sp)
                     }
                     if (!item.rrule.isNullOrBlank()) {
-                        Text("Repeats", color = palette.accent, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(stringResource(R.string.qr_repeats), color = palette.accent, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
                 }
                 HorizontalDivider(color = palette.line.copy(alpha = 0.55f))
@@ -466,7 +473,13 @@ internal fun IcsImportPreviewScreen(
             colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
             shape = RoundedCornerShape(8.dp),
         ) {
-            Text(if (items.size == 1) "Import event" else "Import ${items.size} items")
+            Text(
+                if (items.size == 1) {
+                    stringResource(R.string.qr_import_single)
+                } else {
+                    pluralStringResource(R.plurals.qr_import_items, items.size, items.size)
+                },
+            )
         }
     }
 }
@@ -496,16 +509,25 @@ private fun QrTopBar(
     }
 }
 
+@Composable
 private fun ParsedIcsItem.previewDateTime(use24HourFormat: Boolean): String {
-    if (startTimeMs <= 0L) return "No date"
+    if (startTimeMs <= 0L) return stringResource(R.string.qr_no_date)
     val zone = runCatching { ZoneId.of(timeZone) }.getOrDefault(ZoneId.systemDefault())
     val start = Instant.ofEpochMilli(startTimeMs).atZone(zone)
-    val dateFormat = DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.getDefault())
-    if (isAllDay) return "${start.toLocalDate().format(dateFormat)} - All-day"
-    val timeFormat = DateTimeFormatter.ofPattern(if (use24HourFormat) "HH:mm" else "h:mm a", Locale.getDefault())
+    val dateFormat = localizedFormatter("EEE, d MMM yyyy")
+    val startDate = start.toLocalDate().format(dateFormat)
+    if (isAllDay) return stringResource(R.string.qr_date_all_day, startDate)
+    val timeFormat = localizedFormatter(if (use24HourFormat) "HH:mm" else "h:mm a")
     val end = Instant.ofEpochMilli(endTimeMs).atZone(zone)
-    return "${start.toLocalDate().format(dateFormat)} - ${start.toLocalTime().format(timeFormat)} to ${end.toLocalTime().format(timeFormat)}"
+    return stringResource(
+        R.string.qr_date_time_span,
+        startDate,
+        start.toLocalTime().format(timeFormat),
+        end.toLocalTime().format(timeFormat),
+    )
 }
 
+// Locale.ROOT, not the default locale: in Turkish, lowercase("I") is "ı", which the ASCII
+// regex below then strips out of the filename.
 private fun String.safeQrFilename(): String =
-    lowercase().replace(Regex("[^a-z0-9._-]+"), "-").trim('-').take(80).ifBlank { "dotcal-event-qr" }
+    lowercase(Locale.ROOT).replace(Regex("[^a-z0-9._-]+"), "-").trim('-').take(80).ifBlank { "dotcal-event-qr" }

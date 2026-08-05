@@ -6,6 +6,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.annotation.PluralsRes
+import androidx.annotation.StringRes
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Typeface
@@ -207,6 +209,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.foundation.layout.ColumnScope
 import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.billing.ProManager
@@ -243,8 +246,11 @@ import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
+import com.dotfield.dotcal.prefs.AppLanguage
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import com.dotfield.dotcal.BOOT_LANGUAGE_KEY
+import com.dotfield.dotcal.applyAppLanguage
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
 import com.dotfield.dotcal.share.CardImageExporter
 import com.dotfield.dotcal.share.QrEventImageExporter
@@ -373,7 +379,9 @@ fun DotCalApp(
     var taskTemplatePrefill by remember { mutableStateOf<EventTemplate?>(null) }
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     val productDetails by viewModel.productDetails.collectAsStateWithLifecycle()
-    val proPrice = productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
+    val purchaseOffers by viewModel.purchaseOffers.collectAsStateWithLifecycle()
+    val proPrice = purchaseOffers.firstOrNull()?.formattedPrice
+        ?: productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
     val appLockState by viewModel.appLockState.collectAsStateWithLifecycle()
     val privateVaultIds by viewModel.privateVaultIds.collectAsStateWithLifecycle()
     val privateVaultEvents by viewModel.privateVaultEvents.collectAsStateWithLifecycle()
@@ -391,6 +399,16 @@ fun DotCalApp(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    // Hoisted for the non-composable callbacks below (toasts, snackbars, share intents,
+    // and the plural-backed bulk-edit results).
+    val resources = context.resources
+    val undoActionLabel = stringResource(R.string.bulk_undo)
+    val bulkUndoneMessage = stringResource(R.string.bulk_edit_undone)
+    val bulkFailedMessage = stringResource(R.string.bulk_edit_failed)
+    val eventUpdatedMessage = stringResource(R.string.bulk_event_updated)
+    val qrRejectInvalid = stringResource(R.string.qr_reject_invalid)
+    val qrRejectNotDotCal = stringResource(R.string.qr_reject_not_dotcal)
+    val qrRejectUnsupported = stringResource(R.string.qr_reject_unsupported)
     val bootPreferences = remember(context) { context.getSharedPreferences(BOOT_PREFS, android.content.Context.MODE_PRIVATE) }
     val bootThemeMode = remember(bootPreferences) {
         DotCalThemeMode.fromStorage(bootPreferences.getString(BOOT_THEME_KEY, null))
@@ -400,6 +418,9 @@ fun DotCalApp(
     }
     val bootDefaultView = remember(bootPreferences) {
         CalendarTab.fromStorage(bootPreferences.getString(BOOT_DEFAULT_VIEW_KEY, null))
+    }
+    val bootAppLanguage = remember(bootPreferences) {
+        AppLanguage.fromTag(bootPreferences.getString(BOOT_LANGUAGE_KEY, null))
     }
     val bootPalette = remember(bootAccentColor) {
         dotCalBootPalette(bootAccentColor)
@@ -413,11 +434,14 @@ fun DotCalApp(
         if (result.resultCode == Activity.RESULT_OK) appUnlocked = true
     }
     val requestDeviceUnlock: () -> Unit = {
-        val intent = keyguardManager.createConfirmDeviceCredentialIntent("Unlock DotCal", "Confirm your device lock to continue.")
+        val intent = keyguardManager.createConfirmDeviceCredentialIntent(
+            context.getString(R.string.unlock_device_title),
+            context.getString(R.string.unlock_device_subtitle),
+        )
         if (intent != null) {
             deviceCredentialLauncher.launch(intent)
         } else {
-            showDotCalToast(context, bootPalette, "Device lock unavailable")
+            showDotCalToast(context, bootPalette, R.string.toast_device_lock_unavailable)
         }
     }
 
@@ -436,11 +460,11 @@ fun DotCalApp(
                 when {
                     info.installStatus() == InstallStatus.DOWNLOADED -> updateDownloaded = true
                     info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE && flexibleAllowed -> updateAvailable = true
-                    manual -> showDotCalToast(context, bootPalette, "DotCal is up to date")
+                    manual -> showDotCalToast(context, bootPalette, R.string.toast_up_to_date)
                 }
             }
             .addOnFailureListener {
-                if (manual) showDotCalToast(context, bootPalette, "Couldn't check for updates")
+                if (manual) showDotCalToast(context, bootPalette, R.string.toast_update_check_failed)
             }
     }
     val startFlexibleUpdate: () -> Unit = {
@@ -511,6 +535,11 @@ fun DotCalApp(
             AppFont.fromId(preferences[CalendarPreferences.KEY_APP_FONT])
         }
     }.collectAsStateWithLifecycle(initialValue = AppFont.NDot)
+    val appLanguage by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            AppLanguage.fromTag(preferences[CalendarPreferences.KEY_APP_LANGUAGE])
+        }
+    }.collectAsStateWithLifecycle(initialValue = bootAppLanguage)
     val storedCalendarTab by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             CalendarTab.fromStorage(preferences[CalendarPreferences.KEY_DEFAULT_VIEW])
@@ -621,7 +650,7 @@ fun DotCalApp(
     var pendingAddAccountAfterPermission by remember { mutableStateOf(false) }
     fun launchGoogleAddAccount() {
         val activity = context as? Activity ?: run {
-            showDotCalToast(context, palette, "Account setup unavailable")
+            showDotCalToast(context, palette, R.string.toast_account_setup_unavailable)
             return
         }
         runCatching {
@@ -643,7 +672,7 @@ fun DotCalApp(
                 Handler(Looper.getMainLooper()),
             )
         }.onFailure {
-            showDotCalToast(context, palette, "Account setup unavailable")
+            showDotCalToast(context, palette, R.string.toast_account_setup_unavailable)
         }
     }
     val calendarPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -666,10 +695,10 @@ fun DotCalApp(
         if (hasContactsPermission) {
             viewModel.setBirthdayCalendarEnabled(true) { result ->
                 val imported = result.getOrNull()?.importedCount ?: 0
-                showDotCalToast(context, palette, "$imported Birthdays Imported")
+                showDotCalToastPlural(context, palette, R.plurals.birthdays_imported, imported)
             }
         } else {
-            showDotCalToast(context, palette, "Contacts access needed")
+            showDotCalToast(context, palette, R.string.contacts_access_needed)
         }
     }
     val onboardingCalendarPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -710,9 +739,9 @@ fun DotCalApp(
                 val ok = runCatching {
                     context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
                 }.isSuccess
-                showDotCalToast(context, palette, if (ok) "Calendar exported" else "Export failed")
+                showDotCalToast(context, palette, if (ok) R.string.toast_calendar_exported else R.string.toast_export_failed)
             }.onFailure {
-                showDotCalToast(context, palette, "Export failed")
+                showDotCalToast(context, palette, R.string.toast_export_failed)
             }
         }
     }
@@ -727,9 +756,9 @@ fun DotCalApp(
                 }.getOrNull()
             }
             if (text.isNullOrBlank()) {
-                showDotCalToast(context, palette, "Couldn't read file")
+                showDotCalToast(context, palette, R.string.toast_file_read_failed)
             } else {
-                openIcsPreview(text, "Import failed - not a valid .ics file")
+                openIcsPreview(text, context.getString(R.string.toast_import_invalid_ics))
             }
         }
     }
@@ -742,9 +771,9 @@ fun DotCalApp(
                 val ok = runCatching {
                     context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
                 }.isSuccess
-                showDotCalToast(context, palette, if (ok) "Backup saved" else "Backup failed")
+                showDotCalToast(context, palette, if (ok) R.string.toast_backup_saved else R.string.toast_backup_failed)
             }.onFailure {
-                showDotCalToast(context, palette, "Backup failed")
+                showDotCalToast(context, palette, R.string.toast_backup_failed)
             }
         }
     }
@@ -756,7 +785,7 @@ fun DotCalApp(
             context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
         }.getOrNull()
         if (text.isNullOrBlank()) {
-            showDotCalToast(context, palette, "Couldn't read file")
+            showDotCalToast(context, palette, R.string.toast_file_read_failed)
             return@rememberLauncherForActivityResult
         }
         viewModel.importBackup(text) { result ->
@@ -764,11 +793,15 @@ fun DotCalApp(
                 showDotCalToast(
                     context,
                     palette,
-                    "Restored: ${summary.eventsInserted} new, ${summary.eventsUpdated} updated",
+                    context.getString(
+                        R.string.toast_restore_summary,
+                        summary.eventsInserted,
+                        summary.eventsUpdated,
+                    ),
                     Toast.LENGTH_LONG,
                 )
             }.onFailure {
-                showDotCalToast(context, palette, "Restore failed - not a valid DotCal backup")
+                showDotCalToast(context, palette, R.string.toast_restore_invalid_backup)
             }
         }
     }
@@ -1022,12 +1055,24 @@ fun DotCalApp(
         viewModel.closeEventDetail()
         addSheet = true
     }
-    fun showBulkResult(message: String, result: Result<BulkEditResult>) {
+    // Takes a plural resource rather than a pre-built string so the count agrees with the
+    // locale's plural rules. Resolved via resources.getQuantityString because every call site
+    // is a non-composable callback.
+    fun showBulkResult(@PluralsRes messageRes: Int, count: Int, result: Result<BulkEditResult>) {
         result
             .onSuccess { summary ->
                 selectedAgendaEventIds = emptySet()
                 bulkEventSheet = null
-                val suffix = if (summary.skippedCount > 0) ", ${summary.skippedCount} skipped" else ""
+                val message = resources.getQuantityString(messageRes, count, count)
+                val suffix = if (summary.skippedCount > 0) {
+                    resources.getQuantityString(
+                        R.plurals.bulk_skipped_suffix,
+                        summary.skippedCount,
+                        summary.skippedCount,
+                    )
+                } else {
+                    ""
+                }
                 scope.launch {
                     val dismissJob = launch {
                         delay(BULK_UNDO_SNACKBAR_MILLIS)
@@ -1035,18 +1080,18 @@ fun DotCalApp(
                     }
                     val snackbarResult = snackbarHostState.showSnackbar(
                         message = "$message$suffix",
-                        actionLabel = "UNDO",
+                        actionLabel = undoActionLabel,
                     )
                     dismissJob.cancel()
                     if (snackbarResult == SnackbarResult.ActionPerformed) {
                         viewModel.undoBulkEdit(summary.undoToken) {
-                            showDotCalToast(context, palette, "Bulk edit undone")
+                            showDotCalToast(context, palette, bulkUndoneMessage)
                         }
                     }
                 }
             }
             .onFailure {
-                showDotCalToast(context, palette, "Bulk edit failed")
+                showDotCalToast(context, palette, bulkFailedMessage)
             }
     }
     fun showDragResult(result: Result<BulkEditResult>) {
@@ -1058,19 +1103,19 @@ fun DotCalApp(
                         snackbarHostState.currentSnackbarData?.dismiss()
                     }
                     val snackbarResult = snackbarHostState.showSnackbar(
-                        message = "Event updated",
+                        message = eventUpdatedMessage,
                         actionLabel = "UNDO",
                     )
                     dismissJob.cancel()
                     if (snackbarResult == SnackbarResult.ActionPerformed) {
                         viewModel.undoBulkEdit(summary.undoToken) {
-                            showDotCalToast(context, palette, "Change undone")
+                            showDotCalToast(context, palette, R.string.toast_change_undone)
                         }
                     }
                 }
             }
             .onFailure {
-                showDotCalToast(context, palette, "Couldn't move event")
+                showDotCalToast(context, palette, R.string.toast_move_event_failed)
             }
     }
     fun commitEventDrag(request: PendingEventDrag) {
@@ -1160,12 +1205,12 @@ fun DotCalApp(
         viewModel.syncNow { result ->
             isSyncing = false
             if (showToast) {
-                val message = when {
-                    result.isSuccess && result.getOrNull()?.permissionDenied != true -> "Calendars synced"
-                    result.getOrNull()?.permissionDenied == true -> "Sync failed\nCheck calendar access"
-                    else -> "Sync failed\nTry again"
+                val messageRes = when {
+                    result.isSuccess && result.getOrNull()?.permissionDenied != true -> R.string.sync_success
+                    result.getOrNull()?.permissionDenied == true -> R.string.sync_failed_permission
+                    else -> R.string.sync_failed_retry
                 }
-                showDotCalToast(context, palette, message)
+                showDotCalToast(context, palette, messageRes)
             }
         }
     }
@@ -1552,6 +1597,7 @@ fun DotCalApp(
                 themeMode = resolvedThemeMode,
                 accentColor = resolvedAccentColor,
                 appFont = appFont,
+                appLanguage = appLanguage,
                 palette = palette,
                 screen = settingsScreen,
                 onBack = { closeTopSurface() },
@@ -1579,6 +1625,17 @@ fun DotCalApp(
                         context.calendarPreferencesDataStore.edit { preferences ->
                             preferences[CalendarPreferences.KEY_APP_FONT] = selectedFont.id
                         }
+                    }
+                },
+                onAppLanguageSelected = { selectedLanguage ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_APP_LANGUAGE] = selectedLanguage.tag
+                        }
+                        // Committed synchronously: below API 33 the recreate() below restarts the
+                        // activity immediately, and attachBaseContext reads this mirror on the way up.
+                        bootPreferences.edit().putString(BOOT_LANGUAGE_KEY, selectedLanguage.tag).commit()
+                        applyAppLanguage(context, selectedLanguage)
                     }
                 },
                 syncEnabled = syncEnabled,
@@ -1703,9 +1760,10 @@ fun DotCalApp(
                             viewModel.setBirthdayCalendarEnabled(true) { result ->
                                 val birthdayResult = result.getOrNull()
                                 val message = if (result.isSuccess && birthdayResult?.permissionDenied != true) {
-                                    "${birthdayResult?.importedCount ?: 0} Birthdays Imported"
+                                    val imported = birthdayResult?.importedCount ?: 0
+                                    resources.getQuantityString(R.plurals.birthdays_imported, imported, imported)
                                 } else {
-                                    "Contacts access needed"
+                                    context.getString(R.string.contacts_access_needed)
                                 }
                                 showDotCalToast(context, palette, message)
                             }
@@ -1714,21 +1772,21 @@ fun DotCalApp(
                         }
                     } else {
                         viewModel.setBirthdayCalendarEnabled(false) {
-                            showDotCalToast(context, palette, "Birthdays disabled")
+                            showDotCalToast(context, palette, R.string.birthdays_disabled)
                         }
                     }
                 },
                 onAddHolidayCountry = { item ->
                     viewModel.addHolidayCountry(item) { result ->
                         if (result.isFailure) {
-                            showDotCalToast(context, palette, "Could not add holidays")
+                            showDotCalToast(context, palette, R.string.toast_holidays_add_failed)
                         }
                     }
                 },
                 onRemoveHolidayCountry = { item ->
                     viewModel.removeHolidayCountry(item) { result ->
                         if (result.isFailure) {
-                            showDotCalToast(context, palette, "Could not remove holidays")
+                            showDotCalToast(context, palette, R.string.toast_holidays_remove_failed)
                         }
                     }
                 },
@@ -1783,7 +1841,7 @@ fun DotCalApp(
                 proPrice = proPrice,
                 onDotCalPro = {
                     if (isPro) {
-                        showDotCalToast(context, palette, "You're already Pro!")
+                        showDotCalToast(context, palette, R.string.toast_already_pro)
                     } else {
                         showPaywall = true
                     }
@@ -1793,7 +1851,7 @@ fun DotCalApp(
                         showDotCalToast(
                             context,
                             palette,
-                            if (restored) "Purchase restored - enjoy DotCal Pro!" else "No previous purchase found on this account",
+                            if (restored) R.string.toast_purchase_restored else R.string.toast_no_previous_purchase,
                         )
                     }
                 },
@@ -1826,18 +1884,18 @@ fun DotCalApp(
                 onDisableAppLock = {
                     viewModel.disableAppLock {
                         appUnlocked = false
-                        showDotCalToast(context, palette, "App Lock disabled")
+                        showDotCalToast(context, palette, R.string.toast_app_lock_disabled)
                     }
                 },
                 onClearAppLockPin = {
                     viewModel.clearAppLockPin {
                         appUnlocked = false
-                        showDotCalToast(context, palette, "PIN removed")
+                        showDotCalToast(context, palette, R.string.toast_pin_removed)
                     }
                 },
                 onRestorePrivateEvent = { eventId ->
                     viewModel.restoreFromPrivateVault(eventId) {
-                        showDotCalToast(context, palette, "Restored from Private Vault")
+                        showDotCalToast(context, palette, R.string.toast_restored_from_vault)
                     }
                 },
                 onRecentlyDeleted = {
@@ -1987,24 +2045,24 @@ fun DotCalApp(
                                     sharedWithoutDescription = encoded.sharedWithoutDescription,
                                 )
                                 if (encoded.sharedWithoutDescription) {
-                                    showDotCalToast(context, palette, "Shared without description")
+                                    showDotCalToast(context, palette, R.string.toast_shared_without_description)
                                 }
                             }.onFailure {
-                                showDotCalToast(context, palette, "Event is too large to share as QR")
+                                showDotCalToast(context, palette, R.string.toast_event_too_large_qr)
                             }
                         }
                     },
                     onPinCountdown = {
                         viewModel.pinCountdown(event, isPro) { result ->
                             when (result) {
-                                CountdownPinResult.Pinned -> showDotCalToast(context, palette, "Countdown pinned")
+                                CountdownPinResult.Pinned -> showDotCalToast(context, palette, R.string.toast_countdown_pinned)
                                 is CountdownPinResult.FreeLimitReached -> pendingCountdownLimitEvent = event to result.activeEventId
                             }
                         }
                     },
                     onUnpinCountdown = {
                         viewModel.unpinCountdown(event) {
-                            showDotCalToast(context, palette, "Countdown removed")
+                            showDotCalToast(context, palette, R.string.toast_countdown_removed)
                         }
                     },
                     onShareCountdownImage = {
@@ -2021,7 +2079,7 @@ fun DotCalApp(
                             }
                             result
                                 .onSuccess { uri -> shareCountdownImage(context, event, uri, palette) }
-                                .onFailure { showDotCalToast(context, palette, "Could not share countdown") }
+                                .onFailure { showDotCalToast(context, palette, R.string.toast_countdown_share_failed) }
                         }
                     },
                     onDuplicate = { openDuplicateEditor(event) },
@@ -2032,13 +2090,13 @@ fun DotCalApp(
                         } else {
                             viewModel.moveToPrivateVault(event) {
                                 viewModel.closeEventDetail()
-                                showDotCalToast(context, palette, "Moved to Private Vault")
+                                showDotCalToast(context, palette, R.string.toast_moved_to_vault)
                             }
                         }
                     },
                     onRestoreFromPrivate = {
                         viewModel.restoreFromPrivateVault(event.baseEventId()) {
-                            showDotCalToast(context, palette, "Restored from Private Vault")
+                            showDotCalToast(context, palette, R.string.toast_restored_from_vault)
                         }
                     },
                     onDelete = {
@@ -2055,7 +2113,7 @@ fun DotCalApp(
                 dragHandle = { BottomSheetDragHandle(palette) },
             ) {
                 CompactActionSheetContent(
-                    title = "Share Event",
+                    title = stringResource(R.string.share_event_title),
                     actions = ShareEventOption.entries.map { option ->
                         CompactActionItem(option.label) {
                             val eventReminders = reminders.filter { it.eventId == event.baseEventId() }
@@ -2068,7 +2126,7 @@ fun DotCalApp(
                                     }
                                     result
                                         .onSuccess { uri -> shareEventIcs(context, event, uri, palette) }
-                                        .onFailure { showDotCalToast(context, palette, "Could not share event") }
+                                        .onFailure { showDotCalToast(context, palette, R.string.toast_event_share_failed) }
                                 }
                             }
                         }
@@ -2086,7 +2144,7 @@ fun DotCalApp(
             ) {
                 QrEventShareScreen(
                     eventTitle = session.event.title,
-                    eventDateTime = session.event.shareDateTimeLine(use24HourFormat),
+                    eventDateTime = session.event.shareDateTimeLine(context, use24HourFormat),
                     eventMeta = session.event.qrShareMetaLine(),
                     payload = session.payload,
                     sharedWithoutDescription = session.sharedWithoutDescription,
@@ -2105,7 +2163,7 @@ fun DotCalApp(
                             }
                             result
                                 .onSuccess { uri -> shareQrEventImage(context, session.event, uri, palette) }
-                                .onFailure { showDotCalToast(context, palette, "Could not share QR image") }
+                                .onFailure { showDotCalToast(context, palette, R.string.toast_qr_share_failed) }
                         }
                     },
                 )
@@ -2125,16 +2183,16 @@ fun DotCalApp(
                         is QrEventDecodeResult.Success -> {
                             val parsedItems = IcsParser.parse(decoded.icsText)
                             if (parsedItems.isEmpty()) {
-                                QrScanOutcome.Rejected("Not a valid event code")
+                                QrScanOutcome.Rejected(qrRejectInvalid)
                             } else {
                                 showQrScanner = false
                                 pendingIcsImport = PendingIcsImport(decoded.icsText, parsedItems)
                                 QrScanOutcome.Accepted
                             }
                         }
-                        QrEventDecodeResult.NotDotCal -> QrScanOutcome.Rejected("Not a DotCal event code")
-                        QrEventDecodeResult.UnsupportedVersion -> QrScanOutcome.Rejected("DotCal event code needs a newer app")
-                        QrEventDecodeResult.Malformed -> QrScanOutcome.Rejected("Not a valid event code")
+                        QrEventDecodeResult.NotDotCal -> QrScanOutcome.Rejected(qrRejectNotDotCal)
+                        QrEventDecodeResult.UnsupportedVersion -> QrScanOutcome.Rejected(qrRejectUnsupported)
+                        QrEventDecodeResult.Malformed -> QrScanOutcome.Rejected(qrRejectInvalid)
                     }
                 },
             )
@@ -2158,11 +2216,11 @@ fun DotCalApp(
                                 showDotCalToast(
                                     context,
                                     palette,
-                                    "Imported: ${summary.inserted} new, ${summary.updated} updated",
+                                    context.getString(R.string.toast_import_summary, summary.inserted, summary.updated),
                                     Toast.LENGTH_LONG,
                                 )
                             }.onFailure {
-                                showDotCalToast(context, palette, "Import failed - not a valid .ics file")
+                                showDotCalToast(context, palette, R.string.toast_import_invalid_ics)
                             }
                         }
                     },
@@ -2179,19 +2237,19 @@ fun DotCalApp(
                         dragHandle = { BottomSheetDragHandle(palette) },
                     ) {
                         CompactActionSheetContent(
-                            title = "Bulk Edit",
+                            title = stringResource(R.string.bulk_edit_title),
                             actions = listOf(
-                                CompactActionItem("Move to date") { bulkEventSheet = BulkEventSheet.MoveDate },
-                                CompactActionItem("Copy to date") { bulkEventSheet = BulkEventSheet.CopyDate },
-                                CompactActionItem("Shift by days/hours") { bulkEventSheet = BulkEventSheet.Shift },
-                                CompactActionItem("Move to calendar") { bulkEventSheet = BulkEventSheet.Calendar },
-                                CompactActionItem("Change color") { bulkEventSheet = BulkEventSheet.Color },
-                                CompactActionItem("Toggle ghost") {
+                                CompactActionItem(stringResource(R.string.bulk_move_to_date)) { bulkEventSheet = BulkEventSheet.MoveDate },
+                                CompactActionItem(stringResource(R.string.bulk_copy_to_date)) { bulkEventSheet = BulkEventSheet.CopyDate },
+                                CompactActionItem(stringResource(R.string.bulk_shift_by)) { bulkEventSheet = BulkEventSheet.Shift },
+                                CompactActionItem(stringResource(R.string.bulk_move_to_calendar)) { bulkEventSheet = BulkEventSheet.Calendar },
+                                CompactActionItem(stringResource(R.string.bulk_change_color)) { bulkEventSheet = BulkEventSheet.Color },
+                                CompactActionItem(stringResource(R.string.bulk_toggle_ghost)) {
                                     viewModel.bulkToggleGhost(selectedAgendaEventIds) { result ->
-                                        showBulkResult("${selectedAgendaEventIds.size} events updated", result)
+                                        showBulkResult(R.plurals.events_updated, selectedAgendaEventIds.size, result)
                                     }
                                 },
-                                CompactActionItem("Delete selected") {
+                                CompactActionItem(stringResource(R.string.bulk_delete_selected)) {
                                     bulkEventSheet = null
                                     pendingBulkDelete = true
                                 },
@@ -2208,36 +2266,36 @@ fun DotCalApp(
                         dragHandle = { BottomSheetDragHandle(palette) },
                     ) {
                         CompactActionSheetContent(
-                            title = "Shift Selected",
+                            title = stringResource(R.string.bulk_shift_title),
                             actions = listOf(
-                                CompactActionItem("-7 days") {
+                                CompactActionItem(stringResource(R.string.bulk_shift_minus_7_days)) {
                                     viewModel.bulkShiftEvents(selectedAgendaEventIds, days = -7, hours = 0) { result ->
-                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                        showBulkResult(R.plurals.events_shifted, selectedAgendaEventIds.size, result)
                                     }
                                 },
-                                CompactActionItem("-1 day") {
+                                CompactActionItem(stringResource(R.string.bulk_shift_minus_1_day)) {
                                     viewModel.bulkShiftEvents(selectedAgendaEventIds, days = -1, hours = 0) { result ->
-                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                        showBulkResult(R.plurals.events_shifted, selectedAgendaEventIds.size, result)
                                     }
                                 },
-                                CompactActionItem("+1 day") {
+                                CompactActionItem(stringResource(R.string.bulk_shift_plus_1_day)) {
                                     viewModel.bulkShiftEvents(selectedAgendaEventIds, days = 1, hours = 0) { result ->
-                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                        showBulkResult(R.plurals.events_shifted, selectedAgendaEventIds.size, result)
                                     }
                                 },
-                                CompactActionItem("+7 days") {
+                                CompactActionItem(stringResource(R.string.bulk_shift_plus_7_days)) {
                                     viewModel.bulkShiftEvents(selectedAgendaEventIds, days = 7, hours = 0) { result ->
-                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                        showBulkResult(R.plurals.events_shifted, selectedAgendaEventIds.size, result)
                                     }
                                 },
-                                CompactActionItem("-1 hour") {
+                                CompactActionItem(stringResource(R.string.bulk_shift_minus_1_hour)) {
                                     viewModel.bulkShiftEvents(selectedAgendaEventIds, days = 0, hours = -1) { result ->
-                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                        showBulkResult(R.plurals.events_shifted, selectedAgendaEventIds.size, result)
                                     }
                                 },
-                                CompactActionItem("+1 hour") {
+                                CompactActionItem(stringResource(R.string.bulk_shift_plus_1_hour)) {
                                     viewModel.bulkShiftEvents(selectedAgendaEventIds, days = 0, hours = 1) { result ->
-                                        showBulkResult("${selectedAgendaEventIds.size} events shifted", result)
+                                        showBulkResult(R.plurals.events_shifted, selectedAgendaEventIds.size, result)
                                     }
                                 },
                             ),
@@ -2253,11 +2311,11 @@ fun DotCalApp(
                         dragHandle = { BottomSheetDragHandle(palette) },
                     ) {
                         CompactActionSheetContent(
-                            title = "Move to Calendar",
+                            title = stringResource(R.string.bulk_move_calendar_title),
                             actions = assignableAccounts.map { account ->
                                 CompactActionItem(account.displayName.readableCalendarLabel()) {
                                     viewModel.bulkChangeCalendar(selectedAgendaEventIds, account.id) { result ->
-                                        showBulkResult("${selectedAgendaEventIds.size} events moved", result)
+                                        showBulkResult(R.plurals.events_moved, selectedAgendaEventIds.size, result)
                                     }
                                 }
                             },
@@ -2273,16 +2331,16 @@ fun DotCalApp(
                         dragHandle = { BottomSheetDragHandle(palette) },
                     ) {
                         CompactActionSheetContent(
-                            title = "Change Color",
+                            title = stringResource(R.string.bulk_change_color_title),
                             actions = AccentColor.freePresets.map { preset ->
                                 CompactActionItem(preset.label) {
                                     viewModel.bulkChangeColor(selectedAgendaEventIds, preset.hex) { result ->
-                                        showBulkResult("${selectedAgendaEventIds.size} events recolored", result)
+                                        showBulkResult(R.plurals.events_recolored, selectedAgendaEventIds.size, result)
                                     }
                                 }
-                            } + CompactActionItem("Use calendar color") {
+                            } + CompactActionItem(stringResource(R.string.bulk_use_calendar_color)) {
                                 viewModel.bulkChangeColor(selectedAgendaEventIds, null) { result ->
-                                    showBulkResult("${selectedAgendaEventIds.size} events recolored", result)
+                                    showBulkResult(R.plurals.events_recolored, selectedAgendaEventIds.size, result)
                                 }
                             },
                             palette = palette,
@@ -2291,7 +2349,7 @@ fun DotCalApp(
                 }
                 BulkEventSheet.MoveDate -> {
                     DateTimeChoiceSheet(
-                        title = "Move to date",
+                        title = stringResource(R.string.bulk_move_to_date_title),
                         selectedDate = selectedDate,
                         selectedTime = LocalTime.of(9, 0),
                         minDate = null,
@@ -2300,14 +2358,14 @@ fun DotCalApp(
                         onDismiss = { bulkEventSheet = null },
                         onSelected = { pickedDate, _ ->
                             viewModel.bulkMoveToDate(selectedAgendaEventIds, pickedDate) { result ->
-                                showBulkResult("${selectedAgendaEventIds.size} events moved", result)
+                                showBulkResult(R.plurals.events_moved, selectedAgendaEventIds.size, result)
                             }
                         },
                     )
                 }
                 BulkEventSheet.CopyDate -> {
                     DateTimeChoiceSheet(
-                        title = "Copy to date",
+                        title = stringResource(R.string.bulk_copy_to_date_title),
                         selectedDate = selectedDate,
                         selectedTime = LocalTime.of(9, 0),
                         minDate = null,
@@ -2316,7 +2374,7 @@ fun DotCalApp(
                         onDismiss = { bulkEventSheet = null },
                         onSelected = { pickedDate, _ ->
                             viewModel.bulkCopyToDate(selectedAgendaEventIds, pickedDate) { result ->
-                                showBulkResult("${selectedAgendaEventIds.size} events copied", result)
+                                showBulkResult(R.plurals.events_copied, selectedAgendaEventIds.size, result)
                             }
                         },
                     )
@@ -2338,7 +2396,7 @@ fun DotCalApp(
                         .padding(bottom = 28.dp),
                 ) {
                     Text(
-                        "1 countdown active",
+                        pluralStringResource(R.plurals.countdown_active, 1, 1),
                         color = palette.primaryText,
                         fontFamily = LocalHeadingFont.current,
                         fontWeight = FontWeight.SemiBold,
@@ -2347,7 +2405,7 @@ fun DotCalApp(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "DotCal Pro gives you unlimited countdowns. You can also swap your current free countdown to this event.",
+                        stringResource(R.string.countdown_limit_body),
                         color = palette.secondaryText,
                         fontSize = 15.sp,
                         lineHeight = 22.sp,
@@ -2362,11 +2420,11 @@ fun DotCalApp(
                         shape = RoundedCornerShape(24.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
                     ) {
-                        Text("Unlock Unlimited", fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.countdown_unlock_unlimited), fontWeight = FontWeight.SemiBold)
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        "Swap to this countdown",
+                        stringResource(R.string.countdown_swap_to_this),
                         color = palette.primaryText,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
@@ -2376,7 +2434,7 @@ fun DotCalApp(
                             .clickable {
                                 pendingCountdownLimitEvent = null
                                 viewModel.swapCountdownPin(activeEventId, event) {
-                                    showDotCalToast(context, palette, "Countdown swapped")
+                                    showDotCalToast(context, palette, R.string.countdown_swapped)
                                 }
                             }
                             .padding(vertical = 14.dp),
@@ -2386,7 +2444,7 @@ fun DotCalApp(
         }
         pendingCopyToDateEvent?.let { event ->
             DateTimeChoiceSheet(
-                title = "Copy to date",
+                title = stringResource(R.string.bulk_copy_to_date_title),
                 selectedDate = event.localDate(),
                 selectedTime = event.startLocalTime(),
                 minDate = null,
@@ -2421,13 +2479,13 @@ fun DotCalApp(
                         } else {
                             viewModel.moveToPrivateVault(task) {
                                 taskDetail = null
-                                showDotCalToast(context, palette, "Moved to Private Vault")
+                                showDotCalToast(context, palette, R.string.toast_moved_to_vault)
                             }
                         }
                     },
                     onRestoreFromPrivate = {
                         viewModel.restoreFromPrivateVault(task.baseEventId()) {
-                            showDotCalToast(context, palette, "Restored from Private Vault")
+                            showDotCalToast(context, palette, R.string.toast_restored_from_vault)
                         }
                     },
                     onComplete = {
@@ -2625,7 +2683,7 @@ fun DotCalApp(
                 onCopy = { text ->
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                     clipboard.setPrimaryClip(android.content.ClipData.newPlainText("DotCal availability", text))
-                    showDotCalToast(context, palette, "Availability copied")
+                    showDotCalToast(context, palette, R.string.availability_copied)
                 },
                 onShare = { text -> shareAvailabilityText(context, text) },
             )
@@ -2671,7 +2729,7 @@ fun DotCalApp(
                 onBack = { showFocusProfiles = false },
                 onApply = { id ->
                     viewModel.applyFocusProfile(id) {
-                        showDotCalToast(context, palette, "Calendar set applied")
+                        showDotCalToast(context, palette, R.string.calendar_set_applied)
                     }
                 },
                 onSaveCurrent = { name ->
@@ -2684,7 +2742,7 @@ fun DotCalApp(
                             createdAtMs = System.currentTimeMillis(),
                         ),
                     )
-                    showDotCalToast(context, palette, "Calendar set saved")
+                    showDotCalToast(context, palette, R.string.calendar_set_saved)
                 },
                 onDelete = { id -> viewModel.deleteFocusProfile(id) },
             )
@@ -2708,17 +2766,22 @@ fun DotCalApp(
                 onSavePattern = { pattern -> viewModel.saveShiftPattern(pattern) },
                 onDeletePattern = { id, removeGenerated ->
                     viewModel.deleteShiftPattern(id, removeGenerated) {
-                        showDotCalToast(context, palette, "Shift pattern deleted")
+                        showDotCalToast(context, palette, R.string.shift_pattern_deleted)
                     }
                 },
                 onGenerate = { patternId, rangeStart, rangeEnd, accountId ->
                     viewModel.applyShiftPattern(patternId, rangeStart, rangeEnd, accountId) { result ->
-                        val message = when {
-                            result.generatedCount == 0 -> "No shifts added. Check that the pattern uses Day/Night shift types, not only Off."
-                            result.replacedCount > 0 -> "${result.generatedCount} shifts added, ${result.replacedCount} replaced"
-                            else -> "${result.generatedCount} shifts added"
+                        val messageRes = when {
+                            result.generatedCount == 0 -> R.string.shift_none_added
+                            result.replacedCount > 0 -> R.string.shift_added_with_replaced
+                            else -> R.string.shift_added
                         }
-                        showDotCalToast(context, palette, message, Toast.LENGTH_LONG)
+                        val formatArgs = when {
+                            result.generatedCount == 0 -> emptyArray<Any>()
+                            result.replacedCount > 0 -> arrayOf(result.generatedCount, result.replacedCount)
+                            else -> arrayOf(result.generatedCount)
+                        }
+                        showDotCalToast(context, palette, messageRes, *formatArgs, duration = Toast.LENGTH_LONG)
                     }
                 },
             )
@@ -2732,7 +2795,7 @@ fun DotCalApp(
                 onTemplateSelected = { template ->
                     val dates = selectedBulkDates.toList()
                     viewModel.applyTemplateToDates(template.id, dates, template.accountId ?: assignableAccounts.firstOrNull()?.id) { count ->
-                        showDotCalToast(context, palette, "$count events added")
+                        showDotCalToastPlural(context, palette, R.plurals.events_added, count)
                         selectedBulkDates = emptySet()
                         showBulkTemplatePicker = false
                     }
@@ -2817,15 +2880,15 @@ fun DotCalApp(
         }
         if (pendingBulkDelete) {
             ConfirmDeleteDialog(
-                title = "Delete selected events?",
-                confirmLabel = "Delete selected",
+                title = stringResource(R.string.bulk_delete_confirm_title),
+                confirmLabel = stringResource(R.string.bulk_delete_selected),
                 palette = palette,
                 onDismiss = { pendingBulkDelete = false },
                 onConfirm = {
                     val count = selectedAgendaEventIds.size
                     pendingBulkDelete = false
                     viewModel.bulkDeleteEvents(selectedAgendaEventIds) { result ->
-                        showBulkResult("$count events deleted", result)
+                        showBulkResult(R.plurals.events_deleted, count, result)
                     }
                 },
             )
@@ -2851,8 +2914,20 @@ fun DotCalApp(
         }
         pendingTaskDelete?.let { task ->
             ConfirmDeleteDialog(
-                title = if (!task.rrule.isNullOrBlank()) "Delete task series?" else "Delete task?",
-                confirmLabel = if (!task.rrule.isNullOrBlank()) "Delete series" else "Delete",
+                title = stringResource(
+                    if (!task.rrule.isNullOrBlank()) {
+                        R.string.task_delete_series_title
+                    } else {
+                        R.string.task_delete_title
+                    },
+                ),
+                confirmLabel = stringResource(
+                    if (!task.rrule.isNullOrBlank()) {
+                        R.string.task_delete_series_confirm
+                    } else {
+                        R.string.task_delete_confirm
+                    },
+                ),
                 palette = palette,
                 onDismiss = { pendingTaskDelete = null },
                 onConfirm = {
@@ -2924,9 +2999,13 @@ fun DotCalApp(
 
 }
 
-private enum class ShareEventOption(val label: String) {
-    Text("Share as text"),
-    Ics("Share as .ics"),
+private enum class ShareEventOption(@StringRes val labelRes: Int) {
+    Text(R.string.share_event_as_text),
+    Ics(R.string.share_event_as_ics),
+    ;
+
+    val label: String
+        @Composable get() = stringResource(labelRes)
 }
 
 private fun shareEventText(
@@ -2938,12 +3017,12 @@ private fun shareEventText(
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_SUBJECT, event.title)
-        putExtra(Intent.EXTRA_TEXT, event.shareText(use24HourFormat))
+        putExtra(Intent.EXTRA_TEXT, event.shareText(context, use24HourFormat))
     }
     runCatching {
-        context.startActivity(Intent.createChooser(intent, "Share Event"))
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_event_title)))
     }.onFailure {
-        showDotCalToast(context, palette, "No share target found")
+        showDotCalToast(context, palette, R.string.share_no_target)
     }
 }
 
@@ -2960,9 +3039,9 @@ private fun shareEventIcs(
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     runCatching {
-        context.startActivity(Intent.createChooser(intent, "Share Event"))
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_event_title)))
     }.onFailure {
-        showDotCalToast(context, palette, "No share target found")
+        showDotCalToast(context, palette, R.string.share_no_target)
     }
 }
 
@@ -2979,9 +3058,9 @@ private fun shareCountdownImage(
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     runCatching {
-        context.startActivity(Intent.createChooser(intent, "Share Countdown"))
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_countdown_chooser)))
     }.onFailure {
-        showDotCalToast(context, palette, "No share target found")
+        showDotCalToast(context, palette, R.string.share_no_target)
     }
 }
 
@@ -2998,9 +3077,9 @@ private fun shareQrEventImage(
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     runCatching {
-        context.startActivity(Intent.createChooser(intent, "Share Event QR"))
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_event_qr_chooser)))
     }.onFailure {
-        showDotCalToast(context, palette, "No share target found")
+        showDotCalToast(context, palette, R.string.share_no_target)
     }
 }
 
@@ -3016,11 +3095,11 @@ private fun createSingleEventIcsUri(
     return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 }
 
-private fun CalendarEvent.shareText(use24HourFormat: Boolean): String {
+private fun CalendarEvent.shareText(context: Context, use24HourFormat: Boolean): String {
     val lines = mutableListOf(title)
-    lines += "Date: ${shareDateTimeLine(use24HourFormat)}"
-    if (location.isNotBlank()) lines += "Location: $location"
-    if (description.isNotBlank()) lines += "Notes: $description"
+    lines += context.getString(R.string.share_field_date, shareDateTimeLine(context, use24HourFormat))
+    if (location.isNotBlank()) lines += context.getString(R.string.share_field_location, location)
+    if (description.isNotBlank()) lines += context.getString(R.string.share_field_notes, description)
     return lines.joinToString("\n")
 }
 
@@ -3029,23 +3108,23 @@ private fun shareAvailabilityText(context: Context, text: String) {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, text)
     }
-    context.startActivity(Intent.createChooser(intent, "Share availability"))
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_availability_chooser)))
 }
 
-private fun CalendarEvent.shareDateTimeLine(use24HourFormat: Boolean): String {
+private fun CalendarEvent.shareDateTimeLine(context: Context, use24HourFormat: Boolean): String {
     val start = Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault())
     val end = Instant.ofEpochMilli(endTimeMs).atZone(ZoneId.systemDefault())
-    val dateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.getDefault())
+    val dateFormatter = localizedFormatter("EEE, d MMM yyyy")
     if (isAllDay == 1) {
         val startDate = start.toLocalDate()
         val endDate = end.minusNanos(1).toLocalDate()
         return if (startDate == endDate) {
-            "${startDate.format(dateFormatter)} (All-day)"
+            context.getString(R.string.share_date_all_day, startDate.format(dateFormatter))
         } else {
-            "${startDate.format(dateFormatter)} - ${endDate.format(dateFormatter)} (All-day)"
+            context.getString(R.string.share_date_all_day_span, startDate.format(dateFormatter), endDate.format(dateFormatter))
         }
     }
-    val timeFormatter = DateTimeFormatter.ofPattern(if (use24HourFormat) "HH:mm" else "h:mm a", Locale.getDefault())
+    val timeFormatter = localizedFormatter(if (use24HourFormat) "HH:mm" else "h:mm a")
     val startText = "${start.toLocalDate().format(dateFormatter)} ${start.toLocalTime().format(timeFormatter)}"
     val endText = if (start.toLocalDate() == end.toLocalDate()) {
         end.toLocalTime().format(timeFormatter)
