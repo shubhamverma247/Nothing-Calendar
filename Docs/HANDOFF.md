@@ -136,7 +136,7 @@ Always report what to test, how to test, and expected result.
 
 ## Current State
 
-- Version: `versionCode 15`, `versionName 1.1.3`
+- Version: `versionCode 16`, `versionName 1.2.0`
 - Product: black/white/red offline Android calendar.
 - Tabs: Calendar, Tasks, Settings.
 - Views: Year, Month, Week, Day, Agenda. Keep hidden ThreeDay unexposed.
@@ -165,6 +165,7 @@ Always report what to test, how to test, and expected result.
 - Availability Text Generator
 - C4 Dead Time Finder
 - C6 Ghost Events / Pencil-In
+- C3 On This Day (Free — shipped in `916dfe3`, ahead of the roadmap entry)
 
 Earlier complete: A1/A2/A3/A5, C2, B1, B5, Search, Templates, Calendar Sets, Shift Patterns, Private Vault, App Lock, import/export, backup/restore, widgets, holidays, birthdays, reminders, billing.
 
@@ -257,10 +258,13 @@ General UI polish:
 
 ## Next Roadmap
 
-1. C3 On This Day
-2. C1 Life-in-Dots
-3. C7 Year Wrapped
-4. Vault Decoy PIN
+1. C1 Life-in-Dots
+2. C7 Year Wrapped
+3. Vault Decoy PIN
+
+C3 On This Day was **removed from this list** — it was already implemented in `916dfe3`
+`feat(calendar): add on this day memories` and this file simply never got updated. See
+`## Completed Roadmap`. Do not re-implement it.
 
 ## Requested Backlog
 
