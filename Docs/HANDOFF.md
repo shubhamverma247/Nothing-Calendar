@@ -1,10 +1,33 @@
 # DotCal Handoff
 
-Updated: 2026-08-02
+Updated: 2026-08-06
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full history: `Docs/HANDOFF.original.md`. Feature spec: `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. Do not touch `Docs/HANDOFF - Copy.md`.
 
 ## Latest Continuation
+
+Play device-reach compatibility fix complete on `main`:
+
+- `android.hardware.camera` and `android.hardware.microphone` are now explicitly declared
+  `required="false"` alongside the existing `android.hardware.camera.any` optional declaration.
+- Runtime guards were added for optional hardware:
+  - Calendar QR scan top-bar action is hidden when `PackageManager.FEATURE_CAMERA_ANY` is absent.
+  - QR scanner host only renders when camera hardware is present, and `QrEventScannerScreen` has a
+    defensive hardware guard.
+  - Event editor hides the voice-note recording control when `FEATURE_MICROPHONE` is absent.
+  - Existing voice-note playback remains available on mic-less devices when a voice note already
+    exists.
+- Verification:
+  `.\gradlew.bat --no-daemon --console=plain --rerun-tasks :app:testDebugUnitTest :app:assembleDebug`
+  returned `BUILD SUCCESSFUL`.
+- `aapt2 dump badging app/build/outputs/apk/debug/app-debug.apk` now reports:
+  - `uses-feature-not-required: name='android.hardware.camera'`
+  - `uses-feature-not-required: name='android.hardware.camera.any'`
+  - `uses-feature-not-required: name='android.hardware.microphone'`
+  - no implied camera or microphone feature remains.
+- `versionCode` was bumped to 17 for the next Play upload.
+- Debug APK was installed successfully on device `4ab0d020` after first installing the existing
+  package for user 0 with `cmd package install-existing --user 0 com.dotfield.dotcal`.
 
 Google Calendar outbound sync issue confirmed and fixed on `feature/google-calendar-outbound-sync`:
 
@@ -136,7 +159,7 @@ Always report what to test, how to test, and expected result.
 
 ## Current State
 
-- Version: `versionCode 16`, `versionName 1.2.0`
+- Version: `versionCode 17`, `versionName 1.2.0`
 - Product: black/white/red offline Android calendar.
 - Tabs: Calendar, Tasks, Settings.
 - Views: Year, Month, Week, Day, Agenda. Keep hidden ThreeDay unexposed.

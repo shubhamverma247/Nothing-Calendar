@@ -44,6 +44,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -261,9 +262,14 @@ internal fun QrEventShareScreen(
 @Composable
 internal fun QrEventScannerScreen(
     palette: DotCalPalette,
+    hasCameraHardware: Boolean = true,
     onBack: () -> Unit,
     onCodeDetected: (String) -> QrScanOutcome,
 ) {
+    if (!hasCameraHardware) {
+        LaunchedEffect(Unit) { onBack() }
+        return
+    }
     val context = LocalContext.current
     var hasCameraPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)

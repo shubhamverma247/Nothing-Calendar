@@ -921,6 +921,7 @@ private fun VoiceNoteEditorSection(
     voiceNotePath: String?,
     palette: DotCalPalette,
     isPro: Boolean,
+    canRecordVoiceNote: Boolean,
     onRequestPro: () -> Unit,
     onVoiceNoteChanged: (String?) -> Unit,
 ) {
@@ -995,7 +996,7 @@ private fun VoiceNoteEditorSection(
                     onVoiceNoteChanged(null)
                 },
             )
-            else -> EmptyVoiceNoteRow(
+            canRecordVoiceNote -> EmptyVoiceNoteRow(
                 palette = palette,
                 permissionDenied = permissionDenied,
                 onRecord = {
@@ -1253,6 +1254,9 @@ internal fun EventEditorScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
+    val hasMicrophoneHardware = remember(context) {
+        context.packageManager.hasSystemFeature(PackageManager.FEATURE_MICROPHONE)
+    }
     val savedNoReminderToast = stringResource(R.string.event_saved_no_reminder)
     val templateSavedToast = stringResource(R.string.event_template_saved)
     val templateDefaultName = stringResource(R.string.event_template_default_name)
@@ -1541,15 +1545,18 @@ internal fun EventEditorScreen(
                 onRemoveImage = { uri -> imageUris = imageUris.filterNot { it == uri } },
             )
             Spacer(modifier = Modifier.height(16.dp))
-            VoiceNoteEditorSection(
-                eventId = draftEventId,
-                voiceNotePath = voiceNotePath,
-                palette = palette,
-                isPro = isPro,
-                onRequestPro = onRequestPro,
-                onVoiceNoteChanged = { voiceNotePath = it },
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            if (hasMicrophoneHardware || !voiceNotePath.isNullOrBlank()) {
+                VoiceNoteEditorSection(
+                    eventId = draftEventId,
+                    voiceNotePath = voiceNotePath,
+                    palette = palette,
+                    isPro = isPro,
+                    canRecordVoiceNote = hasMicrophoneHardware,
+                    onRequestPro = onRequestPro,
+                    onVoiceNoteChanged = { voiceNotePath = it },
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

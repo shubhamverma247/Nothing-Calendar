@@ -397,6 +397,9 @@ fun DotCalApp(
     }
     var isSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val hasCameraHardware = remember(context) {
+        context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
+    }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     // Hoisted for the non-composable callbacks below (toasts, snackbars, share intents,
@@ -1332,6 +1335,7 @@ fun DotCalApp(
                             },
                             onQuickAdd = { showQuickAdd = true },
                             onSearch = { showSearch = true },
+                            canScanQr = hasCameraHardware,
                             onScanQr = { showQrScanner = true },
                             onJumpToDate = { showJumpToDatePicker = true },
                             onAvailability = {
@@ -2170,13 +2174,14 @@ fun DotCalApp(
             }
         }
         AnimatedVisibility(
-            visible = showQrScanner,
+            visible = showQrScanner && hasCameraHardware,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
             modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
         ) {
             QrEventScannerScreen(
                 palette = palette,
+                hasCameraHardware = hasCameraHardware,
                 onBack = { showQrScanner = false },
                 onCodeDetected = { rawValue ->
                     when (val decoded = QrEventPayloadCodec.decode(rawValue)) {

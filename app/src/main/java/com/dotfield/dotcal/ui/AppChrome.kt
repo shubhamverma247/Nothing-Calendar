@@ -107,6 +107,7 @@ internal fun CalendarTabContainer(
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
     onScanQr: (() -> Unit)? = null,
+    canScanQr: Boolean = true,
     onJumpToDate: (() -> Unit)? = null,
     onAvailability: (() -> Unit)? = null,
     onCalendarSets: (() -> Unit)? = null,
@@ -137,6 +138,7 @@ internal fun CalendarTabContainer(
                 onQuickAdd = onQuickAdd,
                 onSearch = onSearch,
                 onScanQr = onScanQr,
+                canScanQr = canScanQr,
                 onJumpToDate = onJumpToDate,
                 onAvailability = onAvailability,
                 onCalendarSets = onCalendarSets,
@@ -184,6 +186,7 @@ internal fun CalendarActionBar(
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
     onScanQr: (() -> Unit)? = null,
+    canScanQr: Boolean = true,
     onJumpToDate: (() -> Unit)? = null,
     onAvailability: (() -> Unit)? = null,
     onCalendarSets: (() -> Unit)? = null,
@@ -233,7 +236,7 @@ internal fun CalendarActionBar(
             maxLines = 1,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (onScanQr != null) {
+            if (onScanQr != null && canScanQr) {
                 IconButton(
                     onClick = onScanQr,
                     modifier = Modifier.size(44.dp),
