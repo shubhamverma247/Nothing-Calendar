@@ -292,7 +292,10 @@ private fun DayCell(
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     events.take(3).forEach { event ->
                         Box(
                             modifier = Modifier
@@ -302,12 +305,27 @@ private fun DayCell(
                                 .border(0.7.dp, event.displayColor(palette).copy(alpha = if (event.isGhost) 0.55f else 1f), CircleShape),
                         )
                     }
+                    if (events.size > 3) {
+                        Text(
+                            stringResource(R.string.month_day_more_count, events.size - 3),
+                            fontFamily = mono,
+                            fontSize = 8.sp,
+                            color = palette.secondaryText,
+                        )
+                    }
                 }
             } else {
-                Spacer(
-                        modifier = Modifier
-                            .size(28.dp),
-                )
+                Box(
+                    modifier = Modifier.size(28.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        date.dayOfMonth.toString().padStart(2, '0'),
+                        color = palette.disabledText,
+                        fontFamily = mono,
+                        fontSize = 14.sp,
+                    )
+                }
             }
         }
     }

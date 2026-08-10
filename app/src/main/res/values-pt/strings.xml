@@ -794,6 +794,7 @@
     <string name="task_delete_title">Excluir tarefa?</string>
     <string name="time_range">%1$s - %2$s</string>
     <string name="week_number_short">S%1$s</string>
+    <string name="month_day_more_count">+%1$d</string>
     <string name="unlock_device_subtitle">Confirm seu dispositivo Bloqueio to Continuar.</string>
     <string name="unlock_device_title">Desbloquear DotCal</string>
     <plurals name="birthdays_imported">

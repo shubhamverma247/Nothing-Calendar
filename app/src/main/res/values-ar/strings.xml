@@ -902,6 +902,7 @@
     <string name="task_delete_title">حذف مهمة?</string>
     <string name="time_range">%1$s - %2$s</string>
     <string name="week_number_short">W%1$s</string>
+    <string name="month_day_more_count">+%1$d</string>
     <string name="unlock_device_subtitle">Confirm your Geraet Lock إلى Weiter.</string>
     <string name="unlock_device_title">Entsperren DotCal</string>
     <plurals name="birthdays_imported">

@@ -848,6 +848,7 @@
     <string name="task_delete_title">Udalit zadacha?</string>
     <string name="time_range">%1$s - %2$s</string>
     <string name="week_number_short">N%1$s</string>
+    <string name="month_day_more_count">+%1$d</string>
     <string name="unlock_device_subtitle">Confirm vash Geraet Blokirovka to Weiter.</string>
     <string name="unlock_device_title">Entsperren DotCal</string>
     <plurals name="birthdays_imported">

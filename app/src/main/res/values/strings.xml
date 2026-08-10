@@ -1014,6 +1014,9 @@
     <!-- Calendar grid views. week_number_short is the compact ISO week label on the week-view
          rail: %1$s is the zero-padded number, so German can render "KW02". -->
     <string name="week_number_short">W%1$s</string>
+    <!-- Month grid overflow affordance, shown after the three event dots in a day cell when the day
+         holds more events than fit: %1$d is the count NOT shown, e.g. "+2". -->
+    <string name="month_day_more_count">+%1$d</string>
     <string name="calendar_clear">Clear</string>
     <string name="calendar_apply_template">Apply Template</string>
     <string name="calendar_tasks">Tasks</string>
