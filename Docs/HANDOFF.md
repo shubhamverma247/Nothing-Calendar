@@ -1,10 +1,20 @@
 # DotCal Handoff
 
-Updated: 2026-08-06
+Updated: 2026-08-10
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full history: `Docs/HANDOFF.original.md`. Feature spec: `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. Do not touch `Docs/HANDOFF - Copy.md`.
 
 ## Latest Continuation
+
+Month view + bottom nav UX research pass complete on `main` (**read-only — no code changed**):
+
+- Competitive research plus a full read of `MonthView`, `DayCell`, `EventListSheet` and
+  `DotCalBottomNav`. Findings and a phased work order are in
+  `## Planned: Month View + Bottom Nav UX`.
+- Nothing was implemented. The plan is deliberately split into three batches so it does **not** ship
+  in one pass — batch 2 changes state ownership and needs its own branch.
+- Branch audit: all five non-`main` local branches are **fully merged** into `main` (ahead-count 0).
+- The `versionCode` 17 -> 18 bump landed separately as `6793737` and is pushed.
 
 Play device-reach compatibility fix complete on `main`:
 
@@ -101,9 +111,15 @@ Locale fill pass is complete mechanically:
 
 ## Resume Prompt
 
-Continue DotCal in `D:\Caveman\caveman\Nothing-Calendar` on branch `pro-features`. Read `Docs/HANDOFF.md` and `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`.
+Continue DotCal in `D:\Caveman\caveman\Nothing-Calendar` on branch `main`. Read `Docs/HANDOFF.md` and `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`.
 
-The in-app Language picker is built and working. **UI string extraction is now in progress** — passes 1, 2, 3a-i, 3a-ii and 4 are done and fully audited, the rest is not started. Read `## Planned: UI String Extraction` for exactly where it stopped and what is left. All work is **uncommitted**; last commit is still `95d3a7f`. Build + 59 JVM tests pass; debug APK is installed on device `4ab0d020`.
+**All work happens on `main`.** Last commit is `6793737` (versionCode bump to 18), pushed to `origin/main`. `versionCode 18`, `versionName 1.2.0`. Every other local branch is already merged into `main` — see `## Worktree Notes`.
+
+**Next up is `## Planned: Month View + Bottom Nav UX`** — a researched, phased plan for the Month grid and the floating bottom nav. Nothing there is implemented yet. Work it **batch by batch, not in one pass**, and stop for verification between batches.
+
+Manual QA for the camera/microphone device-reach fix is still pending — see `## Manual QA`.
+
+The UI string extraction job is paused mid-way. Passes 1, 2, 3a-i, 3a-ii, 4 and 5 are done and fully audited; pass 6 (leftovers) onward is not started. Read `## Planned: UI String Extraction` for exactly where it stopped and what is left.
 
 **Settings, the Event editor, Tasks and the shared Dialogs are now fully extracted and fully
 translated to Spanish.** Switching to `Español` changes Settings, the whole event/task create-edit
@@ -117,14 +133,14 @@ Two scope decisions the user already made — do not re-ask:
 
 Also settled: Privacy Policy body stays English (`translatable="false"`) because machine-translated legal text is a liability. `AppLanguage.native` always stays in its own language; `AppLanguage.label` does get translated.
 
-Next step is **pass 5** — Pro/Paywall (`ProFeatureScreens.kt`) and Onboarding.
+Next step for that job is **pass 6** — `DotCalApp.kt`, `CalendarViews.kt`, `QrEventScreens.kt`, `AvailabilityScreen.kt`, `AgendaScreens.kt` leftovers (see the work order).
 
 Keep Room at 5 tables; no package/deep-link/DB filename changes, Hilt, or Compose Nav. After app changes run required tests/build, then install debug APK when device connected. Report exact manual QA steps and expected results. Do not run manual phone QA yourself unless asked.
 
 ## Hard Rules
 
 - Workdir: `D:\Caveman\caveman\Nothing-Calendar`
-- Branch: `pro-features`
+- Branch: `main`
 - Package/application id: `com.dotfield.dotcal`
 - Deep link scheme: `dotcal://`
 - Room DB: `dotcal.db`
@@ -291,6 +307,8 @@ C3 On This Day was **removed from this list** — it was already implemented in 
 
 ## Requested Backlog
 
+- **Month view + bottom nav UX.** Researched and planned, nothing implemented. Three batches, run in
+  order — see `## Planned: Month View + Bottom Nav UX`. This is the current priority.
 - **Full UI string extraction + translation.** The Language picker ships and works, but the app is
   still hardcoded English. This is now the blocking follow-up for the feature to mean anything to a
   non-English user. Scope it as one job — see `## Hardcoded String Inventory`.
@@ -355,14 +373,126 @@ Notes for whoever scopes the extraction:
 - Reproduce the counts with:
   `rg -U -o 'Text\(\s*"[^"\n]{2,}"' --glob '*.kt' app/src/main/java | wc -l`
 
+## Planned: Month View + Bottom Nav UX
+
+**Not started. Research-only pass — no code was changed.** Do the batches **in order, one at a time**,
+with `## Required Verification` between each. Do not ship all three in one pass.
+
+### What is there today
+
+- `MonthView` (`CalendarViews.kt:112`) — 42 fixed cells (6 rows always), horizontal swipe at a
+  50dp threshold flips month, bulk-select bar at the bottom when `selectedBulkDates` is non-empty.
+- `DayCell` (`CalendarViews.kt:223`) — square `aspectRatio(1f)`, 28dp day-number circle,
+  **max 3 dots at 4dp** via `events.take(3)`, no overflow indicator. Out-of-month days render a bare
+  `Spacer` (`CalendarViews.kt:307`) — no number at all.
+- Day tap → `viewModel.selectDate()` + `showSheet = true` (`DotCalApp.kt:1409`) → `EventListSheet`
+  (`AgendaScreens.kt:73`), a `ModalBottomSheet` owned at app level (`DotCalApp.kt:2988`) with a
+  **fixed 260dp** `LazyColumn` (`AgendaScreens.kt:96`).
+- `DotCalBottomNav` (`AppChrome.kt:421`) — floating 68dp pill, 3 items, `spacedBy(80.dp)`
+  (`AppChrome.kt:457`), item box **30dp** (`AppChrome.kt:504`), `noRippleClickable`.
+
+### Research summary
+
+Two industry patterns: **dots + tap-to-reveal** (Apple, Google Calendar mobile month — what DotCal
+does) and **chips + overflow** (Fantastical, Notion Calendar, Outlook). Findings that drove the plan:
+
+- The standard overflow affordance is 2-3 events plus a `+N more` indicator. Silently dropping the
+  4th event is the single most-reported complaint about dot-style month views.
+- Guidance is consistent: treat the grid as a **navigator** and keep a detail region visible at the
+  same time so month context never disappears.
+- Google Calendar's own event sheet is capped at roughly a quarter of the screen precisely so the
+  grid stays visible and directly tappable behind it.
+- Colour-only encoding is never accessible on its own; pair it with shape, position or text.
+
+**Rejected on purpose:** the "expand the selected week row into chips" hybrid. It is a real
+best-practice, but the persistent panel (batch 2) solves the same problem, Week and Agenda views
+already exist, and animating row heights adds layout risk for no extra gain. Do not revive it.
+
+**Also rejected:** Fantastical-style chips in every cell. Titles in a 7-column mono grid break the
+dot-matrix identity the product is built on. Density tint carries the same "this day is busy" signal
+without the clutter.
+
+### Batch 1 — low-risk polish (do this first)
+
+Each item is independent and visible. Nothing here changes state ownership.
+
+1. **`+N` overflow indicator.** After the 3 dots, show remaining count (`events.size - 3`). Keep it
+   in the dot-matrix language — small mono `+2` at ~8sp, or a dash in the 4th dot slot. Highest
+   value-per-line-changed in the whole plan.
+2. **Out-of-month day numbers.** Replace the bare `Spacer` at `CalendarViews.kt:307` with a dimmed
+   number on `palette.disabledText`, no dots. Users currently cannot see across a month boundary.
+3. **Bottom nav touch target 30dp -> 48dp** (`AppChrome.kt:504`). Below the Android minimum today;
+   the pill is 68dp tall so the room already exists. Keep the icon's visual size — grow only the
+   clickable box.
+4. **Bottom nav spacing.** Replace hardcoded `spacedBy(80.dp)` (`AppChrome.kt:457`) with
+   `weight(1f)` per item or `SpaceEvenly`. The fixed gap crowds small screens and strands the icons
+   mid-pill on large ones.
+5. **Normalise nav icon sizes** — currently 26dp / 28dp / 24dp, which reads optically uneven.
+6. **Nav haptics.** `DayCell` fires haptics (`CalendarViews.kt:260`) but the nav does not, and
+   `noRippleClickable` means there is no ripple either — nav taps have zero feedback today.
+7. **Settings icon stroke mismatch.** It is Material `Icons.Filled.Settings` while Calendar and Tasks
+   are hand-drawn Canvas at 1.8dp. Draw a matching Canvas gear.
+8. **Selected-state indicator.** `selectedFill` (`AppChrome.kt:497-501`) is **dead code** — its
+   `targetValue` is always `Color.Transparent`, so nothing animates and active state is
+   colour-tint-only. Either add a 3dp accent dot under the active icon, or delete the block. Do not
+   leave a no-op animation in place.
+
+### Batch 2 — persistent event panel (biggest UX win, do it alone)
+
+Replaces the modal sheet so the month grid stays visible and tappable while the day's events show.
+This is the change that most improves day-to-day use: comparing several days currently costs a
+tap-read-dismiss cycle per day.
+
+**Known constraint, settle it before writing code:** `ModalBottomSheet` cannot do this. Its scrim
+swallows background touches, so grid tap-through will not work. The panel has to live **inside**
+`MonthView` (grid above, drag-resizable panel below) and the app-level `showSheet` /
+`EventListSheet` path at `DotCalApp.kt:2988` has to move. That is a state-ownership change — commit
+batch 1 first and keep this pass on its own commit so it can be reverted independently.
+
+- Collapsed height around a third of the screen, expandable by drag, grid visible above.
+- Tapping another day **swaps the panel content** instead of closing it.
+- Drop the fixed 260dp height (`AgendaScreens.kt:96`) for content-driven height — an empty day
+  should not render a large empty box.
+- Keep the existing bulk-select bar behaviour intact.
+
+### Batch 3 — density and motion
+
+1. **Density tint.** Reuse the `DayDensityDot` logic (`AgendaScreens.kt:350`) to tint a busy day's
+   cell background. More information than dots, no added clutter, and it strengthens the dot-matrix
+   look rather than fighting it.
+2. **All-day vs timed distinction.** Every dot is an identical 4dp circle today, separated only by
+   colour. Give all-day events a short horizontal bar and timed events the dot. The ghost-event
+   dotted-border treatment is the precedent to follow.
+3. **Month transition animation.** Swipe currently jumps with no motion, while tab switching uses
+   `Crossfade` (`DotCalApp.kt:1374`) — inconsistent. Add direction-aware `AnimatedContent` slide.
+4. **Semantics — do not skip this.** `DayCell` has no `contentDescription` or semantics, and all
+   three nav icons are Canvas-drawn with none either (the settings icon passes
+   `contentDescription = null`). **Month view and the bottom nav are both unusable with TalkBack
+   today.** Nav items want `role = Tab` plus selected state.
+5. **Conditional 6th row.** Skip the last grid row when it is entirely out-of-month, giving the
+   remaining cells more height.
+
+### Cleanup noted while reading
+
+- `MonthView` takes `onJumpToday` and `onJumpPickerRequest` (`CalendarViews.kt:122-123`) and passes
+  them from `DotCalApp.kt:1389-1390`, but **neither is referenced in the body**. Dead params.
+
+### Do not touch
+
+- The `Scaffold` `bottomBar` zero-height spacer (`DotCalApp.kt:1295`) and the bottom-nav render
+  ordering (`DotCalApp.kt:1953`). Both carry comments explaining why they are that way; they are
+  deliberate, not oversights.
+
 ## Planned: UI String Extraction
 
-**In progress.** Passes 1, 2, 3a-i, 3a-ii and 4 are done, verified and audited (see
-`### Post-pass-4 audit`); pass 5 onward is not started.
+**In progress, paused.** Passes 1, 2, 3a-i, 3a-ii, 4 and 5 are done, verified and audited (see
+`### Post-pass-4 audit`); **pass 6 (leftovers) onward is not started.** This job is behind
+`## Planned: Month View + Bottom Nav UX` in priority — resume it after those batches unless asked
+otherwise.
 The inventory below (`## Hardcoded String Inventory`) was measured *before* this work — the per-file
 counts there are still broadly right for the untouched files, but `AppChrome.kt`,
-`SettingsScreens.kt`, `EventScreens.kt`, `TaskScreens.kt`, `DialogScreens.kt` and the converted
-enums no longer match it.
+`SettingsScreens.kt`, `EventScreens.kt`, `TaskScreens.kt`, `DialogScreens.kt`, `ProFeatureScreens.kt`
+and the converted enums no longer match it.
 
 ### Scope decisions (settled — do not re-ask)
 
@@ -708,6 +838,19 @@ on internal/closed/open testing must be deactivated too. Deadline: **Aug 31, 202
 
 ## Manual QA
 
+Optional camera / microphone device reach (**pending — not yet run**):
+
+- Camera device: Calendar top bar. Expected: QR scan icon visible immediately left of `+`, and it
+  opens the scanner.
+- Event Detail > More > Share as QR, then scan it. Expected: QR renders and scanning opens the ICS
+  import preview.
+- Mic device: event editor > Voice note. Expected: recording works.
+- Save an event with a voice note, reopen it. Expected: playback works.
+- **Camera-less device** (or a build with the feature masked): Expected: the QR scan icon is hidden,
+  and no path can reach the scanner.
+- **Mic-less device:** Expected: the voice-note recorder is hidden, but an event that already has a
+  voice note still plays it back.
+
 Language picker:
 
 - Settings > Appearance. Expected: a `Language` panel sits directly under `Font`, subtitle reads `System default` on a fresh install.
@@ -925,10 +1068,25 @@ C6 Ghost Events / Pencil-In:
 
 ## Worktree Notes
 
-- Language picker work **and UI string extraction passes 1/2/3a-i/3a-ii/4** are uncommitted on
-  `pro-features`; last commit is still `95d3a7f`. Untracked additions include
-  `prefs/AppLanguage.kt`, `res/xml/locales_config.xml`, the 8 `values-*/` locale folders, and
-  `app/src/test/java/com/dotfield/dotcal/prefs/`.
+**Branch state as of 2026-08-10.** All work happens on `main`.
+
+- `main` is at `6793737` and in sync with `origin/main`.
+- Every other local branch is **fully merged** into `main` — each has ahead-count 0, so no branch
+  holds work that `main` does not already have:
+
+  | Branch | Tip | Behind `main` |
+  |---|---|---|
+  | `live` | `95d3a7f` | 8 |
+  | `opentesting` | `95d3a7f` | 8 |
+  | `feature/event-color-picker-and-billing-offers` | `95d3a7f` | 8 |
+  | `feature/google-calendar-outbound-sync` | `b9e8e33` | 7 |
+  | `pro-features` | `7b790ff` | 6 |
+
+- Remotes: `origin/main`, `origin/live`, `origin/open-testing`, `origin/open-testing-22-07-2026`,
+  `origin/pro-features`.
+- Local `opentesting` maps to remote `origin/open-testing`; local `opentesting`/`live` have no
+  upstream tracking set. `origin/open-testing-22-07-2026` is a dated snapshot — leave alone.
+- The Language picker and UI string extraction work described above is **committed and merged into
+  `main`** (it was uncommitted on `pro-features` when the earlier notes were written).
 - An earlier AppCompat-based Language picker attempt was written and **fully reverted**. The shipped picker does not use AppCompat.
-- Local branch `opentesting` maps to remote `origin/open-testing`; local `opentesting`/`live` have no upstream tracking set. `origin/open-testing-22-07-2026` is a dated snapshot — leave alone.
 - User-owned untracked files: `Docs/HANDOFF - Copy.md`, `build-b4.log`. Leave untouched.
