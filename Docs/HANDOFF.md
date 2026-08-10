@@ -25,7 +25,7 @@ Play device-reach compatibility fix complete on `main`:
   - `uses-feature-not-required: name='android.hardware.camera.any'`
   - `uses-feature-not-required: name='android.hardware.microphone'`
   - no implied camera or microphone feature remains.
-- `versionCode` was bumped to 17 for the next Play upload.
+- `versionCode` was bumped to 18 for the next Play upload.
 - Debug APK was installed successfully on device `4ab0d020` after first installing the existing
   package for user 0 with `cmd package install-existing --user 0 com.dotfield.dotcal`.
 
@@ -159,7 +159,7 @@ Always report what to test, how to test, and expected result.
 
 ## Current State
 
-- Version: `versionCode 17`, `versionName 1.2.0`
+- Version: `versionCode 18`, `versionName 1.2.0`
 - Product: black/white/red offline Android calendar.
 - Tabs: Calendar, Tasks, Settings.
 - Views: Year, Month, Week, Day, Agenda. Keep hidden ThreeDay unexposed.
