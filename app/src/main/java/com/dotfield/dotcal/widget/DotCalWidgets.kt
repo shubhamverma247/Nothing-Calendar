@@ -224,7 +224,7 @@ private fun MediumWidget(context: Context, data: WidgetCalendarData, palette: Do
                 modifier = GlanceModifier.width(54.dp).clickable(actionStartActivity(openCalendarMonthIntent(context))),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                RingBadge(data.nextEvent?.dayOfMonth ?: data.todayLabel, 46, palette, textSize = 20, textColor = palette.primary)
+                RingBadge(data.todayLabel, 46, palette, textSize = 20, textColor = palette.primary)
                 Spacer(GlanceModifier.height(7.dp))
                 Text(todayDayAbbrev(), maxLines = 1, style = monoStyle(palette.secondary, 11, FontWeight.Bold))
             }
@@ -601,7 +601,7 @@ private fun WidgetSurfaceBox(palette: DotCalWidgetPalette, content: @Composable 
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ImageProvider(palette.surfaceDrawable))
+            .background(palette.background)
             .cornerRadius(18.dp),
     ) {
         // Dot texture: a tiled BitmapDrawable applied as a view background.

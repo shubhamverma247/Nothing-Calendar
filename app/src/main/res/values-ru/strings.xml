@@ -112,6 +112,10 @@
     <string name="settings_panel_widget_style">Widget Stil</string>
     <string name="settings_transparent_widgets">Transparent Widgets</string>
     <string name="settings_transparent_widgets_subtitle">Let Hintergrundbild Anzeigen durch alle DotCal Widgets</string>
+    <string name="settings_widget_opacity">Непрозрачность виджета</string>
+    <string name="settings_widget_opacity_percent">%1$d%%</string>
+    <string name="settings_widget_opacity_subtitle">Настройте силу прозрачной поверхности виджета</string>
+    <string name="settings_widget_opacity_subtitle_disabled">Включите прозрачные виджеты, чтобы настроить непрозрачность</string>
     <string name="settings_widget_dot_texture">Widget Punkt Textur</string>
     <string name="settings_widget_dot_texture_subtitle">Anzeigen subtle DotCal dotted surface</string>
     <string name="settings_widget_dot_texture_subtitle_disabled">nur applies wann Transparent Widgets are Aus</string>
@@ -848,7 +852,28 @@
     <string name="task_delete_title">Udalit zadacha?</string>
     <string name="time_range">%1$s - %2$s</string>
     <string name="week_number_short">N%1$s</string>
-    <string name="month_day_more_count">+%1$d</string>
+    <string name="month_day_more_count">+%1$d ещё</string>
+    <string name="a11y_today">Сегодня</string>
+    <string name="a11y_outside_current_month">вне текущего месяца</string>
+    <string name="a11y_selected">Выбрано</string>
+    <string name="a11y_bulk_selected">Выбрано для массового действия</string>
+    <string name="a11y_not_selected">Не выбрано</string>
+    <string name="a11y_no_events">нет событий</string>
+    <string name="a11y_untitled_event">Событие без названия</string>
+    <string name="a11y_open_day">Открыть день</string>
+    <string name="a11y_select_date">Выбрать дату</string>
+    <plurals name="a11y_event_count">
+        <item quantity="one">%1$d событие</item>
+        <item quantity="few">%1$d события</item>
+        <item quantity="many">%1$d событий</item>
+        <item quantity="other">%1$d события</item>
+    </plurals>
+    <plurals name="a11y_more_events">
+        <item quantity="one">ещё %1$d</item>
+        <item quantity="few">ещё %1$d</item>
+        <item quantity="many">ещё %1$d</item>
+        <item quantity="other">ещё %1$d</item>
+    </plurals>
     <string name="unlock_device_subtitle">Confirm vash Geraet Blokirovka to Weiter.</string>
     <string name="unlock_device_title">Entsperren DotCal</string>
     <plurals name="birthdays_imported">

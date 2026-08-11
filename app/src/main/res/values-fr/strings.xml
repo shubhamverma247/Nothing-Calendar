@@ -112,6 +112,10 @@
     <string name="settings_panel_widget_style">Widget Style</string>
     <string name="settings_transparent_widgets">Transparent Widgets</string>
     <string name="settings_transparent_widgets_subtitle">Let fond Afficher un travers tous DotCal Widgets</string>
+    <string name="settings_widget_opacity">Opacité du widget</string>
+    <string name="settings_widget_opacity_percent">%1$d%%</string>
+    <string name="settings_widget_opacity_subtitle">Ajuster l’intensité de la surface transparente</string>
+    <string name="settings_widget_opacity_subtitle_disabled">Activez les widgets transparents pour régler l’opacité</string>
     <string name="settings_widget_dot_texture">Widget points texture</string>
     <string name="settings_widget_dot_texture_subtitle">Afficher subtle DotCal dotted surface</string>
     <string name="settings_widget_dot_texture_subtitle_disabled">seulement applies quand Transparent Widgets are Desactive</string>
@@ -794,7 +798,24 @@
     <string name="task_delete_title">Supprimer tache?</string>
     <string name="time_range">%1$s - %2$s</string>
     <string name="week_number_short">S%1$s</string>
-    <string name="month_day_more_count">+%1$d</string>
+    <string name="month_day_more_count">+%1$d de plus</string>
+    <string name="a11y_today">Aujourd’hui</string>
+    <string name="a11y_outside_current_month">hors du mois actuel</string>
+    <string name="a11y_selected">Sélectionné</string>
+    <string name="a11y_bulk_selected">Sélectionné pour action groupée</string>
+    <string name="a11y_not_selected">Non sélectionné</string>
+    <string name="a11y_no_events">aucun événement</string>
+    <string name="a11y_untitled_event">Événement sans titre</string>
+    <string name="a11y_open_day">Ouvrir le jour</string>
+    <string name="a11y_select_date">Sélectionner la date</string>
+    <plurals name="a11y_event_count">
+        <item quantity="one">%1$d événement</item>
+        <item quantity="other">%1$d événements</item>
+    </plurals>
+    <plurals name="a11y_more_events">
+        <item quantity="one">%1$d de plus</item>
+        <item quantity="other">%1$d de plus</item>
+    </plurals>
     <string name="unlock_device_subtitle">Confirm votre appareil Verrouillage to Continuer.</string>
     <string name="unlock_device_title">Deverrouiller DotCal</string>
     <plurals name="birthdays_imported">

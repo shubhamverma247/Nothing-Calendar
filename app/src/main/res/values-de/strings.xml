@@ -112,6 +112,10 @@
     <string name="settings_panel_widget_style">Widget Stil</string>
     <string name="settings_transparent_widgets">Transparent Widgets</string>
     <string name="settings_transparent_widgets_subtitle">Let Hintergrundbild Anzeigen durch alle DotCal Widgets</string>
+    <string name="settings_widget_opacity">Widget-Deckkraft</string>
+    <string name="settings_widget_opacity_percent">%1$d%%</string>
+    <string name="settings_widget_opacity_subtitle">Stärke der transparenten Widget-Fläche anpassen</string>
+    <string name="settings_widget_opacity_subtitle_disabled">Transparente Widgets aktivieren, um die Deckkraft anzupassen</string>
     <string name="settings_widget_dot_texture">Widget Punkt Textur</string>
     <string name="settings_widget_dot_texture_subtitle">Anzeigen subtle DotCal dotted surface</string>
     <string name="settings_widget_dot_texture_subtitle_disabled">nur applies wann Transparent Widgets are Aus</string>
@@ -794,7 +798,24 @@
     <string name="task_delete_title">Loeschen Aufgabe?</string>
     <string name="time_range">%1$s - %2$s</string>
     <string name="week_number_short">KW%1$s</string>
-    <string name="month_day_more_count">+%1$d</string>
+    <string name="month_day_more_count">+%1$d mehr</string>
+    <string name="a11y_today">Heute</string>
+    <string name="a11y_outside_current_month">außerhalb des aktuellen Monats</string>
+    <string name="a11y_selected">Ausgewählt</string>
+    <string name="a11y_bulk_selected">Für Stapelaktion ausgewählt</string>
+    <string name="a11y_not_selected">Nicht ausgewählt</string>
+    <string name="a11y_no_events">keine Ereignisse</string>
+    <string name="a11y_untitled_event">Unbenanntes Ereignis</string>
+    <string name="a11y_open_day">Tag öffnen</string>
+    <string name="a11y_select_date">Datum auswählen</string>
+    <plurals name="a11y_event_count">
+        <item quantity="one">1 Ereignis</item>
+        <item quantity="other">%1$d Ereignisse</item>
+    </plurals>
+    <plurals name="a11y_more_events">
+        <item quantity="one">1 weiteres</item>
+        <item quantity="other">%1$d weitere</item>
+    </plurals>
     <string name="unlock_device_subtitle">Confirm dein Geraet Sperre to Weiter.</string>
     <string name="unlock_device_title">Entsperren DotCal</string>
     <plurals name="birthdays_imported">

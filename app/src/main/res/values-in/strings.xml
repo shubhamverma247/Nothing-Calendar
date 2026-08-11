@@ -112,6 +112,10 @@
     <string name="settings_panel_widget_style">Widget Estilo</string>
     <string name="settings_transparent_widgets">Transparente Widgets</string>
     <string name="settings_transparent_widgets_subtitle">Let papel de parede Mostrar atraves todos DotCal Widgets</string>
+    <string name="settings_widget_opacity">Opasitas widget</string>
+    <string name="settings_widget_opacity_percent">%1$d%%</string>
+    <string name="settings_widget_opacity_subtitle">Atur kekuatan permukaan widget transparan</string>
+    <string name="settings_widget_opacity_subtitle_disabled">Aktifkan widget transparan untuk mengatur opasitas</string>
     <string name="settings_widget_dot_texture">Widget pontos textura</string>
     <string name="settings_widget_dot_texture_subtitle">Mostrar subtle DotCal dotted surface</string>
     <string name="settings_widget_dot_texture_subtitle_disabled">somente applies quando Transparente Widgets are Desativado</string>
@@ -794,7 +798,24 @@
     <string name="task_delete_title">Hapus tugas?</string>
     <string name="time_range">%1$s - %2$s</string>
     <string name="week_number_short">M%1$s</string>
-    <string name="month_day_more_count">+%1$d</string>
+    <string name="month_day_more_count">+%1$d lagi</string>
+    <string name="a11y_today">Hari ini</string>
+    <string name="a11y_outside_current_month">di luar bulan ini</string>
+    <string name="a11y_selected">Dipilih</string>
+    <string name="a11y_bulk_selected">Dipilih untuk aksi massal</string>
+    <string name="a11y_not_selected">Tidak dipilih</string>
+    <string name="a11y_no_events">tidak ada acara</string>
+    <string name="a11y_untitled_event">Acara tanpa judul</string>
+    <string name="a11y_open_day">Buka hari</string>
+    <string name="a11y_select_date">Pilih tanggal</string>
+    <plurals name="a11y_event_count">
+        <item quantity="one">%1$d acara</item>
+        <item quantity="other">%1$d acara</item>
+    </plurals>
+    <plurals name="a11y_more_events">
+        <item quantity="one">%1$d lagi</item>
+        <item quantity="other">%1$d lagi</item>
+    </plurals>
     <string name="unlock_device_subtitle">Confirm anda dispositivo Kunci to Continuar.</string>
     <string name="unlock_device_title">Desbloquear DotCal</string>
     <plurals name="birthdays_imported">

@@ -620,6 +620,12 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_WIDGET_TRANSPARENT] ?: false
         }
     }.collectAsStateWithLifecycle(initialValue = false)
+    val widgetOpacityPercent by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            val transparent = preferences[CalendarPreferences.KEY_WIDGET_TRANSPARENT] ?: false
+            (preferences[CalendarPreferences.KEY_WIDGET_OPACITY_PERCENT] ?: if (transparent) 0 else 35).coerceIn(0, 100)
+        }
+    }.collectAsStateWithLifecycle(initialValue = 35)
     val widgetDotTexture by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_WIDGET_DOT_TEXTURE] ?: true
@@ -1386,8 +1392,6 @@ fun DotCalApp(
                                         showWeekNumbers = showWeekNumbers,
                                         onPrevious = viewModel::previousMonth,
                                         onNext = viewModel::nextMonth,
-                                        onJumpToday = { jumpToDate(LocalDate.now()) },
-                                        onJumpPickerRequest = { showJumpToDatePicker = true },
                                         highlightDate = jumpHighlightDate,
                                         selectedBulkDates = selectedBulkDates,
                                         onBulkSelectionStart = { date ->
@@ -1654,6 +1658,7 @@ fun DotCalApp(
                 defaultAllDayReminderTime = defaultAllDayReminderTime,
                 weekStartOption = weekStartOption,
                 widgetTransparent = widgetTransparent,
+                widgetOpacityPercent = widgetOpacityPercent,
                 widgetDotTexture = widgetDotTexture,
                 appLockState = appLockState,
                 privateVaultEvents = privateVaultEvents,
@@ -1740,6 +1745,21 @@ fun DotCalApp(
                         scope.launch {
                             context.calendarPreferencesDataStore.edit { preferences ->
                                 preferences[CalendarPreferences.KEY_WIDGET_TRANSPARENT] = enabled
+                                if (enabled && preferences[CalendarPreferences.KEY_WIDGET_OPACITY_PERCENT] == null) {
+                                    preferences[CalendarPreferences.KEY_WIDGET_OPACITY_PERCENT] = 35
+                                }
+                            }
+                            WidgetUpdateWorker.updateNow(context)
+                        }
+                    }
+                },
+                onWidgetOpacityChange = { opacityPercent ->
+                    if (!isPro) {
+                        showPaywall = true
+                    } else {
+                        scope.launch {
+                            context.calendarPreferencesDataStore.edit { preferences ->
+                                preferences[CalendarPreferences.KEY_WIDGET_OPACITY_PERCENT] = opacityPercent.coerceIn(0, 100)
                             }
                             WidgetUpdateWorker.updateNow(context)
                         }

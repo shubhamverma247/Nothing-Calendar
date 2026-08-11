@@ -26,7 +26,6 @@ data class DotCalWidgetPalette(
     val border: ColorProvider,
     val inactive: ColorProvider,
     val dot: ColorProvider,
-    val surfaceDrawable: Int,
     val dotTile: Int,
     val solidSurface: ColorProvider,
     val accent: ColorProvider = ColorProvider(Color(0xFFFF3B30)),
@@ -36,6 +35,7 @@ data class DotCalWidgetSettings(
     val themeMode: String = "System",
     val accentColor: String? = null,
     val transparent: Boolean = false,
+    val opacityPercent: Int = 35,
     val showDotTexture: Boolean = true,
     val accountId: String? = null,
 )
@@ -59,6 +59,7 @@ suspend fun syncDotCalWidgetState(context: Context, glanceId: GlanceId): DotCalW
             this[CalendarPreferences.KEY_THEME_MODE] = settings.themeMode
             settings.accentColor?.let { this[CalendarPreferences.KEY_ACCENT_COLOR] = it } ?: remove(CalendarPreferences.KEY_ACCENT_COLOR)
             this[CalendarPreferences.KEY_WIDGET_TRANSPARENT] = settings.transparent
+            this[CalendarPreferences.KEY_WIDGET_OPACITY_PERCENT] = settings.opacityPercent
             this[CalendarPreferences.KEY_WIDGET_DOT_TEXTURE] = settings.showDotTexture
         }
     }
@@ -74,23 +75,21 @@ fun dotCalWidgetPalette(context: Context, settings: DotCalWidgetSettings): DotCa
     val mode = settings.themeMode
     val accent = widgetAccentColor(settings.accentColor)
     val transparent = settings.transparent
+    val opacity = settings.opacityPercent.coerceIn(0, 100) / 100f
     val showDotTexture = settings.showDotTexture
     val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
     if (mode == "System") {
-        val solidSurface = if (systemDark) ColorProvider(Color(0xFF1A1A1A)) else ColorProvider(Color(0xFFFFFFFF))
+        val solidColor = if (systemDark) Color(0xFF1A1A1A) else Color(0xFFFFFFFF)
+        val surfaceColor = if (transparent) solidColor.copy(alpha = opacity) else solidColor
+        val solidSurface = ColorProvider(solidColor)
         return DotCalWidgetPalette(
-            background = if (transparent) ColorProvider(Color.Transparent) else context.colorProvider(R.color.widget_background),
+            background = ColorProvider(surfaceColor),
             primary = context.colorProvider(R.color.widget_primary),
             secondary = context.colorProvider(R.color.widget_secondary),
             dim = context.colorProvider(R.color.widget_dim),
             border = context.colorProvider(R.color.widget_border),
             inactive = context.colorProvider(R.color.widget_inactive),
             dot = context.colorProvider(R.color.widget_dot),
-            surfaceDrawable = when {
-                transparent -> R.drawable.widget_surface_transparent
-                systemDark -> R.drawable.widget_surface_dark
-                else -> R.drawable.widget_surface_light
-            },
             dotTile = if (showDotTexture && !transparent) {
                 if (systemDark) R.drawable.widget_dot_pattern_dark else R.drawable.widget_dot_pattern_light
             } else {
@@ -106,31 +105,33 @@ fun dotCalWidgetPalette(context: Context, settings: DotCalWidgetSettings): DotCa
         else -> systemDark
     }
     return if (isDark) {
+        val solidColor = Color(0xFF1A1A1A)
+        val surfaceColor = if (transparent) solidColor.copy(alpha = opacity) else solidColor
         DotCalWidgetPalette(
-            background = ColorProvider(if (transparent) Color.Transparent else Color(0xFF1A1A1A)),
+            background = ColorProvider(surfaceColor),
             primary = ColorProvider(Color(0xFFFFFFFF)),
             secondary = ColorProvider(Color(0xFF7A7A7A)),
             dim = ColorProvider(Color(0xFF4A4A4A)),
             border = ColorProvider(Color(0xFF2A2A2A)),
             inactive = ColorProvider(Color(0xFF4A4A4A)),
             dot = ColorProvider(Color(0xFF242424)),
-            surfaceDrawable = if (transparent) R.drawable.widget_surface_transparent else R.drawable.widget_surface_dark,
             dotTile = if (showDotTexture && !transparent) R.drawable.widget_dot_pattern_dark else R.drawable.widget_dot_pattern_transparent,
-            solidSurface = ColorProvider(Color(0xFF1A1A1A)),
+            solidSurface = ColorProvider(solidColor),
             accent = ColorProvider(accent),
         )
     } else {
+        val solidColor = Color(0xFFFFFFFF)
+        val surfaceColor = if (transparent) solidColor.copy(alpha = opacity) else solidColor
         DotCalWidgetPalette(
-            background = ColorProvider(if (transparent) Color.Transparent else Color(0xFFFFFFFF)),
+            background = ColorProvider(surfaceColor),
             primary = ColorProvider(Color(0xFF101010)),
             secondary = ColorProvider(Color(0xFF6B6B6B)),
             dim = ColorProvider(Color(0xFFB5B5B5)),
             border = ColorProvider(Color(0xFFECECEC)),
             inactive = ColorProvider(Color(0xFFB5B5B5)),
             dot = ColorProvider(Color(0xFFEDEDED)),
-            surfaceDrawable = if (transparent) R.drawable.widget_surface_transparent else R.drawable.widget_surface_light,
             dotTile = if (showDotTexture && !transparent) R.drawable.widget_dot_pattern_light else R.drawable.widget_dot_pattern_transparent,
-            solidSurface = ColorProvider(Color(0xFFFFFFFF)),
+            solidSurface = ColorProvider(solidColor),
             accent = ColorProvider(accent),
         )
     }
@@ -146,10 +147,12 @@ private suspend fun readDotCalWidgetSettings(context: Context): DotCalWidgetSett
 }
 
 private fun Preferences.toDotCalWidgetSettings(): DotCalWidgetSettings {
+    val transparent = this[CalendarPreferences.KEY_WIDGET_TRANSPARENT] ?: false
     return DotCalWidgetSettings(
         themeMode = this[CalendarPreferences.KEY_THEME_MODE] ?: "System",
         accentColor = this[CalendarPreferences.KEY_ACCENT_COLOR],
-        transparent = this[CalendarPreferences.KEY_WIDGET_TRANSPARENT] ?: false,
+        transparent = transparent,
+        opacityPercent = (this[CalendarPreferences.KEY_WIDGET_OPACITY_PERCENT] ?: if (transparent) 0 else 35).coerceIn(0, 100),
         showDotTexture = this[CalendarPreferences.KEY_WIDGET_DOT_TEXTURE] ?: true,
         accountId = this[CalendarPreferences.KEY_WIDGET_ACCOUNT_ID],
     )

@@ -1,10 +1,127 @@
 # DotCal Handoff
 
-Updated: 2026-08-10
+Updated: 2026-08-11
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full history: `Docs/HANDOFF.original.md`. Feature spec: `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. Do not touch `Docs/HANDOFF - Copy.md`.
 
 ## Latest Continuation
+
+**Month View + Bottom Nav UX polish is complete through Batch 3 partial, and priority widget date
+clarity + opacity polish is now built/installed for review.** Full detail in
+`## Planned: Month View + Bottom Nav UX`.
+
+- **Batch 1A (Month grid) — DONE, approved on device.** `+N` overflow indicator as string resource
+  `month_day_more_count` (base + all 8 locales, key parity 720/755), dimmed out-of-month day numbers,
+  and the `+N` vertical alignment fix (`includeFontPadding = false` + `LineHeightStyle` trim).
+- **Batch 1B (bottom nav, `AppChrome.kt`) — DONE, approved on device.** Six items: 48dp touch target,
+  `weight(1f)` spacing, 26dp/1.85dp icon normalisation, `LocalView` + `VIRTUAL_KEY` haptics,
+  hand-drawn Canvas gear, dead `selectedFill` deleted.
+- **Batch 2 (persistent drag panel) — BUILT, REJECTED, REVERTED.** Do not rebuild. See
+  `### Batch 2 — REJECTED AND REVERTED`.
+- **Batch 2 (redefined) — event title chips in month cells. DONE, approved on device `4ab0d020`.**
+  Tall rectangular cells (no `DayCell` `aspectRatio(1f)`), 3 flat tinted
+  title chips + `+N more` per cell, **no chip borders**, tighter day-row spacing after user
+  feedback, no inline events list below the grid. Day taps still open `EventListSheet`; chips are
+  visual-only. All-day events use the same chip treatment.
+- **Batch 3 partial polish — DONE and installed on `4ab0d020`.** Added TalkBack/accessibility
+  semantics for Month day cells and bottom nav tabs, and removed dead `MonthView` params
+  `onJumpToday` / `onJumpPickerRequest`. Visual Batch 3 polish (density tint, all-day marker, month
+  transition animation, conditional 6th row) is still optional and not started.
+- **Priority widget polish — DONE and installed on `4ab0d020`.** Medium agenda widget date block now
+  uses today's date number with today's weekday, so it no longer mixes next-event date with today's
+  weekday. Added a Pro-gated `Settings > Widgets > Widget Opacity` slider backed by
+  `widget_opacity_percent` (default 35%) and applied it to transparent widget surfaces. Chip taps in
+  Month view were deliberately left unchanged: chips remain visual-only and day tap behavior still
+  opens `EventListSheet`.
+- **Audit fixes after widget/month polish - DONE and installed on `4ab0d020`.** Opacity slider now
+  uses local draft state while dragging and commits DataStore/widget refresh on tap, accessibility
+  set-progress, or drag finish. Month day TalkBack labels and bottom nav selected/not-selected state
+  are localized through string/plural resources. Month visible title chips adapt to 2 when week
+  numbers or tight row height would overcrowd the cell, otherwise 3. Existing users who already had
+  transparent widgets stay fully transparent after upgrade when no opacity value exists; newly
+  enabling transparency writes the 35% default.
+- **Week-number alignment follow-up - DONE, approved after tuning, and installed on `4ab0d020`.**
+  Month week-number column now shares the same reserved width as the month header/body grid, and
+  body week-number labels are top-aligned to the day-number row instead of sitting low in each tall
+  event-chip cell.
+
+The current month/bottom-nav/widget polish batch is being committed to `main` and pushed to
+`origin/main` at the user's request. `Docs/FEEDBACK.md` remains user-owned untracked and must stay
+untouched.
+
+Priority widget feedback from a Spanish user is now implemented and pending user visual approval:
+
+- Medium agenda widget left badge now always shows `data.todayLabel`, matching `todayDayAbbrev()`.
+  Future event dates stay in the event rows. Previous screenshot mixed a next-event badge with
+  today's weekday, while the visible events were on
+  `MIE, AGO 12`; this is the case now fixed.
+- Transparent widgets now have a gradual opacity control in Settings. When `Transparent Widgets` is
+  off, the opacity row remains visible but disabled with explanatory copy; when on, the slider writes
+  `CalendarPreferences.KEY_WIDGET_OPACITY_PERCENT` and refreshes widgets immediately.
+- Follow-up polish: opacity slider no longer renders as a lone round thumb. It now has a visible
+  pill rail, accent-filled progress segment, and muted disabled state.
+- Audit follow-up: slider drag no longer writes preferences for every movement, slider exposes
+  progress semantics, accessibility strings are localized, and legacy transparent-widget installs
+  keep their old fully-transparent look until the user changes opacity.
+- Month week-number alignment follow-up: week-number column width now matches header/body grid math,
+  and week-number labels align to the day-number row in tall month cells.
+- Verification:
+  `.\gradlew.bat --no-daemon --console=plain :app:compileDebugKotlin` returned `BUILD SUCCESSFUL`;
+  `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug` returned
+  `BUILD SUCCESSFUL`; `.\gradlew.bat --no-daemon --console=plain :app:lintDebug` returned
+  `BUILD SUCCESSFUL`; `git diff --check` passed with CRLF warnings only; debug APK installed
+  successfully on device `4ab0d020`.
+
+User feedback from Gary: bought Pro soon after installing and asked for file attachments in addition
+to images, especially venue tickets supplied as PDFs.
+
+- Recommendation: add later as a high-value Pro feature after current UI/widget polish is accepted.
+  This is a strong calendar use case and matches expectations from Google
+  Calendar, Apple Calendar, and Outlook.
+- Implementation direction: add a `Files` section near Images / Voice note in Event editor and Event
+  detail. Support PDF first, then common documents such as DOCX/XLSX/TXT. Use Android Storage Access
+  Framework document picker and copy selected files into app-private storage so tickets still open if
+  the original document is moved or deleted.
+- Storage direction: use `dotcal_side_store.json` / side-store metadata for file attachments, not a
+  Room migration. Keep Room exactly 5 tables.
+- Product boundary: keep attachments local to DotCal for v1. Do not promise Google Calendar / Drive
+  attachment sync unless cloud permissions and sharing model are explicitly approved later.
+- Suggested limits: 5 files per event, 20 MB per file initially. Pro-gate adding files, but keep
+  viewing existing attachments available if entitlement is lost.
+
+User feedback referencing SuperShift calendar: user likes easier work-shift entry, sharing plans
+with other DotCal users, and a two-week widget. Treat this as shift-worker convenience, **not** a
+DotCal rebrand into a shift-only app.
+
+- Recommendation: add as a later Pro-focused roadmap pack because DotCal already has Shift Patterns
+  and this improves value for nurses, retail staff, drivers, freelancers, trainers, and other users
+  with irregular schedules.
+- Product positioning: DotCal remains a general offline calendar. The feature name should be
+  something like `Shift Worker Convenience Pack`, not `SuperShift clone`.
+- Best first scope: quick shift add from Calendar, share shift plan as image/PDF/ICS, and a compact
+  two-week widget. These fit offline-first and require no backend.
+- Avoid for now: live shared calendars between DotCal users, payroll/overtime reports, multi-job
+  management as a first-class model, and shift alarms. Those make DotCal feel like a niche shift app
+  and/or require permissions/backend/product complexity.
+
+Billing plan discussion: DotCal currently supports only the `dotcal_pro` one-time in-app product.
+Adding subscriptions is possible through Google Play, but app code must explicitly support `SUBS`.
+
+- Recommendation: offer `Monthly` + existing `Lifetime`; skip weekly initially because weekly billing
+  can feel aggressive for a calendar app and may reduce trust.
+- Play Console direction: keep existing `dotcal_pro` INAPP lifetime product. Add a subscription
+  product such as `dotcal_pro_sub` with a monthly auto-renewing base plan. Yearly can be added later
+  or in the same implementation if pricing is settled.
+- App direction: `ProManager` must query both `BillingClient.ProductType.INAPP` and
+  `BillingClient.ProductType.SUBS`, restore both, and treat either lifetime purchase or active
+  subscription as Pro.
+- Entitlement priority: lifetime purchase wins forever; otherwise active subscription grants Pro;
+  otherwise free.
+- If a user buys lifetime while a monthly subscription is active, DotCal should unlock lifetime but
+  cannot cancel the subscription from app-only code. Show a clear message and a `Manage subscription`
+  deep link to Google Play. Backend cancellation via Google Play Developer API is possible but out of
+  scope for now because it requires server-side purchase-token handling and breaks the app-only
+  offline-first model.
 
 Month view + bottom nav UX research pass complete on `main` (**read-only — no code changed**):
 
@@ -113,9 +230,27 @@ Locale fill pass is complete mechanically:
 
 Continue DotCal in `D:\Caveman\caveman\Nothing-Calendar` on branch `main`. Read `Docs/HANDOFF.md` and `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`.
 
-**All work happens on `main`.** Last commit is `6793737` (versionCode bump to 18), pushed to `origin/main`. `versionCode 18`, `versionName 1.2.0`. Every other local branch is already merged into `main` — see `## Worktree Notes`.
+**All work happens on `main`.** `versionCode 18`, `versionName 1.2.0`. Every other local branch is already merged into `main` — see `## Worktree Notes`.
 
-**Next up is `## Planned: Month View + Bottom Nav UX`** — a researched, phased plan for the Month grid and the floating bottom nav. Nothing there is implemented yet. Work it **batch by batch, not in one pass**, and stop for verification between batches.
+**Next up is no longer blocked on Month View Batch 2** -- batch 1 is DONE and approved, batch 2 drag
+panel was rejected/reverted, and batch 2 redefined as Google-style event title chips is now DONE and
+approved on device. Batch 3 accessibility/dead-param cleanup is also DONE. Priority widget date
+clarity + opacity is built and installed for review. Remaining Batch 3 visual polish is optional
+unless the user asks for more month-view polish.
+
+**Nothing in the working tree is committed.** `HEAD` is `fd906fc`, 2 commits ahead of `origin/main`, nothing pushed. Uncommitted: the batch 1A `+N` alignment fix and batch 2 title chips in `CalendarViews.kt`, ALL of batch 1B in `AppChrome.kt`, month overflow string updates in `values*/strings.xml`, widget date clarity + opacity slider changes in `DotCalWidgets.kt`, `DotCalGlanceTheme.kt`, `CalendarPreferences.kt`, `DotCalApp.kt`, `SettingsScreens.kt`, widget opacity strings in `values*/strings.xml`, this file, and the user's untracked `Docs/FEEDBACK.md`. **Do not commit unless explicitly told to. Do not create or switch branches.**
+
+**Batch 1 is approved — do not redo it.** Do **not** revert the nav haptics to the Compose API, do **not** add `IGNORE_VIEW_SETTING`, and do **not** add an accent dot under the active nav icon without asking.
+
+**Batch 2's drag panel is dead — do not rebuild it.** See `### Batch 2 — REJECTED AND REVERTED`. `showSheet` and `EventListSheet` are back in place and staying.
+
+**Batch 2 redefined is built, installed, and approved.** It adds event title chips in month cells. Cells are **tall rectangles** (`DayCell`'s `aspectRatio(1f)` is gone, **no inline events list below it**), and chips have **no rectangle border** — flat tinted fills only. Budget on `4ab0d020` (393x873dp): original full-height split was ~612dp for 6 rows → 56w x ~102h cells; after user feedback, rows are capped at `dayCellWidth * 1.60f` (~90dp on this device) to keep rows closer than the first build while adding back a little day-row gap. Current cap is **3 chips + `+N more`**. ~11 characters per chip; truncation is inherent to a 7-column phone grid and the user accepted it.
+
+Settled during implementation: day tap still opens `EventListSheet`, chips are visual-only, and all-day events use the same chip treatment for this batch.
+
+**Do not touch** the `Scaffold` `bottomBar` zero-height spacer (`DotCalApp.kt:1295`) or the bottom-nav render ordering (`DotCalApp.kt:1953`) — both deliberate, both carry comments. The selected-week-chips and drag-panel approaches stay rejected; "Fantastical-style chips in every cell" was **overruled by the user** and is now the plan.
+
+Shell note: absolute Windows paths get mangled by the bash tool — `cd "d:\Caveman\caveman\Nothing-Calendar"` at the start of each Bash call. Python is not on PATH; use sed/awk for file edits.
 
 Manual QA for the camera/microphone device-reach fix is still pending — see `## Manual QA`.
 
@@ -307,11 +442,224 @@ C3 On This Day was **removed from this list** — it was already implemented in 
 
 ## Requested Backlog
 
-- **Month view + bottom nav UX.** Researched and planned, nothing implemented. Three batches, run in
-  order — see `## Planned: Month View + Bottom Nav UX`. This is the current priority.
+- **Widget date clarity + opacity control.** DONE and installed for review. Medium agenda widget now
+  keeps today's date number paired with today's weekday, and transparent widgets have a gradual
+  opacity slider in `Settings > Widgets`.
+- **Month view + bottom nav UX.** Batch 1 and Batch 2 are approved; Batch 3 accessibility/dead-param
+  cleanup is done. Only optional visual polish remains — see `## Planned: Month View + Bottom Nav UX`.
+- **Pro subscription plans.** Current billing is one-time `dotcal_pro` only. Future plan should add a
+  monthly subscription next to Lifetime, with no weekly plan initially and no backend auto-cancel.
+  See `## Planned: Pro Subscription Plans`.
+- **Shift Worker Convenience Pack.** SuperShift-style user feedback asked for easier work-shift
+  entry, schedule sharing, and a two-week widget. Add later as general-calendar shift convenience,
+  not as a DotCal rebrand. First scope should be quick shift add, shift-plan image/PDF/ICS export,
+  and a two-week widget. See `## Planned: Shift Worker Convenience Pack`.
+- **Event file attachments.** Gary requested attaching PDFs/files such as venue tickets to events.
+  Recommendation: add later as a Pro feature using SAF + app-private copies + side-store metadata,
+  with no Room schema change and no Google/Drive attachment sync in v1. See
+  `## Planned: Event File Attachments`.
 - **Full UI string extraction + translation.** The Language picker ships and works, but the app is
   still hardcoded English. This is now the blocking follow-up for the feature to mean anything to a
   non-English user. Scope it as one job — see `## Hardcoded String Inventory`.
+
+## Planned: Pro Subscription Plans
+
+Current state:
+
+- DotCal currently supports only the one-time in-app product `dotcal_pro`.
+- Code path is one-time only: `ProManager` queries `BillingClient.ProductType.INAPP`, purchase
+  restore checks only INAPP purchases, and the paywall uses one-time product details/offers.
+- Billing library is already `billing-ktx` 8.0.0, so subscriptions are technically supported by the
+  dependency but not by DotCal's implementation.
+
+Recommendation:
+
+- Add `Monthly` subscription next to existing `Lifetime`.
+- Keep Lifetime as the default selected/recommended plan because DotCal has already been positioned
+  as a one-time Pro purchase.
+- Skip weekly at launch. Weekly billing is supported by Google Play but can feel aggressive for a
+  calendar app; it is better used later only if pricing tests show demand.
+- Optional later: add Yearly once monthly conversion/churn is understood.
+
+Play Console setup:
+
+- Keep existing one-time product:
+  - Product id: `dotcal_pro`
+  - Product type: in-app product / one-time
+  - Meaning: Lifetime Pro
+- Add subscription product:
+  - Suggested product id: `dotcal_pro_sub`
+  - Base plan id: `monthly`
+  - Type: auto-renewing
+  - Billing period: monthly
+  - Optional offer later: free trial or intro price, only if paywall copy clearly explains renewal
+    terms.
+
+App implementation plan:
+
+- Refactor billing UI model to represent more than one purchasable plan:
+  - Lifetime plan from `ProductType.INAPP`
+  - Subscription plan(s) from `ProductType.SUBS`
+- Query product details for both product types. Subscription details come from
+  `subscriptionOfferDetails`; one-time/lifetime details come from
+  `oneTimePurchaseOfferDetails` / `oneTimePurchaseOfferDetailsList`.
+- Purchase flow:
+  - Lifetime: current `BillingFlowParams.ProductDetailsParams` path.
+  - Monthly: subscription product details + selected subscription offer token/base plan offer token.
+- Restore/refresh:
+  - Query `INAPP` purchases for lifetime.
+  - Query `SUBS` purchases for active subscription.
+  - Set Pro true if either entitlement is valid.
+- Keep current boolean `isPro` entitlement for app gates. Add a display-only source later if needed:
+  `None`, `Lifetime`, `Subscription`.
+- Paywall:
+  - Show two cards: `Monthly` and `Lifetime`.
+  - Prices always come from Play Billing.
+  - Suggested copy: `Cancel anytime` for Monthly, `One-time purchase` for Lifetime.
+  - Restore button checks both products.
+  - Add `Manage subscription` link only when a subscription purchase is detected.
+
+Entitlement rules:
+
+- Lifetime purchased = Pro forever, regardless of subscription state.
+- Else active subscription = Pro while Google Play reports it active.
+- Else no Pro.
+- Existing lifetime buyers must never be downgraded.
+- If subscription expires/cancels/account-hold ends and no lifetime purchase exists, Pro should turn
+  off after refresh.
+
+Lifetime while subscribed:
+
+- If a monthly subscriber buys Lifetime, DotCal should immediately unlock Lifetime and keep Pro
+  forever.
+- DotCal app-only code cannot automatically cancel that user's Google Play subscription. The purchase
+  is attached to the user's Play account, and the one-time INAPP product is not a subscription
+  replacement.
+- Show a post-purchase message such as:
+  `Lifetime is active. If you also have an active monthly subscription, manage or cancel it in Google
+  Play to avoid future renewal.`
+- Provide a `Manage subscription` button/deep link to the Google Play subscription management page.
+- Do not build backend cancellation now. Developer-initiated cancellation is possible with Google
+  Play Developer API, but it requires backend/server auth, purchase-token storage/verification, and
+  notification handling. That is out of scope for DotCal's current offline-first/app-only model.
+
+Suggested implementation batches:
+
+1. Backend billing support only: query/restore/purchase INAPP + SUBS, preserve lifetime entitlement,
+   add tests where current billing abstractions allow it.
+2. Paywall polish: plan cards, selected plan state, monthly/lifetime copy, subscription management
+   link, and final QA through internal testing.
+
+## Planned: Shift Worker Convenience Pack
+
+User feedback:
+
+- User referenced SuperShift-style workflows and liked ideas around easier work-shift entry, sharing
+  plans with other DotCal users, and a two-week widget.
+- Internal product decision: this is worth adding, but DotCal should stay a general-purpose calendar.
+  Build shift convenience around existing events/shift patterns instead of turning DotCal into a
+  shift-only app.
+
+Assessment:
+
+- Worth adding after current approved UI/widget polish is accepted.
+- Fit is strong because `Shift Patterns` already exist in DotCal and are stored outside Room via the
+  existing side-store pattern. The missing value is speed and visibility, not a brand-new data model.
+- User segment is broad enough for DotCal: nurses, retail workers, drivers, security, freelancers,
+  trainers, support teams, and anyone with repeating irregular schedules.
+- Keep as a Pro value pack, but do not hide existing normal event editing behind shift-specific UX.
+
+Phase 1 — Quick Shift Add:
+
+- Add a fast path from Calendar Month/Week/Day: long-press a day/time or use an action such as
+  `Add shift`.
+- Reuse saved shift types from the current Shift Patterns implementation.
+- Let a user pick a shift type and date, then create normal `CalendarEvent` rows through the existing
+  repository path. No new Room tables/columns.
+- Support multiple shifts per day because SuperShift users explicitly expect split shifts and second
+  jobs, but keep this as multiple normal events rather than a separate shift table.
+- Keep generated shift events editable like regular DotCal events.
+
+Phase 2 — Share Shift Plan:
+
+- Add range-based export for shifts/calendar plan: week, two-week, month, or custom range.
+- First outputs should be image/PDF and ICS. This satisfies "share my roster" without accounts,
+  backend, contacts access, or live sync.
+- PDF/image should include title, dates, shift names, times, notes/location when present, and optional
+  total hours summary if cheap to compute from event durations.
+- ICS export can reuse DotCal's existing calendar/event export direction where possible.
+- Do not implement true live sharing between DotCal users in this phase.
+
+Phase 3 — Two-Week Widget:
+
+- Add a compact 14-day widget showing shift/event chips by day. This is useful beyond shift workers
+  and fits Android widgets well.
+- Widget configuration should allow calendar/account filtering if existing widget config supports it;
+  otherwise keep first version simple and reuse visible calendars.
+- Reuse the existing widget settings surface so widget settings do not fragment.
+- Keep text dense, monochrome/red DotCal identity, and avoid a shift-app-only visual style.
+
+Out of scope unless user demand repeats:
+
+- Live shared calendars between DotCal users. Requires accounts, backend, conflict handling, invites,
+  privacy controls, deletion semantics, and likely notification infrastructure.
+- Payroll/overtime reports as a full module. A simple total-hours line in export is acceptable, but
+  pay calculations would pull DotCal toward a niche workforce app.
+- Multi-job management as a first-class entity. Use calendars/colors for now.
+- Shift alarms. Useful, but permission/platform behavior and reliability need a separate design pass.
+
+Hard boundaries:
+
+- No Room schema change for this pack unless explicitly approved later. Keep Room exactly 5 tables.
+- No cloud sync/backend/live account sharing in v1.
+- No package/deep-link/DB filename changes.
+- Do not start this before Batch 2 month chips are approved.
+
+## Planned: Event File Attachments
+
+User request from Gary:
+
+> I love the app, and bought the pro licence shortly after installing it.
+> Would it be possible to have file attachments as well as images please? I'll often attach venue
+> tickets to an event if a PDF has been provided.
+
+Assessment:
+
+- Worth adding. This is a real calendar workflow: tickets, booking PDFs, appointment forms, venue
+  instructions, invoices, and travel documents belong on the event.
+- Competitive fit is strong: Google Calendar, Apple Calendar, and Outlook all support event
+  attachments or linked files in their calendar/event flows.
+- DotCal fit is strong because the app already has event Images and Voice note sections; generic
+  files extend the same event-context media model.
+- Priority: backlog after current approved UI/widget polish is accepted.
+
+Implementation plan:
+
+- Add a `Files` / `Attachments` section to Event editor and Event detail near Images and Voice note.
+- Start with PDFs, then allow common document MIME types: PDF, plain text, Word, Excel, PowerPoint,
+  and generic `application/octet-stream` only if metadata and opener are available.
+- Use Android Storage Access Framework (`ACTION_OPEN_DOCUMENT` / ActivityResult document picker) so
+  no broad storage permission is needed.
+- Copy selected files into app-private storage, e.g. `files/event_attachments/<eventId>/...`, instead
+  of relying only on persisted URI grants. This keeps tickets available after the source file moves,
+  cloud provider logs out, or the user deletes the original.
+- Store attachment metadata in `dotcal_side_store.json`: event id, internal path, original display
+  name, MIME type, byte size, created timestamp, and optional original URI string for diagnostics.
+- Keep Room schema unchanged: no new tables, no new columns. Room stays exactly 5 tables.
+- Add file actions: open with system viewer, share, remove. Use `FileProvider` for app-private files.
+- Cap initial scope at 5 files per event and 20 MB per file to avoid unbounded backup/storage growth.
+- Pro model: adding file attachments is Pro-gated. Viewing/opening/removing already-attached files
+  should remain available even if Pro entitlement is later lost, matching a user-owned-data model.
+
+Important boundaries:
+
+- Do not implement Google Calendar / Drive attachment sync in v1. DotCal remains offline-first and
+  CalendarProvider-based; cloud attachment sharing needs separate permissions and product decisions.
+- Do not store arbitrary file blobs in Room.
+- Do not request broad storage permissions. SAF + app-private copies is the preferred Android path.
+- Backups/import-export need explicit handling before shipping: either include copied attachments in
+  DotCal backups or clearly mark them as local-only and not backed up. Prefer including them if size
+  limits are already enforced.
 
 ## Hardcoded String Inventory
 
@@ -375,21 +723,25 @@ Notes for whoever scopes the extraction:
 
 ## Planned: Month View + Bottom Nav UX
 
-**Not started. Research-only pass — no code was changed.** Do the batches **in order, one at a time**,
-with `## Required Verification` between each. Do not ship all three in one pass.
+**Batch 1 DONE and approved on device (uncommitted). Batch 2 was built, rejected on sight, and fully
+reverted — see `### Batch 2 — REJECTED AND REVERTED`. Batch 2 is now redefined as Google-style event
+title chips in the month cells and approved on device. Batch 3 accessibility/dead-param cleanup is
+also DONE.** Remaining Batch 3 visual polish is optional; keep any future polish in small batches
+with `## Required Verification` between each.
 
 ### What is there today
 
 - `MonthView` (`CalendarViews.kt:112`) — 42 fixed cells (6 rows always), horizontal swipe at a
   50dp threshold flips month, bulk-select bar at the bottom when `selectedBulkDates` is non-empty.
-- `DayCell` (`CalendarViews.kt:223`) — square `aspectRatio(1f)`, 28dp day-number circle,
-  **max 3 dots at 4dp** via `events.take(3)`, no overflow indicator. Out-of-month days render a bare
-  `Spacer` (`CalendarViews.kt:307`) — no number at all.
+- `DayCell` (`CalendarViews.kt:223`) — tall rectangular cell, 28dp day-number circle, max 3 flat
+  tinted event-title chips via `events.take(3)`, `+N more` overflow indicator, dimmed out-of-month
+  day numbers (batch 1A).
 - Day tap → `viewModel.selectDate()` + `showSheet = true` (`DotCalApp.kt:1409`) → `EventListSheet`
   (`AgendaScreens.kt:73`), a `ModalBottomSheet` owned at app level (`DotCalApp.kt:2988`) with a
-  **fixed 260dp** `LazyColumn` (`AgendaScreens.kt:96`).
-- `DotCalBottomNav` (`AppChrome.kt:421`) — floating 68dp pill, 3 items, `spacedBy(80.dp)`
-  (`AppChrome.kt:457`), item box **30dp** (`AppChrome.kt:504`), `noRippleClickable`.
+  **fixed 260dp** `LazyColumn` (`AgendaScreens.kt:96`). **Still in place — batch 2's removal of this
+  was reverted.**
+- `DotCalBottomNav` (`AppChrome.kt:421`) — floating 68dp pill, 3 items, `weight(1f)` per item, 48dp
+  touch target, 26dp/1.85dp Canvas icons incl. hand-drawn gear (all batch 1B).
 
 ### Research summary
 
@@ -412,50 +764,121 @@ already exist, and animating row heights adds layout risk for no extra gain. Do 
 dot-matrix identity the product is built on. Density tint carries the same "this day is busy" signal
 without the clutter.
 
-### Batch 1 — low-risk polish (do this first)
+### Batch 1 — low-risk polish (DONE, approved on device, uncommitted)
 
-Each item is independent and visible. Nothing here changes state ownership.
+All 8 items shipped. 1A (month grid) and 1B (bottom nav) were both approved on device `4ab0d020`.
 
-1. **`+N` overflow indicator.** After the 3 dots, show remaining count (`events.size - 3`). Keep it
-   in the dot-matrix language — small mono `+2` at ~8sp, or a dash in the 4th dot slot. Highest
-   value-per-line-changed in the whole plan.
-2. **Out-of-month day numbers.** Replace the bare `Spacer` at `CalendarViews.kt:307` with a dimmed
-   number on `palette.disabledText`, no dots. Users currently cannot see across a month boundary.
-3. **Bottom nav touch target 30dp -> 48dp** (`AppChrome.kt:504`). Below the Android minimum today;
-   the pill is 68dp tall so the room already exists. Keep the icon's visual size — grow only the
-   clickable box.
-4. **Bottom nav spacing.** Replace hardcoded `spacedBy(80.dp)` (`AppChrome.kt:457`) with
-   `weight(1f)` per item or `SpaceEvenly`. The fixed gap crowds small screens and strands the icons
-   mid-pill on large ones.
-5. **Normalise nav icon sizes** — currently 26dp / 28dp / 24dp, which reads optically uneven.
-6. **Nav haptics.** `DayCell` fires haptics (`CalendarViews.kt:260`) but the nav does not, and
-   `noRippleClickable` means there is no ripple either — nav taps have zero feedback today.
-7. **Settings icon stroke mismatch.** It is Material `Icons.Filled.Settings` while Calendar and Tasks
-   are hand-drawn Canvas at 1.8dp. Draw a matching Canvas gear.
-8. **Selected-state indicator.** `selectedFill` (`AppChrome.kt:497-501`) is **dead code** — its
-   `targetValue` is always `Color.Transparent`, so nothing animates and active state is
-   colour-tint-only. Either add a 3dp accent dot under the active icon, or delete the block. Do not
-   leave a no-op animation in place.
+1. ✅ **`+N` overflow indicator.** String resource `month_day_more_count`, base + all 8 locales,
+   key parity 720/755. Includes the vertical-alignment fix: `includeFontPadding = false` plus a
+   `LineHeightStyle` trim, because the Row otherwise centres the taller font-metrics box and the
+   glyphs sit visibly below the 4dp dots.
+2. ✅ **Out-of-month day numbers** — dimmed on `palette.disabledText`, no dots.
+3. ✅ **Bottom nav touch target 30dp -> 48dp.** Icon visual size unchanged; only the clickable box grew.
+4. ✅ **Bottom nav spacing** — `spacedBy(80.dp)` replaced with `weight(1f)` per item.
+5. ✅ **Normalised nav icon sizes** — 26dp / 1.85dp stroke via `NAV_ICON_SIZE` + `NAV_ICON_STROKE`
+   (Tasks went 28dp -> 26dp).
+6. ✅ **Nav haptics.** Uses `LocalView` + `HapticFeedbackConstants.VIRTUAL_KEY`. The first attempt with
+   Compose `HapticFeedbackType.TextHandleMove` did **not** fire on this device. **Do not revert to the
+   Compose API here, and do not add `IGNORE_VIEW_SETTING`** — the system haptic preference must win.
+7. ✅ **Settings icon** — hand-drawn Canvas gear (8 teeth, 5.2dp inner / 7.6dp outer) replacing
+   Material `Icons.Filled.Settings`. The `SettingsGearIcon` import was removed from `AppChrome.kt`
+   **only**; `DotCalApp.kt`, `EventScreens.kt` and `ProFeatureScreens.kt` still use it.
+8. ✅ **Selected-state indicator** — dead `selectedFill` block deleted. **No accent dot was added; ask
+   before adding one.**
 
-### Batch 2 — persistent event panel (biggest UX win, do it alone)
+### Batch 2 — REJECTED AND REVERTED (2026-08-11)
 
-Replaces the modal sheet so the month grid stays visible and tappable while the day's events show.
-This is the change that most improves day-to-day use: comparing several days currently costs a
-tap-read-dismiss cycle per day.
+**A persistent drag-resizable panel was fully implemented, installed on `4ab0d020`, rejected on sight
+by the user, and reverted byte-exact. Do not rebuild it.**
 
-**Known constraint, settle it before writing code:** `ModalBottomSheet` cannot do this. Its scrim
-swallows background touches, so grid tap-through will not work. The panel has to live **inside**
-`MonthView` (grid above, drag-resizable panel below) and the app-level `showSheet` /
-`EventListSheet` path at `DotCalApp.kt:2988` has to move. That is a state-ownership change — commit
-batch 1 first and keep this pass on its own commit so it can be reverted independently.
+What was built: a bottom-anchored `MonthEventPanel` inside `MonthView` drawn *over* the grid, with an
+animated `heightIn` cap, drag-to-expand, `BackHandler` collapse, and removal of all five `showSheet`
+sites plus `EventListSheet`. It built clean (65 tests) and installed fine.
 
-- Collapsed height around a third of the screen, expandable by drag, grid visible above.
-- Tapping another day **swaps the panel content** instead of closing it.
-- Drop the fixed 260dp height (`AgendaScreens.kt:96`) for content-driven height — an empty day
-  should not render a large empty box.
-- Keep the existing bulk-select bar behaviour intact.
+**Why it was rejected:** it read as a bottom sheet that would not go away, and it is not how other
+calendars present month events. The revert restored `CalendarViews.kt` to the batch-1A blob (`9fb40f8`)
+and `DotCalApp.kt` / `AgendaScreens.kt` to HEAD with zero diff. `showSheet` and `EventListSheet` are
+**back in place and staying** unless a future batch deliberately removes them.
+
+Lesson for whoever picks this up: the written plan said "grid above, drag-resizable panel below" but
+never settled whether the grid shrinks or the panel floats. That ambiguity is what produced a rejected
+build. **Settle the visual shape against a reference screenshot before writing code.**
+
+### Batch 2 (redefined) — Google-style event title chips in month cells
+
+**Built, installed on `4ab0d020`, and approved on device.** The user's chosen direction, from a
+reference screenshot of a month grid showing event title blocks inside the cells.
+
+Two decisions the user made explicitly:
+
+1. **Cells become tall rectangles, not squares.** `DayCell`'s `aspectRatio(1f)` has to go. Chips need
+   the grid to fill the screen, so there is **no events list below the grid** — the user was shown
+   that trade-off and chose chips.
+2. **No rectangle border on the chips.** Flat tinted fills only, no outline.
+
+Settled during implementation:
+
+- Day tap still opens `EventListSheet`; chips are visual-only and have no direct tap target.
+- All-day events use the same chip treatment as timed events for this batch.
+- There is no inline event list below the grid. The existing modal `EventListSheet` remains owned by
+  `DotCalApp`.
+
+Implementation:
+
+- `MonthView` grid `BoxWithConstraints` now takes `weight(1f)` and computes row height from the
+  available height, capped at `dayCellWidth * 1.60f` so adjacent day rows stay closer than the first
+  full-height build while leaving room for three chips.
+- `DayCell` no longer applies `aspectRatio(1f)`. It fills the row height, keeps the 28dp day number,
+  then renders up to three `MonthEventChip`s with tight vertical spacing.
+- `MonthEventChip` is a 14dp-high flat tinted rounded fill, 8sp monospace title, no border. Ghost
+  events keep the same shape with lower fill/text alpha.
+- Overflow copy now uses the existing `month_day_more_count` key as `+N more` (base + all 8 locale
+  files).
+- Jump-to-date highlight was re-anchored around the day number because tall cells made the old
+  height-relative circle drift into chip space.
+
+Vertical budget, measured on `4ab0d020` (1080x2400 @440dpi = 393x873dp):
+
+| Element | Height |
+|---|---|
+| Chrome above grid (56 action bar + 12 + 42 segmented + 4 + 32 weekday header) | 146dp |
+| Bottom nav pill clearance | 90dp |
+| **Left for 6 grid rows** | **~612dp** |
+| Per cell | 56w x **~102h** |
+| Day number | 28dp |
+| **Left for chips** | **~70dp; current cap is 3 chips + `+N more` after user spacing feedback** |
+
+Known constraint the user accepted: a 56dp-wide cell in mono at ~7sp fits about **11 characters**, so
+"Team Stand-up" truncates to `Team Stand…`. Google Calendar's mobile month view is equally cramped —
+this is inherent to a 7-column phone grid, not a bug to fix.
+
+**This overrules the earlier "Also rejected: Fantastical-style chips in every cell" note below.** That
+rejection was a brand judgement (chips break the dot-matrix identity) and the user has now overruled
+it deliberately. The *other* rejection — the selected-week-expands-into-chips hybrid — still stands.
+
+Verification:
+
+- `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug` returned
+  `BUILD SUCCESSFUL`.
+- Debug APK installed successfully on device `4ab0d020`.
+- User reviewed on device and approved.
 
 ### Batch 3 — density and motion
+
+**Partial low-risk polish DONE and installed on `4ab0d020`:**
+
+- Month day cells now expose TalkBack labels with date, today/selected/bulk/out-of-month state, event
+  count, visible event titles, and `+N more` equivalent.
+- Bottom nav items now expose `Role.Tab`, selected state, and labels for Calendar, Tasks, Settings.
+- `MonthView` dead params `onJumpToday` and `onJumpPickerRequest` were removed from the Month path.
+
+Verification:
+
+- `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug` returned
+  `BUILD SUCCESSFUL`.
+- Debug APK installed successfully on device `4ab0d020`.
+
+Remaining optional visual polish:
 
 1. **Density tint.** Reuse the `DayDensityDot` logic (`AgendaScreens.kt:350`) to tint a busy day's
    cell background. More information than dots, no added clutter, and it strengthens the dot-matrix
@@ -465,17 +888,12 @@ batch 1 first and keep this pass on its own commit so it can be reverted indepen
    dotted-border treatment is the precedent to follow.
 3. **Month transition animation.** Swipe currently jumps with no motion, while tab switching uses
    `Crossfade` (`DotCalApp.kt:1374`) — inconsistent. Add direction-aware `AnimatedContent` slide.
-4. **Semantics — do not skip this.** `DayCell` has no `contentDescription` or semantics, and all
-   three nav icons are Canvas-drawn with none either (the settings icon passes
-   `contentDescription = null`). **Month view and the bottom nav are both unusable with TalkBack
-   today.** Nav items want `role = Tab` plus selected state.
-5. **Conditional 6th row.** Skip the last grid row when it is entirely out-of-month, giving the
+4. **Conditional 6th row.** Skip the last grid row when it is entirely out-of-month, giving the
    remaining cells more height.
 
 ### Cleanup noted while reading
 
-- `MonthView` takes `onJumpToday` and `onJumpPickerRequest` (`CalendarViews.kt:122-123`) and passes
-  them from `DotCalApp.kt:1389-1390`, but **neither is referenced in the body**. Dead params.
+- `MonthView` dead params `onJumpToday` and `onJumpPickerRequest` were removed from the Month path.
 
 ### Do not touch
 

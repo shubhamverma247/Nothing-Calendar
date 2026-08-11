@@ -140,6 +140,10 @@
     <string name="settings_panel_widget_style">Widget Style</string>
     <string name="settings_transparent_widgets">Transparent Widgets</string>
     <string name="settings_transparent_widgets_subtitle">Let wallpaper show through all DotCal widgets</string>
+    <string name="settings_widget_opacity">Widget Opacity</string>
+    <string name="settings_widget_opacity_percent">%1$d%%</string>
+    <string name="settings_widget_opacity_subtitle">Adjust transparent widget surface strength</string>
+    <string name="settings_widget_opacity_subtitle_disabled">Turn on transparent widgets to adjust opacity</string>
     <string name="settings_widget_dot_texture">Widget Dot Texture</string>
     <string name="settings_widget_dot_texture_subtitle">Show the subtle DotCal dotted surface</string>
     <string name="settings_widget_dot_texture_subtitle_disabled">Only applies when transparent widgets are off</string>
@@ -1014,9 +1018,26 @@
     <!-- Calendar grid views. week_number_short is the compact ISO week label on the week-view
          rail: %1$s is the zero-padded number, so German can render "KW02". -->
     <string name="week_number_short">W%1$s</string>
-    <!-- Month grid overflow affordance, shown after the three event dots in a day cell when the day
-         holds more events than fit: %1$d is the count NOT shown, e.g. "+2". -->
-    <string name="month_day_more_count">+%1$d</string>
+    <!-- Month grid overflow affordance, shown after the three event chips in a day cell when the
+         day holds more events than fit: %1$d is the count NOT shown, e.g. "+2 more". -->
+    <string name="month_day_more_count">+%1$d more</string>
+    <string name="a11y_today">Today</string>
+    <string name="a11y_outside_current_month">outside current month</string>
+    <string name="a11y_selected">Selected</string>
+    <string name="a11y_bulk_selected">Bulk selected</string>
+    <string name="a11y_not_selected">Not selected</string>
+    <string name="a11y_no_events">no events</string>
+    <string name="a11y_untitled_event">Untitled event</string>
+    <string name="a11y_open_day">Open day</string>
+    <string name="a11y_select_date">Select date</string>
+    <plurals name="a11y_event_count">
+        <item quantity="one">1 event</item>
+        <item quantity="other">%1$d events</item>
+    </plurals>
+    <plurals name="a11y_more_events">
+        <item quantity="one">1 more</item>
+        <item quantity="other">%1$d more</item>
+    </plurals>
     <string name="calendar_clear">Clear</string>
     <string name="calendar_apply_template">Apply Template</string>
     <string name="calendar_tasks">Tasks</string>

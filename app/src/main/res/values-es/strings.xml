@@ -136,6 +136,10 @@
     <string name="settings_panel_widget_style">Estilo de widget</string>
     <string name="settings_transparent_widgets">Widgets transparentes</string>
     <string name="settings_transparent_widgets_subtitle">Deja que el fondo se vea a través de los widgets</string>
+    <string name="settings_widget_opacity">Opacidad del widget</string>
+    <string name="settings_widget_opacity_percent">%1$d%%</string>
+    <string name="settings_widget_opacity_subtitle">Ajusta la intensidad de la superficie transparente</string>
+    <string name="settings_widget_opacity_subtitle_disabled">Activa los widgets transparentes para ajustar la opacidad</string>
     <string name="settings_widget_dot_texture">Textura de puntos</string>
     <string name="settings_widget_dot_texture_subtitle">Muestra la sutil superficie punteada de DotCal</string>
     <string name="settings_widget_dot_texture_subtitle_disabled">Solo se aplica si los widgets transparentes están desactivados</string>
@@ -941,7 +945,24 @@
     <!-- Start-end time range, e.g. "9:00 - 10:30". Both args are required. -->
     <string name="time_range">%1$s - %2$s</string>
     <string name="week_number_short">S%1$s</string>
-    <string name="month_day_more_count">+%1$d</string>
+    <string name="month_day_more_count">+%1$d más</string>
+    <string name="a11y_today">Hoy</string>
+    <string name="a11y_outside_current_month">fuera del mes actual</string>
+    <string name="a11y_selected">Seleccionado</string>
+    <string name="a11y_bulk_selected">Seleccionado para acción en lote</string>
+    <string name="a11y_not_selected">No seleccionado</string>
+    <string name="a11y_no_events">sin eventos</string>
+    <string name="a11y_untitled_event">Evento sin título</string>
+    <string name="a11y_open_day">Abrir día</string>
+    <string name="a11y_select_date">Seleccionar fecha</string>
+    <plurals name="a11y_event_count">
+        <item quantity="one">1 evento</item>
+        <item quantity="other">%1$d eventos</item>
+    </plurals>
+    <plurals name="a11y_more_events">
+        <item quantity="one">1 más</item>
+        <item quantity="other">%1$d más</item>
+    </plurals>
     <string name="unlock_device_subtitle">Confirma el bloqueo de tu dispositivo para continuar.</string>
     <string name="unlock_device_title">Desbloquear DotCal</string>
 

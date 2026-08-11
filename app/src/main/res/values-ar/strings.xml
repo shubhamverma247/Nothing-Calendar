@@ -112,6 +112,10 @@
     <string name="settings_panel_widget_style">Widget Stil</string>
     <string name="settings_transparent_widgets">شفاف الأدوات</string>
     <string name="settings_transparent_widgets_subtitle">Let Hintergrundbild Anzeigen durch alle DotCal الأدوات</string>
+    <string name="settings_widget_opacity">تعتيم الأداة</string>
+    <string name="settings_widget_opacity_percent">%1$d%%</string>
+    <string name="settings_widget_opacity_subtitle">اضبط قوة سطح الأداة الشفاف</string>
+    <string name="settings_widget_opacity_subtitle_disabled">فعّل الأدوات الشفافة لضبط التعتيم</string>
     <string name="settings_widget_dot_texture">Widget Punkt Textur</string>
     <string name="settings_widget_dot_texture_subtitle">Anzeigen subtle DotCal dotted surface</string>
     <string name="settings_widget_dot_texture_subtitle_disabled">nur applies wann شفاف الأدوات are Aus</string>
@@ -902,7 +906,32 @@
     <string name="task_delete_title">حذف مهمة?</string>
     <string name="time_range">%1$s - %2$s</string>
     <string name="week_number_short">W%1$s</string>
-    <string name="month_day_more_count">+%1$d</string>
+    <string name="month_day_more_count">+%1$d أكثر</string>
+    <string name="a11y_today">اليوم</string>
+    <string name="a11y_outside_current_month">خارج الشهر الحالي</string>
+    <string name="a11y_selected">محدد</string>
+    <string name="a11y_bulk_selected">محدد لإجراء جماعي</string>
+    <string name="a11y_not_selected">غير محدد</string>
+    <string name="a11y_no_events">لا توجد أحداث</string>
+    <string name="a11y_untitled_event">حدث بلا عنوان</string>
+    <string name="a11y_open_day">فتح اليوم</string>
+    <string name="a11y_select_date">تحديد التاريخ</string>
+    <plurals name="a11y_event_count">
+        <item quantity="zero">لا توجد أحداث</item>
+        <item quantity="one">حدث واحد</item>
+        <item quantity="two">حدثان</item>
+        <item quantity="few">%1$d أحداث</item>
+        <item quantity="many">%1$d حدثًا</item>
+        <item quantity="other">%1$d حدث</item>
+    </plurals>
+    <plurals name="a11y_more_events">
+        <item quantity="zero">لا مزيد</item>
+        <item quantity="one">واحد إضافي</item>
+        <item quantity="two">اثنان إضافيان</item>
+        <item quantity="few">%1$d إضافية</item>
+        <item quantity="many">%1$d إضافيًا</item>
+        <item quantity="other">%1$d إضافي</item>
+    </plurals>
     <string name="unlock_device_subtitle">Confirm your Geraet Lock إلى Weiter.</string>
     <string name="unlock_device_title">Entsperren DotCal</string>
     <plurals name="birthdays_imported">

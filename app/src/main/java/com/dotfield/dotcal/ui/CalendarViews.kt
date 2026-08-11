@@ -72,8 +72,17 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick as semanticsOnClick
+import androidx.compose.ui.semantics.onLongClick as semanticsOnLongClick
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -94,6 +103,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.time.temporal.WeekFields
 import java.util.Locale
 
@@ -119,8 +129,6 @@ internal fun MonthView(
     showWeekNumbers: Boolean,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    onJumpToday: () -> Unit,
-    onJumpPickerRequest: () -> Unit,
     highlightDate: LocalDate?,
     selectedBulkDates: Set<LocalDate>,
     onBulkSelectionStart: (LocalDate) -> Unit,
@@ -148,9 +156,10 @@ internal fun MonthView(
                 )
             },
     ) {
+        val weekNumberColumnWidth = 36.dp
         Row(modifier = Modifier.fillMaxWidth().height(32.dp).background(palette.calendarSurface)) {
             if (showWeekNumbers) {
-                WeekNumberCell(label = "", palette = palette, modifier = Modifier.width(36.dp).fillMaxHeight())
+                WeekNumberCell(label = "", palette = palette, modifier = Modifier.width(weekNumberColumnWidth).fillMaxHeight())
             }
             weekDayLabels.forEach {
                 Text(
@@ -164,17 +173,23 @@ internal fun MonthView(
             }
         }
 
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val weekNumberWidth = if (showWeekNumbers) 36.dp else 0.dp
-            val dayCellSize = (maxWidth - weekNumberWidth) / 7f
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            val weekNumberWidth = if (showWeekNumbers) weekNumberColumnWidth else 0.dp
+            val dayCellWidth = (maxWidth - weekNumberWidth) / 7f
+            // Cells are TALL, not square. Event title chips need vertical room that a 1:1 cell
+            // cannot give, but cap row height so month rows do not drift too far apart.
+            val dayCellHeight = if (maxHeight > 0.dp) minOf(maxHeight / 6f, dayCellWidth * 1.60f) else dayCellWidth
+            val visibleChipCount = if (dayCellHeight < 76.dp || showWeekNumbers) 2 else 3
             Column(modifier = Modifier.fillMaxWidth()) {
                 days.chunked(7).forEach { week ->
-                    Row(modifier = Modifier.fillMaxWidth().height(dayCellSize)) {
+                    Row(modifier = Modifier.fillMaxWidth().height(dayCellHeight)) {
                         if (showWeekNumbers) {
                             WeekNumberCell(
                                 label = isoWeekNumberLabel(week.first()),
                                 palette = palette,
-                                modifier = Modifier.width(36.dp).fillMaxHeight(),
+                                modifier = Modifier.width(weekNumberColumnWidth).fillMaxHeight(),
+                                contentAlignment = Alignment.TopCenter,
+                                textModifier = Modifier.padding(top = 7.dp),
                             )
                         }
                         week.forEach { day ->
@@ -185,6 +200,7 @@ internal fun MonthView(
                                 isBulkSelected = day in selectedBulkDates,
                                 isHighlighted = day == highlightDate,
                                 events = eventsByDate[day].orEmpty(),
+                                visibleChipCount = visibleChipCount,
                                 palette = palette,
                                 onClick = { onDateSelected(day) },
                                 onLongPress = { onBulkSelectionStart(day) },
@@ -228,6 +244,7 @@ private fun DayCell(
     isBulkSelected: Boolean,
     isHighlighted: Boolean,
     events: List<CalendarEvent>,
+    visibleChipCount: Int,
     palette: DotCalPalette,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
@@ -236,6 +253,63 @@ private fun DayCell(
     val isToday = date == LocalDate.now()
     val inMonth = YearMonth.from(date) == activeMonth
     val haptic = LocalHapticFeedback.current
+    val todayLabel = stringResource(R.string.a11y_today)
+    val outsideCurrentMonthLabel = stringResource(R.string.a11y_outside_current_month)
+    val selectedLabel = stringResource(R.string.a11y_selected)
+    val bulkSelectedLabel = stringResource(R.string.a11y_bulk_selected)
+    val notSelectedLabel = stringResource(R.string.a11y_not_selected)
+    val noEventsLabel = stringResource(R.string.a11y_no_events)
+    val eventCountLabel = pluralStringResource(R.plurals.a11y_event_count, events.size, events.size)
+    val moreEventsLabel = pluralStringResource(
+        R.plurals.a11y_more_events,
+        (events.size - visibleChipCount.coerceAtMost(events.size)).coerceAtLeast(0),
+        (events.size - visibleChipCount.coerceAtMost(events.size)).coerceAtLeast(0),
+    )
+    val untitledEventLabel = stringResource(R.string.a11y_untitled_event)
+    val openDayLabel = stringResource(R.string.a11y_open_day)
+    val selectDateLabel = stringResource(R.string.a11y_select_date)
+    val accessibilityLabel = remember(
+        date,
+        events,
+        visibleChipCount,
+        inMonth,
+        isToday,
+        isSelected,
+        isBulkSelected,
+        todayLabel,
+        outsideCurrentMonthLabel,
+        selectedLabel,
+        bulkSelectedLabel,
+        noEventsLabel,
+        eventCountLabel,
+        moreEventsLabel,
+        untitledEventLabel,
+    ) {
+        monthDayAccessibilityLabel(
+            date = date,
+            events = events,
+            visibleChipCount = visibleChipCount,
+            inMonth = inMonth,
+            isToday = isToday,
+            isSelected = isSelected,
+            isBulkSelected = isBulkSelected,
+            todayLabel = todayLabel,
+            outsideCurrentMonthLabel = outsideCurrentMonthLabel,
+            selectedLabel = selectedLabel,
+            bulkSelectedLabel = bulkSelectedLabel,
+            noEventsLabel = noEventsLabel,
+            eventCountLabel = eventCountLabel,
+            moreEventsLabel = moreEventsLabel,
+            untitledEventLabel = untitledEventLabel,
+        )
+    }
+    val accessibilityState = remember(isSelected, isBulkSelected) {
+        when {
+            isBulkSelected -> bulkSelectedLabel
+            isSelected -> selectedLabel
+            else -> notSelectedLabel
+        }
+    }
     val highlightColor by animateColorAsState(
         targetValue = if (isHighlighted) palette.accent.copy(alpha = 0.28f) else Color.Transparent,
         animationSpec = tween(durationMillis = 500),
@@ -243,14 +317,26 @@ private fun DayCell(
     )
     Box(
         modifier = modifier
-            .aspectRatio(1f)
             .background(palette.calendarSurface)
+            .semantics(mergeDescendants = true) {
+                contentDescription = accessibilityLabel
+                stateDescription = accessibilityState
+                this.selected = isSelected || isBulkSelected
+                semanticsOnClick(label = openDayLabel) {
+                    onClick()
+                    true
+                }
+                semanticsOnLongClick(label = selectDateLabel) {
+                    onLongPress()
+                    true
+                }
+            }
             .drawBehind {
                 if (inMonth && highlightColor.alpha > 0f) {
                     drawCircle(
                         color = highlightColor,
-                        radius = size.minDimension * 0.42f,
-                        center = Offset(size.width / 2f, size.height * 0.36f),
+                        radius = minOf(22.dp.toPx(), size.minDimension * 0.42f),
+                        center = Offset(size.width / 2f, 18.dp.toPx()),
                     )
                 }
             }
@@ -268,7 +354,12 @@ private fun DayCell(
             },
         contentAlignment = Alignment.TopCenter,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 8.dp)) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 3.dp, vertical = 3.dp),
+        ) {
             if (inMonth) {
                 Box(
                     modifier = Modifier
@@ -291,28 +382,34 @@ private fun DayCell(
                         fontSize = 14.sp,
                     )
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    events.take(3).forEach { event ->
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(if (event.isGhost) Color.Transparent else event.displayColor(palette))
-                                .border(0.7.dp, event.displayColor(palette).copy(alpha = if (event.isGhost) 0.55f else 1f), CircleShape),
-                        )
-                    }
-                    if (events.size > 3) {
-                        Text(
-                            stringResource(R.string.month_day_more_count, events.size - 3),
-                            fontFamily = mono,
-                            fontSize = 8.sp,
-                            color = palette.secondaryText,
-                        )
-                    }
+                Spacer(modifier = Modifier.height(3.dp))
+                events.take(visibleChipCount).forEach { event ->
+                    MonthEventChip(
+                        event = event,
+                        palette = palette,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(1.dp))
+                }
+                if (events.size > visibleChipCount) {
+                    Text(
+                        stringResource(R.string.month_day_more_count, events.size - visibleChipCount),
+                        modifier = Modifier.fillMaxWidth(),
+                        fontFamily = mono,
+                        fontSize = 8.sp,
+                        color = palette.secondaryText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        style = TextStyle(
+                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                            lineHeight = 9.sp,
+                            lineHeightStyle = LineHeightStyle(
+                                alignment = LineHeightStyle.Alignment.Center,
+                                trim = LineHeightStyle.Trim.Both,
+                            ),
+                        ),
+                    )
                 }
             } else {
                 Box(
@@ -328,6 +425,78 @@ private fun DayCell(
                 }
             }
         }
+    }
+}
+
+private fun monthDayAccessibilityLabel(
+    date: LocalDate,
+    events: List<CalendarEvent>,
+    visibleChipCount: Int,
+    inMonth: Boolean,
+    isToday: Boolean,
+    isSelected: Boolean,
+    isBulkSelected: Boolean,
+    todayLabel: String,
+    outsideCurrentMonthLabel: String,
+    selectedLabel: String,
+    bulkSelectedLabel: String,
+    noEventsLabel: String,
+    eventCountLabel: String,
+    moreEventsLabel: String,
+    untitledEventLabel: String,
+): String = buildString {
+    if (isToday) append(todayLabel).append(", ")
+    append(date.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.getDefault())))
+    if (!inMonth) append(", ").append(outsideCurrentMonthLabel)
+    if (isSelected) append(", ").append(selectedLabel)
+    if (isBulkSelected) append(", ").append(bulkSelectedLabel)
+    append(", ")
+    append(if (events.isEmpty()) noEventsLabel else eventCountLabel)
+    val visibleTitles = events.take(visibleChipCount).map { it.title.ifBlank { untitledEventLabel } }
+    if (visibleTitles.isNotEmpty()) {
+        append(": ")
+        append(visibleTitles.joinToString())
+    }
+    if (events.size > visibleTitles.size) {
+        append(", ")
+        append(moreEventsLabel)
+    }
+}
+
+@Composable
+private fun MonthEventChip(
+    event: CalendarEvent,
+    palette: DotCalPalette,
+    modifier: Modifier = Modifier,
+) {
+    val eventColor = event.displayColor(palette)
+    val title = event.title.ifBlank { stringResource(R.string.event_conflict_untitled) }
+    Box(
+        modifier = modifier
+            .height(14.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .background(eventColor.copy(alpha = if (event.isGhost) 0.10f else 0.18f))
+            .padding(horizontal = 3.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            title,
+            modifier = Modifier.fillMaxWidth(),
+            color = eventColor.copy(alpha = if (event.isGhost) 0.68f else 1f),
+            fontFamily = mono,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 8.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = TextStyle(
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                lineHeight = 9.sp,
+                lineHeightStyle = LineHeightStyle(
+                    alignment = LineHeightStyle.Alignment.Center,
+                    trim = LineHeightStyle.Trim.Both,
+                ),
+            ),
+        )
     }
 }
 
@@ -465,15 +634,17 @@ private fun WeekNumberCell(
     label: String,
     palette: DotCalPalette,
     modifier: Modifier = Modifier,
+    contentAlignment: Alignment = Alignment.Center,
+    textModifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
-            .width(28.dp)
             .background(palette.calendarSurface),
-        contentAlignment = Alignment.Center,
+        contentAlignment = contentAlignment,
     ) {
         Text(
             label,
+            modifier = textModifier,
             color = palette.secondaryText.copy(alpha = 0.72f),
             fontFamily = mono,
             fontSize = 9.sp,

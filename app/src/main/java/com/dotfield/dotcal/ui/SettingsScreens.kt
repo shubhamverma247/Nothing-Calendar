@@ -175,6 +175,11 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -278,6 +283,7 @@ internal fun SettingsPreview(
     defaultAllDayReminderTime: LocalTime,
     weekStartOption: WeekStartOption,
     widgetTransparent: Boolean,
+    widgetOpacityPercent: Int,
     widgetDotTexture: Boolean,
     appLockState: AppLockState,
     privateVaultEvents: List<CalendarEvent>,
@@ -295,6 +301,7 @@ internal fun SettingsPreview(
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
     onWidgetTransparentChange: (Boolean) -> Unit,
+    onWidgetOpacityChange: (Int) -> Unit,
     onWidgetDotTextureChange: (Boolean) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
     onAddHolidayCountry: (HolidayCountryUiItem) -> Unit,
@@ -470,11 +477,13 @@ internal fun SettingsPreview(
         ) {
             WidgetSettings(
                 widgetTransparent = widgetTransparent,
+                widgetOpacityPercent = widgetOpacityPercent,
                 widgetDotTexture = widgetDotTexture,
                 isPro = isPro,
                 palette = palette,
                 onBack = { onScreenChange(SettingsScreen.Root) },
                 onWidgetTransparentChange = onWidgetTransparentChange,
+                onWidgetOpacityChange = onWidgetOpacityChange,
                 onWidgetDotTextureChange = onWidgetDotTextureChange,
             )
         }
@@ -909,11 +918,13 @@ private fun ReminderDefaultsSettings(
 @Composable
 private fun WidgetSettings(
     widgetTransparent: Boolean,
+    widgetOpacityPercent: Int,
     widgetDotTexture: Boolean,
     isPro: Boolean,
     palette: DotCalPalette,
     onBack: () -> Unit,
     onWidgetTransparentChange: (Boolean) -> Unit,
+    onWidgetOpacityChange: (Int) -> Unit,
     onWidgetDotTextureChange: (Boolean) -> Unit,
 ) {
     LazyColumn(
@@ -933,6 +944,14 @@ private fun WidgetSettings(
                     isPro = isPro,
                     palette = palette,
                     onCheckedChange = onWidgetTransparentChange,
+                )
+                SettingsContentDivider(palette)
+                SettingsWidgetOpacityRow(
+                    opacityPercent = widgetOpacityPercent,
+                    enabled = widgetTransparent,
+                    isPro = isPro,
+                    palette = palette,
+                    onOpacityChange = onWidgetOpacityChange,
                 )
                 SettingsContentDivider(palette)
                 SettingsWidgetToggleRow(
@@ -3174,6 +3193,150 @@ internal fun SettingsToggleRow(
             palette = palette,
             onCheckedChange = onCheckedChange,
         )
+    }
+}
+
+@Composable
+private fun SettingsWidgetOpacityRow(
+    opacityPercent: Int,
+    enabled: Boolean,
+    isPro: Boolean,
+    palette: DotCalPalette,
+    onOpacityChange: (Int) -> Unit,
+) {
+    val active = enabled && isPro
+    val titleColor = if (active) palette.primaryText else palette.secondaryText
+    val subtitleColor = if (active) palette.secondaryText else palette.disabledText
+    var draftOpacityPercent by remember { mutableStateOf(opacityPercent.coerceIn(0, 100)) }
+    LaunchedEffect(opacityPercent) {
+        draftOpacityPercent = opacityPercent.coerceIn(0, 100)
+    }
+    val fraction = draftOpacityPercent / 100f
+    fun updateDraft(value: Float) {
+        if (active) draftOpacityPercent = (value.coerceIn(0f, 1f) * 100).roundToInt().coerceIn(0, 100)
+    }
+    fun commitDraft(value: Float = fraction) {
+        if (active) onOpacityChange((value.coerceIn(0f, 1f) * 100).roundToInt().coerceIn(0, 100))
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.settings_widget_opacity),
+                color = titleColor,
+                fontFamily = mono,
+                fontWeight = FontWeight.Normal,
+                fontSize = 16.sp,
+                modifier = Modifier.weight(1f),
+            )
+            if (!isPro) {
+                ProFeatureTag(palette)
+            } else {
+                Text(
+                    stringResource(R.string.settings_widget_opacity_percent, draftOpacityPercent),
+                    color = titleColor,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+        Text(
+            if (enabled) {
+                stringResource(R.string.settings_widget_opacity_subtitle)
+            } else {
+                stringResource(R.string.settings_widget_opacity_subtitle_disabled)
+            },
+            color = subtitleColor,
+            fontFamily = mono,
+            fontSize = 13.sp,
+            lineHeight = 16.sp,
+        )
+        WidgetOpacitySlider(
+            fraction = fraction,
+            active = active,
+            palette = palette,
+            onChange = ::updateDraft,
+            onChangeFinished = ::commitDraft,
+        )
+    }
+}
+
+@Composable
+private fun WidgetOpacitySlider(
+    fraction: Float,
+    active: Boolean,
+    palette: DotCalPalette,
+    onChange: (Float) -> Unit,
+    onChangeFinished: (Float) -> Unit,
+) {
+    var widthPx by remember { mutableStateOf(1) }
+    val clampedFraction = fraction.coerceIn(0f, 1f)
+    var gestureFraction by remember { mutableFloatStateOf(clampedFraction) }
+    LaunchedEffect(clampedFraction) {
+        gestureFraction = clampedFraction
+    }
+    val trackColor = if (active) palette.switchOffTrack else palette.line.copy(alpha = 0.45f)
+    val fillColor = if (active) palette.accent else palette.disabledText.copy(alpha = 0.35f)
+    val stateText = stringResource(R.string.settings_widget_opacity_percent, (clampedFraction * 100).roundToInt())
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(28.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(trackColor)
+            .border(1.dp, palette.line, RoundedCornerShape(14.dp))
+            .onSizeChanged { widthPx = it.width.coerceAtLeast(1) }
+            .semantics {
+                progressBarRangeInfo = ProgressBarRangeInfo(clampedFraction, 0f..1f, 100)
+                stateDescription = stateText
+                setProgress { target ->
+                    if (active) {
+                        val value = target.coerceIn(0f, 1f)
+                        gestureFraction = value
+                        onChange(value)
+                        onChangeFinished(value)
+                        true
+                    } else {
+                        false
+                    }
+                }
+            }
+            .pointerInput(active) {
+                detectTapGestures { offset ->
+                    if (active) {
+                        val value = (offset.x / widthPx).coerceIn(0f, 1f)
+                        gestureFraction = value
+                        onChange(value)
+                        onChangeFinished(value)
+                    }
+                }
+            }
+            .pointerInput(active) {
+                detectHorizontalDragGestures(
+                    onDragEnd = { if (active) onChangeFinished(gestureFraction) },
+                    onDragCancel = { if (active) onChangeFinished(gestureFraction) },
+                ) { change, _ ->
+                    if (active) {
+                        val value = (change.position.x / widthPx).coerceIn(0f, 1f)
+                        gestureFraction = value
+                        onChange(value)
+                    }
+                }
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(clampedFraction)
+                .background(fillColor),
+        )
+        SliderThumb(fraction = clampedFraction, widthPx = widthPx)
     }
 }
 

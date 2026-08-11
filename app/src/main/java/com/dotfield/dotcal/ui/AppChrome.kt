@@ -2,9 +2,9 @@
 
 import android.app.Activity
 import android.os.Build
+import android.view.HapticFeedbackConstants
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -39,7 +39,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Settings as SettingsGearIcon
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -58,7 +57,9 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -66,6 +67,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -429,6 +436,9 @@ internal fun DotCalBottomNav(
     val inactive = palette.secondaryText
     val pillColor = if (palette.isDark) Color(0xFF1A1A1A) else Color(0xFFFFFFFF)
     val borderColor = palette.disabledText.copy(alpha = if (palette.isDark) 0.22f else 0.16f)
+    val calendarLabel = stringResource(R.string.settings_panel_calendar)
+    val tasksLabel = stringResource(R.string.tasks_title)
+    val settingsLabel = stringResource(R.string.settings_title)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -454,28 +464,33 @@ internal fun DotCalBottomNav(
                 .noRippleClickable {}
                 .padding(horizontal = 0.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(80.dp, Alignment.CenterHorizontally),
         ) {
             BottomNavItem(
                 selected = selected == ScreenTab.Calendar,
+                label = calendarLabel,
                 activeColor = active,
                 inactiveColor = inactive,
                 icon = { tint -> BottomCalendarIcon(tint) },
                 onClick = onCalendar,
+                modifier = Modifier.weight(1f),
             )
             BottomNavItem(
                 selected = selected == ScreenTab.Tasks,
+                label = tasksLabel,
                 activeColor = active,
                 inactiveColor = inactive,
                 icon = { tint -> BottomTaskIcon(tint) },
                 onClick = onTasks,
+                modifier = Modifier.weight(1f),
             )
             BottomNavItem(
                 selected = selected == ScreenTab.Settings,
+                label = settingsLabel,
                 activeColor = active,
                 inactiveColor = inactive,
                 icon = { tint -> BottomSettingsIcon(tint) },
                 onClick = onSettings,
+                modifier = Modifier.weight(1f),
             )
         }
     }
@@ -484,30 +499,51 @@ internal fun DotCalBottomNav(
 @Composable
 private fun BottomNavItem(
     selected: Boolean,
+    label: String,
     activeColor: Color,
     inactiveColor: Color,
     icon: @Composable (Color) -> Unit,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    val view = LocalView.current
+    val isCurrent = selected
+    val selectedState = stringResource(R.string.a11y_selected)
+    val notSelectedState = stringResource(R.string.a11y_not_selected)
     val tint by animateColorAsState(
-        targetValue = if (selected) activeColor else inactiveColor,
+        targetValue = if (isCurrent) activeColor else inactiveColor,
         animationSpec = tween(200),
         label = "navTint",
     )
-    val selectedFill by animateColorAsState(
-        targetValue = Color.Transparent,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
-        label = "navSelectedFill",
-    )
     Box(
-        modifier = Modifier
-            .size(30.dp)
-            .clip(CircleShape)
-            .background(selectedFill)
-            .noRippleClickable(onClick = onClick),
+        modifier = modifier.fillMaxHeight(),
         contentAlignment = Alignment.Center,
     ) {
-        icon(tint)
+        Box(
+            modifier = Modifier
+                // 48dp is the Android minimum touch target. The icon keeps its own smaller size —
+                // only the clickable box grows, inside the 68dp pill.
+                .size(48.dp)
+                .clip(CircleShape)
+                .semantics {
+                    contentDescription = label
+                    role = Role.Tab
+                    stateDescription = if (isCurrent) selectedState else notSelectedState
+                    this.selected = isCurrent
+                }
+                .noRippleClickable {
+                    // The pill has no ripple, so this tap is otherwise silent. VIRTUAL_KEY is the
+                    // platform constant for a button press — Compose's TextHandleMove is a
+                    // text-cursor tick that many devices suppress entirely, so it was not felt.
+                    // flags = IGNORE_VIEW_SETTING is deliberately NOT set: the system haptic
+                    // preference must still win.
+                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    onClick()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            icon(tint)
+        }
     }
 }
 
@@ -569,10 +605,14 @@ private fun CalendarViewSegmentedControl(
     }
 }
 
+/** Shared by all three bottom-nav icons so they stay optically matched. */
+private val NAV_ICON_SIZE = 26.dp
+private val NAV_ICON_STROKE = 1.85.dp
+
 @Composable
 private fun BottomCalendarIcon(tint: Color) {
-    Canvas(modifier = Modifier.size(26.dp)) {
-        val stroke = Stroke(width = 1.85.dp.toPx())
+    Canvas(modifier = Modifier.size(NAV_ICON_SIZE)) {
+        val stroke = Stroke(width = NAV_ICON_STROKE.toPx())
         val left = 4.5.dp.toPx()
         val top = 5.5.dp.toPx()
         val right = size.width - 4.5.dp.toPx()
@@ -595,25 +635,48 @@ private fun BottomCalendarIcon(tint: Color) {
 
 @Composable
 private fun BottomTaskIcon(tint: Color) {
-    Canvas(modifier = Modifier.size(28.dp)) {
-        val stroke = Stroke(width = 1.8.dp.toPx())
+    // 26dp canvas with a 17dp glyph box, matching BottomCalendarIcon so the three nav icons read
+    // optically even. Was a 28dp canvas with an 18dp glyph.
+    Canvas(modifier = Modifier.size(NAV_ICON_SIZE)) {
+        val strokePx = NAV_ICON_STROKE.toPx()
+        val stroke = Stroke(width = strokePx)
         drawRoundRect(
             color = tint,
-            topLeft = Offset(5.dp.toPx(), 5.dp.toPx()),
-            size = androidx.compose.ui.geometry.Size(18.dp.toPx(), 18.dp.toPx()),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.5.dp.toPx(), 3.5.dp.toPx()),
+            topLeft = Offset(4.5.dp.toPx(), 4.5.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size(17.dp.toPx(), 17.dp.toPx()),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx(), 3.dp.toPx()),
             style = stroke,
         )
-        drawLine(tint, Offset(9.dp.toPx(), 11.dp.toPx()), Offset(11.dp.toPx(), 13.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-        drawLine(tint, Offset(11.dp.toPx(), 13.dp.toPx()), Offset(14.5.dp.toPx(), 9.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-        drawLine(tint, Offset(16.dp.toPx(), 11.dp.toPx()), Offset(20.dp.toPx(), 11.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-        drawLine(tint, Offset(9.dp.toPx(), 18.dp.toPx()), Offset(20.dp.toPx(), 18.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+        drawLine(tint, Offset(8.5.dp.toPx(), 10.5.dp.toPx()), Offset(10.5.dp.toPx(), 12.5.dp.toPx()), strokeWidth = strokePx)
+        drawLine(tint, Offset(10.5.dp.toPx(), 12.5.dp.toPx()), Offset(13.5.dp.toPx(), 8.5.dp.toPx()), strokeWidth = strokePx)
+        drawLine(tint, Offset(15.dp.toPx(), 10.5.dp.toPx()), Offset(18.5.dp.toPx(), 10.5.dp.toPx()), strokeWidth = strokePx)
+        drawLine(tint, Offset(8.5.dp.toPx(), 16.5.dp.toPx()), Offset(18.5.dp.toPx(), 16.5.dp.toPx()), strokeWidth = strokePx)
     }
 }
 
 @Composable
 private fun BottomSettingsIcon(tint: Color) {
-    Icon(Icons.Filled.SettingsGearIcon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+    // Hand-drawn to match the Calendar and Tasks icons. Was Material Icons.Filled.Settings, whose
+    // solid fill read heavier than the 1.8dp strokes either side of it.
+    Canvas(modifier = Modifier.size(NAV_ICON_SIZE)) {
+        val strokePx = NAV_ICON_STROKE.toPx()
+        val center = Offset(size.width / 2f, size.height / 2f)
+        drawCircle(color = tint, radius = 5.2.dp.toPx(), center = center, style = Stroke(width = strokePx))
+        drawCircle(color = tint, radius = 2.1.dp.toPx(), center = center, style = Stroke(width = strokePx))
+        val toothInner = 5.2.dp.toPx()
+        val toothOuter = 7.6.dp.toPx()
+        repeat(8) { index ->
+            rotate(degrees = index * 45f, pivot = center) {
+                drawLine(
+                    color = tint,
+                    start = Offset(center.x, center.y - toothInner),
+                    end = Offset(center.x, center.y - toothOuter),
+                    strokeWidth = strokePx,
+                    cap = StrokeCap.Round,
+                )
+            }
+        }
+    }
 }
 
 @Composable
