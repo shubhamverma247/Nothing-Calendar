@@ -297,6 +297,7 @@
     <string name="event_section_description">DESCRIPTION</string>
     <string name="event_section_images">IMAGES</string>
     <string name="event_section_voice_note">VOIX NOTE</string>
+    <string name="event_section_files">FICHIERS</string>
     <string name="event_all_day">Toute la journee</string>
     <string name="event_delete">Supprimer evenement</string>
     <string name="event_options">evenement Options</string>
@@ -347,6 +348,10 @@
     <string name="event_conflict_extra">+%1$d Plus</string>
     <string name="event_images">Images</string>
     <string name="event_images_count">%1$d/5</string>
+    <string name="event_files">Fichiers</string>
+    <string name="event_files_count">%1$d/5</string>
+    <string name="event_add_pdf">Ajouter un PDF</string>
+    <string name="event_remove_file">Supprimer le fichier</string>
     <string name="event_image_placeholder">IMG</string>
     <string name="event_image_unavailable">Image Indisponible</string>
     <string name="event_voice_note">Voix Note</string>
@@ -759,6 +764,9 @@
     <string name="toast_event_too_large_qr">evenement is too large to Partager as QR</string>
     <string name="toast_export_failed">Exporter Echec</string>
     <string name="toast_file_read_failed">Couldn\'t read file</string>
+    <string name="toast_file_attachment_failed">Impossible de joindre le PDF</string>
+    <string name="toast_file_attachment_missing">Fichier manquant</string>
+    <string name="toast_file_attachment_no_app">Aucune app ne peut ouvrir ce fichier</string>
     <string name="toast_holidays_add_failed">Impossible d ajouter les jours feries</string>
     <string name="toast_holidays_remove_failed">Impossible de supprimer les jours feries</string>
     <string name="toast_import_invalid_ics">Importation echouee - fichier .ics invalide</string>
@@ -770,7 +778,7 @@
     <string name="toast_purchase_restored">Purchase restaure - enjoy DotCal Pro!</string>
     <string name="toast_qr_share_failed">Impossible de partager l image QR</string>
     <string name="toast_restore_invalid_backup">Restauration echouee - sauvegarde DotCal invalide</string>
-    <string name="toast_restore_summary">restaure: %1$d Nouveau, %2$d un jour</string>
+    <string name="toast_restore_summary">restaure: %1$d Nouveau, %2$d un jour, %3$d PDF</string>
     <string name="toast_restored_from_vault">restaure De Prive Coffre</string>
     <string name="toast_shared_without_description">Shared sans Description</string>
     <string name="toast_up_to_date">DotCal is up to date</string>

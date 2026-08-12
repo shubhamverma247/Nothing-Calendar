@@ -1,9 +1,17 @@
 package com.dotfield.dotcal.data
 
 import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.datastore.preferences.core.edit
 import com.dotfield.dotcal.data.backup.BackupData
+import com.dotfield.dotcal.data.backup.BackupFileAttachment
 import com.dotfield.dotcal.data.backup.BackupSerializer
+import com.dotfield.dotcal.data.attachments.EventFileAttachment
+import com.dotfield.dotcal.data.attachments.encodeEventFileAttachments
+import com.dotfield.dotcal.data.attachments.eventAttachmentDirectory
+import com.dotfield.dotcal.data.attachments.eventAttachmentFile
+import com.dotfield.dotcal.data.attachments.parseEventFileAttachments
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.data.countdown.CountdownPinResult
@@ -59,6 +67,8 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.io.File
+import java.util.Base64
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.absoluteValue
@@ -81,6 +91,7 @@ data class EventEditorData(
     val voiceNotePath: String? = null,
     val colorHex: String? = null,
     val isGhost: Boolean = false,
+    val fileAttachments: List<EventFileAttachment> = emptyList(),
 )
 
 data class TaskEditorData(
@@ -191,6 +202,58 @@ class DotCalRepository(
     suspend fun unpinCountdown(eventId: String) = withContext(Dispatchers.IO) {
         sideStore.remove(CountdownPinStore.Namespace, eventId)
         updateWidgets()
+    }
+
+    suspend fun readEventFileAttachments(eventId: String): List<EventFileAttachment> = withContext(Dispatchers.IO) {
+        sideStore.read(EVENT_FILE_ATTACHMENTS_NAMESPACE, eventId)
+            ?.let(::parseEventFileAttachments)
+            .orEmpty()
+    }
+
+    suspend fun importEventFileAttachment(
+        eventId: String,
+        sourceUri: Uri,
+        currentAttachments: List<EventFileAttachment>,
+    ): EventFileAttachment = withContext(Dispatchers.IO) {
+        require(currentAttachments.size < MAX_EVENT_FILE_ATTACHMENTS) { "FILE LIMIT REACHED" }
+        val resolver = context.contentResolver
+        val mimeType = resolver.getType(sourceUri) ?: EVENT_FILE_PDF_MIME
+        val displayName = resolver.queryDisplayName(sourceUri)
+        require(mimeType == EVENT_FILE_PDF_MIME || displayName.endsWith(".pdf", ignoreCase = true)) {
+            "ONLY PDF ATTACHMENTS ARE SUPPORTED"
+        }
+        val attachmentId = UUID.randomUUID().toString()
+        val output = eventAttachmentFile(context.filesDir, eventId, attachmentId)
+        output.parentFile?.mkdirs()
+        var copiedBytes = 0L
+        resolver.openInputStream(sourceUri).use { input ->
+            requireNotNull(input) { "FILE UNAVAILABLE" }
+            output.outputStream().use { out ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read == -1) break
+                    copiedBytes += read
+                    if (copiedBytes > MAX_EVENT_FILE_ATTACHMENT_BYTES) {
+                        runCatching { output.delete() }
+                        error("FILE TOO LARGE")
+                    }
+                    out.write(buffer, 0, read)
+                }
+            }
+        }
+        EventFileAttachment(
+            id = attachmentId,
+            displayName = displayName,
+            mimeType = EVENT_FILE_PDF_MIME,
+            sizeBytes = copiedBytes,
+            localPath = output.absolutePath,
+            addedAtMs = System.currentTimeMillis(),
+        )
+    }
+
+    suspend fun discardEventFileAttachment(attachment: EventFileAttachment) = withContext(Dispatchers.IO) {
+        runCatching { File(attachment.localPath).delete() }
     }
 
     fun observeAppLockState(): Flow<AppLockState> = privacyManager.observeAppLockState()
@@ -345,6 +408,7 @@ class DotCalRepository(
         val eventsInserted: Int,
         val eventsUpdated: Int,
         val remindersRestored: Int,
+        val fileAttachmentsRestored: Int = 0,
     )
 
     /**
@@ -356,11 +420,13 @@ class DotCalRepository(
         val events = dao.getAllUserEventsForExport()
         val accounts = events.map { it.accountId }.toSet().mapNotNull { dao.getAccount(it) }
         val reminders = events.flatMap { dao.getRemindersForEvent(it.id) }
+        val fileAttachments = exportBackupFileAttachments(events)
         BackupSerializer.encode(
             BackupData(
                 accounts = accounts,
                 events = events,
                 reminders = reminders,
+                fileAttachments = fileAttachments,
                 createdAtMs = System.currentTimeMillis(),
             ),
         )
@@ -387,6 +453,7 @@ class DotCalRepository(
         var eventsInserted = 0
         var eventsUpdated = 0
         var remindersRestored = 0
+        var fileAttachmentsRestored = 0
         val now = System.currentTimeMillis()
         data.events.forEach { event ->
             val existing = dao.getEvent(event.id)
@@ -406,13 +473,66 @@ class DotCalRepository(
             }
             if (existing != null) eventsUpdated++ else eventsInserted++
         }
+        val restoredEventIds = data.events.map { it.id }.toSet()
+        val fileAttachmentsByEventId = data.fileAttachments
+            .filter { fileAttachment -> fileAttachment.eventId in restoredEventIds }
+            .groupBy { it.eventId }
+        if (data.hasFileAttachmentsSection) {
+            restoredEventIds.forEach { eventId ->
+                val restored = restoreBackupFileAttachments(eventId, fileAttachmentsByEventId[eventId].orEmpty())
+                replaceEventFileAttachments(eventId, restored)
+                fileAttachmentsRestored += restored.size
+            }
+        } else {
+            fileAttachmentsByEventId.forEach { (eventId, attachments) ->
+                val restored = restoreBackupFileAttachments(eventId, attachments)
+                replaceEventFileAttachments(eventId, restored)
+                fileAttachmentsRestored += restored.size
+            }
+        }
         if (eventsInserted > 0 || eventsUpdated > 0 || accountsAdded > 0) updateWidgets()
         BackupImportResult(
             accountsAdded = accountsAdded,
             eventsInserted = eventsInserted,
             eventsUpdated = eventsUpdated,
             remindersRestored = remindersRestored,
+            fileAttachmentsRestored = fileAttachmentsRestored,
         )
+    }
+
+    private suspend fun exportBackupFileAttachments(events: List<CalendarEvent>): List<BackupFileAttachment> {
+        return events.flatMap { event ->
+            readEventFileAttachments(event.id).mapNotNull { attachment ->
+                val file = File(attachment.localPath)
+                if (!file.exists() || file.length() > MAX_EVENT_FILE_ATTACHMENT_BYTES) return@mapNotNull null
+                BackupFileAttachment(
+                    eventId = event.id,
+                    attachment = attachment,
+                    base64Content = Base64.getEncoder().encodeToString(file.readBytes()),
+                )
+            }
+        }
+    }
+
+    private fun restoreBackupFileAttachments(
+        eventId: String,
+        attachments: List<BackupFileAttachment>,
+    ): List<EventFileAttachment> {
+        return attachments.take(MAX_EVENT_FILE_ATTACHMENTS).mapNotNull { backupAttachment ->
+            runCatching {
+                val bytes = Base64.getDecoder().decode(backupAttachment.base64Content)
+                require(bytes.size <= MAX_EVENT_FILE_ATTACHMENT_BYTES) { "FILE TOO LARGE" }
+                val attachment = backupAttachment.attachment
+                val output = eventAttachmentFile(context.filesDir, eventId, attachment.id)
+                output.parentFile?.mkdirs()
+                output.writeBytes(bytes)
+                attachment.copy(
+                    mimeType = attachment.mimeType.ifBlank { EVENT_FILE_PDF_MIME },
+                    sizeBytes = bytes.size.toLong(),
+                    localPath = output.absolutePath,
+                )
+            }.getOrNull()
+        }
     }
 
     fun observeSelectedHolidayCountries(): Flow<List<String>> = dao.observeHolidayAccountIds()
@@ -850,6 +970,7 @@ class DotCalRepository(
         dao.getRemindersForEvent(event.id).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
         dao.upsertEvent(event)
         writeGhostFlag(event.id, data.isGhost)
+        replaceEventFileAttachments(event.id, data.fileAttachments, previousEventId = eventId)
         dao.deleteRemindersForEvent(event.id)
         val reminderMinutes = data.reminderMinutesList
             ?.distinct()
@@ -1376,6 +1497,9 @@ class DotCalRepository(
 
     /** Snapshots of deleted events/tasks within the 30-day window, newest first. */
     suspend fun listRecentlyDeleted(): List<DeletedSnapshot> = withContext(Dispatchers.IO) {
+        recentlyDeletedStore.pruneExpired(System.currentTimeMillis()).forEach { eventId ->
+            deleteEventFileAttachments(eventId)
+        }
         recentlyDeletedStore.list(System.currentTimeMillis())
     }
 
@@ -1411,11 +1535,15 @@ class DotCalRepository(
 
     /** Permanently drop one snapshot from the trash. */
     suspend fun purgeDeleted(eventId: String) = withContext(Dispatchers.IO) {
+        deleteEventFileAttachments(eventId)
         recentlyDeletedStore.remove(eventId)
     }
 
     /** Empty the entire trash. */
     suspend fun emptyRecentlyDeleted() = withContext(Dispatchers.IO) {
+        recentlyDeletedStore.list(System.currentTimeMillis()).forEach { snapshot ->
+            deleteEventFileAttachments(snapshot.event.id)
+        }
         recentlyDeletedStore.clear()
     }
 
@@ -1654,6 +1782,7 @@ class DotCalRepository(
         )
         dao.upsertEvent(detachedEvent)
         writeGhostFlag(detachedId, data.isGhost)
+        replaceEventFileAttachments(detachedId, data.fileAttachments)
         val reminderMinutes = data.reminderMinutesList
             ?.distinct()
             ?.sorted()
@@ -1688,6 +1817,42 @@ class DotCalRepository(
 
     private fun updateWidgets() {
         WidgetUpdateWorker.enqueue(context)
+    }
+
+    private suspend fun replaceEventFileAttachments(
+        eventId: String,
+        attachments: List<EventFileAttachment>,
+        previousEventId: String? = null,
+    ) {
+        val trimmed = attachments.take(MAX_EVENT_FILE_ATTACHMENTS)
+        val previous = readEventFileAttachments(eventId) +
+            previousEventId?.takeIf { it != eventId }?.let { readEventFileAttachments(it) }.orEmpty()
+        val keptPaths = trimmed.map { it.localPath }.toSet()
+        previous.filterNot { it.localPath in keptPaths }.forEach { discardEventFileAttachment(it) }
+        if (trimmed.isEmpty()) {
+            sideStore.remove(EVENT_FILE_ATTACHMENTS_NAMESPACE, eventId)
+        } else {
+            sideStore.write(EVENT_FILE_ATTACHMENTS_NAMESPACE, eventId, trimmed.encodeEventFileAttachments())
+        }
+        previousEventId?.takeIf { it != eventId }?.let {
+            sideStore.remove(EVENT_FILE_ATTACHMENTS_NAMESPACE, it)
+        }
+    }
+
+    private suspend fun deleteEventFileAttachments(eventId: String) {
+        readEventFileAttachments(eventId).forEach { discardEventFileAttachment(it) }
+        sideStore.remove(EVENT_FILE_ATTACHMENTS_NAMESPACE, eventId)
+        runCatching { eventAttachmentDirectory(context.filesDir, eventId).deleteRecursively() }
+    }
+
+    private fun android.content.ContentResolver.queryDisplayName(uri: Uri): String {
+        return query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+            } else {
+                null
+            }
+        }?.takeIf { it.isNotBlank() } ?: "Attachment.pdf"
     }
 
     private fun List<CalendarEvent>.filterOutPrivate(privateIds: Set<String>): List<CalendarEvent> {
@@ -1825,6 +1990,10 @@ class DotCalRepository(
         private const val HOLIDAY_ACCOUNT_PREFIX = "holiday-"
         private const val DEFAULT_EVENT_COLOR = "#FF0000"
         private const val GHOST_FLAGS_NAMESPACE = "ghost_flags"
+        private const val EVENT_FILE_ATTACHMENTS_NAMESPACE = "event_file_attachments"
+        private const val EVENT_FILE_PDF_MIME = "application/pdf"
+        private const val MAX_EVENT_FILE_ATTACHMENTS = 5
+        private const val MAX_EVENT_FILE_ATTACHMENT_BYTES = 20L * 1024L * 1024L
         private const val BIRTHDAY_ACCOUNT_ID = ContactsProviderDataSource.BIRTHDAY_ACCOUNT_ID
         private const val BIRTHDAY_COLOR = ContactsProviderDataSource.BIRTHDAY_COLOR
         private const val BIRTHDAY_REMINDER_MINUTES = 1440

@@ -327,6 +327,10 @@
     <!-- Event editor: media attachments -->
     <string name="event_images">Images</string>
     <string name="event_images_count">%1$d/5</string>
+    <string name="event_files">Files</string>
+    <string name="event_files_count">%1$d/5</string>
+    <string name="event_add_pdf">Add PDF</string>
+    <string name="event_remove_file">Remove file</string>
     <string name="event_image_placeholder">IMG</string>
     <string name="event_image_unavailable">Image unavailable</string>
     <string name="event_voice_note">Voice note</string>
@@ -396,6 +400,7 @@
     <string name="event_section_description">DESCRIPTION</string>
     <string name="event_section_images">IMAGES</string>
     <string name="event_section_voice_note">VOICE NOTE</string>
+    <string name="event_section_files">FILES</string>
     <string name="event_all_day">All-day</string>
     <string name="event_delete">Delete Event</string>
     <string name="event_options">Event Options</string>
@@ -890,10 +895,13 @@
     <string name="toast_countdown_share_failed">Could not share countdown</string>
     <string name="toast_event_share_failed">Could not share event</string>
     <string name="toast_qr_share_failed">Could not share QR image</string>
+    <string name="toast_file_attachment_failed">Could not attach PDF</string>
+    <string name="toast_file_attachment_missing">File is missing</string>
+    <string name="toast_file_attachment_no_app">No app can open this file</string>
     <string name="toast_import_invalid_ics">Import failed - not a valid .ics file</string>
     <!-- Restore/import summaries. Two independent counts, so a plural on either one would be
          wrong; the counts are formatted into a neutral frame instead. -->
-    <string name="toast_restore_summary">Restored: %1$d new, %2$d updated</string>
+    <string name="toast_restore_summary">Restored: %1$d new, %2$d updated, %3$d PDFs</string>
     <string name="toast_import_summary">Imported: %1$d new, %2$d updated</string>
     <string name="bulk_delete_confirm_title">Delete selected events?</string>
     <!-- Date-picker sheet headers. Separate from the bulk_move_to_date / bulk_copy_to_date

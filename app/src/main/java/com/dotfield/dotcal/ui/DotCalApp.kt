@@ -3,6 +3,7 @@ package com.dotfield.dotcal.ui
 import android.Manifest
 import android.accounts.AccountManager
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -241,6 +242,7 @@ import com.dotfield.dotcal.data.isRecurrenceOccurrence
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
+import com.dotfield.dotcal.data.attachments.EventFileAttachment
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
@@ -335,6 +337,7 @@ fun DotCalApp(
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val syncMetadata by viewModel.syncMetadata.collectAsStateWithLifecycle()
     val detailEvent by viewModel.detailEvent.collectAsStateWithLifecycle()
+    val eventFileAttachments by viewModel.eventFileAttachments.collectAsStateWithLifecycle()
     var screenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var previousScreenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var showSheet by remember { mutableStateOf(false) }
@@ -521,6 +524,9 @@ fun DotCalApp(
             updateCheckedThisSession = true
             checkForUpdates(false)
         }
+    }
+    LaunchedEffect(detailEvent?.baseEventId()) {
+        detailEvent?.baseEventId()?.let(viewModel::refreshEventFileAttachments)
     }
 
     val themeMode by remember(context) {
@@ -806,6 +812,7 @@ fun DotCalApp(
                         R.string.toast_restore_summary,
                         summary.eventsInserted,
                         summary.eventsUpdated,
+                        summary.fileAttachmentsRestored,
                     ),
                     Toast.LENGTH_LONG,
                 )
@@ -1016,6 +1023,7 @@ fun DotCalApp(
         duplicateDraftPrefill = null
         templatePrefill = null
         addEditorDateOverride = null
+        viewModel.refreshEventFileAttachments(event.baseEventId())
         editingEvent = event
         addSheet = true
     }
@@ -2038,6 +2046,7 @@ fun DotCalApp(
                     palette = palette,
                     isPrivate = event.baseEventId() in privateVaultIds,
                     isCountdownPinned = event.baseEventId() in countdownPins,
+                    fileAttachments = eventFileAttachments[event.baseEventId()].orEmpty(),
                     onBack = viewModel::closeEventDetail,
                     onEdit = {
                         openEditEditor(event)
@@ -2122,6 +2131,9 @@ fun DotCalApp(
                         viewModel.restoreFromPrivateVault(event.baseEventId()) {
                             showDotCalToast(context, palette, R.string.toast_restored_from_vault)
                         }
+                    },
+                    onOpenFileAttachment = { attachment ->
+                        openEventFileAttachment(context, attachment, palette)
                     },
                     onDelete = {
                         pendingDelete = PendingDelete(event, RecurringEditScope.WholeSeries, DeleteSource.Detail)
@@ -2578,7 +2590,13 @@ fun DotCalApp(
                 isPro = isPro,
                 conflictWarnings = conflictWarnings,
                 use24HourFormat = use24HourFormat,
+                initialFileAttachments = editingEvent?.baseEventId()?.let { eventFileAttachments[it] }.orEmpty(),
                 onConflictRangeChanged = viewModel::refreshConflictWarnings,
+                onImportFileAttachment = viewModel::importEventFileAttachment,
+                onDiscardFileAttachment = viewModel::discardEventFileAttachment,
+                onOpenFileAttachment = { attachment ->
+                    openEventFileAttachment(context, attachment, palette)
+                },
                 prefill = quickAddPrefill,
                 draftPrefill = duplicateDraftPrefill,
                 templatePrefill = templatePrefill,
@@ -3105,6 +3123,24 @@ private fun shareQrEventImage(
         context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_event_qr_chooser)))
     }.onFailure {
         showDotCalToast(context, palette, R.string.share_no_target)
+    }
+}
+
+private fun openEventFileAttachment(context: Context, attachment: EventFileAttachment, palette: DotCalPalette) {
+    val file = File(attachment.localPath)
+    if (!file.exists()) {
+        showDotCalToast(context, palette, R.string.toast_file_attachment_missing)
+        return
+    }
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, attachment.mimeType.ifBlank { "application/pdf" })
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try {
+        context.startActivity(Intent.createChooser(intent, attachment.displayName))
+    } catch (_: ActivityNotFoundException) {
+        showDotCalToast(context, palette, R.string.toast_file_attachment_no_app)
     }
 }
 

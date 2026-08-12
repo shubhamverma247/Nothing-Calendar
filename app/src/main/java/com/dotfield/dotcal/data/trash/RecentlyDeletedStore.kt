@@ -58,6 +58,24 @@ class RecentlyDeletedStore(context: Context) {
         return result.sortedByDescending { it.deletedAtMs }
     }
 
+    /** Prune expired snapshots and return the event ids that became permanent deletes. */
+    fun pruneExpired(nowMs: Long): List<String> {
+        val files = dir.listFiles { f -> f.isFile && f.name.endsWith(EXT) } ?: return emptyList()
+        val expiredIds = ArrayList<String>()
+        for (file in files) {
+            val snapshot = runCatching { decode(file.readText()) }.getOrNull()
+            if (snapshot == null) {
+                runCatching { file.delete() }
+                continue
+            }
+            if (nowMs - snapshot.deletedAtMs >= RETENTION_MS) {
+                expiredIds.add(snapshot.event.id)
+                runCatching { file.delete() }
+            }
+        }
+        return expiredIds
+    }
+
     /** Read a single snapshot by event id, or null if missing/unreadable. */
     fun get(eventId: String): DeletedSnapshot? {
         val file = fileFor(eventId)

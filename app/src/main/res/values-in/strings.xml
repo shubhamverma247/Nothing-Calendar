@@ -297,6 +297,7 @@
     <string name="event_section_description">DESCRICAO</string>
     <string name="event_section_images">IMAGENS</string>
     <string name="event_section_voice_note">VOZ NOTA</string>
+    <string name="event_section_files">FILE</string>
     <string name="event_all_day">todos-Hari</string>
     <string name="event_delete">Hapus acara</string>
     <string name="event_options">acara Opcoes</string>
@@ -347,6 +348,10 @@
     <string name="event_conflict_extra">+%1$d Mais</string>
     <string name="event_images">Imagens</string>
     <string name="event_images_count">%1$d/5</string>
+    <string name="event_files">File</string>
+    <string name="event_files_count">%1$d/5</string>
+    <string name="event_add_pdf">Tambah PDF</string>
+    <string name="event_remove_file">Hapus file</string>
     <string name="event_image_placeholder">IMG</string>
     <string name="event_image_unavailable">Imagem Indisponivel</string>
     <string name="event_voice_note">Voz Nota</string>
@@ -759,6 +764,9 @@
     <string name="toast_event_too_large_qr">acara is too large to Bagikan as QR</string>
     <string name="toast_export_failed">Ekspor Gagal</string>
     <string name="toast_file_read_failed">Couldn\'t read file</string>
+    <string name="toast_file_attachment_failed">Tidak dapat melampirkan PDF</string>
+    <string name="toast_file_attachment_missing">File tidak ditemukan</string>
+    <string name="toast_file_attachment_no_app">Tidak ada aplikasi yang dapat membuka file ini</string>
     <string name="toast_holidays_add_failed">Tidak dapat menambahkan hari libur</string>
     <string name="toast_holidays_remove_failed">Tidak dapat menghapus hari libur</string>
     <string name="toast_import_invalid_ics">Impor gagal - bukan file .ics yang valid</string>
@@ -770,7 +778,7 @@
     <string name="toast_purchase_restored">Purchase restaurado - enjoy DotCal Pro!</string>
     <string name="toast_qr_share_failed">Tidak dapat membagikan gambar QR</string>
     <string name="toast_restore_invalid_backup">Pemulihan gagal - bukan cadangan DotCal yang valid</string>
-    <string name="toast_restore_summary">restaurado: %1$d Novo, %2$d atualizado</string>
+    <string name="toast_restore_summary">restaurado: %1$d Novo, %2$d atualizado, %3$d PDF</string>
     <string name="toast_restored_from_vault">restaurado De Privado Brankas</string>
     <string name="toast_shared_without_description">Shared sem Descricao</string>
     <string name="toast_up_to_date">DotCal is up to Tanggal</string>

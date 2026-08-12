@@ -349,6 +349,7 @@
     <string name="event_section_description">BESCHREIBUNG</string>
     <string name="event_section_images">BILDER</string>
     <string name="event_section_voice_note">SPRACHE NOTIZ</string>
+    <string name="event_section_files">الملفات</string>
     <string name="event_all_day">alle-اليوم</string>
     <string name="event_delete">حذف حدث</string>
     <string name="event_options">حدث Optionen</string>
@@ -403,6 +404,10 @@
     <string name="event_conflict_extra">+%1$d Weitere</string>
     <string name="event_images">Bilder</string>
     <string name="event_images_count">%1$d/5</string>
+    <string name="event_files">الملفات</string>
+    <string name="event_files_count">%1$d/5</string>
+    <string name="event_add_pdf">إضافة PDF</string>
+    <string name="event_remove_file">إزالة الملف</string>
     <string name="event_image_placeholder">IMG</string>
     <string name="event_image_unavailable">Bild Nicht verfuegbar</string>
     <string name="event_voice_note">Sprache Notiz</string>
@@ -867,6 +872,9 @@
     <string name="toast_event_too_large_qr">حدث is too large إلى مشاركة as QR</string>
     <string name="toast_export_failed">تصدير فشل</string>
     <string name="toast_file_read_failed">Couldn\'t read file</string>
+    <string name="toast_file_attachment_failed">تعذر إرفاق ملف PDF</string>
+    <string name="toast_file_attachment_missing">الملف مفقود</string>
+    <string name="toast_file_attachment_no_app">لا يوجد تطبيق يمكنه فتح هذا الملف</string>
     <string name="toast_holidays_add_failed">تعذرت إضافة العطلات</string>
     <string name="toast_holidays_remove_failed">تعذرت إزالة العطلات</string>
     <string name="toast_import_invalid_ics">فشل الاستيراد - ليس ملف .ics صالحا</string>
@@ -878,7 +886,7 @@
     <string name="toast_purchase_restored">Purchase wiederhergestellt - enjoy DotCal Pro!</string>
     <string name="toast_qr_share_failed">تعذرت مشاركة صورة QR</string>
     <string name="toast_restore_invalid_backup">فشلت الاستعادة - ليست نسخة احتياطية صالحة من DotCal</string>
-    <string name="toast_restore_summary">wiederhergestellt: %1$d Neu, %2$d aktuell</string>
+    <string name="toast_restore_summary">wiederhergestellt: %1$d Neu, %2$d aktuell, %3$d PDF</string>
     <string name="toast_restored_from_vault">wiederhergestellt Von Privat Vault</string>
     <string name="toast_shared_without_description">Shared بدون Beschreibung</string>
     <string name="toast_up_to_date">DotCal is up إلى التاريخ</string>

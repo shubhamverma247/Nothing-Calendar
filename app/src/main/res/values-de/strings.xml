@@ -297,6 +297,7 @@
     <string name="event_section_description">BESCHREIBUNG</string>
     <string name="event_section_images">BILDER</string>
     <string name="event_section_voice_note">SPRACHE NOTIZ</string>
+    <string name="event_section_files">DATEIEN</string>
     <string name="event_all_day">Ganztaegig</string>
     <string name="event_delete">Loeschen Termin</string>
     <string name="event_options">Termin Optionen</string>
@@ -347,6 +348,10 @@
     <string name="event_conflict_extra">+%1$d Weitere</string>
     <string name="event_images">Bilder</string>
     <string name="event_images_count">%1$d/5</string>
+    <string name="event_files">Dateien</string>
+    <string name="event_files_count">%1$d/5</string>
+    <string name="event_add_pdf">PDF hinzufuegen</string>
+    <string name="event_remove_file">Datei entfernen</string>
     <string name="event_image_placeholder">IMG</string>
     <string name="event_image_unavailable">Bild Nicht verfuegbar</string>
     <string name="event_voice_note">Sprache Notiz</string>
@@ -759,6 +764,9 @@
     <string name="toast_event_too_large_qr">Termin is too large to Teilen as QR</string>
     <string name="toast_export_failed">Exportieren Fehlgeschlagen</string>
     <string name="toast_file_read_failed">Couldn\'t read file</string>
+    <string name="toast_file_attachment_failed">PDF konnte nicht angehaengt werden</string>
+    <string name="toast_file_attachment_missing">Datei fehlt</string>
+    <string name="toast_file_attachment_no_app">Keine App kann diese Datei oeffnen</string>
     <string name="toast_holidays_add_failed">Feiertage konnten nicht hinzugefuegt werden</string>
     <string name="toast_holidays_remove_failed">Feiertage konnten nicht entfernt werden</string>
     <string name="toast_import_invalid_ics">Import fehlgeschlagen - keine gueltige .ics-Datei</string>
@@ -770,7 +778,7 @@
     <string name="toast_purchase_restored">Purchase wiederhergestellt - enjoy DotCal Pro!</string>
     <string name="toast_qr_share_failed">QR-Bild konnte nicht geteilt werden</string>
     <string name="toast_restore_invalid_backup">Wiederherstellung fehlgeschlagen - kein gueltiges DotCal-Backup</string>
-    <string name="toast_restore_summary">wiederhergestellt: %1$d Neu, %2$d aktuell</string>
+    <string name="toast_restore_summary">wiederhergestellt: %1$d Neu, %2$d aktuell, %3$d PDFs</string>
     <string name="toast_restored_from_vault">wiederhergestellt Von Privat Tresor</string>
     <string name="toast_shared_without_description">Shared ohne Beschreibung</string>
     <string name="toast_up_to_date">DotCal is up to Datum</string>

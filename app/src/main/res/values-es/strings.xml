@@ -351,6 +351,7 @@
     <string name="event_section_description">DESCRIPCIÓN</string>
     <string name="event_section_images">IMÁGENES</string>
     <string name="event_section_voice_note">NOTA DE VOZ</string>
+    <string name="event_section_files">ARCHIVOS</string>
     <string name="event_all_day">Todo el día</string>
     <string name="event_delete">Eliminar evento</string>
     <string name="event_options">Opciones del evento</string>
@@ -412,6 +413,10 @@
     <!-- Event editor: media attachments -->
     <string name="event_images">Imágenes</string>
     <string name="event_images_count">%1$d/5</string>
+    <string name="event_files">Archivos</string>
+    <string name="event_files_count">%1$d/5</string>
+    <string name="event_add_pdf">Añadir PDF</string>
+    <string name="event_remove_file">Quitar archivo</string>
     <string name="event_image_placeholder">IMG</string>
     <string name="event_image_unavailable">Imagen no disponible</string>
     <string name="event_voice_note">Nota de voz</string>
@@ -893,6 +898,9 @@
     <string name="toast_event_too_large_qr">El evento es demasiado grande para compartir como QR</string>
     <string name="toast_export_failed">Exportación fallida</string>
     <string name="toast_file_read_failed">No se pudo leer el archivo</string>
+    <string name="toast_file_attachment_failed">No se pudo adjuntar el PDF</string>
+    <string name="toast_file_attachment_missing">Falta el archivo</string>
+    <string name="toast_file_attachment_no_app">Ninguna app puede abrir este archivo</string>
     <string name="toast_holidays_add_failed">No se pudieron añadir los festivos</string>
     <string name="toast_holidays_remove_failed">No se pudieron eliminar los festivos</string>
     <string name="toast_import_invalid_ics">Importación fallida - no es un archivo .ics válido</string>
@@ -904,7 +912,7 @@
     <string name="toast_purchase_restored">Compra restaurada - ¡disfruta DotCal Pro!</string>
     <string name="toast_qr_share_failed">No se pudo compartir la imagen QR</string>
     <string name="toast_restore_invalid_backup">Restauración fallida - no es una copia de seguridad válida de DotCal</string>
-    <string name="toast_restore_summary">Restaurados: %1$d nuevos, %2$d actualizados</string>
+    <string name="toast_restore_summary">Restaurados: %1$d nuevos, %2$d actualizados, %3$d PDF</string>
     <string name="toast_restored_from_vault">Restaurado de la Caja Fuerte Privada</string>
     <string name="toast_shared_without_description">Compartido sin descripción</string>
     <string name="toast_up_to_date">DotCal está actualizado</string>

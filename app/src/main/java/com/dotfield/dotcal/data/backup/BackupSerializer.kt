@@ -3,6 +3,7 @@ package com.dotfield.dotcal.data.backup
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventReminder
+import com.dotfield.dotcal.data.attachments.EventFileAttachment
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -18,7 +19,15 @@ data class BackupData(
     val accounts: List<CalendarAccount>,
     val events: List<CalendarEvent>,
     val reminders: List<EventReminder>,
+    val fileAttachments: List<BackupFileAttachment> = emptyList(),
+    val hasFileAttachmentsSection: Boolean = true,
     val createdAtMs: Long,
+)
+
+data class BackupFileAttachment(
+    val eventId: String,
+    val attachment: EventFileAttachment,
+    val base64Content: String,
 )
 
 /**
@@ -40,6 +49,8 @@ object BackupSerializer {
         for (event in data.events) events.put(encodeEvent(event))
         val reminders = JSONArray()
         for (reminder in data.reminders) reminders.put(encodeReminder(reminder))
+        val fileAttachments = JSONArray()
+        for (attachment in data.fileAttachments) fileAttachments.put(encodeFileAttachment(attachment))
         return JSONObject()
             .put("format", FORMAT)
             .put("version", VERSION)
@@ -47,6 +58,7 @@ object BackupSerializer {
             .put("accounts", accounts)
             .put("events", events)
             .put("reminders", reminders)
+            .put("fileAttachments", fileAttachments)
             .toString()
     }
 
@@ -65,10 +77,18 @@ object BackupSerializer {
         val remindersJson = root.optJSONArray("reminders") ?: JSONArray()
         val reminders = ArrayList<EventReminder>(remindersJson.length())
         for (i in 0 until remindersJson.length()) reminders.add(decodeReminder(remindersJson.getJSONObject(i)))
+        val hasFileAttachmentsSection = root.has("fileAttachments")
+        val fileAttachmentsJson = root.optJSONArray("fileAttachments") ?: JSONArray()
+        val fileAttachments = ArrayList<BackupFileAttachment>(fileAttachmentsJson.length())
+        for (i in 0 until fileAttachmentsJson.length()) {
+            fileAttachments.add(decodeFileAttachment(fileAttachmentsJson.getJSONObject(i)))
+        }
         return BackupData(
             accounts = accounts,
             events = events,
             reminders = reminders,
+            fileAttachments = fileAttachments,
+            hasFileAttachmentsSection = hasFileAttachmentsSection,
             createdAtMs = root.optLong("createdAtMs", 0L),
         )
     }
@@ -165,6 +185,32 @@ object BackupSerializer {
             triggerAtMs = r.getLong("triggerAtMs"),
             alarmRequestCode = r.getInt("alarmRequestCode"),
             isDelivered = r.optInt("isDelivered", 0),
+        )
+
+    private fun encodeFileAttachment(fileAttachment: BackupFileAttachment): JSONObject {
+        val attachment = fileAttachment.attachment
+        return JSONObject()
+            .put("eventId", fileAttachment.eventId)
+            .put("id", attachment.id)
+            .put("displayName", attachment.displayName)
+            .put("mimeType", attachment.mimeType)
+            .put("sizeBytes", attachment.sizeBytes)
+            .put("addedAtMs", attachment.addedAtMs)
+            .put("base64Content", fileAttachment.base64Content)
+    }
+
+    private fun decodeFileAttachment(fileAttachment: JSONObject): BackupFileAttachment =
+        BackupFileAttachment(
+            eventId = fileAttachment.getString("eventId"),
+            attachment = EventFileAttachment(
+                id = fileAttachment.getString("id"),
+                displayName = fileAttachment.optString("displayName", "Attachment.pdf"),
+                mimeType = fileAttachment.optString("mimeType", "application/pdf"),
+                sizeBytes = fileAttachment.optLong("sizeBytes", 0L),
+                localPath = "",
+                addedAtMs = fileAttachment.optLong("addedAtMs", 0L),
+            ),
+            base64Content = fileAttachment.getString("base64Content"),
         )
 
     private fun JSONObject.optNullableString(key: String): String? =

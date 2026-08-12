@@ -3,4 +3,7 @@
     <cache-path
         name="shared_events"
         path="shared_events/" />
+    <files-path
+        name="event_files"
+        path="event_files/" />
 </paths>

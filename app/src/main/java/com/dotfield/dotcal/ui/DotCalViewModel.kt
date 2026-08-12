@@ -2,6 +2,7 @@ package com.dotfield.dotcal.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
 import com.dotfield.dotcal.data.BirthdayImportResult
 import com.dotfield.dotcal.data.BulkEditResult
 import com.dotfield.dotcal.data.BulkEditUndoToken
@@ -14,6 +15,7 @@ import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.baseEventId
+import com.dotfield.dotcal.data.attachments.EventFileAttachment
 import com.dotfield.dotcal.data.billing.ProManager
 import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.privacy.AppLockState
@@ -171,6 +173,8 @@ class DotCalViewModel(
 
     private val _detailEvent = MutableStateFlow<CalendarEvent?>(null)
     val detailEvent: StateFlow<CalendarEvent?> = _detailEvent
+    private val _eventFileAttachments = MutableStateFlow<Map<String, List<EventFileAttachment>>>(emptyMap())
+    val eventFileAttachments: StateFlow<Map<String, List<EventFileAttachment>>> = _eventFileAttachments
 
     // ----- Pro / Billing -----
     val productDetails = proManager.productDetails
@@ -250,6 +254,35 @@ class DotCalViewModel(
 
     fun closeEventDetail() {
         _detailEvent.value = null
+    }
+
+    fun refreshEventFileAttachments(eventId: String) {
+        viewModelScope.launch {
+            _eventFileAttachments.value = _eventFileAttachments.value + (
+                eventId to repository.readEventFileAttachments(eventId)
+            )
+        }
+    }
+
+    fun importEventFileAttachment(
+        eventId: String,
+        uri: Uri,
+        currentAttachments: List<EventFileAttachment>,
+        onDone: (Result<EventFileAttachment>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val result = runCatching { repository.importEventFileAttachment(eventId, uri, currentAttachments) }
+            result.getOrNull()?.let { attachment ->
+                _eventFileAttachments.value = _eventFileAttachments.value + (
+                    eventId to (currentAttachments + attachment).take(5)
+                )
+            }
+            onDone(result)
+        }
+    }
+
+    fun discardEventFileAttachment(attachment: EventFileAttachment) {
+        viewModelScope.launch { repository.discardEventFileAttachment(attachment) }
     }
 
     fun refreshConflictWarnings(
@@ -349,6 +382,7 @@ class DotCalViewModel(
             if (existing == null) {
                 _lastSelectedEventAccountId.value = data.accountId
             }
+            (existing?.baseEventId() ?: data.eventId)?.let { refreshEventFileAttachments(it) }
             onSaved()
         }
     }

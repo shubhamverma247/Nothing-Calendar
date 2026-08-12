@@ -146,6 +146,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -187,6 +188,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.zIndex
 import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -211,6 +213,7 @@ import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
+import com.dotfield.dotcal.data.attachments.EventFileAttachment
 import com.dotfield.dotcal.data.countdown.CountdownPinStore
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
@@ -260,6 +263,7 @@ internal fun EventDetailScreen(
     palette: DotCalPalette,
     isPrivate: Boolean,
     isCountdownPinned: Boolean,
+    fileAttachments: List<EventFileAttachment> = emptyList(),
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
@@ -271,6 +275,7 @@ internal fun EventDetailScreen(
     onCopyToDate: () -> Unit,
     onMoveToPrivate: () -> Unit,
     onRestoreFromPrivate: () -> Unit,
+    onOpenFileAttachment: (EventFileAttachment) -> Unit,
     onDelete: () -> Unit,
 ) {
     val isReadOnly = event.source == "BIRTHDAY" || event.source == "HOLIDAY"
@@ -419,6 +424,18 @@ internal fun EventDetailScreen(
                         DetailDivider(palette)
                         DetailSection(label = stringResource(R.string.event_section_voice_note), palette = palette) {
                             DetailVoiceNotePlayer(path = path, palette = palette)
+                        }
+                    }
+                }
+                if (fileAttachments.isNotEmpty()) {
+                    item {
+                        DetailDivider(palette)
+                        DetailSection(label = stringResource(R.string.event_section_files), palette = palette) {
+                            FileAttachmentList(
+                                attachments = fileAttachments,
+                                palette = palette,
+                                onOpen = onOpenFileAttachment,
+                            )
                         }
                     }
                 }
@@ -850,6 +867,98 @@ private fun ImageAttachmentThumb(uri: String, palette: DotCalPalette, onRemove: 
 }
 
 @Composable
+private fun FileAttachmentSection(
+    attachments: List<EventFileAttachment>,
+    palette: DotCalPalette,
+    isPro: Boolean,
+    onAddFile: () -> Unit,
+    onOpen: (EventFileAttachment) -> Unit,
+    onRemove: (EventFileAttachment) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.event_files), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                if (!isPro) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.pro_feature_tag), color = palette.accent, fontFamily = mono, fontSize = 11.sp)
+                }
+            }
+            if (attachments.isNotEmpty()) {
+                Text(stringResource(R.string.event_files_count, attachments.size), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        FileAttachmentList(
+            attachments = attachments,
+            palette = palette,
+            onOpen = onOpen,
+            onRemove = onRemove,
+        )
+        if (attachments.size < 5) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                stringResource(R.string.event_add_pdf),
+                color = palette.accent,
+                fontFamily = mono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, palette.line, RoundedCornerShape(10.dp))
+                    .clickable(role = Role.Button, onClick = onAddFile)
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun FileAttachmentList(
+    attachments: List<EventFileAttachment>,
+    palette: DotCalPalette,
+    onOpen: (EventFileAttachment) -> Unit,
+    onRemove: ((EventFileAttachment) -> Unit)? = null,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        attachments.forEach { attachment ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(palette.cell)
+                    .clickable { onOpen(attachment) }
+                    .padding(horizontal = 12.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.Description, contentDescription = null, tint = palette.accent, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(attachment.displayName, color = palette.primaryText, fontFamily = mono, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(formatFileSize(attachment.sizeBytes), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+                }
+                onRemove?.let { remove ->
+                    IconButton(onClick = { remove(attachment) }, modifier = Modifier.size(34.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.event_remove_file), tint = palette.secondaryText, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatFileSize(bytes: Long): String {
+    if (bytes <= 0L) return "PDF"
+    val mb = bytes.toDouble() / (1024.0 * 1024.0)
+    return if (mb >= 1.0) String.format(Locale.US, "%.1f MB", mb) else "${(bytes / 1024L).coerceAtLeast(1L)} KB"
+}
+
+@Composable
 private fun ImageDisplayThumb(uri: String, palette: DotCalPalette, onClick: (() -> Unit)? = null) {
     val context = LocalContext.current
     val bitmap by produceState<Bitmap?>(initialValue = null, uri) {
@@ -1180,7 +1289,11 @@ internal fun EventEditorScreen(
     isPro: Boolean,
     conflictWarnings: List<CalendarEvent> = emptyList(),
     use24HourFormat: Boolean = true,
+    initialFileAttachments: List<EventFileAttachment> = emptyList(),
     onConflictRangeChanged: (String, CalendarEvent?, LocalDate, LocalDate, LocalTime, LocalTime, Boolean) -> Unit = { _, _, _, _, _, _, _ -> },
+    onImportFileAttachment: (String, Uri, List<EventFileAttachment>, (Result<EventFileAttachment>) -> Unit) -> Unit = { _, _, _, _ -> },
+    onDiscardFileAttachment: (EventFileAttachment) -> Unit = {},
+    onOpenFileAttachment: (EventFileAttachment) -> Unit = {},
     onRequestPro: () -> Unit,
     onDismiss: () -> Unit,
     onSave: (EventEditorData, RecurringEditScope) -> Unit,
@@ -1231,6 +1344,13 @@ internal fun EventEditorScreen(
     var colorHex by remember(editorStateKey) { mutableStateOf(event?.colorHex ?: draft?.colorHex) }
     var imageUris by remember(editorStateKey) { mutableStateOf(parseJsonStringArray(event?.imageUris ?: "[]")) }
     var voiceNotePath by remember(editorStateKey) { mutableStateOf(event?.voiceNotePath) }
+    var fileAttachments by remember(editorStateKey, initialFileAttachments) { mutableStateOf(initialFileAttachments) }
+    val initialFileAttachmentIds = remember(editorStateKey, initialFileAttachments) {
+        initialFileAttachments.map { it.id }.toSet()
+    }
+    var fileAttachmentSaveStarted by remember(editorStateKey) { mutableStateOf(false) }
+    val latestFileAttachments by rememberUpdatedState(fileAttachments)
+    val latestShouldCleanUpDraftFiles by rememberUpdatedState(!fileAttachmentSaveStarted)
     val writableAccounts = accounts
     var selectedAccountId by remember(editorStateKey, writableAccounts, lastSelectedAccountId) {
         mutableStateOf(event?.accountId?.takeIf { id -> writableAccounts.any { it.id == id } }
@@ -1263,6 +1383,7 @@ internal fun EventEditorScreen(
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         pendingPermissionSave?.let { pending ->
             val data = if (granted) pending.first else pending.first.copy(reminderMinutes = null, reminderMinutesList = null)
+            fileAttachmentSaveStarted = true
             onSave(data, pending.second)
             pendingPermissionSave = null
             if (!granted) showDotCalToast(context, palette, savedNoReminderToast)
@@ -1279,6 +1400,28 @@ internal fun EventEditorScreen(
             }
         }
         imageUris = (imageUris + selected).distinct().take(5)
+    }
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        uris.take((5 - fileAttachments.size).coerceAtLeast(0)).forEach { uri ->
+            onImportFileAttachment(draftEventId, uri, fileAttachments) { result ->
+                result.onSuccess { attachment ->
+                    fileAttachments = (fileAttachments + attachment).distinctBy { it.id }.take(5)
+                }.onFailure {
+                    showDotCalToast(context, palette, R.string.toast_file_attachment_failed)
+                }
+            }
+        }
+    }
+    DisposableEffect(editorStateKey) {
+        onDispose {
+            if (latestShouldCleanUpDraftFiles) {
+                latestFileAttachments
+                    .filterNot { it.id in initialFileAttachmentIds }
+                    .forEach(onDiscardFileAttachment)
+            }
+        }
     }
     val isRecurringInstance = event?.isRecurrenceOccurrence() == true
     val canChooseRecurrenceScope = isRecurringInstance
@@ -1326,6 +1469,7 @@ internal fun EventEditorScreen(
             voiceNotePath = voiceNotePath,
             colorHex = colorHex,
             isGhost = isGhost,
+            fileAttachments = fileAttachments,
         )
     }
     fun buildTemplate(name: String): EventTemplate {
@@ -1362,6 +1506,7 @@ internal fun EventEditorScreen(
                 pendingPermissionSave = data to recurringEditScope
                 requestNotificationPermissionForReminder()
             } else {
+                fileAttachmentSaveStarted = true
                 onSave(data, recurringEditScope)
             }
         }
@@ -1543,6 +1688,29 @@ internal fun EventEditorScreen(
                     }
                 },
                 onRemoveImage = { uri -> imageUris = imageUris.filterNot { it == uri } },
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            FileAttachmentSection(
+                attachments = fileAttachments,
+                palette = palette,
+                isPro = isPro,
+                onAddFile = {
+                    clearEditorFocus()
+                    if (!isPro) {
+                        onRequestPro()
+                        return@FileAttachmentSection
+                    }
+                    if (fileAttachments.size < 5) {
+                        filePicker.launch(arrayOf("application/pdf"))
+                    }
+                },
+                onOpen = onOpenFileAttachment,
+                onRemove = { attachment ->
+                    fileAttachments = fileAttachments.filterNot { it.id == attachment.id }
+                    if (attachment.id !in initialFileAttachmentIds) {
+                        onDiscardFileAttachment(attachment)
+                    }
+                },
             )
             Spacer(modifier = Modifier.height(16.dp))
             if (hasMicrophoneHardware || !voiceNotePath.isNullOrBlank()) {

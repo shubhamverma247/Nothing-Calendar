@@ -323,6 +323,7 @@
     <string name="event_section_description">BESCHREIBUNG</string>
     <string name="event_section_images">BILDER</string>
     <string name="event_section_voice_note">SPRACHE NOTIZ</string>
+    <string name="event_section_files">ФАЙЛЫ</string>
     <string name="event_all_day">alle-Den</string>
     <string name="event_delete">Udalit sobytie</string>
     <string name="event_options">sobytie Optionen</string>
@@ -375,6 +376,10 @@
     <string name="event_conflict_extra">+%1$d Weitere</string>
     <string name="event_images">Bilder</string>
     <string name="event_images_count">%1$d/5</string>
+    <string name="event_files">Файлы</string>
+    <string name="event_files_count">%1$d/5</string>
+    <string name="event_add_pdf">Добавить PDF</string>
+    <string name="event_remove_file">Удалить файл</string>
     <string name="event_image_placeholder">IMG</string>
     <string name="event_image_unavailable">Bild Nicht verfuegbar</string>
     <string name="event_voice_note">Sprache Notiz</string>
@@ -813,6 +818,9 @@
     <string name="toast_event_too_large_qr">sobytie is too large to Podelitsya as QR</string>
     <string name="toast_export_failed">Eksport Oshibka</string>
     <string name="toast_file_read_failed">Couldn\'t read file</string>
+    <string name="toast_file_attachment_failed">Не удалось прикрепить PDF</string>
+    <string name="toast_file_attachment_missing">Файл отсутствует</string>
+    <string name="toast_file_attachment_no_app">Нет приложения для открытия этого файла</string>
     <string name="toast_holidays_add_failed">Ne udalos dobavit prazdniki</string>
     <string name="toast_holidays_remove_failed">Ne udalos udalit prazdniki</string>
     <string name="toast_import_invalid_ics">Import ne udalsya - eto ne dopustimyy .ics fayl</string>
@@ -824,7 +832,7 @@
     <string name="toast_purchase_restored">Purchase wiederhergestellt - enjoy DotCal Pro!</string>
     <string name="toast_qr_share_failed">Ne udalos podelitsya QR-izobrazheniem</string>
     <string name="toast_restore_invalid_backup">Vosstanovlenie ne udalos - eto ne dopustimaya rezervnaya kopiya DotCal</string>
-    <string name="toast_restore_summary">wiederhergestellt: %1$d Neu, %2$d aktuell</string>
+    <string name="toast_restore_summary">wiederhergestellt: %1$d Neu, %2$d aktuell, %3$d PDF</string>
     <string name="toast_restored_from_vault">wiederhergestellt Von Privat Hranilishche</string>
     <string name="toast_shared_without_description">Shared ohne Beschreibung</string>
     <string name="toast_up_to_date">DotCal is up to Data</string>
