@@ -718,6 +718,28 @@ class DotCalViewModel(
         }
     }
 
+    fun addShiftOnDate(
+        shiftTypeId: String,
+        date: LocalDate,
+        accountId: String?,
+        onDone: (Boolean) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            onDone(repository.addShiftOnDate(shiftTypeId, date, accountId))
+        }
+    }
+
+    fun buildShiftPlanShareEvents(
+        patternId: String,
+        rangeStart: LocalDate,
+        rangeEnd: LocalDate,
+        onDone: (List<CalendarEvent>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onDone(repository.buildShiftPlanShareEvents(patternId, rangeStart, rangeEnd))
+        }
+    }
+
     fun setAppLockPin(pin: String, onResult: (Result<Unit>) -> Unit = {}) {
         viewModelScope.launch {
             onResult(runCatching {

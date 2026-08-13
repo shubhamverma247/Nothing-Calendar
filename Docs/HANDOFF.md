@@ -1,10 +1,61 @@
 # DotCal Handoff
 
-Updated: 2026-08-11
+Updated: 2026-08-13
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full history: `Docs/HANDOFF.original.md`. Feature spec: `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. Do not touch `Docs/HANDOFF - Copy.md`.
 
 ## Latest Continuation
+
+**Shift Worker Convenience Pack Phase 1 first slice is implemented and Phase 2 first share slice is
+now built.** All work remains uncommitted on `main`; `Docs/FEEDBACK.md` is still user-owned
+untracked and must stay untouched.
+
+- Phase 1 Add Shift remains Pro-gated from Calendar overflow. It opens a bottom sheet with date,
+  saved shift type, and the revised single-row calendar picker dialog. Off/no-output shift types are
+  hidden. Saving creates normal `CalendarEvent` rows through `saveLocalEvent`; Room still has exactly
+  5 entities/tables and no schema migration.
+- Add Shift edge-case polish: selected calendar id now falls back to the visible selected account if
+  accounts refresh while the sheet is open, avoiding stale account ids.
+- Phase 2 first slice: saved shift patterns now have a share action. The share dialog lets the user
+  choose range start/days and export a virtual shift plan as image, PDF, ICS, or DotCal QR.
+- Shift plan sharing does not write events to Room. It builds virtual `CalendarEvent` rows from the
+  saved pattern/types, skips Off days, preserves same-day timed shifts, overnight shifts, and all-day
+  exclusive-end semantics, then reuses existing ICS and DotCal QR import-preview infrastructure.
+- DotCal QR sharing is capped at 14 shifts for reliability; longer ranges tell the user to use ICS,
+  PDF, or image.
+- Shift Patterns screen UI polish is now built: top summary surface, aligned section action pills,
+  refined shift type/pattern cards, proper calendar/share/delete pattern action icons, and a cleaner
+  Build Pattern dialog with shift-type buttons, cycle preview chips, and aligned Remove/Clear
+  actions.
+- Shift plan image/PDF/QR export polish is now built: image footer has extra bottom breathing room
+  so the DotCal label no longer collides with the final shift row, share artifacts do not show the
+  added DotCal icon/mark, PDF header text is width-bounded, PDF event rows scale down on page width
+  so shift times stay fully visible, and the QR share card has a cleaner branded frame/instruction
+  treatment.
+- Notification small icon was updated from the generic calendar glyph to a white-only DotCal
+  calendar/`DC` monogram silhouette in `res/drawable/ic_notification.xml`. Reminder notifications
+  and their `View` / `Snooze 10 Min` actions still reference the same `R.drawable.ic_notification`
+  resource; launcher icons were not used directly.
+- New files added in this continuation:
+  - `app/src/main/java/com/dotfield/dotcal/data/shifts/ShiftPlanShare.kt`
+  - `app/src/main/java/com/dotfield/dotcal/share/ShiftPlanShareExporter.kt`
+  - `app/src/test/java/com/dotfield/dotcal/data/shifts/ShiftPlanShareTest.kt`
+- Verification after this continuation:
+  - `.\gradlew.bat --no-daemon --console=plain :app:compileDebugKotlin` returned `BUILD SUCCESSFUL`.
+  - `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest --tests com.dotfield.dotcal.data.shifts.ShiftEventDraftTest --tests com.dotfield.dotcal.data.shifts.ShiftPlanShareTest` returned `BUILD SUCCESSFUL`.
+  - `.\gradlew.bat --no-daemon --console=plain :app:lintDebug` returned `BUILD SUCCESSFUL`.
+  - `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug` returned `BUILD SUCCESSFUL`.
+  - `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest` returned `BUILD SUCCESSFUL`.
+  - After notification icon polish, `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`
+    returned `BUILD SUCCESSFUL`.
+  - After Shift Patterns UI polish, `.\gradlew.bat --no-daemon --console=plain :app:compileDebugKotlin`
+    returned `BUILD SUCCESSFUL`; `.\gradlew.bat --no-daemon --console=plain :app:lintDebug :app:assembleDebug`
+    returned `BUILD SUCCESSFUL`.
+  - After final shift share export polish, `.\gradlew.bat --no-daemon --console=plain :app:compileDebugKotlin :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`
+    returned `BUILD SUCCESSFUL`.
+  - Debug APK installed successfully on device `4ab0d020` using
+    `C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk`.
+  - `git diff --check` passed with CRLF warnings only.
 
 **Month View + Bottom Nav UX polish is complete through Batch 3 partial, and priority widget date
 clarity + opacity polish is now built/installed for review.** Full detail in
@@ -98,11 +149,26 @@ DotCal rebrand into a shift-only app.
   with irregular schedules.
 - Product positioning: DotCal remains a general offline calendar. The feature name should be
   something like `Shift Worker Convenience Pack`, not `SuperShift clone`.
-- Best first scope: quick shift add from Calendar, share shift plan as image/PDF/ICS, and a compact
-  two-week widget. These fit offline-first and require no backend.
+- Best first scope: quick shift add from Calendar, share shift plan as image/PDF/ICS plus DotCal QR
+  for small ranges, and a compact two-week widget. These fit offline-first and require no backend.
+- Growth-loop note: sharing shift plans should be first-class because users can ask coworkers/family
+  to install DotCal to scan/import a plan. Single shifts can reuse the existing Event Detail >
+  `Share as QR` flow; multi-shift plans should get a dedicated `Share shift plan as DotCal QR`
+  option with range/event-count limits so QR payloads stay reliable.
 - Avoid for now: live shared calendars between DotCal users, payroll/overtime reports, multi-job
   management as a first-class model, and shift alarms. Those make DotCal feel like a niche shift app
   and/or require permissions/backend/product complexity.
+
+Calendar overflow menu customization:
+
+- User asked about making the Calendar tab three-dot menu customizable so users decide which actions
+  appear there.
+- Recommendation: add as a medium-easy polish feature, especially before/alongside shift features
+  because new shift actions will otherwise make the overflow menu feel crowded.
+- First version should be show/hide only, not drag reorder. Keep all current items visible by default,
+  add `Reset to default`, and either prevent hiding the last visible action or leave a stable
+  `Customize menu` entry reachable from Settings.
+- Preserve existing Pro/free behavior, camera-less QR hiding, subtitles, and `Pro` badges.
 
 Billing plan discussion: DotCal currently supports only the `dotcal_pro` one-time in-app product.
 Adding subscriptions is possible through Google Play, but app code must explicitly support `SUBS`.
@@ -453,7 +519,12 @@ C3 On This Day was **removed from this list** — it was already implemented in 
 - **Shift Worker Convenience Pack.** SuperShift-style user feedback asked for easier work-shift
   entry, schedule sharing, and a two-week widget. Add later as general-calendar shift convenience,
   not as a DotCal rebrand. First scope should be quick shift add, shift-plan image/PDF/ICS export,
-  and a two-week widget. See `## Planned: Shift Worker Convenience Pack`.
+  DotCal QR import for small plans, and a two-week widget. See
+  `## Planned: Shift Worker Convenience Pack`.
+- **Calendar overflow menu customization.** Make the Calendar three-dot menu user-configurable via
+  Settings with show/hide toggles first, reorder later if needed. This should happen before or
+  alongside shift-plan actions so the menu does not become cluttered. See
+  `## Planned: Calendar Overflow Menu Customization`.
 - **Event file attachments.** Gary requested attaching PDFs/files such as venue tickets to events.
   Recommendation: add later as a Pro feature using SAF + app-private copies + side-store metadata,
   with no Room schema change and no Google/Drive attachment sync in v1. See
@@ -583,11 +654,17 @@ Phase 1 — Quick Shift Add:
 Phase 2 — Share Shift Plan:
 
 - Add range-based export for shifts/calendar plan: week, two-week, month, or custom range.
-- First outputs should be image/PDF and ICS. This satisfies "share my roster" without accounts,
-  backend, contacts access, or live sync.
+- First outputs should be image/PDF and ICS, plus DotCal QR for compact/small plans. This satisfies
+  "share my roster" without accounts, backend, contacts access, or live sync, while still giving a
+  strong DotCal-to-DotCal install/import loop.
 - PDF/image should include title, dates, shift names, times, notes/location when present, and optional
   total hours summary if cheap to compute from event durations.
 - ICS export can reuse DotCal's existing calendar/event export direction where possible.
+- DotCal QR import should reuse the current event QR/ICS import pattern where possible, but show a
+  plan-level preview such as `Import 12 shifts?` before writing events.
+- Put hard limits on DotCal QR sharing: default to next 14 days or a max event count/payload size;
+  for larger plans, route users to ICS/PDF/image instead of generating unreliable QR codes.
+- The QR share screen should clearly say it is scanned with DotCal to import the shift plan.
 - Do not implement true live sharing between DotCal users in this phase.
 
 Phase 3 — Two-Week Widget:
@@ -614,6 +691,43 @@ Hard boundaries:
 - No cloud sync/backend/live account sharing in v1.
 - No package/deep-link/DB filename changes.
 - Do not start this before Batch 2 month chips are approved.
+
+## Planned: Calendar Overflow Menu Customization
+
+Goal:
+
+- Let users decide which actions appear in the Calendar tab three-dot overflow menu.
+- Keep the first version pragmatic: show/hide toggles only. Do not add drag reorder until users ask
+  for ordering control.
+
+Why:
+
+- The current Calendar overflow menu is a fixed list. New shift actions will add more density.
+- Customization gives power users a cleaner Calendar tab without removing advanced features.
+
+Suggested flow:
+
+- Settings > Calendar Preferences > `Customize Calendar Menu`.
+- Show a list of existing Calendar overflow actions with switches: Search, Templates, Jump to date,
+  Share availability, QR scanner, Quick add, Focus profiles, Shift patterns, Date calculator, Time
+  insights, Recently deleted, and future Shift Plan actions.
+- All current actions stay visible by default for existing behavior parity.
+- Add `Reset to default`.
+- Prevent an empty menu or keep a stable route to customization from Settings.
+
+Implementation notes:
+
+- Store hidden/visible action IDs in DataStore. Use stable internal IDs, not localized labels.
+- Render the Calendar overflow menu by filtering the existing action list through preferences.
+- Preserve existing gates and device logic: Pro/free behavior, `Pro` badges, subtitles, camera-less
+  QR hiding, and any hardware checks must remain exactly as they are.
+- Add strings in every shipped locale.
+- No Room schema change.
+
+Risk:
+
+- Medium-easy. DataStore + Settings UI + menu filtering. Main risk is accidentally changing Pro gate
+  behavior or hiding hardware-dependent QR logic.
 
 ## Planned: Event File Attachments
 

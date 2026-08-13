@@ -40,6 +40,8 @@
     <string name="menu_search_subtitle">Encuentra eventos y tareas</string>
     <string name="menu_new_event">Nuevo evento</string>
     <string name="menu_new_event_subtitle">Crea un evento rápidamente</string>
+    <string name="menu_add_shift">Añadir turno</string>
+    <string name="menu_add_shift_subtitle">Usa un tipo de turno guardado</string>
     <string name="menu_go_to_date">Ir a una fecha</string>
     <string name="menu_go_to_date_subtitle">Salta sin cambiar de vista</string>
     <string name="menu_quick_add">Añadir rápido</string>
@@ -667,6 +669,26 @@
     <string name="shift_section_patterns">PATRONES</string>
     <string name="shift_types_empty">Crea primero los ajustes de Día, Noche y Libre.</string>
     <string name="shift_patterns_empty">Crea un ciclo como Día, Día, Noche, Noche, Libre x4.</string>
+    <string name="shift_pattern_counts">%1$d tipos · %2$d patrones</string>
+    <string name="shift_quick_add_title">Añadir turno</string>
+    <string name="shift_quick_add_subtitle">Elige un tipo de turno guardado y añádelo al día seleccionado.</string>
+    <string name="shift_quick_add_date">Fecha del turno</string>
+    <string name="shift_quick_add_empty">Crea al menos un tipo de turno con horas antes de añadir turnos rápidos.</string>
+    <string name="shift_manage_types">Gestionar tipos de turno</string>
+    <string name="shift_quick_add_confirm">Añadir turno</string>
+    <string name="shift_share_plan">Compartir plan</string>
+    <string name="shift_share_plan_title">Compartir plan de turnos</string>
+    <string name="shift_share_from">Compartir desde</string>
+    <string name="shift_share_days">Días incluidos</string>
+    <string name="shift_share_qr_limit">La importación QR admite hasta 14 turnos. Usa ICS, PDF o imagen para planes más largos.</string>
+    <string name="shift_share_image">Compartir imagen</string>
+    <string name="shift_share_pdf">Compartir PDF</string>
+    <string name="shift_share_ics">Compartir ICS</string>
+    <string name="shift_share_qr">Compartir QR de DotCal</string>
+    <string name="shift_share_chooser">Compartir plan de turnos</string>
+    <string name="shift_share_no_shifts">No hay turnos en este rango</string>
+    <string name="shift_share_qr_too_many">El QR admite hasta %1$d turnos</string>
+    <string name="shift_share_failed">No se pudo compartir este plan de turnos</string>
     <string name="shift_add_type">Añadir tipo de turno</string>
     <string name="shift_build_pattern_row">Crear patrón</string>
     <string name="shift_pattern_delete_title">¿Eliminar patrón de turnos?</string>
@@ -680,6 +702,10 @@
     <string name="shift_build_pattern_title">Crear patrón</string>
     <!-- Default name pre-filled in the pattern builder; a common rotation shorthand. -->
     <string name="shift_pattern_default_name">4 de trabajo, 4 libres</string>
+    <string name="shift_pattern_type_picker">AÑADIR AL CICLO</string>
+    <string name="shift_pattern_cycle_label">CICLO</string>
+    <string name="shift_pattern_cycle_empty">Toca los tipos de turno de arriba para crear el orden.</string>
+    <string name="shift_pattern_cycle_days">%1$d días</string>
     <string name="shift_remove_last">Quitar el último</string>
     <string name="shift_pattern_start">Inicio del patrón</string>
     <string name="shift_generate_title">Generar turnos</string>
@@ -942,6 +968,7 @@
     <string name="shift_added_with_replaced">%1$d turnos añadidos, %2$d reemplazados</string>
     <string name="shift_none_added">No se añadieron turnos. Verifica que el patrón use tipos de turno Día/Noche, no solo Descanso.</string>
     <string name="shift_pattern_deleted">Patrón de turnos eliminado</string>
+    <string name="shift_quick_added">Turno añadido</string>
 
     <!-- Tasks -->
     <string name="task_delete_confirm">Eliminar</string>

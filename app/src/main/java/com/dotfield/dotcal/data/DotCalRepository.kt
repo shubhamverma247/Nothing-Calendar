@@ -43,6 +43,8 @@ import com.dotfield.dotcal.data.shifts.ShiftGenerationRecord
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftPatternStore
 import com.dotfield.dotcal.data.shifts.ShiftType
+import com.dotfield.dotcal.data.shifts.buildShiftEventDraft
+import com.dotfield.dotcal.data.shifts.buildShiftPlanShareEvents
 import com.dotfield.dotcal.data.shifts.expandShiftPattern
 import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import com.dotfield.dotcal.data.templates.EventTemplate
@@ -1648,6 +1650,15 @@ class DotCalRepository(
         shiftPatternStore.savePattern(pattern)
     }
 
+    suspend fun addShiftOnDate(
+        shiftTypeId: String,
+        date: LocalDate,
+        accountId: String?,
+    ): Boolean = withContext(Dispatchers.IO) {
+        val type = shiftPatternStore.listTypes().firstOrNull { it.id == shiftTypeId } ?: return@withContext false
+        saveShiftOccurrences(listOf(GeneratedShiftOccurrence(date, type)), accountId).isNotEmpty()
+    }
+
     suspend fun deleteShiftPattern(id: String, removeGeneratedEvents: Boolean) = withContext(Dispatchers.IO) {
         if (removeGeneratedEvents) removeGeneratedShiftEvents(id)
         shiftPatternStore.removePattern(id)
@@ -1687,6 +1698,17 @@ class DotCalRepository(
         ShiftApplyResult(generatedCount = eventIds.size, replacedCount = replaced)
     }
 
+    suspend fun buildShiftPlanShareEvents(
+        patternId: String,
+        rangeStart: LocalDate,
+        rangeEnd: LocalDate,
+    ): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        val pattern = shiftPatternStore.listPatterns().firstOrNull { it.id == patternId }
+            ?: return@withContext emptyList()
+        val shiftTypes = shiftPatternStore.listTypes().associateBy { it.id }
+        buildShiftPlanShareEvents(pattern, shiftTypes, rangeStart, rangeEnd)
+    }
+
     private suspend fun removeGeneratedShiftEvents(patternId: String) {
         shiftPatternStore.listGenerations()
             .filter { it.patternId == patternId }
@@ -1705,27 +1727,23 @@ class DotCalRepository(
         val eventIds = ArrayList<String>(occurrences.size)
         for (occurrence in occurrences) {
             val eventId = UUID.randomUUID().toString()
-            val type = occurrence.shiftType
-            val startMinute = type.startMinuteOfDay ?: 0
-            val duration = type.durationMinutes ?: 24 * 60
-            val startTime = LocalTime.of(startMinute / 60, startMinute % 60)
-            val endDateTime = occurrence.date.atTime(startTime).plusMinutes(duration.toLong())
+            val draft = buildShiftEventDraft(occurrence.shiftType, occurrence.date) ?: continue
             saveLocalEvent(
                 existing = null,
                 data = EventEditorData(
                     eventId = eventId,
                     accountId = accountId,
-                    title = type.name,
+                    title = draft.title,
                     description = "",
                     location = "",
-                    date = occurrence.date,
-                    endDate = if (type.isAllDay) occurrence.date else endDateTime.toLocalDate(),
-                    startTime = startTime,
-                    endTime = if (type.isAllDay) LocalTime.of(23, 59) else endDateTime.toLocalTime(),
-                    isAllDay = type.isAllDay,
-                    reminderMinutes = type.reminderMinutes,
+                    date = draft.date,
+                    endDate = draft.endDate,
+                    startTime = draft.startTime,
+                    endTime = draft.endTime,
+                    isAllDay = draft.isAllDay,
+                    reminderMinutes = draft.reminderMinutes,
                     rrule = null,
-                    colorHex = type.colorHex,
+                    colorHex = draft.colorHex,
                 ),
             )
             eventIds.add(eventId)

@@ -111,6 +111,7 @@ internal fun CalendarTabContainer(
     onTitleLongClick: () -> Unit,
     onAdd: () -> Unit,
     onTemplates: (() -> Unit)? = null,
+    onQuickShiftAdd: (() -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
     onScanQr: (() -> Unit)? = null,
@@ -142,6 +143,7 @@ internal fun CalendarTabContainer(
                 onTitleLongClick = onTitleLongClick,
                 onAdd = onAdd,
                 onTemplates = onTemplates,
+                onQuickShiftAdd = onQuickShiftAdd,
                 onQuickAdd = onQuickAdd,
                 onSearch = onSearch,
                 onScanQr = onScanQr,
@@ -190,6 +192,7 @@ internal fun CalendarActionBar(
     onTitleLongClick: () -> Unit,
     onAdd: () -> Unit,
     onTemplates: (() -> Unit)? = null,
+    onQuickShiftAdd: (() -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
     onScanQr: (() -> Unit)? = null,
@@ -208,6 +211,7 @@ internal fun CalendarActionBar(
     val hasOverflow = onSearch != null ||
         onJumpToDate != null ||
         onAvailability != null ||
+        onQuickShiftAdd != null ||
         onQuickAdd != null ||
         onTemplates != null ||
         onCalendarSets != null ||
@@ -295,6 +299,19 @@ internal fun CalendarActionBar(
                                 onAdd()
                             },
                         )
+                        if (onQuickShiftAdd != null) {
+                            ActionBarMenuItem(
+                                label = stringResource(R.string.menu_add_shift),
+                                subtitle = stringResource(R.string.menu_add_shift_subtitle),
+                                icon = Icons.Default.EventRepeat,
+                                isPro = showProBadges,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onQuickShiftAdd()
+                                },
+                            )
+                        }
                         if (onJumpToDate != null) {
                             ActionBarMenuItem(
                                 label = stringResource(R.string.menu_go_to_date),

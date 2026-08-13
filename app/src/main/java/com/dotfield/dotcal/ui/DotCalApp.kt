@@ -246,6 +246,7 @@ import com.dotfield.dotcal.data.attachments.EventFileAttachment
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
+import com.dotfield.dotcal.data.shifts.SHIFT_PLAN_QR_EVENT_LIMIT
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.AppLanguage
@@ -256,6 +257,7 @@ import com.dotfield.dotcal.applyAppLanguage
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
 import com.dotfield.dotcal.share.CardImageExporter
 import com.dotfield.dotcal.share.QrEventImageExporter
+import com.dotfield.dotcal.share.ShiftPlanShareExporter
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import com.dotfield.dotcal.ui.theme.NBlack
 import com.dotfield.dotcal.ui.theme.NWhite
@@ -358,6 +360,7 @@ fun DotCalApp(
     var availabilityInitialDate by remember { mutableStateOf(LocalDate.now()) }
     var availabilityInitialEndDate by remember { mutableStateOf(LocalDate.now().plusDays(2)) }
     var showQuickAdd by remember { mutableStateOf(false) }
+    var showQuickShiftAdd by remember { mutableStateOf(false) }
     var showJumpToDatePicker by remember { mutableStateOf(false) }
     var showRecentlyDeleted by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -511,6 +514,7 @@ fun DotCalApp(
                 // can't float over the PIN screen while the app is re-locked.
                 showSheet = false
                 showTaskEditor = false
+                showQuickShiftAdd = false
                 editingTask = null
                 pendingDelete = null
                 pendingTaskDelete = null
@@ -1172,6 +1176,7 @@ fun DotCalApp(
             qrShareSession != null -> qrShareSession = null
             pendingIcsImport != null -> pendingIcsImport = null
             showQrScanner -> showQrScanner = false
+            showQuickShiftAdd -> showQuickShiftAdd = false
             pendingCountdownLimitEvent != null -> pendingCountdownLimitEvent = null
             pendingCopyToDateEvent != null -> pendingCopyToDateEvent = null
             showBulkTemplatePicker -> showBulkTemplatePicker = false
@@ -1284,7 +1289,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || qrShareSession != null || pendingIcsImport != null || showQrScanner || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showAvailability || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || qrShareSession != null || pendingIcsImport != null || showQrScanner || showQuickShiftAdd || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showAvailability || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -1343,6 +1348,14 @@ fun DotCalApp(
                                 if (isPro) {
                                     viewModel.refreshTemplates()
                                     showTemplates = true
+                                } else {
+                                    showPaywall = true
+                                }
+                            },
+                            onQuickShiftAdd = {
+                                if (isPro) {
+                                    viewModel.refreshShiftPatterns()
+                                    showQuickShiftAdd = true
                                 } else {
                                     showPaywall = true
                                 }
@@ -2743,6 +2756,31 @@ fun DotCalApp(
                 onContinue = { result -> openQuickAddResult(result) },
             )
         }
+        if (showQuickShiftAdd) {
+            val shiftTypes by viewModel.shiftTypes.collectAsStateWithLifecycle()
+            QuickShiftAddSheet(
+                palette = palette,
+                shiftTypes = shiftTypes,
+                accounts = assignableAccounts,
+                initialDate = selectedDate,
+                onDismiss = { showQuickShiftAdd = false },
+                onManageTypes = {
+                    viewModel.refreshShiftPatterns()
+                    showShiftPatterns = true
+                },
+                onAddShift = { shiftTypeId, date, accountId ->
+                    viewModel.addShiftOnDate(shiftTypeId, date, accountId) { added ->
+                        if (added) {
+                            viewModel.selectDate(date)
+                            showQuickShiftAdd = false
+                            showDotCalToast(context, palette, R.string.shift_quick_added)
+                        } else {
+                            showDotCalToast(context, palette, R.string.shift_none_added)
+                        }
+                    }
+                },
+            )
+        }
         AnimatedVisibility(
             visible = showTemplates,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
@@ -2825,6 +2863,33 @@ fun DotCalApp(
                             else -> arrayOf(result.generatedCount)
                         }
                         showDotCalToast(context, palette, messageRes, *formatArgs, duration = Toast.LENGTH_LONG)
+                    }
+                },
+                onSharePlan = { pattern, rangeStart, rangeEnd, format ->
+                    viewModel.buildShiftPlanShareEvents(pattern.id, rangeStart, rangeEnd) { planEvents ->
+                        if (planEvents.isEmpty()) {
+                            showDotCalToast(context, palette, R.string.shift_share_no_shifts)
+                            return@buildShiftPlanShareEvents
+                        }
+                        if (format == ShiftPlanShareFormat.Qr && planEvents.size > SHIFT_PLAN_QR_EVENT_LIMIT) {
+                            showDotCalToast(context, palette, R.string.shift_share_qr_too_many, SHIFT_PLAN_QR_EVENT_LIMIT)
+                            return@buildShiftPlanShareEvents
+                        }
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    when (format) {
+                                        ShiftPlanShareFormat.Image -> ShiftPlanShareExporter.createImageUri(context, pattern.name, planEvents, palette.accent.toArgb(), palette.isDark)
+                                        ShiftPlanShareFormat.Pdf -> ShiftPlanShareExporter.createPdfUri(context, pattern.name, planEvents, palette.accent.toArgb(), palette.isDark)
+                                        ShiftPlanShareFormat.Ics -> ShiftPlanShareExporter.createIcsUri(context, pattern.name, planEvents)
+                                        ShiftPlanShareFormat.Qr -> ShiftPlanShareExporter.createQrImageUri(context, pattern.name, planEvents, palette.accent.toArgb(), palette.isDark)
+                                    }
+                                }
+                            }
+                            result
+                                .onSuccess { uri -> shareShiftPlan(context, pattern.name, uri, format, palette) }
+                                .onFailure { showDotCalToast(context, palette, R.string.shift_share_failed) }
+                        }
                     }
                 },
             )
@@ -3121,6 +3186,32 @@ private fun shareQrEventImage(
     }
     runCatching {
         context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_event_qr_chooser)))
+    }.onFailure {
+        showDotCalToast(context, palette, R.string.share_no_target)
+    }
+}
+
+private fun shareShiftPlan(
+    context: Context,
+    planTitle: String,
+    uri: Uri,
+    format: ShiftPlanShareFormat,
+    palette: DotCalPalette,
+) {
+    val mimeType = when (format) {
+        ShiftPlanShareFormat.Image,
+        ShiftPlanShareFormat.Qr -> "image/png"
+        ShiftPlanShareFormat.Pdf -> "application/pdf"
+        ShiftPlanShareFormat.Ics -> "text/calendar"
+    }
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = mimeType
+        putExtra(Intent.EXTRA_SUBJECT, planTitle)
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.shift_share_chooser)))
     }.onFailure {
         showDotCalToast(context, palette, R.string.share_no_target)
     }

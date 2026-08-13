@@ -110,14 +110,15 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings as SettingsGearIcon
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -2058,11 +2059,13 @@ internal fun ShiftPatternsScreen(
     onSavePattern: (ShiftPattern) -> Unit,
     onDeletePattern: (String, Boolean) -> Unit,
     onGenerate: (String, LocalDate, LocalDate, String?) -> Unit,
+    onSharePlan: (ShiftPattern, LocalDate, LocalDate, ShiftPlanShareFormat) -> Unit,
 ) {
     var showTypeEditor by remember { mutableStateOf(false) }
     var showPatternEditor by remember { mutableStateOf(false) }
     var editingType by remember { mutableStateOf<ShiftType?>(null) }
     var generatingPattern by remember { mutableStateOf<ShiftPattern?>(null) }
+    var sharingPattern by remember { mutableStateOf<ShiftPattern?>(null) }
     var deletePattern by remember { mutableStateOf<ShiftPattern?>(null) }
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
         Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
@@ -2074,11 +2077,23 @@ internal fun ShiftPatternsScreen(
         }
         LazyColumn(
             modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 22.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 18.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
-                SettingsSectionTitle(stringResource(R.string.shift_section_types), palette)
+                ShiftScreenHeader(
+                    palette = palette,
+                    typeCount = shiftTypes.size,
+                    patternCount = patterns.size,
+                )
+            }
+            item {
+                ShiftSectionHeader(
+                    title = stringResource(R.string.shift_section_types),
+                    actionLabel = stringResource(R.string.shift_add_type),
+                    palette = palette,
+                    onAction = { showTypeEditor = true },
+                )
                 if (shiftTypes.isEmpty()) {
                     ShiftEmptyText(stringResource(R.string.shift_types_empty), palette)
                 }
@@ -2092,9 +2107,13 @@ internal fun ShiftPatternsScreen(
                 )
             }
             item {
-                CalendarAddAccountRow(palette = palette, onClick = { showTypeEditor = true }, label = stringResource(R.string.shift_add_type))
-                Spacer(modifier = Modifier.height(10.dp))
-                SettingsSectionTitle(stringResource(R.string.shift_section_patterns), palette)
+                Spacer(modifier = Modifier.height(4.dp))
+                ShiftSectionHeader(
+                    title = stringResource(R.string.shift_section_patterns),
+                    actionLabel = stringResource(R.string.shift_build_pattern_row),
+                    palette = palette,
+                    onAction = { showPatternEditor = true },
+                )
                 if (patterns.isEmpty()) {
                     ShiftEmptyText(stringResource(R.string.shift_patterns_empty), palette)
                 }
@@ -2105,16 +2124,12 @@ internal fun ShiftPatternsScreen(
                     shiftTypes = shiftTypes,
                     palette = palette,
                     onGenerate = { generatingPattern = pattern },
+                    onShare = { sharingPattern = pattern },
                     onDelete = { deletePattern = pattern },
                 )
             }
             item {
-                CalendarAddAccountRow(
-                    palette = palette,
-                    onClick = { showPatternEditor = true },
-                    label = stringResource(R.string.shift_build_pattern_row),
-                )
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }
@@ -2163,6 +2178,17 @@ internal fun ShiftPatternsScreen(
             },
         )
     }
+    sharingPattern?.let { pattern ->
+        ShiftPlanShareDialog(
+            pattern = pattern,
+            palette = palette,
+            onDismiss = { sharingPattern = null },
+            onShare = { start, end, format ->
+                onSharePlan(pattern, start, end, format)
+                sharingPattern = null
+            },
+        )
+    }
     deletePattern?.let { pattern ->
         ConfirmDeleteDialog(
             title = stringResource(R.string.shift_pattern_delete_title),
@@ -2178,30 +2204,367 @@ internal fun ShiftPatternsScreen(
 }
 
 @Composable
+private fun ShiftScreenHeader(palette: DotCalPalette, typeCount: Int, patternCount: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(palette.eventCardSurface)
+            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(22.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(palette.accent.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.EventRepeat, contentDescription = null, tint = palette.accent, modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(R.string.shift_patterns_title),
+                color = palette.primaryText,
+                fontFamily = LocalHeadingFont.current,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                stringResource(R.string.shift_pattern_counts, typeCount, patternCount),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShiftSectionHeader(
+    title: String,
+    actionLabel: String,
+    palette: DotCalPalette,
+    onAction: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            color = palette.secondaryText,
+            fontFamily = mono,
+            fontWeight = FontWeight.Bold,
+            fontSize = 11.sp,
+            letterSpacing = 0.6.sp,
+            modifier = Modifier.weight(1f),
+        )
+        Row(
+            modifier = Modifier
+                .height(34.dp)
+                .clip(RoundedCornerShape(17.dp))
+                .background(palette.accent)
+                .noRippleClickable(onClick = onAction)
+                .padding(start = 10.dp, end = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, tint = palette.onAccent, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(5.dp))
+            Text(actionLabel, color = palette.onAccent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
 private fun ShiftEmptyText(text: String, palette: DotCalPalette) {
     Text(text, color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(vertical = 10.dp))
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ShiftTypeCard(type: ShiftType, palette: DotCalPalette, onClick: () -> Unit, onDelete: () -> Unit) {
+internal fun QuickShiftAddSheet(
+    palette: DotCalPalette,
+    shiftTypes: List<ShiftType>,
+    accounts: List<CalendarAccount>,
+    initialDate: LocalDate,
+    onDismiss: () -> Unit,
+    onManageTypes: () -> Unit,
+    onAddShift: (String, LocalDate, String?) -> Unit,
+) {
+    val usableTypes = remember(shiftTypes) { shiftTypes.filter { it.generatesEvent } }
+    var selectedDate by remember(initialDate) { mutableStateOf(initialDate) }
+    var selectedTypeId by remember(usableTypes) { mutableStateOf(usableTypes.firstOrNull()?.id) }
+    var selectedAccountId by remember(accounts) { mutableStateOf(accounts.firstOrNull()?.id) }
+    val selectedAccount = accounts.firstOrNull { it.id == selectedAccountId } ?: accounts.firstOrNull()
+    val effectiveAccountId = selectedAccount?.id
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showCalendarPicker by remember { mutableStateOf(false) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(palette.dialogSurface)
+                .padding(horizontal = 20.dp)
+                .padding(top = 4.dp, bottom = 24.dp),
+        ) {
+            Text(
+                stringResource(R.string.shift_quick_add_title),
+                color = palette.primaryText,
+                fontFamily = LocalHeadingFont.current,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                stringResource(R.string.shift_quick_add_subtitle),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+            )
+            ShiftDateRow(
+                label = stringResource(R.string.shift_quick_add_date),
+                date = selectedDate,
+                palette = palette,
+                onClick = { showDatePicker = true },
+            )
+            Spacer(Modifier.height(14.dp))
+            SettingsSectionTitle(stringResource(R.string.shift_section_types), palette)
+            if (usableTypes.isEmpty()) {
+                ShiftEmptyText(stringResource(R.string.shift_quick_add_empty), palette)
+                CalendarAddAccountRow(
+                    palette = palette,
+                    onClick = {
+                        onDismiss()
+                        onManageTypes()
+                    },
+                    label = stringResource(R.string.shift_manage_types),
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    lazyItems(usableTypes, key = { it.id }) { type ->
+                        QuickShiftTypeRow(
+                            type = type,
+                            selected = type.id == selectedTypeId,
+                            palette = palette,
+                            onClick = { selectedTypeId = type.id },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                if (selectedAccount != null) {
+                    QuickShiftCalendarRow(
+                        account = selectedAccount,
+                        palette = palette,
+                        onClick = { showCalendarPicker = true },
+                    )
+                    Spacer(Modifier.height(18.dp))
+                }
+                Button(
+                    onClick = {
+                        selectedTypeId?.let { onAddShift(it, selectedDate, effectiveAccountId) }
+                    },
+                    enabled = selectedTypeId != null,
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+                    shape = RoundedCornerShape(18.dp),
+                ) {
+                    Text(stringResource(R.string.shift_quick_add_confirm), fontFamily = mono, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+    if (showDatePicker) {
+        DateTimeChoiceSheet(
+            title = stringResource(R.string.shift_quick_add_date),
+            selectedDate = selectedDate,
+            selectedTime = LocalTime.NOON,
+            minDate = null,
+            includeTime = false,
+            palette = palette,
+            onDismiss = { showDatePicker = false },
+            onSelected = { date, _ ->
+                selectedDate = date
+                showDatePicker = false
+            },
+        )
+    }
+    if (showCalendarPicker) {
+        QuickShiftCalendarDialog(
+            accounts = accounts,
+            selectedAccountId = effectiveAccountId,
+            palette = palette,
+            onDismiss = { showCalendarPicker = false },
+            onSelected = { accountId ->
+                selectedAccountId = accountId
+                showCalendarPicker = false
+            },
+        )
+    }
+}
+
+internal enum class ShiftPlanShareFormat { Image, Pdf, Ics, Qr }
+
+@Composable
+private fun QuickShiftTypeRow(
+    type: ShiftType,
+    selected: Boolean,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(palette.eventCardSurface)
+            .background(if (selected) palette.accent.copy(alpha = 0.12f) else palette.eventCardSurface)
+            .border(1.dp, if (selected) palette.accent.copy(alpha = 0.45f) else palette.line.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
             .noRippleClickable(onClick = onClick)
-            .padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(14.dp).clip(CircleShape).background(Color(parseColor(type.colorHex))))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(type.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-            Text(shiftTypeSummary(type), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            Text(type.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(shiftTypeSummary(type), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
-            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete shift type", tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+        if (selected) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = palette.accent, modifier = Modifier.size(20.dp))
         }
+    }
+}
+
+@Composable
+private fun QuickShiftCalendarRow(
+    account: CalendarAccount,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .border(1.dp, palette.textFieldBorder, RoundedCornerShape(14.dp))
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(12.dp).clip(CircleShape).background(Color(parseColor(account.color))))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.shift_calendar), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                account.displayName.readableCalendarLabel(),
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun QuickShiftCalendarDialog(
+    accounts: List<CalendarAccount>,
+    selectedAccountId: String?,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        title = {
+            Text(stringResource(R.string.shift_calendar), color = palette.primaryText, fontFamily = LocalHeadingFont.current)
+        },
+        text = {
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                lazyItems(accounts, key = { it.id }) { account ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (account.id == selectedAccountId) palette.accent.copy(alpha = 0.10f) else Color.Transparent)
+                            .noRippleClickable(onClick = { onSelected(account.id) })
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(12.dp).clip(CircleShape).background(Color(parseColor(account.color))))
+                        Text(
+                            account.displayName.readableCalendarLabel(),
+                            color = palette.primaryText,
+                            fontFamily = mono,
+                            fontSize = 15.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f).padding(start = 12.dp),
+                        )
+                        if (account.id == selectedAccountId) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = palette.accent, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel), color = palette.primaryText, fontFamily = mono)
+            }
+        },
+    )
+}
+
+@Composable
+private fun ShiftTypeCard(type: ShiftType, palette: DotCalPalette, onClick: () -> Unit, onDelete: () -> Unit) {
+    val typeColor = remember(type.colorHex) { Color(parseColor(type.colorHex)) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(palette.eventCardSurface)
+            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(18.dp))
+            .noRippleClickable(onClick = onClick)
+            .padding(start = 14.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(typeColor.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.size(13.dp).clip(CircleShape).background(typeColor))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(type.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(3.dp))
+            Text(shiftTypeSummary(type), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        ShiftMiniActionButton(icon = Icons.Default.DeleteOutline, contentDescription = "Delete shift type", tint = palette.secondaryText, palette = palette, onClick = onDelete)
     }
 }
 
@@ -2211,23 +2574,50 @@ private fun ShiftPatternCard(
     shiftTypes: List<ShiftType>,
     palette: DotCalPalette,
     onGenerate: () -> Unit,
+    onShare: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val typeMap = remember(shiftTypes) { shiftTypes.associateBy { it.id } }
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.eventCardSurface).noRippleClickable(onClick = onGenerate).padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(palette.eventCardSurface)
+            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(18.dp))
+            .noRippleClickable(onClick = onGenerate)
+            .padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(pattern.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-            Text(shiftPatternSummary(pattern, typeMap), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 2)
+            Text(pattern.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(5.dp))
+            Text(shiftPatternSummary(pattern, typeMap), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        IconButton(onClick = onGenerate, modifier = Modifier.size(40.dp)) {
-            Icon(Icons.Default.Add, contentDescription = "Generate shifts", tint = palette.accent, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+            ShiftMiniActionButton(icon = Icons.Default.CalendarMonth, contentDescription = "Generate shifts", tint = palette.accent, palette = palette, onClick = onGenerate)
+            ShiftMiniActionButton(icon = Icons.Default.Share, contentDescription = stringResource(R.string.shift_share_plan), tint = palette.secondaryText, palette = palette, onClick = onShare)
+            ShiftMiniActionButton(icon = Icons.Default.DeleteOutline, contentDescription = "Delete shift pattern", tint = palette.secondaryText, palette = palette, onClick = onDelete)
         }
-        IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
-            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete shift pattern", tint = palette.secondaryText, modifier = Modifier.size(20.dp))
-        }
+    }
+}
+
+@Composable
+private fun ShiftMiniActionButton(
+    icon: ImageVector,
+    contentDescription: String,
+    tint: Color,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(palette.cell.copy(alpha = 0.55f)),
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(19.dp))
     }
 }
 
@@ -2296,6 +2686,7 @@ private fun ShiftTypeEditorDialog(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ShiftPatternEditorDialog(
     palette: DotCalPalette,
@@ -2314,17 +2705,44 @@ private fun ShiftPatternEditorDialog(
         containerColor = palette.dialogSurface,
         title = { Text(stringResource(R.string.shift_build_pattern_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.shift_field_name)) }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
                 ShiftDateRow(label = stringResource(R.string.calc_start_date_row), date = startDate, palette = palette, onClick = { showStartDatePicker = true })
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    lazyItems(shiftTypes, key = { it.id }) { type ->
-                        ShiftChip(type.name, palette, onClick = { cycle = cycle + type.id })
+
+                Text(stringResource(R.string.shift_pattern_type_picker), color = palette.secondaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.6.sp)
+                if (shiftTypes.isEmpty()) {
+                    ShiftEmptyText(stringResource(R.string.shift_types_empty), palette)
+                } else {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        shiftTypes.forEach { type ->
+                            ShiftPatternTypeButton(
+                                type = type,
+                                palette = palette,
+                                onClick = { cycle = cycle + type.id },
+                            )
+                        }
                     }
                 }
-                Text(shiftCycleLabel(cycle, shiftTypes.associateBy { it.id }), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, lineHeight = 17.sp)
-                if (cycle.isNotEmpty()) {
-                    TextButton(onClick = { cycle = cycle.dropLast(1) }) { Text(stringResource(R.string.shift_remove_last), color = palette.accent, fontFamily = mono) }
+
+                ShiftPatternCyclePreview(
+                    cycle = cycle,
+                    typeMap = shiftTypes.associateBy { it.id },
+                    palette = palette,
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { cycle = cycle.dropLast(1) }, enabled = cycle.isNotEmpty()) {
+                        Text(stringResource(R.string.shift_remove_last), color = if (cycle.isNotEmpty()) palette.accent else palette.disabledText, fontFamily = mono)
+                    }
+                    TextButton(onClick = { cycle = emptyList() }, enabled = cycle.isNotEmpty()) {
+                        Text(stringResource(R.string.calendar_clear), color = if (cycle.isNotEmpty()) palette.secondaryText else palette.disabledText, fontFamily = mono)
+                    }
                 }
             }
         },
@@ -2360,6 +2778,84 @@ private fun ShiftPatternEditorDialog(
                 showStartDatePicker = false
             },
         )
+    }
+}
+
+@Composable
+private fun ShiftPatternTypeButton(type: ShiftType, palette: DotCalPalette, onClick: () -> Unit) {
+    val typeColor = remember(type.colorHex) { Color(parseColor(type.colorHex)) }
+    Row(
+        modifier = Modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.eventCardSurface)
+            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(14.dp))
+            .noRippleClickable(onClick = onClick)
+            .padding(start = 10.dp, end = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(11.dp).clip(CircleShape).background(typeColor))
+        Spacer(Modifier.width(8.dp))
+        Text(type.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(7.dp))
+        Icon(Icons.Default.Add, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(16.dp))
+    }
+}
+
+@Composable
+private fun ShiftPatternCyclePreview(
+    cycle: List<String>,
+    typeMap: Map<String, ShiftType>,
+    palette: DotCalPalette,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(palette.eventCardSurface)
+            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(16.dp))
+            .padding(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.shift_pattern_cycle_label), color = palette.secondaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.6.sp, modifier = Modifier.weight(1f))
+            if (cycle.isNotEmpty()) {
+                Text(stringResource(R.string.shift_pattern_cycle_days, cycle.size), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        if (cycle.isEmpty()) {
+            Text(stringResource(R.string.shift_pattern_cycle_empty), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, lineHeight = 17.sp)
+        } else {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                lazyItems(cycle.withIndex().toList(), key = { "${it.index}-${it.value}" }) { item ->
+                    val type = typeMap[item.value]
+                    ShiftPatternCycleChip(
+                        index = item.index + 1,
+                        label = type?.name ?: item.value,
+                        colorHex = type?.colorHex ?: "#FF3B30",
+                        palette = palette,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShiftPatternCycleChip(index: Int, label: String, colorHex: String, palette: DotCalPalette) {
+    val typeColor = remember(colorHex) { Color(parseColor(colorHex)) }
+    Row(
+        modifier = Modifier
+            .height(38.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(typeColor.copy(alpha = 0.13f))
+            .border(1.dp, typeColor.copy(alpha = 0.35f), RoundedCornerShape(13.dp))
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(index.toString(), color = typeColor, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        Spacer(Modifier.width(7.dp))
+        Text(label, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -2413,6 +2909,87 @@ private fun ShiftGenerateDialog(
                 showStartDatePicker = false
             },
         )
+    }
+}
+
+@Composable
+private fun ShiftPlanShareDialog(
+    pattern: ShiftPattern,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onShare: (LocalDate, LocalDate, ShiftPlanShareFormat) -> Unit,
+) {
+    var startDate by remember(pattern.id) { mutableStateOf(LocalDate.now()) }
+    var days by remember(pattern.id) { mutableStateOf("14") }
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    val dayCount = days.toIntOrNull()?.coerceIn(1, 90) ?: 14
+    val rangeEnd = startDate.plusDays(dayCount.toLong() - 1L)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.dialogSurface,
+        title = {
+            Text(stringResource(R.string.shift_share_plan_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(pattern.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold)
+                ShiftDateRow(label = stringResource(R.string.shift_share_from), date = startDate, palette = palette, onClick = { showStartDatePicker = true })
+                OutlinedTextField(
+                    value = days,
+                    onValueChange = { days = it.filter(Char::isDigit).take(2) },
+                    label = { Text(stringResource(R.string.shift_share_days)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = dotCalTextFieldColors(palette),
+                    textStyle = TextStyle(color = palette.primaryText, fontFamily = mono),
+                )
+                Text(
+                    stringResource(R.string.shift_share_qr_limit),
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                )
+                ShiftPlanShareButton(stringResource(R.string.shift_share_image), palette) { onShare(startDate, rangeEnd, ShiftPlanShareFormat.Image) }
+                ShiftPlanShareButton(stringResource(R.string.shift_share_pdf), palette) { onShare(startDate, rangeEnd, ShiftPlanShareFormat.Pdf) }
+                ShiftPlanShareButton(stringResource(R.string.shift_share_ics), palette) { onShare(startDate, rangeEnd, ShiftPlanShareFormat.Ics) }
+                ShiftPlanShareButton(stringResource(R.string.shift_share_qr), palette) { onShare(startDate, rangeEnd, ShiftPlanShareFormat.Qr) }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = palette.primaryText) } },
+    )
+    if (showStartDatePicker) {
+        DateTimeChoiceSheet(
+            title = stringResource(R.string.shift_share_from),
+            selectedDate = startDate,
+            selectedTime = LocalTime.NOON,
+            minDate = null,
+            includeTime = false,
+            palette = palette,
+            onDismiss = { showStartDatePicker = false },
+            onSelected = { date, _ ->
+                startDate = date
+                showStartDatePicker = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun ShiftPlanShareButton(label: String, palette: DotCalPalette, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.eventCardSurface)
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
     }
 }
 
