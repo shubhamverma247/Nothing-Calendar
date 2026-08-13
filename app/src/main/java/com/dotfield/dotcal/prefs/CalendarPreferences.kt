@@ -41,4 +41,6 @@ object CalendarPreferences {
     val KEY_FREE_TIME_START_HOUR = intPreferencesKey("free_time_start_hour")
     val KEY_FREE_TIME_END_HOUR = intPreferencesKey("free_time_end_hour")
     val KEY_ON_THIS_DAY_DISMISSED_DATE = stringPreferencesKey("on_this_day_dismissed_date")
+    val KEY_LAST_SHIFT_TYPE_ID = stringPreferencesKey("last_shift_type_id")
+    val KEY_LAST_SHIFT_ACCOUNT_ID = stringPreferencesKey("last_shift_account_id")
 }

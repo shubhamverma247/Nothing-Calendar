@@ -339,6 +339,7 @@ fun DotCalApp(
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val syncMetadata by viewModel.syncMetadata.collectAsStateWithLifecycle()
     val detailEvent by viewModel.detailEvent.collectAsStateWithLifecycle()
+    val shiftEventMetadata by viewModel.shiftEventMetadata.collectAsStateWithLifecycle()
     val eventFileAttachments by viewModel.eventFileAttachments.collectAsStateWithLifecycle()
     var screenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var previousScreenTab by remember { mutableStateOf(ScreenTab.Calendar) }
@@ -532,7 +533,6 @@ fun DotCalApp(
     LaunchedEffect(detailEvent?.baseEventId()) {
         detailEvent?.baseEventId()?.let(viewModel::refreshEventFileAttachments)
     }
-
     val themeMode by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             DotCalThemeMode.fromStorage(preferences[CalendarPreferences.KEY_THEME_MODE])
@@ -641,6 +641,16 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_WIDGET_DOT_TEXTURE] ?: true
         }
     }.collectAsStateWithLifecycle(initialValue = true)
+    val lastShiftTypeId by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_LAST_SHIFT_TYPE_ID]
+        }
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val lastShiftAccountId by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_LAST_SHIFT_ACCOUNT_ID]
+        }
+    }.collectAsStateWithLifecycle(initialValue = null)
     val weekStartDay = remember(weekStartOption) { resolveWeekStartDay(weekStartOption) }
     val onboardingDone by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
@@ -1296,6 +1306,7 @@ fun DotCalApp(
     // Group events by day once at the top level so the buckets survive Calendar <-> Tasks
     // <-> Settings switches and every calendar view reuses them instead of re-deriving.
     val eventsByDate = remember(events) { events.groupBy { it.localDate() } }
+    val shiftEventIds = remember(shiftEventMetadata) { shiftEventMetadata.keys }
     val appFontFamily = rememberAppFontFamily(appFont)
     CompositionLocalProvider(LocalHeadingFont provides appFontFamily) {
     Box(modifier = Modifier.fillMaxSize().background(palette.topBarSurface)) {
@@ -1408,6 +1419,7 @@ fun DotCalApp(
                                         month = month,
                                         selectedDate = selectedDate,
                                         eventsByDate = eventsByDate,
+                                        shiftEventIds = shiftEventIds,
                                         palette = palette,
                                         weekStart = weekStartDay,
                                         showWeekNumbers = showWeekNumbers,
@@ -1473,6 +1485,7 @@ fun DotCalApp(
                                     CalendarTab.Day -> DayView(
                                         selectedDate = selectedDate,
                                         eventsByDate = eventsByDate,
+                                        shiftEventIds = shiftEventIds,
                                         palette = palette,
                                         isDayPunched = punchCardState.isPunched(selectedDate),
                                         punchStreak = punchCardState.streakEndingAt(selectedDate),
@@ -2763,6 +2776,8 @@ fun DotCalApp(
                 shiftTypes = shiftTypes,
                 accounts = assignableAccounts,
                 initialDate = selectedDate,
+                initialShiftTypeId = lastShiftTypeId,
+                initialAccountId = lastShiftAccountId,
                 onDismiss = { showQuickShiftAdd = false },
                 onManageTypes = {
                     viewModel.refreshShiftPatterns()
@@ -2771,6 +2786,13 @@ fun DotCalApp(
                 onAddShift = { shiftTypeId, date, accountId ->
                     viewModel.addShiftOnDate(shiftTypeId, date, accountId) { added ->
                         if (added) {
+                            scope.launch {
+                                context.calendarPreferencesDataStore.edit { preferences ->
+                                    preferences[CalendarPreferences.KEY_LAST_SHIFT_TYPE_ID] = shiftTypeId
+                                    accountId?.let { preferences[CalendarPreferences.KEY_LAST_SHIFT_ACCOUNT_ID] = it }
+                                        ?: preferences.remove(CalendarPreferences.KEY_LAST_SHIFT_ACCOUNT_ID)
+                                }
+                            }
                             viewModel.selectDate(date)
                             showQuickShiftAdd = false
                             showDotCalToast(context, palette, R.string.shift_quick_added)

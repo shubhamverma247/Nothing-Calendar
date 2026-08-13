@@ -91,6 +91,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.CalendarEvent
+import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.insights.OnThisDayMemory
 import com.dotfield.dotcal.data.scheduling.EventDragMath
 import com.dotfield.dotcal.data.scheduling.EventTimeRange
@@ -124,6 +125,7 @@ internal fun MonthView(
     month: LocalDate,
     selectedDate: LocalDate,
     eventsByDate: Map<LocalDate, List<CalendarEvent>>,
+    shiftEventIds: Set<String>,
     palette: DotCalPalette,
     weekStart: DayOfWeek,
     showWeekNumbers: Boolean,
@@ -200,6 +202,7 @@ internal fun MonthView(
                                 isBulkSelected = day in selectedBulkDates,
                                 isHighlighted = day == highlightDate,
                                 events = eventsByDate[day].orEmpty(),
+                                shiftEventIds = shiftEventIds,
                                 visibleChipCount = visibleChipCount,
                                 palette = palette,
                                 onClick = { onDateSelected(day) },
@@ -247,6 +250,7 @@ private fun DayCell(
     isBulkSelected: Boolean,
     isHighlighted: Boolean,
     events: List<CalendarEvent>,
+    shiftEventIds: Set<String>,
     visibleChipCount: Int,
     palette: DotCalPalette,
     onClick: () -> Unit,
@@ -389,6 +393,7 @@ private fun DayCell(
                 events.take(visibleChipCount).forEach { event ->
                     MonthEventChip(
                         event = event,
+                        isShift = event.baseEventId() in shiftEventIds,
                         palette = palette,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -469,19 +474,29 @@ private fun monthDayAccessibilityLabel(
 @Composable
 private fun MonthEventChip(
     event: CalendarEvent,
+    isShift: Boolean,
     palette: DotCalPalette,
     modifier: Modifier = Modifier,
 ) {
     val eventColor = event.displayColor(palette)
     val title = event.title.ifBlank { stringResource(R.string.event_conflict_untitled) }
-    Box(
+    Row(
         modifier = modifier
             .height(14.dp)
             .clip(RoundedCornerShape(3.dp))
-            .background(eventColor.copy(alpha = if (event.isGhost) 0.10f else 0.18f))
+            .background(eventColor.copy(alpha = if (event.isGhost) 0.12f else if (isShift) 0.30f else 0.18f))
             .padding(horizontal = 3.dp),
-        contentAlignment = Alignment.CenterStart,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (isShift) {
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .fillMaxHeight()
+                    .background(eventColor),
+            )
+            Spacer(Modifier.width(3.dp))
+        }
         Text(
             title,
             modifier = Modifier.fillMaxWidth(),
@@ -854,20 +869,36 @@ private fun weekEventHeight(event: CalendarEvent) =
 private fun WeekEventBlock(
     event: CalendarEvent,
     palette: DotCalPalette,
+    isShift: Boolean,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
 ) {
+    val eventColor = event.displayColor(palette)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
-            .background(event.displayColor(palette).copy(alpha = if (event.isGhost) 0.34f else 0.80f))
+            .background(eventColor.copy(alpha = if (event.isGhost) 0.34f else if (isShift) 0.90f else 0.80f))
             .then(if (event.isGhost) Modifier.ghostDottedBorder(palette, 4f) else Modifier)
             .noRippleClickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        ShiftMarker(isShift = isShift, color = NWhite)
         Text(event.title, color = NWhite, fontFamily = mono, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun ShiftMarker(isShift: Boolean, color: Color) {
+    if (isShift) {
+        Box(
+            modifier = Modifier
+                .padding(end = 5.dp)
+                .size(width = 3.dp, height = 12.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(color.copy(alpha = 0.95f)),
+        )
     }
 }
 
@@ -882,6 +913,7 @@ private fun DraggableEventRow(
     dayColumnWidthPx: Float,
     allowedDayDelta: IntRange,
     use24HourFormat: Boolean,
+    isShift: Boolean = false,
     onClick: () -> Unit,
     onEventDrag: (EventDragChange) -> Unit,
     onDragActiveChange: (Boolean) -> Unit = {},
@@ -1000,6 +1032,7 @@ private fun DraggableEventRow(
                     WeekEventBlock(
                         event = event,
                         palette = palette,
+                        isShift = isShift,
                         modifier = Modifier.fillMaxSize(),
                     )
                     if (draggable) {
@@ -1099,6 +1132,7 @@ private fun dragTimeLabel(range: EventTimeRange, use24HourFormat: Boolean): Stri
 internal fun DayView(
     selectedDate: LocalDate,
     eventsByDate: Map<LocalDate, List<CalendarEvent>>,
+    shiftEventIds: Set<String>,
     palette: DotCalPalette,
     isDayPunched: Boolean,
     punchStreak: Int,
@@ -1170,19 +1204,22 @@ internal fun DayView(
         if (allDayEvents.isNotEmpty()) {
             LazyColumn(modifier = Modifier.fillMaxWidth().height(44.dp).background(palette.calendarSurface)) {
                 items(allDayEvents.size, key = { allDayEvents[it].id }) { index ->
-                    Text(
-                        allDayEvents[index].title,
-                        color = NWhite,
-                        fontFamily = mono,
-                        fontSize = 12.sp,
+                    val event = allDayEvents[index]
+                    val isShift = event.baseEventId() in shiftEventIds
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp)
-                            .background(allDayEvents[index].displayColor(palette).copy(alpha = if (allDayEvents[index].isGhost) 0.32f else 0.75f))
-                            .then(if (allDayEvents[index].isGhost) Modifier.ghostDottedBorder(palette, 2f) else Modifier)
-                            .clickable { onEventClick(allDayEvents[index]) }
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(event.displayColor(palette).copy(alpha = if (event.isGhost) 0.34f else if (isShift) 0.88f else 0.75f))
+                            .then(if (event.isGhost) Modifier.ghostDottedBorder(palette, 2f) else Modifier)
+                            .clickable { onEventClick(event) }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ShiftMarker(isShift = isShift, color = NWhite)
+                        Text(event.title, color = NWhite, fontFamily = mono, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }
@@ -1195,6 +1232,7 @@ internal fun DayView(
                         selectedDate = selectedDate,
                         events = timedEvents,
                         eventLayouts = eventLayouts,
+                        shiftEventIds = shiftEventIds,
                         palette = palette,
                         onAddAtDate = onAddAtDate,
                         onEventClick = onEventClick,
@@ -1452,6 +1490,7 @@ private fun DayTimelineColumn(
     selectedDate: LocalDate,
     events: List<CalendarEvent>,
     eventLayouts: Map<String, WeekEventLayout>,
+    shiftEventIds: Set<String>,
     palette: DotCalPalette,
     onAddAtDate: (LocalDate, LocalTime) -> Unit,
     onEventClick: (CalendarEvent) -> Unit,
@@ -1502,6 +1541,7 @@ private fun DayTimelineColumn(
                 dayColumnWidthPx = constraints.maxWidth.toFloat(),
                 allowedDayDelta = 0..0,
                 use24HourFormat = use24HourFormat,
+                isShift = event.baseEventId() in shiftEventIds,
                 onClick = { onEventClick(event) },
                 onEventDrag = onEventDrag,
             )
@@ -1630,6 +1670,7 @@ private fun ThreeDayHourRow(
                     WeekEventBlock(
                         event = event,
                         palette = palette,
+                        isShift = false,
                         onClick = { onEventClick(event) },
                         modifier = Modifier.zIndex(1f).padding(start = 5.dp, end = 5.dp, top = (5 + index * 29).dp).height(24.dp),
                     )

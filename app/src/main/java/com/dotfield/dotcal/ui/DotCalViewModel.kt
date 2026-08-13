@@ -24,6 +24,7 @@ import com.dotfield.dotcal.data.scheduling.AvailabilityTextFormatter
 import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
+import com.dotfield.dotcal.data.shifts.ShiftEventMetadata
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
 import com.dotfield.dotcal.data.templates.EventTemplate
@@ -39,6 +40,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
@@ -173,6 +175,14 @@ class DotCalViewModel(
 
     private val _detailEvent = MutableStateFlow<CalendarEvent?>(null)
     val detailEvent: StateFlow<CalendarEvent?> = _detailEvent
+    val shiftEventMetadata: StateFlow<Map<String, ShiftEventMetadata>> = combine(
+        events,
+        agendaEvents,
+        detailEvent,
+    ) { monthEvents, agendaItems, detail ->
+        val ids = (monthEvents + agendaItems + listOfNotNull(detail)).map { it.baseEventId() }.toSet()
+        repository.listShiftEventMetadata(ids)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
     private val _eventFileAttachments = MutableStateFlow<Map<String, List<EventFileAttachment>>>(emptyMap())
     val eventFileAttachments: StateFlow<Map<String, List<EventFileAttachment>>> = _eventFileAttachments
 

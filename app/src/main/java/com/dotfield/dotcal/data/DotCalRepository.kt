@@ -39,13 +39,18 @@ import com.dotfield.dotcal.data.scheduling.FreeSlotEngine
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import com.dotfield.dotcal.data.shifts.GeneratedShiftOccurrence
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
+import com.dotfield.dotcal.data.shifts.ShiftEventGeneratedBy
+import com.dotfield.dotcal.data.shifts.ShiftEventMetadata
 import com.dotfield.dotcal.data.shifts.ShiftGenerationRecord
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftPatternStore
 import com.dotfield.dotcal.data.shifts.ShiftType
+import com.dotfield.dotcal.data.shifts.encode
 import com.dotfield.dotcal.data.shifts.buildShiftEventDraft
 import com.dotfield.dotcal.data.shifts.buildShiftPlanShareEvents
 import com.dotfield.dotcal.data.shifts.expandShiftPattern
+import com.dotfield.dotcal.data.shifts.parseShiftEventMetadata
+import com.dotfield.dotcal.data.shifts.shiftMetadataFor
 import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.templates.EventTemplateStore
@@ -968,6 +973,7 @@ class DotCalRepository(
             dao.deleteRemindersForEvent(eventId)
             dao.deleteEvent(eventId)
             writeGhostFlag(eventId, false)
+            sideStore.remove(SHIFT_EVENT_METADATA_NAMESPACE, eventId)
         }
         dao.getRemindersForEvent(event.id).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
         dao.upsertEvent(event)
@@ -1018,6 +1024,7 @@ class DotCalRepository(
         }
         dao.deleteRemindersForEvent(eventId)
         dao.deleteEvent(eventId)
+        sideStore.remove(SHIFT_EVENT_METADATA_NAMESPACE, eventId)
         updateWidgets()
     }
 
@@ -1656,7 +1663,19 @@ class DotCalRepository(
         accountId: String?,
     ): Boolean = withContext(Dispatchers.IO) {
         val type = shiftPatternStore.listTypes().firstOrNull { it.id == shiftTypeId } ?: return@withContext false
-        saveShiftOccurrences(listOf(GeneratedShiftOccurrence(date, type)), accountId).isNotEmpty()
+        saveShiftOccurrence(
+            occurrence = GeneratedShiftOccurrence(date, type),
+            accountId = accountId,
+            metadata = shiftMetadataFor(type, date, ShiftEventGeneratedBy.Manual),
+        ) != null
+    }
+
+    suspend fun listShiftEventMetadata(eventIds: Collection<String>): Map<String, ShiftEventMetadata> = withContext(Dispatchers.IO) {
+        val ids = eventIds.map { it.substringBefore(RECURRENCE_OCCURRENCE_SEPARATOR) }.toSet()
+        sideStore.readNamespace(SHIFT_EVENT_METADATA_NAMESPACE)
+            .filterKeys { it in ids }
+            .mapNotNull { (id, value) -> parseShiftEventMetadata(value)?.let { id to it } }
+            .toMap()
     }
 
     suspend fun deleteShiftPattern(id: String, removeGeneratedEvents: Boolean) = withContext(Dispatchers.IO) {
@@ -1684,7 +1703,7 @@ class DotCalRepository(
             shiftPatternStore.removeGeneration(record.id)
         }
         val occurrences = expandShiftPattern(pattern, shiftTypes, rangeStart, rangeEnd)
-        val eventIds = saveShiftOccurrences(occurrences, accountId)
+        val eventIds = saveShiftOccurrences(occurrences, accountId, ShiftEventGeneratedBy.Pattern, patternId)
         shiftPatternStore.saveGeneration(
             ShiftGenerationRecord(
                 id = ShiftGenerationRecord.newId(),
@@ -1723,32 +1742,76 @@ class DotCalRepository(
     private suspend fun saveShiftOccurrences(
         occurrences: List<GeneratedShiftOccurrence>,
         accountId: String?,
-    ): List<String> {
-        val eventIds = ArrayList<String>(occurrences.size)
-        for (occurrence in occurrences) {
-            val eventId = UUID.randomUUID().toString()
-            val draft = buildShiftEventDraft(occurrence.shiftType, occurrence.date) ?: continue
-            saveLocalEvent(
-                existing = null,
-                data = EventEditorData(
-                    eventId = eventId,
-                    accountId = accountId,
-                    title = draft.title,
-                    description = "",
-                    location = "",
-                    date = draft.date,
-                    endDate = draft.endDate,
-                    startTime = draft.startTime,
-                    endTime = draft.endTime,
-                    isAllDay = draft.isAllDay,
-                    reminderMinutes = draft.reminderMinutes,
-                    rrule = null,
-                    colorHex = draft.colorHex,
-                ),
-            )
-            eventIds.add(eventId)
+        generatedBy: ShiftEventGeneratedBy,
+        patternId: String? = null,
+    ): List<String> = occurrences.mapNotNull { occurrence ->
+        saveShiftOccurrence(
+            occurrence = occurrence,
+            accountId = accountId,
+            metadata = shiftMetadataFor(occurrence.shiftType, occurrence.date, generatedBy, patternId),
+        )?.id
+    }
+
+    private suspend fun saveShiftOccurrence(
+        occurrence: GeneratedShiftOccurrence,
+        accountId: String?,
+        metadata: ShiftEventMetadata,
+    ): CalendarEvent? {
+        ensureLocalAccount()
+        val draft = buildShiftEventDraft(occurrence.shiftType, occurrence.date) ?: return null
+        val zoneId = ZoneId.systemDefault()
+        val start = if (draft.isAllDay) {
+            draft.date.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        } else {
+            draft.date.atTime(draft.startTime).atZone(zoneId).toInstant().toEpochMilli()
         }
-        return eventIds
+        val end = if (draft.isAllDay) {
+            draft.endDate.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+        } else {
+            draft.endDate.atTime(draft.endTime).atZone(zoneId).toInstant().toEpochMilli()
+        }
+        if (end <= start) return null
+        val now = System.currentTimeMillis()
+        val event = CalendarEvent(
+            id = UUID.randomUUID().toString(),
+            accountId = accountId ?: LOCAL_ACCOUNT_ID,
+            title = draft.title,
+            description = "",
+            location = "",
+            startTimeMs = start,
+            endTimeMs = end,
+            timeZone = zoneId.id,
+            isAllDay = if (draft.isAllDay) 1 else 0,
+            colorHex = draft.colorHex,
+            rrule = null,
+            exceptionDates = "[]",
+            source = "LOCAL",
+            googleEventId = null,
+            googleCalendarId = null,
+            syncVersion = 0,
+            isTask = 0,
+            isCompleted = 0,
+            completedAtMs = null,
+            imageUris = "[]",
+            voiceNotePath = null,
+            createdAtMs = now,
+            updatedAtMs = now,
+        )
+        val saved = syncProviderBackedEvent(null, event)
+        dao.upsertEvent(saved)
+        draft.reminderMinutes?.let { minutes ->
+            val reminder = EventReminder(
+                eventId = saved.id,
+                minutesBefore = minutes,
+                triggerAtMs = start - minutes * 60_000L,
+                alarmRequestCode = "${saved.id}-$minutes".hashCode().absoluteValue,
+            )
+            dao.insertReminders(listOf(reminder))
+            reminderScheduler.scheduleReminder(reminder, saved)
+        }
+        sideStore.write(SHIFT_EVENT_METADATA_NAMESPACE, saved.id, metadata.encode())
+        updateWidgets()
+        return saved
     }
 
     private fun rangesOverlap(aStart: LocalDate, aEnd: LocalDate, bStart: LocalDate, bEnd: LocalDate): Boolean =
@@ -2030,6 +2093,7 @@ class DotCalRepository(
         private const val HOLIDAY_ACCOUNT_PREFIX = "holiday-"
         private const val DEFAULT_EVENT_COLOR = "#FF0000"
         private const val GHOST_FLAGS_NAMESPACE = "ghost_flags"
+        private const val SHIFT_EVENT_METADATA_NAMESPACE = "shift_event_metadata"
         private const val EVENT_FILE_ATTACHMENTS_NAMESPACE = "event_file_attachments"
         private const val EVENT_FILE_PDF_MIME = "application/pdf"
         private const val MAX_EVENT_FILE_ATTACHMENTS = 5

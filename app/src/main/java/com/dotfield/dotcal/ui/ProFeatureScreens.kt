@@ -2295,14 +2295,20 @@ internal fun QuickShiftAddSheet(
     shiftTypes: List<ShiftType>,
     accounts: List<CalendarAccount>,
     initialDate: LocalDate,
+    initialShiftTypeId: String?,
+    initialAccountId: String?,
     onDismiss: () -> Unit,
     onManageTypes: () -> Unit,
     onAddShift: (String, LocalDate, String?) -> Unit,
 ) {
     val usableTypes = remember(shiftTypes) { shiftTypes.filter { it.generatesEvent } }
     var selectedDate by remember(initialDate) { mutableStateOf(initialDate) }
-    var selectedTypeId by remember(usableTypes) { mutableStateOf(usableTypes.firstOrNull()?.id) }
-    var selectedAccountId by remember(accounts) { mutableStateOf(accounts.firstOrNull()?.id) }
+    var selectedTypeId by remember(usableTypes, initialShiftTypeId) {
+        mutableStateOf(usableTypes.firstOrNull { it.id == initialShiftTypeId }?.id ?: usableTypes.firstOrNull()?.id)
+    }
+    var selectedAccountId by remember(accounts, initialAccountId) {
+        mutableStateOf(accounts.firstOrNull { it.id == initialAccountId }?.id ?: accounts.firstOrNull()?.id)
+    }
     val selectedAccount = accounts.firstOrNull { it.id == selectedAccountId } ?: accounts.firstOrNull()
     val effectiveAccountId = selectedAccount?.id
     var showDatePicker by remember { mutableStateOf(false) }
