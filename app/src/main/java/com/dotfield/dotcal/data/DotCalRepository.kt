@@ -1842,18 +1842,40 @@ class DotCalRepository(
         attachments: List<EventFileAttachment>,
         previousEventId: String? = null,
     ) {
-        val trimmed = attachments.take(MAX_EVENT_FILE_ATTACHMENTS)
+        val materialized = materializeEventFileAttachments(eventId, attachments)
         val previous = readEventFileAttachments(eventId) +
             previousEventId?.takeIf { it != eventId }?.let { readEventFileAttachments(it) }.orEmpty()
-        val keptPaths = trimmed.map { it.localPath }.toSet()
+        val keptPaths = materialized.map { it.localPath }.toSet()
         previous.filterNot { it.localPath in keptPaths }.forEach { discardEventFileAttachment(it) }
-        if (trimmed.isEmpty()) {
+        if (materialized.isEmpty()) {
             sideStore.remove(EVENT_FILE_ATTACHMENTS_NAMESPACE, eventId)
         } else {
-            sideStore.write(EVENT_FILE_ATTACHMENTS_NAMESPACE, eventId, trimmed.encodeEventFileAttachments())
+            sideStore.write(EVENT_FILE_ATTACHMENTS_NAMESPACE, eventId, materialized.encodeEventFileAttachments())
         }
         previousEventId?.takeIf { it != eventId }?.let {
             sideStore.remove(EVENT_FILE_ATTACHMENTS_NAMESPACE, it)
+        }
+    }
+
+    private fun materializeEventFileAttachments(
+        eventId: String,
+        attachments: List<EventFileAttachment>,
+    ): List<EventFileAttachment> {
+        return attachments.take(MAX_EVENT_FILE_ATTACHMENTS).mapNotNull { attachment ->
+            runCatching {
+                val source = File(attachment.localPath)
+                if (!source.exists()) return@runCatching null
+                val target = eventAttachmentFile(context.filesDir, eventId, attachment.id)
+                if (source.canonicalPath != target.canonicalPath) {
+                    target.parentFile?.mkdirs()
+                    source.copyTo(target, overwrite = true)
+                }
+                attachment.copy(
+                    mimeType = attachment.mimeType.ifBlank { EVENT_FILE_PDF_MIME },
+                    sizeBytes = target.length(),
+                    localPath = target.absolutePath,
+                )
+            }.getOrNull()
         }
     }
 

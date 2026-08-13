@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Close
@@ -134,30 +135,44 @@ internal fun EventListSheet(
                             .height(56.dp)
                             .border(1.dp, palette.accent.copy(alpha = 0.45f), shiftButtonShape),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = palette.accent.copy(alpha = if (palette.isDark) 0.18f else 0.10f),
-                            contentColor = palette.accent,
+                            containerColor = palette.accent,
+                            contentColor = Color.White,
                         ),
+                        contentPadding = PaddingValues(0.dp),
                         shape = shiftButtonShape,
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                stringResource(R.string.menu_add_shift),
-                                fontFamily = mono,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            if (showAddShiftProBadge) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            Row(
+                                modifier = Modifier.align(Alignment.Center),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
+                                    stringResource(R.string.menu_add_shift),
+                                    fontFamily = mono,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (showAddShiftProBadge) {
+                                Text(
                                     stringResource(R.string.badge_pro),
-                                    color = Color.White,
+                                    color = palette.accent,
                                     fontFamily = mono,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 9.sp,
                                     modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 5.dp, end = 7.dp)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(palette.accent)
+                                        .background(Color.White)
                                         .padding(horizontal = 5.dp, vertical = 2.dp),
                                 )
                             }
