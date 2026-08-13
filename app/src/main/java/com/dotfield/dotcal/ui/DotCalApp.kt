@@ -3098,6 +3098,16 @@ fun DotCalApp(
                 showSheet = false
                 openAddEditor()
             },
+            onAddShift = {
+                showSheet = false
+                if (isPro) {
+                    viewModel.refreshShiftPatterns()
+                    showQuickShiftAdd = true
+                } else {
+                    showPaywall = true
+                }
+            },
+            showAddShiftProBadge = !isPro,
             onEdit = {
                 showSheet = false
                 viewModel.openEventDetail(it)

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -76,6 +77,8 @@ internal fun EventListSheet(
     palette: DotCalPalette,
     onDismiss: () -> Unit,
     onAdd: () -> Unit,
+    onAddShift: (() -> Unit)? = null,
+    showAddShiftProBadge: Boolean = false,
     onEdit: (CalendarEvent) -> Unit,
 ) {
     ModalBottomSheet(
@@ -101,12 +104,67 @@ internal fun EventListSheet(
                     }
                 }
             }
-            Button(
-                onClick = onAdd,
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp).height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
-                shape = RoundedCornerShape(16.dp),
-            ) { Text(stringResource(R.string.agenda_add_event), fontFamily = mono) }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, bottom = 24.dp)
+                    .navigationBarsPadding(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Button(
+                    onClick = onAdd,
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.White),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.agenda_add_event),
+                        fontFamily = mono,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (onAddShift != null) {
+                    val shiftButtonShape = RoundedCornerShape(16.dp)
+                    Button(
+                        onClick = onAddShift,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp)
+                            .border(1.dp, palette.accent.copy(alpha = 0.45f), shiftButtonShape),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = palette.accent.copy(alpha = if (palette.isDark) 0.18f else 0.10f),
+                            contentColor = palette.accent,
+                        ),
+                        shape = shiftButtonShape,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(R.string.menu_add_shift),
+                                fontFamily = mono,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (showAddShiftProBadge) {
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    stringResource(R.string.badge_pro),
+                                    color = Color.White,
+                                    fontFamily = mono,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 9.sp,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(palette.accent)
+                                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

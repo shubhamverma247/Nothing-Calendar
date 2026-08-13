@@ -213,7 +213,10 @@ internal fun MonthView(
         }
         if (selectedBulkDates.isNotEmpty()) {
             Row(
-                modifier = Modifier.fillMaxWidth().background(palette.calendarSurface).padding(horizontal = 18.dp, vertical = 10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(palette.calendarSurface)
+                    .padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 102.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(

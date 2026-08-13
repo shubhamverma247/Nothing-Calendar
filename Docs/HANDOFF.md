@@ -36,6 +36,12 @@ untracked and must stay untouched.
   calendar/`DC` monogram silhouette in `res/drawable/ic_notification.xml`. Reminder notifications
   and their `View` / `Snooze 10 Min` actions still reference the same `R.drawable.ic_notification`
   resource; launcher icons were not used directly.
+- New uncommitted Month view polish after `e0f6eef`: tapping a date now shows split action buttons
+  in the event list sheet (`Add Event` / `Add Shift`), with Add Shift reusing the existing Pro-gated
+  Quick Shift sheet for the selected date. The Add Shift button uses an accent-tinted outlined
+  treatment so it stays visible in light theme and shows a `Pro` badge for free users. Long-press
+  bulk selection controls now reserve space above the floating bottom nav so Apply/Clear do not hide
+  behind it.
 - New files added in this continuation:
   - `app/src/main/java/com/dotfield/dotcal/data/shifts/ShiftPlanShare.kt`
   - `app/src/main/java/com/dotfield/dotcal/share/ShiftPlanShareExporter.kt`
@@ -52,6 +58,9 @@ untracked and must stay untouched.
     returned `BUILD SUCCESSFUL`; `.\gradlew.bat --no-daemon --console=plain :app:lintDebug :app:assembleDebug`
     returned `BUILD SUCCESSFUL`.
   - After final shift share export polish, `.\gradlew.bat --no-daemon --console=plain :app:compileDebugKotlin :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`
+    returned `BUILD SUCCESSFUL`.
+  - After Month view Add Shift/safe-area polish, `.\gradlew.bat --no-daemon --console=plain :app:compileDebugKotlin`
+    returned `BUILD SUCCESSFUL`; `.\gradlew.bat --no-daemon --console=plain :app:lintDebug :app:assembleDebug`
     returned `BUILD SUCCESSFUL`.
   - Debug APK installed successfully on device `4ab0d020` using
     `C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk`.
