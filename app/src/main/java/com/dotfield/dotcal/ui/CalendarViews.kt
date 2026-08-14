@@ -70,6 +70,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -139,7 +140,8 @@ internal fun MonthView(
     onDateSelected: (LocalDate) -> Unit,
 ) {
     val days = remember(month, weekStart) { monthGrid(month, weekStart) }
-    val weekDayLabels = remember(weekStart) { weekDayLabels(weekStart) }
+    val locale = currentResourceLocale()
+    val weekDayLabels = remember(weekStart, locale) { weekDayLabels(weekStart, locale) }
     var dragTotal by remember { mutableFloatStateOf(0f) }
 
     Column(
@@ -692,6 +694,7 @@ private fun WeekDayHeader(
 ) {
     val today = date == LocalDate.now()
     val haptic = LocalHapticFeedback.current
+    val locale = currentResourceLocale()
     val highlightColor by animateColorAsState(
         targetValue = if (highlighted) palette.accent.copy(alpha = 0.24f) else Color.Transparent,
         animationSpec = tween(durationMillis = 500),
@@ -721,7 +724,7 @@ private fun WeekDayHeader(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+        Text(date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, locale), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
         Box(
             modifier = Modifier
                 .padding(top = 4.dp)
@@ -1804,6 +1807,7 @@ private fun YearMonthCell(
     onClick: () -> Unit,
 ) {
     val days = remember(month, weekStart) { monthGrid(month, weekStart) }
+    val locale = currentResourceLocale()
     val today = LocalDate.now()
     val isCurrentMonth = month.year == today.year && month.monthValue == today.monthValue
     Column(
@@ -1816,7 +1820,7 @@ private fun YearMonthCell(
             .padding(horizontal = 6.dp, vertical = 7.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(month.month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()), color = if (isCurrentMonth) palette.accent else palette.yearMonthLabel, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            Text(month.month.getDisplayName(java.time.format.TextStyle.SHORT, locale), color = if (isCurrentMonth) palette.accent else palette.yearMonthLabel, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
             Text(month.monthValue.toString().padStart(2, '0'), color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp)
         }
         Spacer(modifier = Modifier.height(5.dp))
@@ -1827,6 +1831,8 @@ private fun YearMonthCell(
             eventDensity = eventDensity,
             heatmapEnabled = heatmapEnabled,
             palette = palette,
+            weekStart = weekStart,
+            locale = locale,
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
     }
@@ -1840,8 +1846,11 @@ private fun MiniMonthGridCanvas(
     eventDensity: Map<LocalDate, Int>,
     heatmapEnabled: Boolean,
     palette: DotCalPalette,
+    weekStart: DayOfWeek,
+    locale: Locale,
     modifier: Modifier = Modifier,
 ) {
+    val labels = remember(weekStart, locale) { weekDayLabels(weekStart, locale) }
     val weekdayColor = palette.yearWeekday.toArgb()
     val secondaryColor = palette.secondaryText.toArgb()
     val accentColor = palette.accent.toArgb()
@@ -1869,7 +1878,6 @@ private fun MiniMonthGridCanvas(
         }
         val columnWidth = size.width / 7f
         val rowHeight = size.height / 7f
-        val labels = listOf("S", "M", "T", "W", "T", "F", "S")
         labels.forEachIndexed { index, label ->
             val x = columnWidth * index + columnWidth / 2f
             val y = rowHeight * 0.58f
@@ -1982,8 +1990,19 @@ private fun weekDays(date: LocalDate, weekStart: DayOfWeek): List<LocalDate> {
     return List(7) { start.plusDays(it.toLong()) }
 }
 
-private fun weekDayLabels(weekStart: DayOfWeek): List<String> {
+@Composable
+private fun currentResourceLocale(): Locale {
+    return LocalContext.current.resources.configuration.locales[0] ?: Locale.getDefault()
+}
+
+private fun weekDayLabels(weekStart: DayOfWeek, locale: Locale): List<String> {
     return List(7) { index ->
-        weekStart.plus(index.toLong()).getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault())
+        weekStart.plus(index.toLong())
+            .getDisplayName(java.time.format.TextStyle.NARROW, locale)
+            .ifBlank {
+                weekStart.plus(index.toLong())
+                    .getDisplayName(java.time.format.TextStyle.SHORT, locale)
+                    .take(1)
+            }
     }
 }
