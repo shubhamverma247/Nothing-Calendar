@@ -108,6 +108,7 @@
     <string name="settings_privacy_policy">Política de privacidad</string>
     <string name="settings_rate">Valorar DotCal</string>
     <string name="settings_more_apps">Más apps nuestras</string>
+    <string name="settings_join_discord">Unirse a Discord</string>
     <string name="settings_send_feedback">Enviar comentarios</string>
     <string name="settings_version">Versión</string>
 
@@ -247,10 +248,10 @@
     <!-- DotCal Pro -->
     <string name="settings_pair_value">%1$s / %2$s</string>
     <string name="settings_pro_lifetime_unlocked">Desbloqueado de por vida</string>
-    <string name="settings_pro_lifetime_tools">Pro tools</string>
-    <string name="settings_pro_lifetime_tools_price">Pro plans / %1$s</string>
-    <string name="settings_pro_plans_available">Choose monthly, annual, or lifetime access</string>
-    <string name="settings_pro_plans_from_price">Plans from %1$s</string>
+    <string name="settings_pro_lifetime_tools">Herramientas Pro</string>
+    <string name="settings_pro_lifetime_tools_price">Planes Pro / %1$s</string>
+    <string name="settings_pro_plans_available">Elige acceso mensual, anual o de por vida</string>
+    <string name="settings_pro_plans_from_price">Planes desde %1$s</string>
     <string name="settings_pro_active">Activo: ¡gracias por tu apoyo!</string>
     <string name="settings_pro_unlock">Desbloquea las funciones Pro</string>
     <string name="pro_feature_tag">Función Pro</string>
@@ -341,8 +342,8 @@
     <string name="dialog_update_ready">Actualización lista</string>
     <string name="dialog_update_ready_body">La actualización se ha descargado. Reinicia DotCal para aplicarla.</string>
     <plurals name="dialog_conflict_overlaps">
-        <item quantity="one">Este horario se superpone con otro evento.</item>
-        <item quantity="other">Este horario se superpone con %1$d eventos más.</item>
+        <item quantity="one">Esta hora se solapa con otro evento.</item>
+        <item quantity="other">Esta hora se solapa con otros %1$d eventos.</item>
     </plurals>
 
     <!-- Event details -->
@@ -587,19 +588,31 @@
     <string name="pro_feature_dead_time_desc">Encuentra bloques libres en los próximos siete días</string>
     <string name="pro_feature_share_availability">Compartir disponibilidad</string>
     <string name="pro_feature_share_availability_desc">Convierte tu tiempo libre en texto que puedes pegar donde quieras</string>
+    <string name="pro_feature_pdf_attachments">Adjuntos PDF</string>
+    <string name="pro_feature_pdf_attachments_desc">Adjunta hasta 5 PDF a cualquier evento</string>
+    <string name="pro_feature_unlimited_countdowns">Cuentas regresivas ilimitadas</string>
+    <string name="pro_feature_unlimited_countdowns_desc">Fija cuentas regresivas para cada fecha importante</string>
+    <string name="pro_feature_widget_calendar_picker">Selector de calendario para widgets</string>
+    <string name="pro_feature_widget_calendar_picker_desc">Elige que calendario muestra cada widget</string>
+    <string name="pro_feature_bulk_actions">Acciones masivas de calendario</string>
+    <string name="pro_feature_bulk_actions_desc">Mueve, copia, colorea, aplica plantillas o desplaza muchos eventos a la vez</string>
+    <string name="pro_feature_shift_sharing">Compartir plan de turnos</string>
+    <string name="pro_feature_shift_sharing_desc">Comparte planes como imagen, PDF, ICS o QR DotCal</string>
+    <string name="pro_feature_year_heatmap">Mapa de calor anual</string>
+    <string name="pro_feature_year_heatmap_desc">Ve temporadas ocupadas y libres en todo el año</string>
 
     <!-- Paywall. "DotCal Pro" is a brand name and stays untranslated. -->
     <string name="paywall_headline">Upgrade to DotCal Pro</string>
-    <string name="paywall_subhead">Advanced calendar tools, widgets, templates, privacy, and time insights in one focused workspace.</string>
+    <string name="paywall_subhead">Herramientas avanzadas de calendario, widgets, plantillas, privacidad e información de tiempo en un espacio enfocado.</string>
     <string name="paywall_lifetime_pro">Pro de por vida</string>
     <string name="paywall_yearly_plan">Anual</string>
     <string name="paywall_monthly_plan">Mensual</string>
     <string name="paywall_recommended">MEJOR VALOR</string>
     <string name="paywall_trial_badge">7-DAY TRIAL</string>
-    <string name="paywall_yearly_trial_detail">7-day free trial, then annual billing</string>
-    <string name="paywall_yearly_detail">Annual subscription</string>
-    <string name="paywall_monthly_detail">Monthly subscription</string>
-    <string name="paywall_lifetime_detail">One-time purchase</string>
+    <string name="paywall_yearly_trial_detail">7 días gratis, luego facturación anual</string>
+    <string name="paywall_yearly_detail">Suscripción anual</string>
+    <string name="paywall_monthly_detail">Suscripción mensual</string>
+    <string name="paywall_lifetime_detail">Compra única</string>
     <string name="paywall_yearly_trial_subtitle">7 días gratis, luego %1$s / año</string>
     <string name="paywall_yearly_subtitle">%1$s / año</string>
     <string name="paywall_monthly_subtitle">%1$s / mes</string>
@@ -630,7 +643,7 @@
     <string name="paywall_restore_none_found">No se encontró ninguna compra previa en esta cuenta</string>
     <string name="paywall_connecting">Conectando...</string>
     <string name="paywall_unlock_pro">Desbloquear Pro</string>
-    <string name="paywall_unlock_pro_price">Continue - %1$s</string>
+    <string name="paywall_unlock_pro_price">Continuar - %1$s</string>
     <string name="paywall_start_free_trial">Iniciar prueba gratis de 7 días</string>
     <string name="paywall_youre_pro">¡Ya eres Pro!</string>
 

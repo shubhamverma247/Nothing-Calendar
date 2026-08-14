@@ -114,6 +114,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
@@ -257,6 +258,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 
+private const val DISCORD_INVITE_URL = "https://discord.gg/sTAKcAG8R"
+private const val PRIVACY_POLICY_URL = "https://dotcal-website.netlify.app/privacy"
+
 @Composable
 internal fun SettingsPreview(
     themeMode: DotCalThemeMode,
@@ -333,6 +337,7 @@ internal fun SettingsPreview(
     onBackup: () -> Unit,
     onRestore: () -> Unit,
 ) {
+    val context = LocalContext.current
     BackHandler {
         when (screen) {
             SettingsScreen.Root -> onBack()
@@ -388,7 +393,9 @@ internal fun SettingsPreview(
             onWidgetDotTextureChange = onWidgetDotTextureChange,
             onBirthdayEnabledChange = onBirthdayEnabledChange,
             onGlobalHolidays = { onScreenChange(SettingsScreen.GlobalHolidays) },
-            onPrivacyPolicy = { onScreenChange(SettingsScreen.PrivacyPolicy) },
+            onPrivacyPolicy = {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL)))
+            },
             onRateDotCal = onRateDotCal,
             onCheckForUpdates = onCheckForUpdates,
             onMoreApps = onMoreApps,
@@ -780,6 +787,10 @@ internal fun SettingsRoot(
                     SettingsIconMenuRow(title = stringResource(R.string.settings_rate), value = "", icon = Icons.Default.Star, palette = palette, onClick = onRateDotCal)
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(title = stringResource(R.string.settings_more_apps), value = stringResource(R.string.settings_more_apps_value), icon = Icons.Default.Apps, palette = palette, onClick = onMoreApps)
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(title = stringResource(R.string.settings_join_discord), value = stringResource(R.string.settings_join_discord_value), icon = Icons.Default.Groups, palette = palette, onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DISCORD_INVITE_URL)))
+                    })
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(title = stringResource(R.string.settings_send_feedback), value = "", icon = Icons.Default.Edit, palette = palette, onClick = {
                         context.startActivity(

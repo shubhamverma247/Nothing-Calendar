@@ -112,6 +112,8 @@
     <string name="settings_more_apps">More apps from us</string>
     <!-- Sibling app's store name — a brand, not copy. -->
     <string name="settings_more_apps_value" translatable="false">DotFiles — File Manager</string>
+    <string name="settings_join_discord">Join Discord</string>
+    <string name="settings_join_discord_value" translatable="false">discord.gg/sTAKcAG8R</string>
     <string name="settings_send_feedback">Send Feedback</string>
     <string name="settings_version">Version</string>
 
@@ -282,19 +284,19 @@
     <string name="privacy_section_08_title" translatable="false">08  Children\'s Privacy</string>
     <string name="privacy_section_09_title" translatable="false">09  Your Rights</string>
     <string name="privacy_section_10_title" translatable="false">10  Policy Changes</string>
-    <string name="privacy_section_01_body" translatable="false">DotCal does not collect your calendar content and does not transmit events, tasks, reminders, attachments, or settings to Dotfield Studio. Your calendar data exists only on your Android device.\n\nThis policy covers the DotCal Android app (com.dotfield.dotcal), published by Dotfield Studio, and applies from the date of your first install.\n\nWe built DotCal with a simple rule: data about your life belongs to you. The app has no Dotfield backend, no account system, no advertising, and no analytics SDK embedded anywhere in the code. Google Play services are used only for Play Billing, purchase restore, and in-app update checks.</string>
-    <string name="privacy_section_02_body" translatable="false">DotCal does not collect, store, or transmit your calendar content to Dotfield Studio.\n\nCalendar events, tasks, reminder alarms, voice notes, image attachments, theme and app settings, and any imported contact birthdays or Google Calendar events all live only on your device. None of that content is sent to Dotfield Studio, and we cannot access it.\n\nDotCal stores a local Pro entitlement flag after a successful Google Play purchase or restore. Payment processing, receipts, and account-level purchase data are handled by Google Play, not by Dotfield Studio. No crash analytics. No usage analytics. No advertising identifiers.</string>
-    <string name="privacy_section_03_body" translatable="false">DotCal requests only what it needs to function:\n\n- Calendar (read/write) - only if you enable Google Calendar sync, to read/create events via Android\'s CalendarProvider. Calendar data does not leave the device through DotCal.\n- Contacts - optional, to read contact birthdays as yearly events. Only reads dates, not full contact data.\n- Exact Alarm &amp; Boot - schedule reminder alarms and re-register them after a reboot.\n- Notifications - display event and task reminders (Android 13+).\n- Microphone - optional, to record voice notes. Saved to app-private storage, only when you tap record.\n- Photos - selected via Android Photo Picker only. DotCal never accesses your full gallery.\n- Internet / Network State - used by Google Play Billing and in-app update checks. DotCal does not use this permission to upload calendar data, analytics, or ads.</string>
+    <string name="privacy_section_01_body" translatable="false">DotCal does not collect your calendar content and does not transmit events, tasks, reminders, attachments, or settings to Dotfield Studio. Your calendar data exists only on your Android device.\n\nThis policy covers the DotCal Android app (com.dotfield.dotcal), published by Dotfield Studio, and applies from the date of your first install.\n\nWe built DotCal with a simple rule: data about your life belongs to you. The app has no Dotfield backend, no account system, no advertising, and no analytics SDK embedded anywhere in the code. Google Play services are used for Play Billing, subscriptions, purchase restore, subscription management, and in-app update checks.</string>
+    <string name="privacy_section_02_body" translatable="false">DotCal does not collect, store, or transmit your calendar content to Dotfield Studio.\n\nCalendar events, tasks, reminder alarms, voice notes, image attachments, PDF attachments, templates, calendar sets, shift patterns, theme and app settings, and any imported contact birthdays or Google Calendar events all live only on your device. None of that content is sent to Dotfield Studio, and we cannot access it.\n\nDotCal stores a local Pro entitlement flag after a successful Google Play purchase, subscription, or restore. Payment processing, receipts, trials, renewals, cancellations, promo redemption, and account-level purchase data are handled by Google Play, not by Dotfield Studio. No crash analytics. No usage analytics. No advertising identifiers.</string>
+    <string name="privacy_section_03_body" translatable="false">DotCal requests only what it needs to function:\n\n- Calendar (read/write) - only if you enable calendar sync, to read/create events via Android\'s CalendarProvider. Calendar data does not leave the device through DotCal.\n- Contacts - optional, to read contact birthday dates and create local yearly birthday events. DotCal does not upload contact data.\n- Camera - optional, used only when you scan a DotCal QR event or shift-plan code.\n- Exact Alarm, Boot, Wake Lock, Vibration, and Foreground Service - schedule precise reminders, re-register them after reboot, and notify reliably.\n- Notifications - display event and task reminders (Android 13+).\n- Microphone - optional, to record voice notes. Saved to app-private storage, only when you tap record.\n- Photos and documents - selected via Android system pickers only. DotCal copies only the images or PDF files you choose.\n- Internet / Network State / Billing - used by Google Play Billing, subscription management, in-app update checks, and external links such as Discord. DotCal does not use network access to upload calendar data, analytics, or ads.\n- Nothing Glyph permission - used for local Glyph Toy integration on supported Nothing devices.</string>
     <string name="privacy_section_04_body" translatable="false">DotCal\'s calendar sync does not connect to Google\'s Calendar API. It reads from Android\'s built-in CalendarProvider - the same local database the default Calendar app uses. No Google Calendar credentials are ever seen or stored by DotCal.\n\nThis is different from apps that use the Google Calendar REST API or OAuth. DotCal does not make HTTP requests for calendar sync and never sees your Google credentials.\n\nIf you disable sync, DotCal stops querying CalendarProvider. Previously imported events stay in DotCal\'s local database until you delete them.</string>
-    <string name="privacy_section_05_body" translatable="false">All DotCal data is stored in Android\'s app-private storage, inaccessible to other apps without root access, and deleted automatically when you uninstall.\n\nStored data includes the SQLite database (events, tasks, recurrence rules), local preferences (theme, view, sync toggles), voice note files, and image attachments.\n\nDotCal does not write to shared external storage. If your device\'s Google Backup is enabled at the system level, Android may back up app data - this is outside DotCal\'s control.</string>
-    <string name="privacy_section_06_body" translatable="false">DotCal integrates no third-party SDKs for analytics, advertising, crash reporting, or remote configuration. No Firebase Analytics, no Crashlytics, no advertising networks, no A/B testing.\n\nDotCal uses Google Play Billing for the one-time Pro purchase and restore flow, Google Play In-App Updates for update checks, and the Nothing Glyph SDK for local Glyph Toy integration on supported Nothing devices. These services do not receive your calendar events, tasks, reminders, attachments, voice notes, or settings from DotCal.</string>
+    <string name="privacy_section_05_body" translatable="false">All DotCal data is stored in Android\'s app-private storage, inaccessible to other apps without root access, and deleted automatically when you uninstall.\n\nStored data includes the SQLite database (events, tasks, recurrence rules), local preferences (theme, view, sync toggles), voice note files, image attachments, PDF attachments, templates, calendar sets, shift patterns, private vault metadata, and recently deleted snapshots.\n\nDotCal does not write to shared external storage unless you explicitly export, back up, or share a file. If your device\'s Google Backup is enabled at the system level, Android may back up app data - this is outside DotCal\'s control.</string>
+    <string name="privacy_section_06_body" translatable="false">DotCal integrates no third-party SDKs for analytics, advertising, crash reporting, or remote configuration. No Firebase Analytics, no Crashlytics, no advertising networks, no A/B testing.\n\nDotCal uses Google Play Billing for Pro subscriptions, trials, lifetime purchases, purchase restore, promo redemption, and subscription management; Google Play In-App Updates for update checks; and the Nothing Glyph SDK for local Glyph Toy integration on supported Nothing devices. DotCal also includes external links such as Google Play listings and Discord; opening them leaves DotCal and is governed by those services\' own policies. These services do not receive your calendar events, tasks, reminders, attachments, voice notes, or settings from DotCal.</string>
     <string name="privacy_section_07_body" translatable="false">Because DotCal stores calendar data locally and does not upload your calendar content, the main risk is physical device access. Keep your device PIN or biometric lock active.\n\nAndroid\'s app sandbox provides the primary protection. On modern devices with hardware-backed encryption, the OS-level encryption protects DotCal data at rest.</string>
     <string name="privacy_section_08_body" translatable="false">DotCal does not knowingly collect information from anyone, including children under 13. Because DotCal collects no data at all, there is no children\'s data to protect beyond standard Android privacy protections.</string>
-    <string name="privacy_section_09_body" translatable="false">Because DotCal does not collect or store personal data on any server, all of your data is under your direct control:\n\n- Access - your data is in the app on your device.\n- Delete - uninstall to remove everything, or delete individual events in-app.\n- Export - PDF export of calendar views is a planned feature.\n- Portability - events synced via CalendarProvider remain in Android\'s calendar database.\n\nIf you are in the EU, UK, or California, GDPR and CCPA rights apply - exercised entirely on-device, since we hold no data.</string>
+    <string name="privacy_section_09_body" translatable="false">Because DotCal does not collect or store personal data on any server, all of your data is under your direct control:\n\n- Access - your data is in the app on your device.\n- Delete - uninstall to remove everything, or delete individual events in-app.\n- Export and backup - you can export ICS calendar files, create local JSON backups, restore backups, and share selected shift plans as image, PDF, ICS, or DotCal QR.\n- Portability - events synced via CalendarProvider remain in Android\'s calendar database.\n\nIf you are in the EU, UK, or California, GDPR and CCPA rights apply - exercised entirely on-device, since we hold no data.</string>
     <string name="privacy_section_10_body" translatable="false">If this policy changes materially - for example, if DotCal adds cloud sync, analytics, advertising, or a Dotfield server feature - we will update this page and the effective date below, and flag the change in a release note. We commit to never adding advertising, analytics, or cloud storage without updating this policy and prominently notifying users.</string>
     <string name="privacy_contact_title" translatable="false">Questions? Contact us</string>
     <string name="privacy_contact_email" translatable="false">dotfieldstudio@gmail.com</string>
-    <string name="privacy_effective" translatable="false">Effective July 14, 2026 / Dotfield Studio</string>
+    <string name="privacy_effective" translatable="false">Effective August 14, 2026 / Dotfield Studio</string>
 
     <!-- Event editor -->
     <string name="event_editor_title_add">Add event</string>
@@ -582,15 +584,21 @@
     <string name="template_all_day">All-day</string>
     <string name="template_repeats">Repeats</string>
     <string name="template_summary_separator" translatable="false"> / </string>
-    <!-- Paywall: the 14 Pro feature rows. "DotCal" in the widget-pack line is a brand term. -->
+    <!-- Paywall: Pro feature rows. "DotCal" in the widget-pack line is a brand term. -->
     <string name="pro_feature_images">Image Attachments</string>
     <string name="pro_feature_images_desc">Add up to 5 photos to any event</string>
+    <string name="pro_feature_pdf_attachments">PDF Attachments</string>
+    <string name="pro_feature_pdf_attachments_desc">Attach up to 5 PDFs to any event</string>
     <string name="pro_feature_voice">Voice Notes</string>
     <string name="pro_feature_voice_desc">Record audio notes on your events</string>
+    <string name="pro_feature_unlimited_countdowns">Unlimited Countdowns</string>
+    <string name="pro_feature_unlimited_countdowns_desc">Pin countdowns for every important date</string>
     <string name="pro_feature_large_widget">Large Widget</string>
     <string name="pro_feature_large_widget_desc">Full month grid widget for your home screen</string>
     <string name="pro_feature_widget_pack">Widget Pack Config</string>
     <string name="pro_feature_widget_pack_desc">Transparent widgets plus DotCal dot texture</string>
+    <string name="pro_feature_widget_calendar_picker">Widget Calendar Picker</string>
+    <string name="pro_feature_widget_calendar_picker_desc">Choose which calendar each widget shows</string>
     <string name="pro_feature_date_calc">Date Calculator</string>
     <string name="pro_feature_date_calc_desc">Calculate days between dates instantly</string>
     <string name="pro_feature_accents">Custom Accent Colors</string>
@@ -603,14 +611,20 @@
     <string name="pro_feature_templates_desc">Save presets and reuse them from the + button</string>
     <string name="pro_feature_calendar_sets">Calendar Sets</string>
     <string name="pro_feature_calendar_sets_desc">Save Work/Personal/Family visibility and switch instantly</string>
+    <string name="pro_feature_bulk_actions">Bulk Calendar Actions</string>
+    <string name="pro_feature_bulk_actions_desc">Move, copy, color, template, or shift many events at once</string>
     <string name="pro_feature_shift_patterns">Shift Patterns</string>
     <string name="pro_feature_shift_patterns_desc">Build rotating shift cycles and generate them in bulk</string>
+    <string name="pro_feature_shift_sharing">Shift Plan Sharing</string>
+    <string name="pro_feature_shift_sharing_desc">Share shift plans as image, PDF, ICS, or DotCal QR</string>
     <string name="pro_feature_time_insights">Time Insights</string>
     <string name="pro_feature_time_insights_desc">See hours, busiest days, and task completion</string>
     <string name="pro_feature_dead_time">Dead Time Finder</string>
     <string name="pro_feature_dead_time_desc">Find open blocks across the next seven days</string>
     <string name="pro_feature_share_availability">Share Availability</string>
     <string name="pro_feature_share_availability_desc">Turn free time into text you can paste anywhere</string>
+    <string name="pro_feature_year_heatmap">Year Heatmap</string>
+    <string name="pro_feature_year_heatmap_desc">See busy and open seasons across the whole year</string>
 
     <!-- Paywall. "DotCal Pro" is a brand name and stays untranslated (see the brand list in
          Docs/HANDOFF.md); paywall_unlock_pro_price takes the Play Store formatted price. -->

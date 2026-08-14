@@ -282,20 +282,26 @@ private data class ProFeature(
 }
 
 private val PRO_FEATURES = listOf(
+    ProFeature(R.string.pro_feature_app_lock, R.string.pro_feature_app_lock_desc),
+    ProFeature(R.string.pro_feature_pdf_attachments, R.string.pro_feature_pdf_attachments_desc),
     ProFeature(R.string.pro_feature_images, R.string.pro_feature_images_desc),
     ProFeature(R.string.pro_feature_voice, R.string.pro_feature_voice_desc),
-    ProFeature(R.string.pro_feature_large_widget, R.string.pro_feature_large_widget_desc),
-    ProFeature(R.string.pro_feature_widget_pack, R.string.pro_feature_widget_pack_desc),
-    ProFeature(R.string.pro_feature_date_calc, R.string.pro_feature_date_calc_desc),
-    ProFeature(R.string.pro_feature_accents, R.string.pro_feature_accents_desc),
-    ProFeature(R.string.pro_feature_recurrence, R.string.pro_feature_recurrence_desc),
-    ProFeature(R.string.pro_feature_app_lock, R.string.pro_feature_app_lock_desc),
-    ProFeature(R.string.pro_feature_templates, R.string.pro_feature_templates_desc),
-    ProFeature(R.string.pro_feature_calendar_sets, R.string.pro_feature_calendar_sets_desc),
+    ProFeature(R.string.pro_feature_unlimited_countdowns, R.string.pro_feature_unlimited_countdowns_desc),
     ProFeature(R.string.pro_feature_shift_patterns, R.string.pro_feature_shift_patterns_desc),
+    ProFeature(R.string.pro_feature_shift_sharing, R.string.pro_feature_shift_sharing_desc),
+    ProFeature(R.string.pro_feature_calendar_sets, R.string.pro_feature_calendar_sets_desc),
+    ProFeature(R.string.pro_feature_bulk_actions, R.string.pro_feature_bulk_actions_desc),
+    ProFeature(R.string.pro_feature_date_calc, R.string.pro_feature_date_calc_desc),
     ProFeature(R.string.pro_feature_time_insights, R.string.pro_feature_time_insights_desc),
     ProFeature(R.string.pro_feature_dead_time, R.string.pro_feature_dead_time_desc),
     ProFeature(R.string.pro_feature_share_availability, R.string.pro_feature_share_availability_desc),
+    ProFeature(R.string.pro_feature_year_heatmap, R.string.pro_feature_year_heatmap_desc),
+    ProFeature(R.string.pro_feature_large_widget, R.string.pro_feature_large_widget_desc),
+    ProFeature(R.string.pro_feature_widget_pack, R.string.pro_feature_widget_pack_desc),
+    ProFeature(R.string.pro_feature_widget_calendar_picker, R.string.pro_feature_widget_calendar_picker_desc),
+    ProFeature(R.string.pro_feature_accents, R.string.pro_feature_accents_desc),
+    ProFeature(R.string.pro_feature_recurrence, R.string.pro_feature_recurrence_desc),
+    ProFeature(R.string.pro_feature_templates, R.string.pro_feature_templates_desc),
 )
 
 private enum class TimeInsightRange(@StringRes val labelRes: Int) {
