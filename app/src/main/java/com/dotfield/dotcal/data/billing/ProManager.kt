@@ -50,11 +50,13 @@ class ProManager(
     private val _billingState = MutableStateFlow<BillingConnectionState>(BillingConnectionState.Disconnected)
     val billingState: StateFlow<BillingConnectionState> = _billingState.asStateFlow()
 
-    private var cachedProductDetails: ProductDetails? = null
+    private val cachedProductDetailsById = mutableMapOf<String, ProductDetails>()
     private val _productDetails = MutableStateFlow<ProductDetails?>(null)
     val productDetails: StateFlow<ProductDetails?> = _productDetails.asStateFlow()
     private val _purchaseOffers = MutableStateFlow<List<ProPurchaseOffer>>(emptyList())
     val purchaseOffers: StateFlow<List<ProPurchaseOffer>> = _purchaseOffers.asStateFlow()
+    private val _hasActiveSubscription = MutableStateFlow(false)
+    val hasActiveSubscription: StateFlow<Boolean> = _hasActiveSubscription.asStateFlow()
 
     private val purchaseResults = MutableStateFlow<PurchaseResult?>(null)
 
@@ -74,15 +76,21 @@ class ProManager(
     private val purchasesUpdatedListener = PurchasesUpdatedListener { result, purchases ->
         when (result.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
-                val purchase = purchases?.firstOrNull { it.products.contains(PRODUCT_ID_PRO) }
-                if (purchase != null) {
-                    scope.launch { handlePurchased(purchase, fromFlow = true) }
+                val proPurchases = purchases.orEmpty().filter { it.containsKnownProProduct() }
+                if (proPurchases.isNotEmpty()) {
+                    scope.launch { handleUpdatedPurchases(proPurchases, fromFlow = true) }
                 } else {
                     purchaseResults.value = PurchaseResult.Error(GENERIC_ERROR)
                 }
             }
             BillingClient.BillingResponseCode.USER_CANCELED ->
                 purchaseResults.value = PurchaseResult.Cancelled
+            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> {
+                scope.launch {
+                    val restored = restorePurchases()
+                    purchaseResults.value = if (restored) PurchaseResult.Success else PurchaseResult.Error(GENERIC_ERROR)
+                }
+            }
             else ->
                 purchaseResults.value = PurchaseResult.Error(GENERIC_ERROR)
         }
@@ -155,73 +163,81 @@ class ProManager(
     /** Queries live purchases and syncs [_isPro] + DataStore, trusting the live query over cache. */
     private suspend fun refreshPurchases() {
         runCatching { queryAndCacheProductDetails() }
-        val result = runCatching {
-            billingClient.queryPurchasesAsync(
-                QueryPurchasesParams.newBuilder()
-                    .setProductType(BillingClient.ProductType.INAPP)
+        val inAppPurchases = queryPurchases(BillingClient.ProductType.INAPP) ?: return
+        val subscriptionPurchases = queryPurchases(BillingClient.ProductType.SUBS) ?: return
+        syncEntitlement(inAppPurchases, subscriptionPurchases, fromFlow = false)
+    }
+
+    private suspend fun handleUpdatedPurchases(purchases: List<Purchase>, fromFlow: Boolean) {
+        purchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }.forEach { purchase ->
+            acknowledgeIfNeeded(purchase)
+        }
+        refreshPurchases()
+        if (fromFlow) {
+            purchaseResults.value = if (_isPro.value) PurchaseResult.Success else PurchaseResult.Error(GENERIC_ERROR)
+        }
+    }
+
+    private suspend fun acknowledgeIfNeeded(purchase: Purchase) {
+        if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED || purchase.isAcknowledged) return
+        runCatching {
+            billingClient.acknowledgePurchase(
+                AcknowledgePurchaseParams.newBuilder()
+                    .setPurchaseToken(purchase.purchaseToken)
                     .build(),
             )
-        }.getOrNull() ?: return
-
-        val proPurchase = result.purchasesList.firstOrNull {
-            it.products.contains(PRODUCT_ID_PRO) &&
-                it.purchaseState == Purchase.PurchaseState.PURCHASED
-        }
-        if (proPurchase != null) {
-            handlePurchased(proPurchase, fromFlow = false)
-        } else {
-            _isPro.value = false
-            repository.setIsPro(false)
         }
     }
 
-    private suspend fun handlePurchased(purchase: Purchase, fromFlow: Boolean) {
-        if (!purchase.isAcknowledged) {
-            runCatching {
-                billingClient.acknowledgePurchase(
-                    AcknowledgePurchaseParams.newBuilder()
-                        .setPurchaseToken(purchase.purchaseToken)
-                        .build(),
-                )
-            }
-        }
-        _isPro.value = true
-        repository.setIsPro(true)
-        runCatching { com.dotfield.dotcal.widget.WidgetUpdateWorker.enqueue(appContext) }
-        if (fromFlow) purchaseResults.value = PurchaseResult.Success
-    }
-
-    private suspend fun queryAndCacheProductDetails(): ProductDetails? {
-        val params = QueryProductDetailsParams.newBuilder()
-            .setProductList(
-                listOf(
-                    QueryProductDetailsParams.Product.newBuilder()
-                        .setProductId(PRODUCT_ID_PRO)
-                        .setProductType(BillingClient.ProductType.INAPP)
-                        .build(),
-                ),
+    private suspend fun queryAndCacheProductDetails(): List<ProductDetails> {
+        val details = queryProductDetails(
+            productType = BillingClient.ProductType.INAPP,
+            productIds = listOf(PRODUCT_ID_PRO),
+        ) + queryProductDetails(
+            productType = BillingClient.ProductType.SUBS,
+            productIds = PRODUCT_IDS_PRO_SUBSCRIPTION,
+        )
+        if (details.isNotEmpty()) {
+            cachedProductDetailsById.clear()
+            details.forEach { cachedProductDetailsById[it.productId] = it }
+            _productDetails.value = cachedProductDetailsById[PRODUCT_ID_PRO]
+            _purchaseOffers.value = buildProPurchaseOffers(
+                lifetimeDetails = cachedProductDetailsById[PRODUCT_ID_PRO],
+                subscriptionDetails = PRODUCT_IDS_PRO_SUBSCRIPTION.mapNotNull(cachedProductDetailsById::get),
             )
-            .build()
-        val result = runCatching { billingClient.queryProductDetails(params) }.getOrNull()
-        val details = result?.productDetailsList?.firstOrNull { it.productId == PRODUCT_ID_PRO }
-        if (details != null) {
-            cachedProductDetails = details
-            _productDetails.value = details
-            _purchaseOffers.value = details.proPurchaseOffers()
         }
         return details
     }
 
+    private suspend fun queryProductDetails(productType: String, productIds: List<String>): List<ProductDetails> {
+        val params = runCatching {
+            QueryProductDetailsParams.newBuilder()
+                .setProductList(
+                    productIds.map { productId ->
+                        QueryProductDetailsParams.Product.newBuilder()
+                            .setProductId(productId)
+                            .setProductType(productType)
+                            .build()
+                    },
+                )
+                .build()
+        }.getOrNull() ?: return emptyList()
+        return runCatching { billingClient.queryProductDetails(params).productDetailsList.orEmpty() }
+            .getOrDefault(emptyList())
+    }
+
     /** Launches the Play purchase flow. Result is delivered through [purchaseResults]. */
-    suspend fun launchPurchaseFlow(activity: Activity, selectedOfferToken: String? = null): PurchaseResult {
+    suspend fun launchPurchaseFlow(activity: Activity, selectedOfferKey: String? = null): PurchaseResult {
         if (_billingState.value != BillingConnectionState.Connected) {
             return PurchaseResult.Error("Billing not available. Please try again.")
         }
-        val details = cachedProductDetails ?: queryAndCacheProductDetails()
-        if (details == null) {
+        if (cachedProductDetailsById.isEmpty()) queryAndCacheProductDetails()
+        val selectedOffer = selectProPurchaseOffer(_purchaseOffers.value, selectedOfferKey)
+        val details = selectedOffer?.let { cachedProductDetailsById[it.productId] }
+            ?: cachedProductDetailsById[PRODUCT_ID_PRO]
+        if (details == null || selectedOffer == null) {
             return PurchaseResult.Error("Product not found. Please update the app or try again later.")
         }
-        val selectedOffer = selectProPurchaseOffer(details.proPurchaseOffers(), selectedOfferToken)
         val productParamsBuilder = BillingFlowParams.ProductDetailsParams.newBuilder()
             .setProductDetails(details)
         selectedOffer?.offerToken?.takeIf { it.isNotBlank() }?.let(productParamsBuilder::setOfferToken)
@@ -230,6 +246,11 @@ class ProManager(
             .setProductDetailsParamsList(listOf(productParams))
             .build()
         val launch = runCatching { billingClient.launchBillingFlow(activity, flowParams) }.getOrNull()
+        if (launch?.responseCode == BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED) {
+            val restored = restorePurchases()
+            if (restored) purchaseResults.value = PurchaseResult.Success
+            return if (restored) PurchaseResult.Success else PurchaseResult.Error(GENERIC_ERROR)
+        }
         if (launch == null || launch.responseCode != BillingClient.BillingResponseCode.OK) {
             return PurchaseResult.Error(GENERIC_ERROR)
         }
@@ -259,46 +280,140 @@ class ProManager(
         if (_billingState.value != BillingConnectionState.Connected) {
             runCatching { connectWithRetry() }
         }
+        val inAppPurchases = queryPurchases(BillingClient.ProductType.INAPP) ?: return _isPro.value
+        val subscriptionPurchases = queryPurchases(BillingClient.ProductType.SUBS) ?: return _isPro.value
+        return syncEntitlement(inAppPurchases, subscriptionPurchases, fromFlow = false).isPro
+    }
+
+    private suspend fun queryPurchases(productType: String): List<Purchase>? {
         val result = runCatching {
             billingClient.queryPurchasesAsync(
                 QueryPurchasesParams.newBuilder()
-                    .setProductType(BillingClient.ProductType.INAPP)
+                    .setProductType(productType)
                     .build(),
             )
-        }.getOrNull() ?: return _isPro.value
+        }.getOrNull()
+        return result?.purchasesList
+    }
 
-        val proPurchase = result.purchasesList.firstOrNull {
-            it.products.contains(PRODUCT_ID_PRO) &&
-                it.purchaseState == Purchase.PurchaseState.PURCHASED
-        }
-        return if (proPurchase != null) {
-            handlePurchased(proPurchase, fromFlow = false)
-            true
-        } else {
-            _isPro.value = false
-            repository.setIsPro(false)
-            false
-        }
+    private suspend fun syncEntitlement(
+        inAppPurchases: List<Purchase>,
+        subscriptionPurchases: List<Purchase>,
+        fromFlow: Boolean,
+    ): ProEntitlement {
+        val lifetime = inAppPurchases.entitlementFor(PRODUCT_ID_PRO)
+        val subscription = subscriptionPurchases.entitlementForAny(PRODUCT_IDS_PRO_SUBSCRIPTION)
+        (inAppPurchases + subscriptionPurchases)
+            .filter { it.containsKnownProProduct() && it.purchaseState == Purchase.PurchaseState.PURCHASED }
+            .forEach { acknowledgeIfNeeded(it) }
+
+        val entitlement = resolveProEntitlement(lifetime, subscription)
+        val changed = _isPro.value != entitlement.isPro || _hasActiveSubscription.value != entitlement.hasActiveSubscription
+        _isPro.value = entitlement.isPro
+        _hasActiveSubscription.value = entitlement.hasActiveSubscription
+        repository.setIsPro(entitlement.isPro)
+        if (changed) runCatching { com.dotfield.dotcal.widget.WidgetUpdateWorker.enqueue(appContext) }
+        if (fromFlow && entitlement.isPro) purchaseResults.value = PurchaseResult.Success
+        return entitlement
     }
 
     companion object {
         const val PRODUCT_ID_PRO = "dotcal_pro"
+        const val PRODUCT_ID_PRO_SUBSCRIPTION = "dotcal_pro_subscription"
+        val PRODUCT_IDS_PRO_SUBSCRIPTION = listOf(PRODUCT_ID_PRO_SUBSCRIPTION, "dotcal_pro_sub")
         private const val MAX_CONNECT_ATTEMPTS = 3
         private const val GENERIC_ERROR = "Something went wrong. Please try again."
     }
 }
 
-private fun ProductDetails.proPurchaseOffers(): List<ProPurchaseOffer> {
+private fun List<Purchase>.entitlementFor(productId: String): PurchaseEntitlement {
+    val relevant = filter { it.products.contains(productId) }
+    return when {
+        relevant.any { it.purchaseState == Purchase.PurchaseState.PURCHASED } -> PurchaseEntitlement.Purchased
+        relevant.any { it.purchaseState == Purchase.PurchaseState.PENDING } -> PurchaseEntitlement.Pending
+        else -> PurchaseEntitlement.None
+    }
+}
+
+private fun List<Purchase>.entitlementForAny(productIds: List<String>): PurchaseEntitlement {
+    val relevant = filter { purchase -> productIds.any { purchase.products.contains(it) } }
+    return when {
+        relevant.any { it.purchaseState == Purchase.PurchaseState.PURCHASED } -> PurchaseEntitlement.Purchased
+        relevant.any { it.purchaseState == Purchase.PurchaseState.PENDING } -> PurchaseEntitlement.Pending
+        else -> PurchaseEntitlement.None
+    }
+}
+
+private fun Purchase.containsKnownProProduct(): Boolean {
+    return products.contains(ProManager.PRODUCT_ID_PRO) ||
+        ProManager.PRODUCT_IDS_PRO_SUBSCRIPTION.any(products::contains)
+}
+
+private fun buildProPurchaseOffers(
+    lifetimeDetails: ProductDetails?,
+    subscriptionDetails: List<ProductDetails>,
+): List<ProPurchaseOffer> {
+    val offers = buildList {
+        subscriptionDetails.flatMap { it.subscriptionPurchaseOffers() }.let(::addAll)
+        lifetimeDetails?.lifetimePurchaseOffers()?.let(::addAll)
+    }
+    return orderedProPurchaseOffers(offers)
+}
+
+private fun ProductDetails.lifetimePurchaseOffers(): List<ProPurchaseOffer> {
     val offers = oneTimePurchaseOfferDetailsList.orEmpty().ifEmpty {
         oneTimePurchaseOfferDetails?.let(::listOf).orEmpty()
     }
-    return offers.mapNotNull { offer ->
-        val token = offer.offerToken ?: return@mapNotNull null
+    val mapped = offers.map { offer ->
         ProPurchaseOffer(
+            plan = ProPurchasePlan.Lifetime,
             formattedPrice = offer.formattedPrice,
-            offerToken = token,
+            productId = productId,
+            productType = BillingClient.ProductType.INAPP,
+            offerToken = offer.offerToken,
             offerId = offer.offerId,
             purchaseOptionId = offer.purchaseOptionId,
         )
     }
+    return mapped.ifEmpty {
+        oneTimePurchaseOfferDetails?.formattedPrice?.let { price ->
+            listOf(
+                ProPurchaseOffer(
+                    plan = ProPurchasePlan.Lifetime,
+                    formattedPrice = price,
+                    productId = productId,
+                    productType = BillingClient.ProductType.INAPP,
+                ),
+            )
+        }.orEmpty()
+    }
+}
+
+private fun ProductDetails.subscriptionPurchaseOffers(): List<ProPurchaseOffer> {
+    val offers = subscriptionOfferDetails.orEmpty().mapNotNull { offer ->
+        val plan = planForBasePlan(offer.basePlanId) ?: return@mapNotNull null
+        val paidPhase = offer.pricingPhases.pricingPhaseList.lastOrNull { it.priceAmountMicros > 0 }
+            ?: offer.pricingPhases.pricingPhaseList.lastOrNull()
+            ?: return@mapNotNull null
+        val trialPhase = offer.pricingPhases.pricingPhaseList.firstOrNull {
+            it.priceAmountMicros == 0L && it.billingPeriod == "P7D"
+        }
+        val hasSevenDayTrial = trialPhase != null ||
+            offer.offerId == YEARLY_TRIAL_OFFER_ID ||
+            offer.offerTags.contains(YEARLY_TRIAL_OFFER_ID)
+        ProPurchaseOffer(
+            plan = plan,
+            formattedPrice = paidPhase.formattedPrice,
+            productId = productId,
+            productType = BillingClient.ProductType.SUBS,
+            offerToken = offer.offerToken,
+            offerId = offer.offerId,
+            basePlanId = offer.basePlanId,
+            offerTags = offer.offerTags,
+            hasFreeTrial = hasSevenDayTrial,
+            trialBillingPeriod = trialPhase?.billingPeriod,
+            billingPeriod = paidPhase.billingPeriod,
+        )
+    }
+    return orderedProPurchaseOffers(offers)
 }

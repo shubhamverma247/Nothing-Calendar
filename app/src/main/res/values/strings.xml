@@ -258,8 +258,10 @@
     <!-- Two-part summary joined by a slash, e.g. "Dark / Red" or "Ndot / Editorial. Redefined." -->
     <string name="settings_pair_value">%1$s / %2$s</string>
     <string name="settings_pro_lifetime_unlocked">Lifetime unlocked</string>
-    <string name="settings_pro_lifetime_tools">Lifetime tools</string>
-    <string name="settings_pro_lifetime_tools_price">Lifetime tools / %1$s</string>
+    <string name="settings_pro_lifetime_tools">Pro tools</string>
+    <string name="settings_pro_lifetime_tools_price">Pro plans / %1$s</string>
+    <string name="settings_pro_plans_available">Choose monthly, annual, or lifetime access</string>
+    <string name="settings_pro_plans_from_price">Plans from %1$s</string>
     <string name="settings_pro_active">Active - thank you for your support!</string>
     <string name="settings_pro_unlock">Unlock Pro features</string>
     <string name="pro_feature_tag">Pro feature</string>
@@ -612,9 +614,24 @@
 
     <!-- Paywall. "DotCal Pro" is a brand name and stays untranslated (see the brand list in
          Docs/HANDOFF.md); paywall_unlock_pro_price takes the Play Store formatted price. -->
-    <string name="paywall_headline">Unlock the power tools</string>
-    <string name="paywall_subhead">Quick capture, templates, calendar sets, widgets, privacy tools, and time insights in one lifetime upgrade.</string>
+    <string name="paywall_headline">Upgrade to DotCal Pro</string>
+    <string name="paywall_subhead">Advanced calendar tools, widgets, templates, privacy, and time insights in one focused workspace.</string>
     <string name="paywall_lifetime_pro">Lifetime Pro</string>
+    <string name="paywall_yearly_plan">Yearly</string>
+    <string name="paywall_monthly_plan">Monthly</string>
+    <string name="paywall_recommended">BEST VALUE</string>
+    <string name="paywall_trial_badge">7-DAY TRIAL</string>
+    <string name="paywall_yearly_trial_detail">7-day free trial, then annual billing</string>
+    <string name="paywall_yearly_detail">Annual subscription</string>
+    <string name="paywall_monthly_detail">Monthly subscription</string>
+    <string name="paywall_lifetime_detail">One-time purchase</string>
+    <string name="paywall_yearly_trial_subtitle">7 days free, then %1$s / year</string>
+    <string name="paywall_yearly_subtitle">%1$s / year</string>
+    <string name="paywall_monthly_subtitle">%1$s / month</string>
+    <string name="paywall_lifetime_subtitle">Pay once. Keep Pro forever.</string>
+    <string name="paywall_yearly_trial_fine_print">7-day free trial, then %1$s / year unless cancelled in Google Play.</string>
+    <string name="paywall_subscription_fine_print">Subscription renews through Google Play. Cancel anytime.</string>
+    <string name="paywall_manage_subscription">Manage subscription</string>
     <string name="paywall_one_time_no_subscription">One-time purchase. No subscription.</string>
     <string name="paywall_one_time_price_from_play">One-time purchase. Price shown by Play Store.</string>
     <string name="paywall_play_store">Play Store</string>
@@ -622,6 +639,10 @@
     <string name="paywall_metric_forever_access">Forever access</string>
     <string name="paywall_metric_offline_first">Offline-first</string>
     <string name="paywall_metric_no_cloud_account">No cloud account</string>
+    <string name="paywall_metric_flexible_plans">Flexible plans</string>
+    <string name="paywall_metric_monthly_yearly_lifetime">Monthly / yearly / lifetime</string>
+    <string name="paywall_metric_play_billing">Play Billing</string>
+    <string name="paywall_metric_cancel_anytime">Cancel anytime</string>
     <string name="paywall_purchase_options">Purchase options</string>
     <string name="paywall_base_offer">Base offer</string>
     <string name="paywall_discount_offer">Discount offer</string>
@@ -634,7 +655,8 @@
     <string name="paywall_restore_none_found">No previous purchase found on this account</string>
     <string name="paywall_connecting">Connecting...</string>
     <string name="paywall_unlock_pro">Unlock Pro</string>
-    <string name="paywall_unlock_pro_price">Unlock Pro - %1$s</string>
+    <string name="paywall_unlock_pro_price">Continue - %1$s</string>
+    <string name="paywall_start_free_trial">Start 7-day free trial</string>
     <string name="paywall_youre_pro">You\'re Pro!</string>
 
     <!-- Global Search facets -->

@@ -247,8 +247,10 @@
     <!-- DotCal Pro -->
     <string name="settings_pair_value">%1$s / %2$s</string>
     <string name="settings_pro_lifetime_unlocked">Desbloqueado de por vida</string>
-    <string name="settings_pro_lifetime_tools">Herramientas de por vida</string>
-    <string name="settings_pro_lifetime_tools_price">Herramientas de por vida / %1$s</string>
+    <string name="settings_pro_lifetime_tools">Pro tools</string>
+    <string name="settings_pro_lifetime_tools_price">Pro plans / %1$s</string>
+    <string name="settings_pro_plans_available">Choose monthly, annual, or lifetime access</string>
+    <string name="settings_pro_plans_from_price">Plans from %1$s</string>
     <string name="settings_pro_active">Activo: ¡gracias por tu apoyo!</string>
     <string name="settings_pro_unlock">Desbloquea las funciones Pro</string>
     <string name="pro_feature_tag">Función Pro</string>
@@ -587,9 +589,24 @@
     <string name="pro_feature_share_availability_desc">Convierte tu tiempo libre en texto que puedes pegar donde quieras</string>
 
     <!-- Paywall. "DotCal Pro" is a brand name and stays untranslated. -->
-    <string name="paywall_headline">Desbloquea las herramientas avanzadas</string>
-    <string name="paywall_subhead">Captura rápida, plantillas, conjuntos de calendarios, widgets, herramientas de privacidad y estadísticas de tiempo en una sola mejora de por vida.</string>
+    <string name="paywall_headline">Upgrade to DotCal Pro</string>
+    <string name="paywall_subhead">Advanced calendar tools, widgets, templates, privacy, and time insights in one focused workspace.</string>
     <string name="paywall_lifetime_pro">Pro de por vida</string>
+    <string name="paywall_yearly_plan">Anual</string>
+    <string name="paywall_monthly_plan">Mensual</string>
+    <string name="paywall_recommended">MEJOR VALOR</string>
+    <string name="paywall_trial_badge">7-DAY TRIAL</string>
+    <string name="paywall_yearly_trial_detail">7-day free trial, then annual billing</string>
+    <string name="paywall_yearly_detail">Annual subscription</string>
+    <string name="paywall_monthly_detail">Monthly subscription</string>
+    <string name="paywall_lifetime_detail">One-time purchase</string>
+    <string name="paywall_yearly_trial_subtitle">7 días gratis, luego %1$s / año</string>
+    <string name="paywall_yearly_subtitle">%1$s / año</string>
+    <string name="paywall_monthly_subtitle">%1$s / mes</string>
+    <string name="paywall_lifetime_subtitle">Paga una vez. Conserva Pro para siempre.</string>
+    <string name="paywall_yearly_trial_fine_print">Prueba gratis de 7 días, luego %1$s / año salvo que canceles en Google Play.</string>
+    <string name="paywall_subscription_fine_print">La suscripción se renueva mediante Google Play. Cancela cuando quieras.</string>
+    <string name="paywall_manage_subscription">Gestionar suscripción</string>
     <string name="paywall_one_time_no_subscription">Pago único. Sin suscripción.</string>
     <string name="paywall_one_time_price_from_play">Pago único. Precio mostrado por Play Store.</string>
     <string name="paywall_play_store">Play Store</string>
@@ -597,6 +614,10 @@
     <string name="paywall_metric_forever_access">Acceso para siempre</string>
     <string name="paywall_metric_offline_first">Sin conexión primero</string>
     <string name="paywall_metric_no_cloud_account">Sin cuenta en la nube</string>
+    <string name="paywall_metric_flexible_plans">Planes flexibles</string>
+    <string name="paywall_metric_monthly_yearly_lifetime">Mensual / anual / de por vida</string>
+    <string name="paywall_metric_play_billing">Facturación de Play</string>
+    <string name="paywall_metric_cancel_anytime">Cancela cuando quieras</string>
     <string name="paywall_purchase_options">Opciones de compra</string>
     <string name="paywall_base_offer">Oferta base</string>
     <string name="paywall_discount_offer">Oferta con descuento</string>
@@ -609,7 +630,8 @@
     <string name="paywall_restore_none_found">No se encontró ninguna compra previa en esta cuenta</string>
     <string name="paywall_connecting">Conectando...</string>
     <string name="paywall_unlock_pro">Desbloquear Pro</string>
-    <string name="paywall_unlock_pro_price">Desbloquear Pro - %1$s</string>
+    <string name="paywall_unlock_pro_price">Continue - %1$s</string>
+    <string name="paywall_start_free_trial">Iniciar prueba gratis de 7 días</string>
     <string name="paywall_youre_pro">¡Ya eres Pro!</string>
 
     <!-- Global Search facets -->

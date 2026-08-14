@@ -189,11 +189,12 @@ class DotCalViewModel(
     // ----- Pro / Billing -----
     val productDetails = proManager.productDetails
     val purchaseOffers = proManager.purchaseOffers
+    val hasActiveSubscription = proManager.hasActiveSubscription
     val purchaseResult = proManager.purchaseResultFlow
 
-    fun purchasePro(activity: android.app.Activity, selectedOfferToken: String? = null) {
+    fun purchasePro(activity: android.app.Activity, selectedOfferKey: String? = null) {
         viewModelScope.launch {
-            val result = proManager.launchPurchaseFlow(activity, selectedOfferToken)
+            val result = proManager.launchPurchaseFlow(activity, selectedOfferKey)
             // Pre-flight failures surface immediately; the real purchase outcome
             // (Success/Cancelled) arrives later through purchaseResult.
             if (result is ProManager.PurchaseResult.Error) {

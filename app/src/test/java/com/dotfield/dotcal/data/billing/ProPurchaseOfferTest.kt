@@ -5,31 +5,46 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ProPurchaseOfferTest {
-    private val baseOffer = ProPurchaseOffer(
+    private val lifetimeOffer = ProPurchaseOffer(
+        plan = ProPurchasePlan.Lifetime,
         formattedPrice = "$4.99",
+        productId = "dotcal_pro",
+        productType = "inapp",
         offerToken = "base-token",
         purchaseOptionId = "base",
     )
-    private val discountOffer = ProPurchaseOffer(
+    private val monthlyOffer = ProPurchaseOffer(
+        plan = ProPurchasePlan.Monthly,
         formattedPrice = "$1.99",
-        offerToken = "discount-token",
-        offerId = "launch-discount",
-        purchaseOptionId = "discount",
+        productId = "dotcal_pro_subscription",
+        productType = "subs",
+        offerToken = "monthly-token",
+        basePlanId = "monthly",
+    )
+    private val yearlyTrialOffer = ProPurchaseOffer(
+        plan = ProPurchasePlan.Yearly,
+        formattedPrice = "$14.99",
+        productId = "dotcal_pro_subscription",
+        productType = "subs",
+        offerToken = "yearly-trial-token",
+        basePlanId = "yearly",
+        offerId = "7day-free",
+        hasFreeTrial = true,
     )
 
     @Test
-    fun defaultSelectionUsesFirstEligibleOffer() {
-        assertEquals(baseOffer, selectProPurchaseOffer(listOf(baseOffer, discountOffer), null))
+    fun defaultSelectionPrefersYearlyTrial() {
+        assertEquals(yearlyTrialOffer, selectProPurchaseOffer(listOf(lifetimeOffer, monthlyOffer, yearlyTrialOffer), null))
     }
 
     @Test
-    fun explicitSelectionUsesMatchingOfferToken() {
-        assertEquals(discountOffer, selectProPurchaseOffer(listOf(baseOffer, discountOffer), "discount-token"))
+    fun explicitSelectionUsesMatchingSelectionKey() {
+        assertEquals(monthlyOffer, selectProPurchaseOffer(listOf(lifetimeOffer, monthlyOffer), monthlyOffer.selectionKey))
     }
 
     @Test
     fun staleSelectionFallsBackToFirstEligibleOffer() {
-        assertEquals(baseOffer, selectProPurchaseOffer(listOf(baseOffer, discountOffer), "expired-token"))
+        assertEquals(lifetimeOffer, selectProPurchaseOffer(listOf(lifetimeOffer, monthlyOffer), "expired-token"))
     }
 
     @Test

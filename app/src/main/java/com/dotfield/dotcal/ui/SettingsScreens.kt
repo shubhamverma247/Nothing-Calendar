@@ -2683,8 +2683,7 @@ private fun SettingsProCard(isPro: Boolean, proPrice: String?, palette: DotCalPa
             Text(
                 when {
                     isPro -> stringResource(R.string.settings_pro_lifetime_unlocked)
-                    proPrice != null -> stringResource(R.string.settings_pro_lifetime_tools_price, proPrice)
-                    else -> stringResource(R.string.settings_pro_lifetime_tools)
+                    else -> stringResource(R.string.paywall_unlock_pro)
                 },
                 color = palette.secondaryText,
                 fontFamily = mono,

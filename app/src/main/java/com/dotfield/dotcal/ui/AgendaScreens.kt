@@ -164,16 +164,18 @@ internal fun EventListSheet(
                             if (showAddShiftProBadge) {
                                 Text(
                                     stringResource(R.string.badge_pro),
-                                    color = palette.accent,
+                                    color = Color.White,
                                     fontFamily = mono,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 9.sp,
+                                    fontSize = 8.sp,
+                                    maxLines = 1,
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .padding(top = 5.dp, end = 7.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color.White)
-                                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                                        .padding(top = 4.dp, end = 5.dp)
+                                        .clip(RoundedCornerShape(7.dp))
+                                        .background(Color.White.copy(alpha = 0.18f))
+                                        .border(1.dp, Color.White.copy(alpha = 0.38f), RoundedCornerShape(7.dp))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp),
                                 )
                             }
                         }

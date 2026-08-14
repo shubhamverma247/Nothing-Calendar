@@ -210,7 +210,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.foundation.layout.ColumnScope
 import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.billing.ProManager
+import com.dotfield.dotcal.data.billing.ProPurchasePlan
 import com.dotfield.dotcal.data.billing.ProPurchaseOffer
+import com.dotfield.dotcal.data.billing.isSevenDayTrial
+import com.dotfield.dotcal.data.billing.selectionKey
 import com.dotfield.dotcal.presentation.datecalculator.DateCalculatorViewModel
 import androidx.datastore.preferences.core.edit
 import androidx.core.content.ContextCompat
@@ -336,11 +339,12 @@ internal fun PaywallScreen(
     val context = LocalContext.current
     val productDetails by viewModel.productDetails.collectAsStateWithLifecycle()
     val purchaseOffers by viewModel.purchaseOffers.collectAsStateWithLifecycle()
+    val hasActiveSubscription by viewModel.hasActiveSubscription.collectAsStateWithLifecycle()
     val billingState by viewModel.billingState.collectAsStateWithLifecycle()
     val purchaseResult by viewModel.purchaseResult.collectAsStateWithLifecycle()
     var purchasing by remember { mutableStateOf(false) }
     var showSuccess by remember { mutableStateOf(false) }
-    var selectedOfferToken by remember { mutableStateOf<String?>(null) }
+    var selectedOfferKey by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(purchaseResult) {
         when (val result = purchaseResult) {
@@ -388,15 +392,15 @@ internal fun PaywallScreen(
 
     val connected = billingState is ProManager.BillingConnectionState.Connected
     LaunchedEffect(purchaseOffers) {
-        val currentStillEligible = purchaseOffers.any { it.offerToken == selectedOfferToken }
-        if (!currentStillEligible) selectedOfferToken = purchaseOffers.firstOrNull()?.offerToken
+        val currentStillEligible = purchaseOffers.any { it.selectionKey == selectedOfferKey }
+        if (!currentStillEligible) selectedOfferKey = purchaseOffers.firstOrNull()?.selectionKey
     }
-    val selectedOffer = purchaseOffers.firstOrNull { it.offerToken == selectedOfferToken } ?: purchaseOffers.firstOrNull()
+    val selectedOffer = purchaseOffers.firstOrNull { it.selectionKey == selectedOfferKey } ?: purchaseOffers.firstOrNull()
     val price = selectedOffer?.formattedPrice ?: productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
-    val priceLoaded = price != null
-    val buyEnabled = connected && !purchasing
+    val buyEnabled = connected && !purchasing && selectedOffer != null
     val buyLabel = when {
         !connected -> stringResource(R.string.paywall_connecting)
+        selectedOffer?.hasFreeTrial == true -> stringResource(R.string.paywall_start_free_trial)
         price != null -> stringResource(R.string.paywall_unlock_pro_price, price)
         else -> stringResource(R.string.paywall_unlock_pro)
     }
@@ -404,7 +408,7 @@ internal fun PaywallScreen(
         val activity = context.findActivity()
         if (activity != null) {
             purchasing = true
-            viewModel.purchasePro(activity, selectedOffer?.offerToken)
+            viewModel.purchasePro(activity, selectedOffer?.selectionKey)
         }
     }
 
@@ -442,17 +446,22 @@ internal fun PaywallScreen(
                         .clip(RoundedCornerShape(28.dp))
                         .background(palette.eventCardSurface)
                         .border(1.dp, palette.eventCardBorder, RoundedCornerShape(28.dp))
-                        .padding(horizontal = 22.dp, vertical = 20.dp),
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Image(
-                        painter = androidx.compose.ui.res.painterResource(id = R.mipmap.ic_launcher_foreground),
-                        contentDescription = null,
+                    Box(
                         modifier = Modifier
-                            .size(88.dp)
-                            .clip(RoundedCornerShape(24.dp)),
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                            .size(54.dp)
+                            .clip(RoundedCornerShape(20.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Image(
+                            painter = androidx.compose.ui.res.painterResource(id = R.mipmap.ic_launcher_foreground),
+                            contentDescription = null,
+                            modifier = Modifier.size(96.dp),
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         stringResource(R.string.paywall_headline),
                         color = palette.primaryText,
@@ -461,7 +470,7 @@ internal fun PaywallScreen(
                         fontSize = 25.sp,
                         textAlign = TextAlign.Center,
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         stringResource(R.string.paywall_subhead),
                         color = palette.secondaryText,
@@ -469,54 +478,6 @@ internal fun PaywallScreen(
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
                         textAlign = TextAlign.Center,
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(palette.accent.copy(alpha = 0.10f))
-                            .border(1.dp, palette.accent.copy(alpha = 0.26f), RoundedCornerShape(18.dp))
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.paywall_lifetime_pro), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text(
-                                if (priceLoaded) {
-                                    stringResource(R.string.paywall_one_time_no_subscription)
-                                } else {
-                                    stringResource(R.string.paywall_one_time_price_from_play)
-                                },
-                                color = palette.secondaryText,
-                                fontFamily = mono,
-                                fontSize = 11.sp,
-                                lineHeight = 14.sp,
-                            )
-                        }
-                        Text(
-                            price ?: stringResource(R.string.paywall_play_store),
-                            color = palette.accent,
-                            fontFamily = LocalHeadingFont.current,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp,
-                        )
-                    }
-                }
-            }
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    PaywallMetricCard(
-                        stringResource(R.string.paywall_metric_pay_once),
-                        stringResource(R.string.paywall_metric_forever_access),
-                        palette,
-                        Modifier.weight(1f),
-                    )
-                    PaywallMetricCard(
-                        stringResource(R.string.paywall_metric_offline_first),
-                        stringResource(R.string.paywall_metric_no_cloud_account),
-                        palette,
-                        Modifier.weight(1f),
                     )
                 }
             }
@@ -528,23 +489,22 @@ internal fun PaywallScreen(
                             .clip(RoundedCornerShape(20.dp))
                             .background(palette.eventCardSurface)
                             .border(1.dp, palette.eventCardBorder, RoundedCornerShape(20.dp))
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(
                             stringResource(R.string.paywall_purchase_options),
                             color = palette.primaryText,
                             fontFamily = mono,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
+                            fontSize = 12.sp,
                         )
-                        purchaseOffers.forEachIndexed { index, offer ->
+                        purchaseOffers.forEach { offer ->
                             PaywallOfferRow(
                                 offer = offer,
-                                index = index,
-                                selected = offer.offerToken == selectedOffer?.offerToken,
+                                selected = offer.selectionKey == selectedOffer?.selectionKey,
                                 palette = palette,
-                                onClick = { selectedOfferToken = offer.offerToken },
+                                onClick = { selectedOfferKey = offer.selectionKey },
                             )
                         }
                     }
@@ -576,11 +536,7 @@ internal fun PaywallScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                if (priceLoaded) {
-                    stringResource(R.string.paywall_one_time_no_subscription)
-                } else {
-                    stringResource(R.string.paywall_final_price_at_checkout)
-                },
+                selectedOffer?.checkoutFinePrint() ?: stringResource(R.string.paywall_final_price_at_checkout),
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 11.sp,
@@ -623,25 +579,62 @@ internal fun PaywallScreen(
                     }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             )
+            if (hasActiveSubscription) {
+                Text(
+                    stringResource(R.string.paywall_manage_subscription),
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .noRippleClickable { context.openDotCalSubscriptionManagement() }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            }
         }
     }
 }
 
 @Composable
+private fun ProPurchaseOffer.checkoutFinePrint(): String = when (plan) {
+    ProPurchasePlan.Yearly -> if (isSevenDayTrial) {
+        stringResource(R.string.paywall_yearly_trial_fine_print, formattedPrice)
+    } else {
+        stringResource(R.string.paywall_subscription_fine_print)
+    }
+    ProPurchasePlan.Monthly -> stringResource(R.string.paywall_subscription_fine_print)
+    ProPurchasePlan.Lifetime -> stringResource(R.string.paywall_one_time_no_subscription)
+}
+
+private fun Context.openDotCalSubscriptionManagement() {
+    val uri = Uri.parse(
+        "https://play.google.com/store/account/subscriptions" +
+            "?sku=${ProManager.PRODUCT_ID_PRO_SUBSCRIPTION}&package=$packageName",
+    )
+    val intent = Intent(Intent.ACTION_VIEW, uri)
+    if (this !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { startActivity(intent) }
+}
+
+@Composable
 private fun PaywallOfferRow(
     offer: ProPurchaseOffer,
-    index: Int,
     selected: Boolean,
     palette: DotCalPalette,
     onClick: () -> Unit,
 ) {
-    val name = offer.offerId?.takeIf { it.isNotBlank() }
-        ?: offer.purchaseOptionId?.takeIf { it.isNotBlank() }
-        ?: stringResource(if (index == 0) R.string.paywall_base_offer else R.string.paywall_discount_offer)
-    val detail = when {
-        !offer.offerId.isNullOrBlank() -> stringResource(R.string.paywall_offer_id, offer.offerId)
-        !offer.purchaseOptionId.isNullOrBlank() -> stringResource(R.string.paywall_purchase_option_id, offer.purchaseOptionId)
-        else -> stringResource(R.string.paywall_play_billing_offer)
+    val name = when (offer.plan) {
+        ProPurchasePlan.Yearly -> stringResource(R.string.paywall_yearly_plan)
+        ProPurchasePlan.Monthly -> stringResource(R.string.paywall_monthly_plan)
+        ProPurchasePlan.Lifetime -> stringResource(R.string.paywall_lifetime_pro)
+    }
+    val detail = when (offer.plan) {
+        ProPurchasePlan.Yearly -> if (offer.isSevenDayTrial) {
+            stringResource(R.string.paywall_yearly_trial_detail)
+        } else {
+            stringResource(R.string.paywall_yearly_detail)
+        }
+        ProPurchasePlan.Monthly -> stringResource(R.string.paywall_monthly_detail)
+        ProPurchasePlan.Lifetime -> stringResource(R.string.paywall_lifetime_detail)
     }
     Row(
         modifier = Modifier
@@ -650,39 +643,31 @@ private fun PaywallOfferRow(
             .background(if (selected) palette.accent.copy(alpha = 0.12f) else palette.cell)
             .border(1.dp, if (selected) palette.accent else palette.line, RoundedCornerShape(14.dp))
             .noRippleClickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(detail, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (offer.isSevenDayTrial) {
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        stringResource(R.string.paywall_trial_badge),
+                        color = palette.accent,
+                        fontFamily = mono,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 8.sp,
+                        maxLines = 1,
+                    )
+                }
+            }
+            Text(detail, color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, lineHeight = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Text(offer.formattedPrice, color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Text(offer.formattedPrice, color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         if (selected) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(Icons.Default.Check, contentDescription = null, tint = palette.accent, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Icon(Icons.Default.Check, contentDescription = null, tint = palette.accent, modifier = Modifier.size(16.dp))
         }
-    }
-}
-
-@Composable
-private fun PaywallMetricCard(
-    label: String,
-    value: String,
-    palette: DotCalPalette,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .height(86.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(palette.eventCardSurface)
-            .border(1.dp, palette.eventCardBorder, RoundedCornerShape(20.dp))
-            .padding(14.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp, maxLines = 1)
-        Text(value, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 2, lineHeight = 17.sp)
     }
 }
 
