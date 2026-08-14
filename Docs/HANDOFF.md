@@ -1,14 +1,47 @@
 # DotCal Handoff
 
-Updated: 2026-08-13
+Updated: 2026-08-14
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full history: `Docs/HANDOFF.original.md`. Feature spec: `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. Do not touch `Docs/HANDOFF - Copy.md`.
 
 ## Latest Continuation
 
+**Calendar overflow menu customization is implemented and verified on `main`.** Users can now open
+`Settings > Calendar Preferences > Calendar menu` and show/hide Calendar tab overflow actions with a
+Reset action. Hidden actions persist through DataStore stable ids; default behavior remains all
+actions visible. The fixed top-bar `+` button and hardware-gated QR scanner icon are unchanged.
+`versionCode` is bumped to 22 for the next Play upload; `versionName` remains 1.3.0.
+Verification passed: `git diff --check`, `:app:testDebugUnitTest`, `:app:assembleDebug`,
+`:app:lintDebug`, and `:app:installDebug`.
+
+Manual QA passed for the previous polish batch:
+
+- `Settings > Privacy Policy` opens in-app and scrolls correctly.
+- Discord opens as an external invite.
+- Slovak/system locale Year view weekday labels align correctly, including Friday 14 under `pi`.
+- Billing sheet/redeem flow is visible through Google Play purchase flow.
+
+Latest Play release notes draft:
+
+```text
+<en-US>
+What’s new in DotCal 1.3.0
+
+• PDF attachments for events
+• Customizable Calendar overflow menu
+• Smoother shift scheduling
+• Improved month calendar navigation
+• Better overflow counts and out-of-month day visibility
+• More polished widgets
+• Clearer shift markers and actions
+• Better calendar localization for month, week, and year labels
+
+We’ve also made several fixes for a smoother calendar experience.
+</en-US>
+```
+
 **Shift Worker Convenience Pack Phase 1 first slice is implemented and Phase 2 first share slice is
-now built.** All work remains uncommitted on `main`; `Docs/FEEDBACK.md` is still user-owned
-untracked and must stay untouched.
+now built.** `Docs/FEEDBACK.md` is still user-owned untracked and must stay untouched.
 
 - Phase 1 Add Shift remains Pro-gated from Calendar overflow. It opens a bottom sheet with date,
   saved shift type, and the revised single-row calendar picker dialog. Off/no-output shift types are
@@ -135,19 +168,15 @@ Priority widget feedback from a Spanish user is now implemented and pending user
 User feedback from Gary: bought Pro soon after installing and asked for file attachments in addition
 to images, especially venue tickets supplied as PDFs.
 
-- Recommendation: add later as a high-value Pro feature after current UI/widget polish is accepted.
-  This is a strong calendar use case and matches expectations from Google
-  Calendar, Apple Calendar, and Outlook.
-- Implementation direction: add a `Files` section near Images / Voice note in Event editor and Event
-  detail. Support PDF first, then common documents such as DOCX/XLSX/TXT. Use Android Storage Access
-  Framework document picker and copy selected files into app-private storage so tickets still open if
-  the original document is moved or deleted.
-- Storage direction: use `dotcal_side_store.json` / side-store metadata for file attachments, not a
-  Room migration. Keep Room exactly 5 tables.
-- Product boundary: keep attachments local to DotCal for v1. Do not promise Google Calendar / Drive
-  attachment sync unless cloud permissions and sharing model are explicitly approved later.
-- Suggested limits: 5 files per event, 20 MB per file initially. Pro-gate adding files, but keep
-  viewing existing attachments available if entitlement is lost.
+- Status: implemented for PDF attachments.
+- Current scope: Event editor and Event detail support up to 5 PDFs per event, 20 MB per PDF.
+- Storage: selected PDFs are copied into app-private storage and tracked through side-store metadata;
+  Room remains unchanged.
+- Access model: adding PDFs is Pro-gated; viewing/opening/removing already-attached PDFs remains
+  available if entitlement is later lost.
+- Backup/restore includes PDF attachments with enforced size/count limits.
+- Boundary: generic documents such as DOCX/XLSX/TXT and Google Calendar / Drive attachment sync are
+  not implemented. DotCal remains offline-first and CalendarProvider-based.
 
 User feedback referencing SuperShift calendar: user likes easier work-shift entry, sharing plans
 with other DotCal users, and a two-week widget. Treat this as shift-worker convenience, **not** a
@@ -179,24 +208,22 @@ Calendar overflow menu customization:
   `Customize menu` entry reachable from Settings.
 - Preserve existing Pro/free behavior, camera-less QR hiding, subtitles, and `Pro` badges.
 
-Billing plan discussion: DotCal currently supports only the `dotcal_pro` one-time in-app product.
-Adding subscriptions is possible through Google Play, but app code must explicitly support `SUBS`.
+Billing state: DotCal now supports one-time Lifetime plus subscription plans through Google Play
+Billing.
 
-- Recommendation: offer `Monthly` + existing `Lifetime`; skip weekly initially because weekly billing
-  can feel aggressive for a calendar app and may reduce trust.
-- Play Console direction: keep existing `dotcal_pro` INAPP lifetime product. Add a subscription
-  product such as `dotcal_pro_sub` with a monthly auto-renewing base plan. Yearly can be added later
-  or in the same implementation if pricing is settled.
-- App direction: `ProManager` must query both `BillingClient.ProductType.INAPP` and
-  `BillingClient.ProductType.SUBS`, restore both, and treat either lifetime purchase or active
+- Lifetime product: `dotcal_pro` as an INAPP one-time product.
+- Subscription products: `dotcal_pro_subscription` and legacy/fallback `dotcal_pro_sub` as SUBS.
+  Base plans are mapped by id: `monthly` -> Monthly, `yearly` -> Yearly.
+- Paywall shows Yearly, Monthly, and Lifetime offers from Play Billing product details. Prices and
+  offer tokens are dynamic.
+- `ProManager` queries product details and purchases for both `BillingClient.ProductType.INAPP` and
+  `BillingClient.ProductType.SUBS`, restores both, and treats either lifetime purchase or active
   subscription as Pro.
 - Entitlement priority: lifetime purchase wins forever; otherwise active subscription grants Pro;
   otherwise free.
-- If a user buys lifetime while a monthly subscription is active, DotCal should unlock lifetime but
-  cannot cancel the subscription from app-only code. Show a clear message and a `Manage subscription`
-  deep link to Google Play. Backend cancellation via Google Play Developer API is possible but out of
-  scope for now because it requires server-side purchase-token handling and breaks the app-only
-  offline-first model.
+- If a user buys lifetime while subscribed, DotCal unlocks lifetime but cannot cancel the Google Play
+  subscription from app-only code. The app shows `Manage subscription` when an active subscription is
+  detected; backend cancellation remains out of scope for the offline-first/app-only model.
 
 Month view + bottom nav UX research pass complete on `main` (**read-only — no code changed**):
 
@@ -275,16 +302,22 @@ Locale fill pass is complete mechanically:
   `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug`
   returned `BUILD SUCCESSFUL`.
 - Debug APK was later installed successfully on device `4ab0d020`.
-- Billing/promo-code check: `dotcal_pro` is a one-time in-app product on Billing Library 8.0.0.
-  Play Console one-time-use promo codes should redeem through Google Play or the Play purchase sheet;
-  custom promo codes are subscription-only. If a code is redeemed outside the app while DotCal is
-  already open, reopen DotCal or tap Restore Purchase to refresh entitlement.
-- One-time product discount-offer support is now wired:
-  - `ProManager` reads `oneTimePurchaseOfferDetailsList` and exposes eligible `ProPurchaseOffer`s.
+- Billing/promo-code check: billing uses Google Play Billing Library 8.0.0 with both lifetime INAPP
+  and subscription SUBS products.
+  - One-time/lifetime promo codes for `dotcal_pro` should redeem through Google Play or the Play
+    purchase sheet.
+  - Subscription promo codes apply to the selected monthly/yearly subscription offer inside the Play
+    purchase sheet. One-time-use subscription codes can also be redeemed through Google Play;
+    custom subscription codes are app-flow only.
+  - If a code is redeemed outside the app while DotCal is already open, reopen DotCal or tap Restore
+    Purchase to refresh entitlement.
+- Product offer support is wired:
+  - `ProManager` reads `oneTimePurchaseOfferDetailsList` for lifetime offers and
+    `subscriptionOfferDetails` for subscription base plans/offers.
   - Paywall shows eligible offer price/options and passes the selected `offerToken` into
     `BillingFlowParams.ProductDetailsParams.setOfferToken(...)`.
-  - App-level Pro price display prefers the first eligible offer and falls back to
-    `oneTimePurchaseOfferDetails?.formattedPrice`.
+  - App-level Pro price display prefers eligible Play Billing offers and falls back to
+    `oneTimePurchaseOfferDetails?.formattedPrice` for lifetime.
 - Add/Edit Event now has a free Color row/sheet. Preset colors write `EventEditorData.colorHex`;
   `Use calendar color` writes `null`. Existing Agenda bulk color behavior is unchanged.
 - Audit fixes after implementation:
@@ -305,7 +338,7 @@ Locale fill pass is complete mechanically:
 
 Continue DotCal in `D:\Caveman\caveman\Nothing-Calendar` on branch `main`. Read `Docs/HANDOFF.md` and `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`.
 
-**All work happens on `main`.** `versionCode 18`, `versionName 1.2.0`. Every other local branch is already merged into `main` — see `## Worktree Notes`.
+**All work happens on `main`.** `versionCode 22`, `versionName 1.3.0`. Every other local branch is already merged into `main` — see `## Worktree Notes`.
 
 **Next up is no longer blocked on Month View Batch 2** -- batch 1 is DONE and approved, batch 2 drag
 panel was rejected/reverted, and batch 2 redefined as Google-style event title chips is now DONE and
@@ -385,7 +418,7 @@ Always report what to test, how to test, and expected result.
 
 ## Current State
 
-- Version: `versionCode 18`, `versionName 1.2.0`
+- Version: `versionCode 22`, `versionName 1.3.0`
 - Product: black/white/red offline Android calendar.
 - Tabs: Calendar, Tasks, Settings.
 - Views: Year, Month, Week, Day, Agenda. Keep hidden ThreeDay unexposed.
@@ -394,10 +427,14 @@ Always report what to test, how to test, and expected result.
 - Existing recurrence field: `rrule`.
 - DataStore: `calendar_preferences`.
 - Pro entitlement: `KEY_IS_PRO`.
-- Billing product: `dotcal_pro`; one-time purchase; option `dotcal-pro-lifetime`; live INR 149.
-- Paywall price is loaded dynamically from Play Billing. Eligible one-time product offers come from
-  `oneTimePurchaseOfferDetailsList`; checkout passes the selected `offerToken`. Base/default price
-  still falls back to `oneTimePurchaseOfferDetails?.formattedPrice`.
+- Billing products:
+  - `dotcal_pro`: INAPP one-time Lifetime product; option `dotcal-pro-lifetime`; live INR 149.
+  - `dotcal_pro_subscription`: SUBS product for Monthly/Yearly plans.
+  - `dotcal_pro_sub`: legacy/fallback SUBS product id still queried by code.
+- Paywall price is loaded dynamically from Play Billing. Subscription offers come from
+  `subscriptionOfferDetails`; lifetime offers come from `oneTimePurchaseOfferDetailsList`. Checkout
+  passes the selected `offerToken`. Lifetime default price still falls back to
+  `oneTimePurchaseOfferDetails?.formattedPrice`.
 - Paywall route: `dotcal://paywall`.
 - Billing library: `billing-ktx` 8.0.0; do not downgrade below v8 (Play requires 8.0.0+ from Aug 31, 2026).
 - Internal-testing billing verification still pending.
@@ -522,82 +559,68 @@ C3 On This Day was **removed from this list** — it was already implemented in 
   opacity slider in `Settings > Widgets`.
 - **Month view + bottom nav UX.** Batch 1 and Batch 2 are approved; Batch 3 accessibility/dead-param
   cleanup is done. Only optional visual polish remains — see `## Planned: Month View + Bottom Nav UX`.
-- **Pro subscription plans.** Current billing is one-time `dotcal_pro` only. Future plan should add a
-  monthly subscription next to Lifetime, with no weekly plan initially and no backend auto-cancel.
-  See `## Planned: Pro Subscription Plans`.
+- **Pro billing plans.** Current billing supports Yearly, Monthly, and Lifetime via Google Play
+  Billing. Lifetime is the one-time `dotcal_pro` INAPP product; subscriptions use SUBS product ids
+  `dotcal_pro_subscription` / `dotcal_pro_sub`. See `## Current: Pro Billing Plans`.
 - **Shift Worker Convenience Pack.** SuperShift-style user feedback asked for easier work-shift
   entry, schedule sharing, and a two-week widget. Add later as general-calendar shift convenience,
   not as a DotCal rebrand. First scope should be quick shift add, shift-plan image/PDF/ICS export,
   DotCal QR import for small plans, and a two-week widget. See
   `## Planned: Shift Worker Convenience Pack`.
-- **Calendar overflow menu customization.** Make the Calendar three-dot menu user-configurable via
-  Settings with show/hide toggles first, reorder later if needed. This should happen before or
-  alongside shift-plan actions so the menu does not become cluttered. See
-  `## Planned: Calendar Overflow Menu Customization`.
-- **Event file attachments.** Gary requested attaching PDFs/files such as venue tickets to events.
-  Recommendation: add later as a Pro feature using SAF + app-private copies + side-store metadata,
-  with no Room schema change and no Google/Drive attachment sync in v1. See
-  `## Planned: Event File Attachments`.
+- **Calendar overflow menu customization.** DONE. Calendar overflow actions can be hidden/shown from
+  `Settings > Calendar Preferences > Calendar menu`, with Reset support and stable DataStore action
+  ids. See `## Current: Calendar Overflow Menu Customization`.
+- **PDF event attachments.** DONE. Gary's request is implemented for PDFs using SAF,
+  app-private copies, side-store metadata, FileProvider open/share, and backup/restore support. See
+  `## Current: PDF Event Attachments`.
 - **Full UI string extraction + translation.** The Language picker ships and works, but the app is
   still hardcoded English. This is now the blocking follow-up for the feature to mean anything to a
   non-English user. Scope it as one job — see `## Hardcoded String Inventory`.
 
-## Planned: Pro Subscription Plans
+## Current: Pro Billing Plans
 
 Current state:
 
-- DotCal currently supports only the one-time in-app product `dotcal_pro`.
-- Code path is one-time only: `ProManager` queries `BillingClient.ProductType.INAPP`, purchase
-  restore checks only INAPP purchases, and the paywall uses one-time product details/offers.
-- Billing library is already `billing-ktx` 8.0.0, so subscriptions are technically supported by the
-  dependency but not by DotCal's implementation.
+- DotCal supports a one-time Lifetime product and auto-renewing subscription plans.
+- `ProManager` queries `BillingClient.ProductType.INAPP` for lifetime and
+  `BillingClient.ProductType.SUBS` for subscriptions.
+- Purchase restore checks both INAPP and SUBS purchases.
+- Paywall uses a shared `ProPurchaseOffer` model for Yearly, Monthly, and Lifetime offers.
+- Billing library is `billing-ktx` 8.0.0; do not downgrade below v8.
 
-Recommendation:
+Product setup:
 
-- Add `Monthly` subscription next to existing `Lifetime`.
-- Keep Lifetime as the default selected/recommended plan because DotCal has already been positioned
-  as a one-time Pro purchase.
-- Skip weekly at launch. Weekly billing is supported by Google Play but can feel aggressive for a
-  calendar app; it is better used later only if pricing tests show demand.
-- Optional later: add Yearly once monthly conversion/churn is understood.
-
-Play Console setup:
-
-- Keep existing one-time product:
+- Existing one-time product:
   - Product id: `dotcal_pro`
   - Product type: in-app product / one-time
   - Meaning: Lifetime Pro
-- Add subscription product:
-  - Suggested product id: `dotcal_pro_sub`
-  - Base plan id: `monthly`
+- Subscription products queried by app:
+  - Primary product id: `dotcal_pro_subscription`
+  - Legacy/fallback product id: `dotcal_pro_sub`
   - Type: auto-renewing
-  - Billing period: monthly
-  - Optional offer later: free trial or intro price, only if paywall copy clearly explains renewal
-    terms.
+  - Base plan ids mapped by code: `monthly`, `yearly`
+  - Optional offers/trials are allowed, but paywall copy must clearly explain renewal terms.
 
-App implementation plan:
+App implementation:
 
-- Refactor billing UI model to represent more than one purchasable plan:
-  - Lifetime plan from `ProductType.INAPP`
-  - Subscription plan(s) from `ProductType.SUBS`
 - Query product details for both product types. Subscription details come from
   `subscriptionOfferDetails`; one-time/lifetime details come from
   `oneTimePurchaseOfferDetails` / `oneTimePurchaseOfferDetailsList`.
 - Purchase flow:
-  - Lifetime: current `BillingFlowParams.ProductDetailsParams` path.
-  - Monthly: subscription product details + selected subscription offer token/base plan offer token.
+  - Lifetime: INAPP product details + selected one-time offer token when present.
+  - Monthly/Yearly: SUBS product details + selected subscription offer token.
 - Restore/refresh:
   - Query `INAPP` purchases for lifetime.
   - Query `SUBS` purchases for active subscription.
   - Set Pro true if either entitlement is valid.
-- Keep current boolean `isPro` entitlement for app gates. Add a display-only source later if needed:
+- Current boolean `isPro` entitlement remains the app gate. Add a display-only source later if needed:
   `None`, `Lifetime`, `Subscription`.
 - Paywall:
-  - Show two cards: `Monthly` and `Lifetime`.
+  - Shows Yearly, Monthly, and Lifetime options when Play Billing returns them.
   - Prices always come from Play Billing.
-  - Suggested copy: `Cancel anytime` for Monthly, `One-time purchase` for Lifetime.
+  - Copy distinguishes subscription renewal from one-time lifetime purchase.
   - Restore button checks both products.
-  - Add `Manage subscription` link only when a subscription purchase is detected.
+  - `Manage subscription` link appears only when a subscription purchase is detected.
 
 Entitlement rules:
 
@@ -610,7 +633,7 @@ Entitlement rules:
 
 Lifetime while subscribed:
 
-- If a monthly subscriber buys Lifetime, DotCal should immediately unlock Lifetime and keep Pro
+- If a subscriber buys Lifetime, DotCal should immediately unlock Lifetime and keep Pro
   forever.
 - DotCal app-only code cannot automatically cancel that user's Google Play subscription. The purchase
   is attached to the user's Play account, and the one-time INAPP product is not a subscription
@@ -623,12 +646,14 @@ Lifetime while subscribed:
   Play Developer API, but it requires backend/server auth, purchase-token storage/verification, and
   notification handling. That is out of scope for DotCal's current offline-first/app-only model.
 
-Suggested implementation batches:
+Promo-code behavior:
 
-1. Backend billing support only: query/restore/purchase INAPP + SUBS, preserve lifetime entitlement,
-   add tests where current billing abstractions allow it.
-2. Paywall polish: plan cards, selected plan state, monthly/lifetime copy, subscription management
-   link, and final QA through internal testing.
+- Lifetime one-time promo codes redeem through Google Play or inside the Play purchase sheet.
+- Subscription one-time-use promo codes can redeem through Google Play or inside the Play purchase
+  sheet for the selected Monthly/Yearly plan.
+- Subscription custom promo codes are app-flow only: user opens DotCal paywall, selects the plan,
+  opens the Google Play purchase sheet, then uses the payment-method dropdown/redeem option.
+- If redemption happens outside the app, `Restore Purchase` or app restart refreshes entitlement.
 
 ## Planned: Shift Worker Convenience Pack
 
@@ -701,44 +726,34 @@ Hard boundaries:
 - No package/deep-link/DB filename changes.
 - Do not start this before Batch 2 month chips are approved.
 
-## Planned: Calendar Overflow Menu Customization
+## Current: Calendar Overflow Menu Customization
 
-Goal:
+Status:
 
-- Let users decide which actions appear in the Calendar tab three-dot overflow menu.
-- Keep the first version pragmatic: show/hide toggles only. Do not add drag reorder until users ask
-  for ordering control.
+- Implemented show/hide customization for Calendar tab three-dot overflow actions.
+- Route: `Settings > Calendar Preferences > Calendar menu`.
+- UI: one switch per overflow action plus a `Reset` action in the header.
+- Storage: DataStore key `hidden_calendar_menu_actions` stores stable hidden action ids. Missing or
+  blank storage means all actions are visible by default.
+- Current configurable actions: Search, New Event, Add Shift, Go to date, Quick Add, Share
+  availability, Templates, Calendar Sets, and Shift Patterns.
+- The fixed top-bar `+` button and hardware-gated QR scanner icon remain outside this customization
+  and keep their prior behavior.
+- Pro/free gating, Pro badges, menu subtitles, and hardware checks remain unchanged.
+- Added locale keys for the new settings labels in every shipped locale.
+- Added `CalendarOverflowActionTest` for persisted hidden-action parsing.
 
-Why:
+Verification:
 
-- The current Calendar overflow menu is a fixed list. New shift actions will add more density.
-- Customization gives power users a cleaner Calendar tab without removing advanced features.
+- `git diff --check` passed with CRLF warnings only.
+- `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`
+  returned `BUILD SUCCESSFUL`.
 
-Suggested flow:
+Possible follow-up:
 
-- Settings > Calendar Preferences > `Customize Calendar Menu`.
-- Show a list of existing Calendar overflow actions with switches: Search, Templates, Jump to date,
-  Share availability, QR scanner, Quick add, Focus profiles, Shift patterns, Date calculator, Time
-  insights, Recently deleted, and future Shift Plan actions.
-- All current actions stay visible by default for existing behavior parity.
-- Add `Reset to default`.
-- Prevent an empty menu or keep a stable route to customization from Settings.
+- Add drag reorder only if users ask for ordering control.
 
-Implementation notes:
-
-- Store hidden/visible action IDs in DataStore. Use stable internal IDs, not localized labels.
-- Render the Calendar overflow menu by filtering the existing action list through preferences.
-- Preserve existing gates and device logic: Pro/free behavior, `Pro` badges, subtitles, camera-less
-  QR hiding, and any hardware checks must remain exactly as they are.
-- Add strings in every shipped locale.
-- No Room schema change.
-
-Risk:
-
-- Medium-easy. DataStore + Settings UI + menu filtering. Main risk is accidentally changing Pro gate
-  behavior or hiding hardware-dependent QR logic.
-
-## Planned: Event File Attachments
+## Current: PDF Event Attachments
 
 User request from Gary:
 
@@ -746,43 +761,33 @@ User request from Gary:
 > Would it be possible to have file attachments as well as images please? I'll often attach venue
 > tickets to an event if a PDF has been provided.
 
-Assessment:
+Current shipped scope:
 
-- Worth adding. This is a real calendar workflow: tickets, booking PDFs, appointment forms, venue
-  instructions, invoices, and travel documents belong on the event.
-- Competitive fit is strong: Google Calendar, Apple Calendar, and Outlook all support event
-  attachments or linked files in their calendar/event flows.
-- DotCal fit is strong because the app already has event Images and Voice note sections; generic
-  files extend the same event-context media model.
-- Priority: backlog after current approved UI/widget polish is accepted.
-
-Implementation plan:
-
-- Add a `Files` / `Attachments` section to Event editor and Event detail near Images and Voice note.
-- Start with PDFs, then allow common document MIME types: PDF, plain text, Word, Excel, PowerPoint,
-  and generic `application/octet-stream` only if metadata and opener are available.
-- Use Android Storage Access Framework (`ACTION_OPEN_DOCUMENT` / ActivityResult document picker) so
-  no broad storage permission is needed.
-- Copy selected files into app-private storage, e.g. `files/event_attachments/<eventId>/...`, instead
-  of relying only on persisted URI grants. This keeps tickets available after the source file moves,
-  cloud provider logs out, or the user deletes the original.
-- Store attachment metadata in `dotcal_side_store.json`: event id, internal path, original display
-  name, MIME type, byte size, created timestamp, and optional original URI string for diagnostics.
-- Keep Room schema unchanged: no new tables, no new columns. Room stays exactly 5 tables.
-- Add file actions: open with system viewer, share, remove. Use `FileProvider` for app-private files.
-- Cap initial scope at 5 files per event and 20 MB per file to avoid unbounded backup/storage growth.
-- Pro model: adding file attachments is Pro-gated. Viewing/opening/removing already-attached files
-  should remain available even if Pro entitlement is later lost, matching a user-owned-data model.
+- Event editor has an `Add PDF` attachment flow near event media.
+- Event detail displays attached PDFs.
+- PDF import uses Android document picking; no broad storage permission is requested.
+- Selected PDFs are copied into app-private event attachment storage and exposed for viewing through
+  `FileProvider`.
+- Attachment metadata is stored in side-store data under the event id; Room schema remains unchanged.
+- Initial limits: 5 PDFs per event and 20 MB per PDF.
+- Adding PDFs is Pro-gated. Viewing/opening/removing existing PDFs remains available if Pro
+  entitlement is later lost.
+- Backup/export serializes PDF attachment metadata and bytes; restore recreates app-private files and
+  reports restored PDF count.
 
 Important boundaries:
 
-- Do not implement Google Calendar / Drive attachment sync in v1. DotCal remains offline-first and
-  CalendarProvider-based; cloud attachment sharing needs separate permissions and product decisions.
+- Generic document attachments are not shipped yet. Current user-facing scope is PDF only.
+- Do not implement Google Calendar / Drive attachment sync without a separate product/privacy review.
+  DotCal remains offline-first and CalendarProvider-based.
 - Do not store arbitrary file blobs in Room.
-- Do not request broad storage permissions. SAF + app-private copies is the preferred Android path.
-- Backups/import-export need explicit handling before shipping: either include copied attachments in
-  DotCal backups or clearly mark them as local-only and not backed up. Prefer including them if size
-  limits are already enforced.
+- Do not request broad storage permissions. SAF + app-private copies remains the preferred Android
+  path.
+
+Possible follow-up:
+
+- Add common document MIME types only if UX copy, opener behavior, backup size impact, and support
+  expectations are reviewed first.
 
 ## Hardcoded String Inventory
 

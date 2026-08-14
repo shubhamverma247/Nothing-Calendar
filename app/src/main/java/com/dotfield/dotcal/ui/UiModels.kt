@@ -67,6 +67,7 @@ internal enum class SettingsScreen {
     Theme,
     Sync,
     CalendarPreferences,
+    CalendarMenu,
     ReminderDefaults,
     Widgets,
     DataRestore,
@@ -75,6 +76,41 @@ internal enum class SettingsScreen {
     GlobalHolidays,
     AppPrivacy,
     PrivacyPolicy,
+}
+
+internal enum class CalendarOverflowAction(
+    val storageKey: String,
+    @StringRes val labelRes: Int,
+    @StringRes val subtitleRes: Int,
+) {
+    Search("search", R.string.menu_search, R.string.menu_search_subtitle),
+    NewEvent("new_event", R.string.menu_new_event, R.string.menu_new_event_subtitle),
+    AddShift("add_shift", R.string.menu_add_shift, R.string.menu_add_shift_subtitle),
+    GoToDate("go_to_date", R.string.menu_go_to_date, R.string.menu_go_to_date_subtitle),
+    QuickAdd("quick_add", R.string.menu_quick_add, R.string.menu_quick_add_subtitle),
+    ShareAvailability("share_availability", R.string.menu_share_availability, R.string.menu_share_availability_subtitle),
+    Templates("templates", R.string.menu_templates, R.string.menu_templates_subtitle),
+    CalendarSets("calendar_sets", R.string.menu_calendar_sets, R.string.menu_calendar_sets_subtitle),
+    ShiftPatterns("shift_patterns", R.string.menu_shift_patterns, R.string.menu_shift_patterns_subtitle);
+
+    val label: String
+        @Composable get() = stringResource(labelRes)
+    val subtitle: String
+        @Composable get() = stringResource(subtitleRes)
+
+    companion object {
+        val Defaults: Set<CalendarOverflowAction> = entries.toSet()
+
+        fun hiddenFromStorage(value: String?): Set<CalendarOverflowAction> {
+            if (value.isNullOrBlank()) return emptySet()
+            val keys = value.split(",").map(String::trim).filter(String::isNotEmpty).toSet()
+            return entries.filter { it.storageKey in keys }.toSet()
+        }
+
+        fun hiddenToStorage(hidden: Set<CalendarOverflowAction>): String {
+            return hidden.map(CalendarOverflowAction::storageKey).sorted().joinToString(",")
+        }
+    }
 }
 
 /**

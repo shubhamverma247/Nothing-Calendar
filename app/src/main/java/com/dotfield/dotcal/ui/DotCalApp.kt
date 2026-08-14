@@ -578,6 +578,14 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] ?: false
         }
     }.collectAsStateWithLifecycle(initialValue = false)
+    val hiddenCalendarMenuActions by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            CalendarOverflowAction.hiddenFromStorage(preferences[CalendarPreferences.KEY_HIDDEN_CALENDAR_MENU_ACTIONS])
+        }
+    }.collectAsStateWithLifecycle(initialValue = emptySet())
+    val visibleCalendarMenuActions = remember(hiddenCalendarMenuActions) {
+        CalendarOverflowAction.Defaults - hiddenCalendarMenuActions
+    }
     val defaultReminderMinutes by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             val stored = preferences[CalendarPreferences.KEY_DEFAULT_REMINDER] ?: 5
@@ -1402,6 +1410,7 @@ fun DotCalApp(
                                     showPaywall = true
                                 }
                             },
+                            visibleOverflowActions = visibleCalendarMenuActions,
                             showProBadges = !isPro,
                             onCalendarTabSelected = {
                                 screenTab = ScreenTab.Calendar
@@ -1688,6 +1697,7 @@ fun DotCalApp(
                 defaultReminderMinutes = defaultReminderMinutes,
                 defaultEventDurationMinutes = defaultEventDurationMinutes,
                 defaultCalendarTab = storedCalendarTab,
+                hiddenCalendarMenuActions = hiddenCalendarMenuActions,
                 showWeekNumbers = showWeekNumbers,
                 defaultAllDayReminderTime = defaultAllDayReminderTime,
                 weekStartOption = weekStartOption,
@@ -1750,6 +1760,25 @@ fun DotCalApp(
                 },
                 onDefaultViewSelected = { tab ->
                     selectCalendarTab(tab)
+                },
+                onCalendarMenuActionVisibleChange = { action, visible ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            val current = CalendarOverflowAction.hiddenFromStorage(
+                                preferences[CalendarPreferences.KEY_HIDDEN_CALENDAR_MENU_ACTIONS],
+                            )
+                            val updated = if (visible) current - action else current + action
+                            preferences[CalendarPreferences.KEY_HIDDEN_CALENDAR_MENU_ACTIONS] =
+                                CalendarOverflowAction.hiddenToStorage(updated)
+                        }
+                    }
+                },
+                onResetCalendarMenuActions = {
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences.remove(CalendarPreferences.KEY_HIDDEN_CALENDAR_MENU_ACTIONS)
+                        }
+                    }
                 },
                 onShowWeekNumbersChange = { enabled ->
                     scope.launch {

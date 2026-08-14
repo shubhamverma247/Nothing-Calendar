@@ -122,6 +122,7 @@ internal fun CalendarTabContainer(
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
     onShiftPatterns: (() -> Unit)? = null,
+    visibleOverflowActions: Set<CalendarOverflowAction> = CalendarOverflowAction.Defaults,
     showProBadges: Boolean = true,
     onCalendarTabSelected: (CalendarTab) -> Unit,
     content: @Composable () -> Unit,
@@ -154,6 +155,7 @@ internal fun CalendarTabContainer(
                 onTimeInsights = onTimeInsights,
                 onDateCalculator = onDateCalculator,
                 onShiftPatterns = onShiftPatterns,
+                visibleOverflowActions = visibleOverflowActions,
                 showProBadges = showProBadges,
             )
         }
@@ -203,21 +205,22 @@ internal fun CalendarActionBar(
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
     onShiftPatterns: (() -> Unit)? = null,
+    visibleOverflowActions: Set<CalendarOverflowAction> = CalendarOverflowAction.Defaults,
     showProBadges: Boolean = true,
 ) {
     val topIconTint = if (palette.isDark) NWhite else palette.accent
     val haptic = LocalHapticFeedback.current
     var showOverflow by remember { mutableStateOf(false) }
-    val hasOverflow = onSearch != null ||
-        onJumpToDate != null ||
-        onAvailability != null ||
-        onQuickShiftAdd != null ||
-        onQuickAdd != null ||
-        onTemplates != null ||
-        onCalendarSets != null ||
-        onTimeInsights != null ||
-        onDateCalculator != null ||
-        onShiftPatterns != null
+    fun CalendarOverflowAction.isVisible() = this in visibleOverflowActions
+    val hasOverflow = (onSearch != null && CalendarOverflowAction.Search.isVisible()) ||
+        CalendarOverflowAction.NewEvent.isVisible() ||
+        (onJumpToDate != null && CalendarOverflowAction.GoToDate.isVisible()) ||
+        (onAvailability != null && CalendarOverflowAction.ShareAvailability.isVisible()) ||
+        (onQuickShiftAdd != null && CalendarOverflowAction.AddShift.isVisible()) ||
+        (onQuickAdd != null && CalendarOverflowAction.QuickAdd.isVisible()) ||
+        (onTemplates != null && CalendarOverflowAction.Templates.isVisible()) ||
+        (onCalendarSets != null && CalendarOverflowAction.CalendarSets.isVisible()) ||
+        (onShiftPatterns != null && CalendarOverflowAction.ShiftPatterns.isVisible())
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -277,7 +280,7 @@ internal fun CalendarActionBar(
                         tonalElevation = 0.dp,
                         modifier = Modifier.width(244.dp),
                     ) {
-                        if (onSearch != null) {
+                        if (onSearch != null && CalendarOverflowAction.Search.isVisible()) {
                             ActionBarMenuItem(
                                 label = stringResource(R.string.menu_search),
                                 subtitle = stringResource(R.string.menu_search_subtitle),
@@ -289,17 +292,19 @@ internal fun CalendarActionBar(
                                 },
                             )
                         }
-                        ActionBarMenuItem(
-                            label = stringResource(R.string.menu_new_event),
-                            subtitle = stringResource(R.string.menu_new_event_subtitle),
-                            icon = Icons.Default.Add,
-                            palette = palette,
-                            onClick = {
-                                showOverflow = false
-                                onAdd()
-                            },
-                        )
-                        if (onQuickShiftAdd != null) {
+                        if (CalendarOverflowAction.NewEvent.isVisible()) {
+                            ActionBarMenuItem(
+                                label = stringResource(R.string.menu_new_event),
+                                subtitle = stringResource(R.string.menu_new_event_subtitle),
+                                icon = Icons.Default.Add,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onAdd()
+                                },
+                            )
+                        }
+                        if (onQuickShiftAdd != null && CalendarOverflowAction.AddShift.isVisible()) {
                             ActionBarMenuItem(
                                 label = stringResource(R.string.menu_add_shift),
                                 subtitle = stringResource(R.string.menu_add_shift_subtitle),
@@ -312,7 +317,7 @@ internal fun CalendarActionBar(
                                 },
                             )
                         }
-                        if (onJumpToDate != null) {
+                        if (onJumpToDate != null && CalendarOverflowAction.GoToDate.isVisible()) {
                             ActionBarMenuItem(
                                 label = stringResource(R.string.menu_go_to_date),
                                 subtitle = stringResource(R.string.menu_go_to_date_subtitle),
@@ -324,7 +329,7 @@ internal fun CalendarActionBar(
                                 },
                             )
                         }
-                        if (onQuickAdd != null) {
+                        if (onQuickAdd != null && CalendarOverflowAction.QuickAdd.isVisible()) {
                             ActionBarMenuItem(
                                 label = stringResource(R.string.menu_quick_add),
                                 subtitle = stringResource(R.string.menu_quick_add_subtitle),
@@ -336,7 +341,7 @@ internal fun CalendarActionBar(
                                 },
                             )
                         }
-                        if (onAvailability != null) {
+                        if (onAvailability != null && CalendarOverflowAction.ShareAvailability.isVisible()) {
                             ActionBarMenuItem(
                                 label = stringResource(R.string.menu_share_availability),
                                 subtitle = stringResource(R.string.menu_share_availability_subtitle),
@@ -349,7 +354,7 @@ internal fun CalendarActionBar(
                                 },
                             )
                         }
-                        if (onTemplates != null) {
+                        if (onTemplates != null && CalendarOverflowAction.Templates.isVisible()) {
                             ActionBarMenuItem(
                                 label = stringResource(R.string.menu_templates),
                                 subtitle = stringResource(R.string.menu_templates_subtitle),
@@ -362,7 +367,7 @@ internal fun CalendarActionBar(
                                 },
                             )
                         }
-                        if (onCalendarSets != null) {
+                        if (onCalendarSets != null && CalendarOverflowAction.CalendarSets.isVisible()) {
                             ActionBarMenuItem(
                                 label = stringResource(R.string.menu_calendar_sets),
                                 subtitle = stringResource(R.string.menu_calendar_sets_subtitle),
@@ -375,7 +380,7 @@ internal fun CalendarActionBar(
                                 },
                             )
                         }
-                        if (onShiftPatterns != null) {
+                        if (onShiftPatterns != null && CalendarOverflowAction.ShiftPatterns.isVisible()) {
                             ActionBarMenuItem(
                                 label = stringResource(R.string.menu_shift_patterns),
                                 subtitle = stringResource(R.string.menu_shift_patterns_subtitle),

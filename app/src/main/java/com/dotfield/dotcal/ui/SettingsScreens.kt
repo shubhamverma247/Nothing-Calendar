@@ -283,6 +283,7 @@ internal fun SettingsPreview(
     defaultReminderMinutes: Int?,
     defaultEventDurationMinutes: Int,
     defaultCalendarTab: CalendarTab,
+    hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
     defaultAllDayReminderTime: LocalTime,
     weekStartOption: WeekStartOption,
@@ -301,6 +302,8 @@ internal fun SettingsPreview(
     onDefaultReminderSelected: (Int?) -> Unit,
     onDefaultEventDurationSelected: (Int) -> Unit,
     onDefaultViewSelected: (CalendarTab) -> Unit,
+    onCalendarMenuActionVisibleChange: (CalendarOverflowAction, Boolean) -> Unit,
+    onResetCalendarMenuActions: () -> Unit,
     onShowWeekNumbersChange: (Boolean) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
@@ -369,6 +372,7 @@ internal fun SettingsPreview(
             defaultReminderMinutes = defaultReminderMinutes,
             defaultEventDurationMinutes = defaultEventDurationMinutes,
             defaultCalendarTab = defaultCalendarTab,
+            hiddenCalendarMenuActions = hiddenCalendarMenuActions,
             showWeekNumbers = showWeekNumbers,
             defaultAllDayReminderTime = defaultAllDayReminderTime,
             weekStartOption = weekStartOption,
@@ -386,6 +390,7 @@ internal fun SettingsPreview(
             onDefaultReminderSelected = onDefaultReminderSelected,
             onDefaultEventDurationSelected = onDefaultEventDurationSelected,
             onDefaultViewSelected = onDefaultViewSelected,
+            onCalendarMenuSettings = { onScreenChange(SettingsScreen.CalendarMenu) },
             onShowWeekNumbersChange = onShowWeekNumbersChange,
             onDefaultAllDayReminderTimeSelected = onDefaultAllDayReminderTimeSelected,
             onWeekStartSelected = onWeekStartSelected,
@@ -444,6 +449,7 @@ internal fun SettingsPreview(
         ) {
             CalendarPreferencesSettings(
                 defaultCalendarTab = defaultCalendarTab,
+                hiddenCalendarMenuActions = hiddenCalendarMenuActions,
                 showWeekNumbers = showWeekNumbers,
                 birthdayEnabled = birthdayEnabled,
                 weekStartOption = weekStartOption,
@@ -451,10 +457,25 @@ internal fun SettingsPreview(
                 palette = palette,
                 onBack = { onScreenChange(SettingsScreen.Root) },
                 onDefaultViewSelected = onDefaultViewSelected,
+                onCalendarMenuSettings = { onScreenChange(SettingsScreen.CalendarMenu) },
                 onShowWeekNumbersChange = onShowWeekNumbersChange,
                 onBirthdayEnabledChange = onBirthdayEnabledChange,
                 onWeekStartSelected = onWeekStartSelected,
                 onGlobalHolidays = { onScreenChange(SettingsScreen.GlobalHolidays) },
+            )
+        }
+        AnimatedVisibility(
+            visible = screen == SettingsScreen.CalendarMenu,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+        ) {
+            CalendarMenuSettings(
+                hiddenActions = hiddenCalendarMenuActions,
+                palette = palette,
+                onBack = { onScreenChange(SettingsScreen.CalendarPreferences) },
+                onActionVisibleChange = onCalendarMenuActionVisibleChange,
+                onReset = onResetCalendarMenuActions,
             )
         }
         AnimatedVisibility(
@@ -628,6 +649,7 @@ internal fun SettingsRoot(
     defaultReminderMinutes: Int?,
     defaultEventDurationMinutes: Int,
     defaultCalendarTab: CalendarTab,
+    hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
     defaultAllDayReminderTime: LocalTime,
     weekStartOption: WeekStartOption,
@@ -645,6 +667,7 @@ internal fun SettingsRoot(
     onDefaultReminderSelected: (Int?) -> Unit,
     onDefaultEventDurationSelected: (Int) -> Unit,
     onDefaultViewSelected: (CalendarTab) -> Unit,
+    onCalendarMenuSettings: () -> Unit,
     onShowWeekNumbersChange: (Boolean) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
@@ -820,6 +843,7 @@ internal fun SettingsRoot(
 @Composable
 private fun CalendarPreferencesSettings(
     defaultCalendarTab: CalendarTab,
+    hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
     birthdayEnabled: Boolean,
     weekStartOption: WeekStartOption,
@@ -827,6 +851,7 @@ private fun CalendarPreferencesSettings(
     palette: DotCalPalette,
     onBack: () -> Unit,
     onDefaultViewSelected: (CalendarTab) -> Unit,
+    onCalendarMenuSettings: () -> Unit,
     onShowWeekNumbersChange: (Boolean) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
@@ -852,6 +877,13 @@ private fun CalendarPreferencesSettings(
                     selectedTab = defaultCalendarTab,
                     palette = palette,
                     onViewSelected = onDefaultViewSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsMenuRow(
+                    title = stringResource(R.string.settings_calendar_menu),
+                    value = calendarMenuSummary(hiddenCalendarMenuActions),
+                    palette = palette,
+                    onClick = onCalendarMenuSettings,
                 )
                 SettingsContentDivider(palette)
                 SettingsToggleRow(
@@ -1461,6 +1493,7 @@ private fun SettingsLargeHeader(
     onBack: () -> Unit,
     title: String,
     showBack: Boolean = true,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp)) {
         if (showBack) {
@@ -1468,14 +1501,20 @@ private fun SettingsLargeHeader(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
         }
-        Text(
-            title,
-            color = palette.primaryText,
-            fontFamily = LocalHeadingFont.current,
-            fontWeight = FontWeight.Normal,
-            fontSize = 28.sp,
-            modifier = Modifier.padding(start = 0.dp, top = if (showBack) 2.dp else 10.dp),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = if (showBack) 2.dp else 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                title,
+                color = palette.primaryText,
+                fontFamily = LocalHeadingFont.current,
+                fontWeight = FontWeight.Normal,
+                fontSize = 28.sp,
+                modifier = Modifier.weight(1f),
+            )
+            trailing?.invoke()
+        }
     }
 }
 
@@ -1894,6 +1933,56 @@ private fun PrivacyPolicySettings(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun CalendarMenuSettings(
+    hiddenActions: Set<CalendarOverflowAction>,
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onActionVisibleChange: (CalendarOverflowAction, Boolean) -> Unit,
+    onReset: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item {
+            SettingsLargeHeader(
+                palette = palette,
+                onBack = onBack,
+                title = stringResource(R.string.settings_calendar_menu),
+                trailing = {
+                    TextButton(onClick = onReset) {
+                        Text(
+                            stringResource(R.string.settings_reset),
+                            color = palette.accent,
+                            fontFamily = mono,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                },
+            )
+        }
+        item {
+            SettingsPanel(title = stringResource(R.string.settings_panel_calendar_menu), palette = palette, framed = false) {
+                CalendarOverflowAction.entries.forEachIndexed { index, action ->
+                    SettingsWidgetToggleRow(
+                        title = action.label,
+                        subtitle = action.subtitle,
+                        checked = action !in hiddenActions,
+                        isPro = true,
+                        palette = palette,
+                        onCheckedChange = { visible -> onActionVisibleChange(action, visible) },
+                    )
+                    if (index != CalendarOverflowAction.entries.lastIndex) {
+                        SettingsContentDivider(palette)
+                    }
+                }
+            }
+        }
     }
 }
 

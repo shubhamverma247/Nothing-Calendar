@@ -273,6 +273,16 @@ internal fun selectedHolidayCountriesLabel(countries: List<HolidayCountryUiItem>
 }
 
 @Composable
+internal fun calendarMenuSummary(hiddenActions: Set<CalendarOverflowAction>): String {
+    val visibleCount = CalendarOverflowAction.entries.size - hiddenActions.size
+    return stringResource(
+        R.string.settings_calendar_menu_visible_count,
+        visibleCount.coerceAtLeast(0),
+        CalendarOverflowAction.entries.size,
+    )
+}
+
+@Composable
 internal fun List<SyncMetadata>.lastSyncedSubtitle(): String {
     return stringResource(R.string.sync_last_synced, lastSyncedRelativeLabel())
 }

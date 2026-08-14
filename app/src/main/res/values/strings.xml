@@ -105,6 +105,7 @@
     <string name="settings_value_active">Active</string>
     <string name="settings_value_off">Off</string>
     <string name="settings_value_local">Local</string>
+    <string name="settings_reset">Reset</string>
     <string name="settings_panel_about">About</string>
     <string name="settings_check_updates">Check for updates</string>
     <string name="settings_privacy_policy">Privacy Policy</string>
@@ -125,6 +126,9 @@
     <string name="settings_birthday_calendar_subtitle">Import contacts\' birthdays</string>
     <string name="settings_global_holidays">Global Holidays</string>
     <string name="settings_default_view">Default view</string>
+    <string name="settings_calendar_menu">Calendar menu</string>
+    <string name="settings_calendar_menu_visible_count">%1$d/%2$d visible</string>
+    <string name="settings_panel_calendar_menu">Visible menu actions</string>
     <string name="settings_default_event_duration">Default event duration</string>
     <string name="settings_start_of_week">Start of the week</string>
 

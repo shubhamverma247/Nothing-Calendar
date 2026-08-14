@@ -976,4 +976,8 @@
         <item quantity="many">Importirovat %1$d elementov</item>
         <item quantity="other">Importirovat %1$d elementa</item>
     </plurals>
+    <string name="settings_reset">Reset</string>
+    <string name="settings_calendar_menu">Calendar menu</string>
+    <string name="settings_calendar_menu_visible_count">%1$d/%2$d visible</string>
+    <string name="settings_panel_calendar_menu">Visible menu actions</string>
 </resources>
