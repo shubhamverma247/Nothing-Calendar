@@ -1698,6 +1698,7 @@ internal fun YearView(
     onMonthSelected: (LocalDate) -> Unit,
 ) {
     var dragTotal by remember { mutableFloatStateOf(0f) }
+    val today = LocalDate.now()
     val months = remember(selectedDate.year) { List(12) { selectedDate.withMonth(it + 1).withDayOfMonth(1) } }
     val eventDensity = remember(eventsByDate, selectedDate.year) {
         val density = mutableMapOf<LocalDate, Int>()
@@ -1747,6 +1748,7 @@ internal fun YearView(
                     heatmapEnabled = heatmapEnabled,
                     palette = palette,
                     weekStart = weekStart,
+                    today = today,
                     onClick = { onMonthSelected(month) },
                 )
             }
@@ -1804,11 +1806,11 @@ private fun YearMonthCell(
     heatmapEnabled: Boolean,
     palette: DotCalPalette,
     weekStart: DayOfWeek,
+    today: LocalDate,
     onClick: () -> Unit,
 ) {
     val days = remember(month, weekStart) { monthGrid(month, weekStart) }
     val locale = currentResourceLocale()
-    val today = LocalDate.now()
     val isCurrentMonth = month.year == today.year && month.monthValue == today.monthValue
     Column(
         modifier = Modifier
@@ -1997,12 +1999,12 @@ private fun currentResourceLocale(): Locale {
 
 private fun weekDayLabels(weekStart: DayOfWeek, locale: Locale): List<String> {
     return List(7) { index ->
-        weekStart.plus(index.toLong())
-            .getDisplayName(java.time.format.TextStyle.NARROW, locale)
+        val day = weekStart.plus(index.toLong())
+        day.getDisplayName(java.time.format.TextStyle.SHORT, locale)
+            .trimEnd('.')
+            .take(2)
             .ifBlank {
-                weekStart.plus(index.toLong())
-                    .getDisplayName(java.time.format.TextStyle.SHORT, locale)
-                    .take(1)
+                day.getDisplayName(java.time.format.TextStyle.NARROW, locale)
             }
     }
 }

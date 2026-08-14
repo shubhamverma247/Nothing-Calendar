@@ -393,9 +393,7 @@ internal fun SettingsPreview(
             onWidgetDotTextureChange = onWidgetDotTextureChange,
             onBirthdayEnabledChange = onBirthdayEnabledChange,
             onGlobalHolidays = { onScreenChange(SettingsScreen.GlobalHolidays) },
-            onPrivacyPolicy = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL)))
-            },
+            onPrivacyPolicy = { onScreenChange(SettingsScreen.PrivacyPolicy) },
             onRateDotCal = onRateDotCal,
             onCheckForUpdates = onCheckForUpdates,
             onMoreApps = onMoreApps,
@@ -1879,165 +1877,23 @@ private fun PrivacyPolicySettings(
     palette: DotCalPalette,
     onBack: () -> Unit,
 ) {
-    val context = LocalContext.current
     Column(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
         SettingsCompactHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_privacy_policy))
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp),
-        ) {
-            // Hero intro
-            item {
-                Column {
-                    Text(
-                        stringResource(R.string.privacy_legal_label),
-                        color = palette.accent,
-                        fontFamily = mono,
-                        fontSize = 11.sp,
-                        letterSpacing = 2.sp,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        stringResource(R.string.privacy_hero),
-                        color = palette.primaryText,
-                        fontFamily = LocalHeadingFont.current,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        lineHeight = 28.sp,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        stringResource(R.string.privacy_intro),
-                        color = palette.secondaryText,
-                        fontFamily = mono,
-                        fontSize = 13.sp,
-                        lineHeight = 19.sp,
-                    )
-                }
-            }
-
-            item {
-                PrivacySection(
-                    stringResource(R.string.privacy_section_01_title),
-                    stringResource(R.string.privacy_section_01_body),
-                    palette,
-                )
-            }
-            item {
-                PrivacySection(
-                    stringResource(R.string.privacy_section_02_title),
-                    stringResource(R.string.privacy_section_02_body),
-                    palette,
-                )
-            }
-            item {
-                PrivacySection(
-                    stringResource(R.string.privacy_section_03_title),
-                    stringResource(R.string.privacy_section_03_body),
-                    palette,
-                )
-            }
-            item {
-                PrivacySection(
-                    stringResource(R.string.privacy_section_04_title),
-                    stringResource(R.string.privacy_section_04_body),
-                    palette,
-                )
-            }
-            item {
-                PrivacySection(
-                    stringResource(R.string.privacy_section_05_title),
-                    stringResource(R.string.privacy_section_05_body),
-                    palette,
-                )
-            }
-            item {
-                PrivacySection(
-                    stringResource(R.string.privacy_section_06_title),
-                    stringResource(R.string.privacy_section_06_body),
-                    palette,
-                )
-            }
-            item {
-                PrivacySection(
-                    stringResource(R.string.privacy_section_07_title),
-                    stringResource(R.string.privacy_section_07_body),
-                    palette,
-                )
-            }
-            item {
-                PrivacySection(
-                    stringResource(R.string.privacy_section_08_title),
-                    stringResource(R.string.privacy_section_08_body),
-                    palette,
-                )
-            }
-            item {
-                PrivacySection(
-                    stringResource(R.string.privacy_section_09_title),
-                    stringResource(R.string.privacy_section_09_body),
-                    palette,
-                )
-            }
-            item {
-                PrivacySection(
-                    stringResource(R.string.privacy_section_10_title),
-                    stringResource(R.string.privacy_section_10_body),
-                    palette,
-                )
-            }
-
-            // Contact card
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(palette.cell)
-                        .noRippleClickable {
-                            context.startActivity(
-                                Intent(Intent.ACTION_SENDTO).apply {
-                                    data = Uri.parse("mailto:dotfieldstudio@gmail.com?subject=DotCal%20Privacy")
-                                }
-                            )
-                        }
-                        .padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.privacy_contact_title),
-                            color = palette.primaryText,
-                            fontFamily = mono,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                        )
-                        Text(
-                            stringResource(R.string.privacy_contact_email),
-                            color = palette.accent,
-                            fontFamily = mono,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
+        AndroidView(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            factory = { context ->
+                WebView(context).apply {
+                    webViewClient = WebViewClient()
+                    isVerticalScrollBarEnabled = true
+                    setOnTouchListener { view, _ ->
+                        view.parent.requestDisallowInterceptTouchEvent(true)
+                        false
                     }
-                    Icon(
-                        Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = palette.secondaryText,
-                        modifier = Modifier.size(20.dp),
-                    )
+                    settings.javaScriptEnabled = false
+                    loadUrl(PRIVACY_POLICY_URL)
                 }
             }
-            item {
-                Text(
-                    stringResource(R.string.privacy_effective),
-                    color = palette.secondaryText,
-                    fontFamily = mono,
-                    fontSize = 11.sp,
-                )
-            }
-        }
+        )
     }
 }
 
