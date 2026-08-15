@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-08-14
+Updated: 2026-08-15
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full history: `Docs/HANDOFF.original.md`. Feature spec: `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. Do not touch `Docs/HANDOFF - Copy.md`.
 
@@ -39,6 +39,19 @@ What’s new in DotCal 1.3.0
 We’ve also made several fixes for a smoother calendar experience.
 </en-US>
 ```
+
+Next release audit follow-ups:
+
+- App Lock PIN hardening: `AppPrivacyManager.kt` currently stores a 4-8 digit PIN with salted
+  single-pass SHA-256 and no persisted retry throttling. Fix in the next release with a
+  backward-compatible migration to a slow hash such as PBKDF2, plus failed-attempt backoff/lockout
+  UI. Risk: existing SHA-256 PINs must continue to unlock and migrate safely, and QA must cover set
+  PIN, unlock, wrong attempts, cooldown, change PIN, remove PIN, and app relock.
+- DotCalApp decomposition: `DotCalApp.kt` is roughly 2,800 lines with very high cognitive
+  complexity. In the next release, split route/state orchestration into smaller screen coordinators
+  and move settings, calendar, and event flows into scoped composables. Goal is to reduce future
+  regression risk and broad recomposition side effects; this should be a refactor-only pass with
+  focused navigation/app-lock/paywall/manual QA.
 
 **Shift Worker Convenience Pack Phase 1 first slice is implemented and Phase 2 first share slice is
 now built.** `Docs/FEEDBACK.md` is still user-owned untracked and must stay untouched.
