@@ -370,6 +370,7 @@ private fun ProductDetails.lifetimePurchaseOffers(): List<ProPurchaseOffer> {
             formattedPrice = offer.formattedPrice,
             productId = productId,
             productType = BillingClient.ProductType.INAPP,
+            priceAmountMicros = offer.priceAmountMicros,
             offerToken = offer.offerToken,
             offerId = offer.offerId,
             purchaseOptionId = offer.purchaseOptionId,
@@ -383,6 +384,7 @@ private fun ProductDetails.lifetimePurchaseOffers(): List<ProPurchaseOffer> {
                     formattedPrice = price,
                     productId = productId,
                     productType = BillingClient.ProductType.INAPP,
+                    priceAmountMicros = oneTimePurchaseOfferDetails?.priceAmountMicros,
                 ),
             )
         }.orEmpty()
@@ -406,6 +408,7 @@ private fun ProductDetails.subscriptionPurchaseOffers(): List<ProPurchaseOffer> 
             formattedPrice = paidPhase.formattedPrice,
             productId = productId,
             productType = BillingClient.ProductType.SUBS,
+            priceAmountMicros = paidPhase.priceAmountMicros,
             offerToken = offer.offerToken,
             offerId = offer.offerId,
             basePlanId = offer.basePlanId,

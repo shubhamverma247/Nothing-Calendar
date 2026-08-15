@@ -669,7 +669,23 @@ private fun PaywallOfferRow(
             }
             Text(detail, color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp, lineHeight = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Text(offer.formattedPrice, color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            offer.comparisonFormattedPrice?.let { comparisonPrice ->
+                Text(
+                    comparisonPrice,
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    textDecoration = TextDecoration.LineThrough,
+                )
+            }
+            Text(offer.formattedPrice, color = palette.accent, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
+        }
         if (selected) {
             Spacer(modifier = Modifier.width(6.dp))
             Icon(Icons.Default.Check, contentDescription = null, tint = palette.accent, modifier = Modifier.size(16.dp))

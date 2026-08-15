@@ -11,6 +11,8 @@ data class ProPurchaseOffer(
     val formattedPrice: String,
     val productId: String,
     val productType: String,
+    val priceAmountMicros: Long? = null,
+    val comparisonFormattedPrice: String? = null,
     val offerToken: String? = null,
     val offerId: String? = null,
     val purchaseOptionId: String? = null,
@@ -76,12 +78,33 @@ internal fun selectProPurchaseOffer(
 }
 
 internal fun orderedProPurchaseOffers(offers: List<ProPurchaseOffer>): List<ProPurchaseOffer> {
-    val yearly = offers
-        .filter { it.plan == ProPurchasePlan.Yearly }
-        .maxWithOrNull(compareBy<ProPurchaseOffer> { it.hasFreeTrial }.thenBy { it.offerId == YEARLY_TRIAL_OFFER_ID })
-    val monthly = offers.firstOrNull { it.plan == ProPurchasePlan.Monthly }
-    val lifetime = offers.firstOrNull { it.plan == ProPurchasePlan.Lifetime }
+    val yearlyOffers = offers.filter { it.plan == ProPurchasePlan.Yearly }
+    val monthlyOffers = offers.filter { it.plan == ProPurchasePlan.Monthly }
+    val lifetimeOffers = offers.filter { it.plan == ProPurchasePlan.Lifetime }
+    val yearly = yearlyOffers
+        .maxWithOrNull(
+            compareBy<ProPurchaseOffer> { it.hasFreeTrial }
+                .thenBy { it.offerId == YEARLY_TRIAL_OFFER_ID }
+                .thenByDescending { it.priceAmountMicros ?: Long.MAX_VALUE },
+        )
+        ?.withComparisonPrice(yearlyOffers)
+    val monthly = monthlyOffers
+        .minWithOrNull(compareBy<ProPurchaseOffer> { it.priceAmountMicros ?: Long.MAX_VALUE })
+        ?.withComparisonPrice(monthlyOffers)
+    val lifetime = lifetimeOffers
+        .minWithOrNull(compareBy<ProPurchaseOffer> { it.priceAmountMicros ?: Long.MAX_VALUE })
+        ?.withComparisonPrice(lifetimeOffers)
     return listOfNotNull(yearly, monthly, lifetime)
+}
+
+private fun ProPurchaseOffer.withComparisonPrice(planOffers: List<ProPurchaseOffer>): ProPurchaseOffer {
+    val selectedPrice = priceAmountMicros ?: return this
+    val comparison = planOffers
+        .filter { it.priceAmountMicros != null && it.priceAmountMicros > selectedPrice }
+        .maxByOrNull { it.priceAmountMicros ?: Long.MIN_VALUE }
+        ?.formattedPrice
+        ?.takeUnless { it == formattedPrice }
+    return copy(comparisonFormattedPrice = comparison)
 }
 
 internal const val MONTHLY_BASE_PLAN_ID = "monthly"
