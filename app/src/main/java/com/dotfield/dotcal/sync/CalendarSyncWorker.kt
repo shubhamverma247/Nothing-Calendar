@@ -82,7 +82,7 @@ object CalendarSyncWorkScheduler {
         val request = PeriodicWorkRequestBuilder<CalendarSyncWorker>(interval.toLong(), TimeUnit.MINUTES).build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             CalendarSyncWorker.UNIQUE_PERIODIC_WORK,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             request,
         )
     }

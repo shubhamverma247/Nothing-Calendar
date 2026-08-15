@@ -48,13 +48,15 @@ class CalendarSyncRepository(
                 ?.let { dao.getDeletedGoogleEventIds(it.toList()).toSet() }
                 ?: emptySet()
             val upserts = mutableListOf<CalendarEvent>()
+            var accountInserted = 0
+            var accountUpdated = 0
             providerByGoogleId.forEach { (googleEventId, providerEvent) ->
                 if (googleEventId in deletedGoogleIds) return@forEach
                 val localEvent = localByGoogleId[googleEventId]
                 when {
                     localEvent == null -> {
                         upserts += providerEvent
-                        inserted += 1
+                        accountInserted += 1
                     }
                     localEvent.syncVersion != providerEvent.syncVersion -> {
                         upserts += providerEvent.copy(
@@ -62,7 +64,7 @@ class CalendarSyncRepository(
                             createdAtMs = localEvent.createdAtMs,
                             updatedAtMs = now,
                         )
-                        updated += 1
+                        accountUpdated += 1
                     }
                 }
             }
@@ -70,7 +72,10 @@ class CalendarSyncRepository(
             val deleteIds = localEvents
                 .filter { localEvent -> localEvent.googleEventId !in providerIds }
                 .map { it.id }
-            deleted += deleteIds.size
+            val accountDeleted = deleteIds.size
+            inserted += accountInserted
+            updated += accountUpdated
+            deleted += accountDeleted
             dao.applyProviderCalendarSync(
                 account = account,
                 upserts = upserts,
@@ -80,9 +85,9 @@ class CalendarSyncRepository(
                     lastSyncMs = now,
                     lastSyncStatus = "SUCCESS",
                     errorMessage = null,
-                    eventsInserted = inserted,
-                    eventsUpdated = updated,
-                    eventsDeleted = deleted,
+                    eventsInserted = accountInserted,
+                    eventsUpdated = accountUpdated,
+                    eventsDeleted = accountDeleted,
                 ),
                 tombstoneCutoffMs = tombstoneCutoffMs,
             )
