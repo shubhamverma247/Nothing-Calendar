@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dotfield.dotcal.R
@@ -64,6 +65,26 @@ private enum class AvailabilityPreset(@StringRes val labelRes: Int) {
 
     val label: String
         @Composable get() = stringResource(labelRes)
+}
+
+internal data class AvailabilityScrollbarThumb(
+    val height: Dp,
+    val offset: Dp,
+)
+
+internal fun availabilityScrollbarThumb(
+    trackHeight: Dp,
+    scrollValue: Int,
+    maxScroll: Int,
+): AvailabilityScrollbarThumb? {
+    if (!trackHeight.value.isFinite() || trackHeight <= 0.dp || maxScroll <= 0) return null
+    val height = minOf(trackHeight, 32.dp)
+    val travel = (trackHeight - height).coerceAtLeast(0.dp)
+    val progress = (scrollValue.toFloat() / maxScroll).coerceIn(0f, 1f)
+    return AvailabilityScrollbarThumb(
+        height = height,
+        offset = travel * progress,
+    )
 }
 
 @Composable
@@ -214,25 +235,29 @@ internal fun AvailabilityScreen(
                             )
                         }
                         if (previewScrollState.maxValue > 0) {
-                            BoxWithConstraints(
-                                modifier = Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .fillMaxHeight()
-                                    .width(3.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(palette.line.copy(alpha = 0.35f)),
-                            ) {
-                                val thumbHeight = if (maxHeight < 32.dp) maxHeight else 32.dp
-                                val travel = maxHeight - thumbHeight
-                                val thumbOffset = travel * (previewScrollState.value.toFloat() / previewScrollState.maxValue)
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(thumbHeight)
-                                        .offset(y = thumbOffset)
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(palette.accent),
-                                )
+                            BoxWithConstraints(modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()) {
+                                availabilityScrollbarThumb(
+                                    trackHeight = maxHeight,
+                                    scrollValue = previewScrollState.value,
+                                    maxScroll = previewScrollState.maxValue,
+                                )?.let { thumb ->
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .width(3.dp)
+                                            .clip(RoundedCornerShape(2.dp))
+                                            .background(palette.line.copy(alpha = 0.35f)),
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(thumb.height)
+                                                .offset(y = thumb.offset)
+                                                .clip(RoundedCornerShape(2.dp))
+                                                .background(palette.accent),
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

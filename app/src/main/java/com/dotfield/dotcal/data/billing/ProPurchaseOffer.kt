@@ -62,6 +62,16 @@ internal fun resolveProEntitlement(
     )
 }
 
+internal fun shouldSyncQueriedProEntitlement(
+    lifetime: PurchaseEntitlement?,
+    subscription: PurchaseEntitlement?,
+): Boolean {
+    val hasCompleteQuery = lifetime != null && subscription != null
+    val hasQueriedPurchase = lifetime == PurchaseEntitlement.Purchased ||
+        subscription == PurchaseEntitlement.Purchased
+    return hasCompleteQuery || hasQueriedPurchase
+}
+
 internal fun preferredProPurchaseOffer(offers: List<ProPurchaseOffer>): ProPurchaseOffer? {
     return offers.firstOrNull { it.plan == ProPurchasePlan.Yearly && it.hasFreeTrial }
         ?: offers.firstOrNull { it.plan == ProPurchasePlan.Yearly }

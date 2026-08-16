@@ -163,9 +163,9 @@ class ProManager(
     /** Queries live purchases and syncs [_isPro] + DataStore, trusting the live query over cache. */
     private suspend fun refreshPurchases() {
         runCatching { queryAndCacheProductDetails() }
-        val inAppPurchases = queryPurchases(BillingClient.ProductType.INAPP) ?: return
-        val subscriptionPurchases = queryPurchases(BillingClient.ProductType.SUBS) ?: return
-        syncEntitlement(inAppPurchases, subscriptionPurchases, fromFlow = false)
+        val inAppPurchases = queryPurchases(BillingClient.ProductType.INAPP)
+        val subscriptionPurchases = queryPurchases(BillingClient.ProductType.SUBS)
+        syncEntitlementIfQueryAllows(inAppPurchases, subscriptionPurchases, fromFlow = false)
     }
 
     private suspend fun handleUpdatedPurchases(purchases: List<Purchase>, fromFlow: Boolean) {
@@ -280,9 +280,10 @@ class ProManager(
         if (_billingState.value != BillingConnectionState.Connected) {
             runCatching { connectWithRetry() }
         }
-        val inAppPurchases = queryPurchases(BillingClient.ProductType.INAPP) ?: return _isPro.value
-        val subscriptionPurchases = queryPurchases(BillingClient.ProductType.SUBS) ?: return _isPro.value
-        return syncEntitlement(inAppPurchases, subscriptionPurchases, fromFlow = false).isPro
+        val inAppPurchases = queryPurchases(BillingClient.ProductType.INAPP)
+        val subscriptionPurchases = queryPurchases(BillingClient.ProductType.SUBS)
+        return syncEntitlementIfQueryAllows(inAppPurchases, subscriptionPurchases, fromFlow = false)?.isPro
+            ?: _isPro.value
     }
 
     private suspend fun queryPurchases(productType: String): List<Purchase>? {
@@ -315,6 +316,21 @@ class ProManager(
         if (changed) runCatching { com.dotfield.dotcal.widget.WidgetUpdateWorker.enqueue(appContext) }
         if (fromFlow && entitlement.isPro) purchaseResults.value = PurchaseResult.Success
         return entitlement
+    }
+
+    private suspend fun syncEntitlementIfQueryAllows(
+        inAppPurchases: List<Purchase>?,
+        subscriptionPurchases: List<Purchase>?,
+        fromFlow: Boolean,
+    ): ProEntitlement? {
+        val lifetime = inAppPurchases?.entitlementFor(PRODUCT_ID_PRO)
+        val subscription = subscriptionPurchases?.entitlementForAny(PRODUCT_IDS_PRO_SUBSCRIPTION)
+        if (!shouldSyncQueriedProEntitlement(lifetime, subscription)) return null
+        return syncEntitlement(
+            inAppPurchases = inAppPurchases.orEmpty(),
+            subscriptionPurchases = subscriptionPurchases.orEmpty(),
+            fromFlow = fromFlow,
+        )
     }
 
     companion object {

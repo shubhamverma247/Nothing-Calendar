@@ -83,4 +83,19 @@ class ProEntitlementTest {
     fun subscriptionExpirationCannotClearLifetimeEntitlement() {
         assertTrue(resolveProEntitlement(PurchaseEntitlement.Purchased, PurchaseEntitlement.None).isPro)
     }
+
+    @Test
+    fun lifetimeRestoreCanSyncWhenSubscriptionQueryFails() {
+        assertTrue(shouldSyncQueriedProEntitlement(PurchaseEntitlement.Purchased, null))
+    }
+
+    @Test
+    fun partialQueryWithoutPurchaseDoesNotClearCachedEntitlement() {
+        assertFalse(shouldSyncQueriedProEntitlement(PurchaseEntitlement.None, null))
+    }
+
+    @Test
+    fun completeQueryCanSyncNoPurchaseResult() {
+        assertTrue(shouldSyncQueriedProEntitlement(PurchaseEntitlement.None, PurchaseEntitlement.None))
+    }
 }
