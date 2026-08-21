@@ -1114,11 +1114,13 @@ private fun VoiceNoteEditorSection(
                         return@EmptyVoiceNoteRow
                     }
                     if (permissionDenied) {
-                        context.startActivity(
-                            Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.parse("package:${context.packageName}")
-                            },
-                        )
+                        runCatching {
+                            context.startActivity(
+                                Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                },
+                            )
+                        }
                     } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                         startVoiceRecording(context, eventId)?.let { started ->
                             recorder = started
@@ -1308,7 +1310,7 @@ internal fun EventEditorScreen(
     val seed = if (event == null && draft == null) prefill else null
     // Template prefill likewise only seeds a brand-new event. Applied to the current date.
     val tpl = if (event == null && draft == null) templatePrefill else null
-    val tplStartTime: LocalTime? = tpl?.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60) }
+    val tplStartTime: LocalTime? = minuteOfDayToLocalTimeOrNull(tpl?.startMinuteOfDay)
     val editorDate = event?.localDate() ?: draft?.date ?: seed?.date ?: selectedDate
     val initialStart = event?.startLocalTime() ?: draft?.startTime ?: seed?.startTime ?: tplStartTime ?: selectedTime
     val tplEndTime: LocalTime? = if (tpl != null && tplStartTime != null) {

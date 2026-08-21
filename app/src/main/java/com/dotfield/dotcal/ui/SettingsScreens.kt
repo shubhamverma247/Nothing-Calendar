@@ -810,15 +810,17 @@ internal fun SettingsRoot(
                     SettingsIconMenuRow(title = stringResource(R.string.settings_more_apps), value = stringResource(R.string.settings_more_apps_value), icon = Icons.Default.Apps, palette = palette, onClick = onMoreApps)
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(title = stringResource(R.string.settings_join_discord), value = stringResource(R.string.settings_join_discord_value), icon = Icons.Default.Groups, palette = palette, onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DISCORD_INVITE_URL)))
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DISCORD_INVITE_URL))) }
                     })
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(title = stringResource(R.string.settings_send_feedback), value = "", icon = Icons.Default.Edit, palette = palette, onClick = {
-                        context.startActivity(
-                            Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:dotfieldstudio@gmail.com?subject=DotCal%20Feedback")
-                            }
-                        )
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_SENDTO).apply {
+                                    data = Uri.parse("mailto:dotfieldstudio@gmail.com?subject=DotCal%20Feedback")
+                                },
+                            )
+                        }
                     })
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(title = stringResource(R.string.settings_version), value = BuildConfig.VERSION_NAME, icon = Icons.Default.Description, palette = palette, showChevron = false, onClick = {})

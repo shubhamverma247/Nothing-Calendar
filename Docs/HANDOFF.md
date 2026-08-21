@@ -1,10 +1,59 @@
 # DotCal Handoff
 
-Updated: 2026-08-15
+Updated: 2026-08-21
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full history: `Docs/HANDOFF.original.md`. Feature spec: `Docs/DotCal — FINAL PACKAGE 14 Feature.txt`. Do not touch `Docs/HANDOFF - Copy.md`.
 
 ## Latest Continuation
+
+**Crash/sync audit batch is in progress on `main`; do not touch `Docs/FEEDBACK.md`.** Current local
+release target is `versionCode 29`, `versionName 1.3.1`. No commit/push has been made for this
+batch yet.
+
+- Crash hardening: Room database creation is process-wide singleton, WAL is enabled, DB open sets
+  `PRAGMA busy_timeout=5000`, and event flows retry transient `SQLiteDatabaseLockedException`.
+- Compose guardrails: month cell metrics and timed event preview heights clamp invalid/negative
+  constraints; Availability scrollbar keeps the previous invalid-height guard.
+- Corrupt stored-data guardrails: invalid timezone ids fall back safely, corrupt template/shift
+  minute-of-day values are ignored/fallback instead of crashing, and external intents are wrapped
+  with `runCatching`.
+- Google Calendar sync fixes: provider import now reads `Events.DURATION`, handles multi-day/all-day
+  duration strings such as `P2D` and timed strings such as `PT1H30M`, falls back from missing event
+  color to the provider calendar color, and writes valid provider duration strings as `PT...S`.
+- Multi-day display behavior: events are bucketed into every visible date, not only the start date.
+  For a user-visible all-day range `Aug 21` through `Aug 25`, DotCal should show chips on `Aug 21`,
+  `Aug 22`, `Aug 23`, `Aug 24`, and `Aug 25`. Day/Week all-day chips show position labels like
+  `Title (Day 1/5)` through `Title (Day 5/5)`. Google provider all-day end dates are stored
+  exclusive internally, so a UI range ending Aug 25 normally has provider `DTEND=Aug 26`.
+- Week view fix: all-day row now uses per-day buckets, de-duplicates multi-day events, and uses a
+  slightly taller/padded strip to avoid small-phone clipping.
+- Future R8/Play Console note: release already has `isMinifyEnabled=true`, `isShrinkResources=true`,
+  and `proguard-android-optimize.txt`. Play's "Optimized resource shrinking" warning requires AGP
+  9.0+. Current AGP is 8.10.1; defer AGP 9/repackage-class experimentation to a future dependency
+  upgrade release, after release-build smoke testing.
+
+Verification already run in this batch:
+
+- `:app:testDebugUnitTest`
+- `:app:compileDebugKotlin`
+- `:app:lintDebug`
+- `:app:assembleDebug`
+- `:app:assembleRelease` (R8/minify/resource shrink path passed)
+- `git diff --check`
+- Debug install attempt on connected device `4ab0d020` was blocked by Android:
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because the installed `com.dotfield.dotcal` signature does
+  not match the debug APK signature. Do not uninstall without explicit user approval because it will
+  delete local app data.
+
+Manual QA needed after install:
+
+- Swipe Week and Day views repeatedly on the device that previously clipped the week header.
+- Create/sync a Google all-day event spanning Aug 21-Aug 25; confirm Month shows all five dates,
+  Day shows `Day 1/5` through `Day 5/5`, and Week shows the appropriate per-day labels.
+- Sync Google events with custom calendar colors and confirm DotCal no longer falls back to red when
+  provider event color is missing.
+- Open Availability with long preview text and scroll.
+- Restore purchase on an account with old lifetime purchase.
 
 **Calendar overflow menu customization is implemented and verified on `main`.** Users can now open
 `Settings > Calendar Preferences > Calendar menu` and show/hide Calendar tab overflow actions with a

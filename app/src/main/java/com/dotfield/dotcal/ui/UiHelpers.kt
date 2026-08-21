@@ -34,7 +34,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.time.temporal.WeekFields
 import java.util.Locale
 
@@ -155,8 +157,55 @@ internal fun resolveWeekStartDay(option: WeekStartOption): DayOfWeek {
     return option.fixedDay ?: WeekFields.of(Locale.getDefault()).firstDayOfWeek
 }
 
+private const val MAX_VISIBLE_EVENT_DAYS = 370L
+
 internal fun CalendarEvent.localDate(): LocalDate {
     return Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault()).toLocalDate()
+}
+
+internal fun eventsByVisibleDate(events: List<CalendarEvent>): Map<LocalDate, List<CalendarEvent>> {
+    val grouped = mutableMapOf<LocalDate, MutableList<CalendarEvent>>()
+    events.forEach { event ->
+        event.visibleDates().forEach { date ->
+            grouped.getOrPut(date) { mutableListOf() }.add(event)
+        }
+    }
+    return grouped
+}
+
+internal fun CalendarEvent.visibleDates(): List<LocalDate> {
+    val zone = displayZone()
+    val startDate = Instant.ofEpochMilli(startTimeMs).atZone(zone).toLocalDate()
+    val inclusiveEndInstant = (endTimeMs - 1L).coerceAtLeast(startTimeMs)
+    val endDate = Instant.ofEpochMilli(inclusiveEndInstant).atZone(zone).toLocalDate()
+    val dayCount = ChronoUnit.DAYS.between(startDate, endDate).coerceIn(0L, MAX_VISIBLE_EVENT_DAYS - 1L)
+    return List(dayCount.toInt() + 1) { startDate.plusDays(it.toLong()) }
+}
+
+internal fun CalendarEvent.titleForVisibleDate(date: LocalDate): String {
+    val dates = visibleDates()
+    if (dates.size <= 1) return title
+    val dayIndex = dates.indexOf(date).takeIf { it >= 0 } ?: return title
+    return "$title (Day ${dayIndex + 1}/${dates.size})"
+}
+
+internal fun CalendarEvent.visibleDayPositionLabel(date: LocalDate): String? {
+    val dates = visibleDates()
+    if (dates.size <= 1) return null
+    val dayIndex = dates.indexOf(date).takeIf { it >= 0 } ?: return null
+    return "${dayIndex + 1}/${dates.size}"
+}
+
+internal fun CalendarEvent.isMultiDayVisible(): Boolean = visibleDates().size > 1
+
+internal fun CalendarEvent.shouldShowStripTitle(date: LocalDate, segmentDates: List<LocalDate>): Boolean {
+    val visibleInSegment = visibleDates().filter { it in segmentDates }
+    return visibleInSegment.firstOrNull() == date
+}
+
+private fun CalendarEvent.displayZone(): ZoneId {
+    if (isAllDay == 1 && source == "GOOGLE") return ZoneOffset.UTC
+    return runCatching { ZoneId.of(timeZone) }.getOrDefault(ZoneId.systemDefault())
 }
 
 internal fun CalendarEvent.hasTaskDate(): Boolean {
@@ -211,6 +260,11 @@ internal fun toHour24(hour12: Int, period: String): Int {
 internal fun parseStoredTime(value: String?): LocalTime? {
     if (value.isNullOrBlank()) return null
     return runCatching { LocalTime.parse(value) }.getOrNull()
+}
+
+internal fun minuteOfDayToLocalTimeOrNull(minuteOfDay: Int?): LocalTime? {
+    val minute = minuteOfDay?.takeIf { it in 0..(23 * 60 + 59) } ?: return null
+    return LocalTime.of(minute / 60, minute % 60)
 }
 
 internal fun coerceEndAfterStart(start: LocalTime, end: LocalTime): LocalTime {

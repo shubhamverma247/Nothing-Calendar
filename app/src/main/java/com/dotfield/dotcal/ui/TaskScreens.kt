@@ -704,7 +704,7 @@ internal fun TaskEditorSheet(
     val taskKey = task?.id ?: "new-task"
     // Template prefill only seeds a brand-new task.
     val tpl = if (task == null) templatePrefill else null
-    val tplTime: LocalTime? = tpl?.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60) }
+    val tplTime: LocalTime? = minuteOfDayToLocalTimeOrNull(tpl?.startMinuteOfDay)
     var title by remember(taskKey) { mutableStateOf(task?.title ?: tpl?.title ?: "") }
     var titleError by remember { mutableStateOf(false) }
     var dueDate by remember(taskKey) { mutableStateOf<LocalDate?>(task?.takeIf { it.hasTaskDate() }?.localDate() ?: LocalDate.now()) }

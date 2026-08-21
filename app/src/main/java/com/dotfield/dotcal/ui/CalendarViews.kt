@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -87,6 +88,7 @@ import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -96,6 +98,7 @@ import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.insights.OnThisDayMemory
 import com.dotfield.dotcal.data.scheduling.EventDragMath
 import com.dotfield.dotcal.data.scheduling.EventTimeRange
+import com.dotfield.dotcal.ui.theme.NBlack
 import com.dotfield.dotcal.ui.theme.NWhite
 import java.time.Duration
 import java.time.DayOfWeek
@@ -179,14 +182,10 @@ internal fun MonthView(
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
             val weekNumberWidth = if (showWeekNumbers) weekNumberColumnWidth else 0.dp
-            val dayCellWidth = (maxWidth - weekNumberWidth) / 7f
-            // Cells are TALL, not square. Event title chips need vertical room that a 1:1 cell
-            // cannot give, but cap row height so month rows do not drift too far apart.
-            val dayCellHeight = if (maxHeight > 0.dp) minOf(maxHeight / 6f, dayCellWidth * 1.60f) else dayCellWidth
-            val visibleChipCount = if (dayCellHeight < 76.dp || showWeekNumbers) 2 else 3
+            val dayCellMetrics = monthDayCellMetrics(maxWidth, maxHeight, weekNumberWidth)
             Column(modifier = Modifier.fillMaxWidth()) {
                 days.chunked(7).forEach { week ->
-                    Row(modifier = Modifier.fillMaxWidth().height(dayCellHeight)) {
+                    Row(modifier = Modifier.fillMaxWidth().height(dayCellMetrics.height)) {
                         if (showWeekNumbers) {
                             WeekNumberCell(
                                 label = isoWeekNumberLabel(week.first()),
@@ -199,13 +198,14 @@ internal fun MonthView(
                         week.forEach { day ->
                             DayCell(
                                 date = day,
+                                weekDates = week,
                                 activeMonth = YearMonth.from(month),
                                 isSelected = day == selectedDate,
                                 isBulkSelected = day in selectedBulkDates,
                                 isHighlighted = day == highlightDate,
                                 events = eventsByDate[day].orEmpty(),
                                 shiftEventIds = shiftEventIds,
-                                visibleChipCount = visibleChipCount,
+                                visibleChipCount = dayCellMetrics.visibleChipCount,
                                 palette = palette,
                                 onClick = { onDateSelected(day) },
                                 onLongPress = { onBulkSelectionStart(day) },
@@ -247,6 +247,7 @@ internal fun MonthView(
 @Composable
 private fun DayCell(
     date: LocalDate,
+    weekDates: List<LocalDate>,
     activeMonth: YearMonth,
     isSelected: Boolean,
     isBulkSelected: Boolean,
@@ -367,7 +368,7 @@ private fun DayCell(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 3.dp, vertical = 3.dp),
+                .padding(vertical = 3.dp),
         ) {
             if (inMonth) {
                 Box(
@@ -395,16 +396,20 @@ private fun DayCell(
                 events.take(visibleChipCount).forEach { event ->
                     MonthEventChip(
                         event = event,
+                        date = date,
+                        weekDates = weekDates,
                         isShift = event.baseEventId() in shiftEventIds,
                         palette = palette,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = if (event.isMultiDayVisible()) 0.dp else 3.dp),
                     )
                     Spacer(modifier = Modifier.height(1.dp))
                 }
                 if (events.size > visibleChipCount) {
                     Text(
                         stringResource(R.string.month_day_more_count, events.size - visibleChipCount),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp),
                         fontFamily = mono,
                         fontSize = 8.sp,
                         color = palette.secondaryText,
@@ -476,48 +481,70 @@ private fun monthDayAccessibilityLabel(
 @Composable
 private fun MonthEventChip(
     event: CalendarEvent,
+    date: LocalDate,
+    weekDates: List<LocalDate>,
     isShift: Boolean,
     palette: DotCalPalette,
     modifier: Modifier = Modifier,
 ) {
     val eventColor = event.displayColor(palette)
+    val contentColor = monthEventContentColor(eventColor)
     val title = event.title.ifBlank { stringResource(R.string.event_conflict_untitled) }
+    val showTitle = event.shouldShowStripTitle(date, weekDates)
     Row(
         modifier = modifier
             .height(14.dp)
-            .clip(RoundedCornerShape(3.dp))
-            .background(eventColor.copy(alpha = if (event.isGhost) 0.12f else if (isShift) 0.30f else 0.18f))
+            .clip(event.visibleSegmentShape(date, weekDates, 3.dp))
+            .background(eventColor.copy(alpha = if (event.isGhost) 0.32f else 0.75f))
             .padding(horizontal = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (isShift) {
+        if (showTitle && isShift) {
             Box(
                 modifier = Modifier
                     .width(2.dp)
                     .fillMaxHeight()
-                    .background(eventColor),
+                    .background(contentColor),
             )
             Spacer(Modifier.width(3.dp))
         }
-        Text(
-            title,
-            modifier = Modifier.fillMaxWidth(),
-            color = eventColor.copy(alpha = if (event.isGhost) 0.68f else 1f),
-            fontFamily = mono,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 8.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = TextStyle(
-                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                lineHeight = 9.sp,
-                lineHeightStyle = LineHeightStyle(
-                    alignment = LineHeightStyle.Alignment.Center,
-                    trim = LineHeightStyle.Trim.Both,
+        if (showTitle) {
+            Text(
+                title,
+                modifier = Modifier.fillMaxWidth(),
+                color = contentColor.copy(alpha = if (event.isGhost) 0.78f else 1f),
+                fontFamily = mono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 8.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = TextStyle(
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    lineHeight = 9.sp,
+                    lineHeightStyle = LineHeightStyle(
+                        alignment = LineHeightStyle.Alignment.Center,
+                        trim = LineHeightStyle.Trim.Both,
+                    ),
                 ),
-            ),
-        )
+            )
+        }
     }
+}
+
+private fun monthEventContentColor(eventColor: Color): Color {
+    return if (eventColor.luminance() > 0.58f) NBlack else NWhite
+}
+
+private fun CalendarEvent.visibleSegmentShape(date: LocalDate, segmentDates: List<LocalDate>, radius: Dp): RoundedCornerShape {
+    val dates = visibleDates().filter { it in segmentDates }
+    if (dates.size <= 1) return RoundedCornerShape(radius)
+    val index = dates.indexOf(date).takeIf { it >= 0 } ?: return RoundedCornerShape(radius)
+    return RoundedCornerShape(
+        topStart = if (index == 0) radius else 0.dp,
+        bottomStart = if (index == 0) radius else 0.dp,
+        topEnd = if (index == dates.lastIndex) radius else 0.dp,
+        bottomEnd = if (index == dates.lastIndex) radius else 0.dp,
+    )
 }
 
 @Composable
@@ -540,11 +567,19 @@ internal fun WeekView(
     use24HourFormat: Boolean,
 ) {
     val days = remember(selectedDate, weekStart) { weekDays(selectedDate, weekStart) }
-    val weekEvents = remember(eventsByDate, days) { days.flatMap { eventsByDate[it].orEmpty() } }
-    val timedEvents = remember(weekEvents) { weekEvents.filter { it.isAllDay == 0 } }
-    val allDayEvents = remember(weekEvents) { weekEvents.filter { it.isAllDay == 1 } }
+    val weekEvents = remember(eventsByDate, days) { days.flatMap { eventsByDate[it].orEmpty() }.distinctBy { it.id } }
+    val timedEvents = remember(weekEvents) { weekEvents.filter { it.isAllDay == 0 && !it.isMultiDayVisible() } }
+    val allDayEventsByDay = remember(eventsByDate, days) {
+        days.associateWith { day ->
+            eventsByDate[day].orEmpty().filter { it.isAllDay == 1 || it.isMultiDayVisible() }.distinctBy { it.id }
+        }
+    }
     val eventLayouts = remember(timedEvents) { layoutTimedEvents(timedEvents) }
-    val timedEventsByDay = remember(timedEvents) { timedEvents.groupBy { it.localDate() } }
+    val timedEventsByDay = remember(eventsByDate, days) {
+        days.associateWith { day ->
+            eventsByDate[day].orEmpty().filter { it.isAllDay == 0 && !it.isMultiDayVisible() }.distinctBy { it.id }
+        }
+    }
 
     var dragTotal by remember { mutableFloatStateOf(0f) }
     var activeDragDay by remember(selectedDate) { mutableStateOf<LocalDate?>(null) }
@@ -583,22 +618,36 @@ internal fun WeekView(
             }
         }
 
-        if (allDayEvents.isNotEmpty()) {
-            Row(modifier = Modifier.fillMaxWidth().height(32.dp).background(palette.calendarSurface)) {
+        if (allDayEventsByDay.any { it.value.isNotEmpty() }) {
+            Row(modifier = Modifier.fillMaxWidth().height(36.dp).background(palette.calendarSurface)) {
                 Spacer(modifier = Modifier.width(if (showWeekNumbers) 36.dp else 32.dp))
                 days.forEach { day ->
-                    val event = allDayEvents.firstOrNull { it.localDate() == day }
+                    val event = allDayEventsByDay[day].orEmpty().firstOrNull()
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(32.dp)
-                            .padding(2.dp)
+                            .fillMaxHeight()
+                            .padding(vertical = 4.dp)
+                            .clip(event?.visibleSegmentShape(day, days, 4.dp) ?: RoundedCornerShape(0.dp))
                             .background(if (event == null) Color.Transparent else event.displayColor(palette).copy(alpha = if (event.isGhost) 0.32f else 0.75f))
                             .then(if (event?.isGhost == true) Modifier.ghostDottedBorder(palette, 4f) else Modifier),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (event != null) {
-                            Text(event.title, color = NWhite, fontFamily = mono, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (event != null && event.shouldShowStripTitle(day, days)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    event.title,
+                                    modifier = Modifier.weight(1f),
+                                    color = NWhite,
+                                    fontFamily = mono,
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }
@@ -924,7 +973,6 @@ private fun DraggableEventRow(
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
     val hourHeightPx = with(density) { hourHeightDp.dp.toPx() }
-    val minHeightPx = with(density) { minimumHeightDp.dp.toPx() }
     val originalRange = remember(event.id, event.startTimeMs, event.endTimeMs) {
         val zoneId = ZoneId.systemDefault()
         EventTimeRange(
@@ -976,7 +1024,7 @@ private fun DraggableEventRow(
     }
     val previewRange = currentRange()
     val previewDurationMinutes = Duration.between(previewRange.start, previewRange.end).toMinutes().coerceAtLeast(15)
-    val previewHeightPx = ((previewDurationMinutes / 60f) * hourHeightPx).coerceAtLeast(minHeightPx)
+    val previewHeight = safeTimedEventHeight(previewDurationMinutes, hourHeightDp, minimumHeightDp)
     val translationY = when (dragMode) {
         EventDragMode.Move, EventDragMode.ResizeStart -> (minuteDelta / 60f) * hourHeightPx
         else -> 0f
@@ -997,7 +1045,7 @@ private fun DraggableEventRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(with(density) { previewHeightPx.toDp() })
+            .height(previewHeight)
             .offset(y = baseTop)
             .graphicsLayer {
                 this.translationX = translationX
@@ -1156,8 +1204,8 @@ internal fun DayView(
 ) {
     val dayAll = remember(eventsByDate, selectedDate) { eventsByDate[selectedDate].orEmpty() }
     val dayEvents = remember(dayAll) { dayAll.filter { it.isTask == 0 } }
-    val allDayEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 1 } }
-    val timedEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 0 } }
+    val allDayEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 1 || it.isMultiDayVisible() } }
+    val timedEvents = remember(dayEvents) { dayEvents.filter { it.isAllDay == 0 && !it.isMultiDayVisible() } }
     val eventLayouts = remember(timedEvents) { layoutTimedEvents(timedEvents) }
     val tasks = remember(dayAll) { dayAll.filter { it.isTask == 1 } }
     var dragTotal by remember { mutableFloatStateOf(0f) }
@@ -1221,7 +1269,26 @@ internal fun DayView(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         ShiftMarker(isShift = isShift, color = NWhite)
-                        Text(event.title, color = NWhite, fontFamily = mono, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            event.title,
+                            modifier = Modifier.weight(1f),
+                            color = NWhite,
+                            fontFamily = mono,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        event.visibleDayPositionLabel(selectedDate)?.let { label ->
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Day $label",
+                                color = NWhite,
+                                fontFamily = mono,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
@@ -1558,6 +1625,54 @@ private fun dayEventTopOffset(time: LocalTime) =
 private fun dayEventHeight(event: CalendarEvent) =
     ((event.durationMinutes() / 60f) * DAY_HOUR_HEIGHT_DP).coerceAtLeast(24f).dp
 
+internal data class MonthDayCellMetrics(
+    val width: Dp,
+    val height: Dp,
+    val visibleChipCount: Int,
+)
+
+internal fun monthDayCellMetrics(
+    maxWidth: Dp,
+    maxHeight: Dp,
+    weekNumberWidth: Dp,
+): MonthDayCellMetrics {
+    val availableWidth = (maxWidth - weekNumberWidth).safeNonNegative()
+    val dayCellWidth = (availableWidth / 7f).safeNonNegative()
+    val rawHeight = if (maxHeight.isPositiveFinite()) {
+        minOf(maxHeight / 6f, dayCellWidth * 1.60f)
+    } else {
+        dayCellWidth
+    }
+    val dayCellHeight = rawHeight.safeNonNegative()
+    return MonthDayCellMetrics(
+        width = dayCellWidth,
+        height = dayCellHeight,
+        visibleChipCount = if (dayCellHeight < 76.dp || weekNumberWidth > 0.dp) 2 else 3,
+    )
+}
+
+private fun Dp.isPositiveFinite(): Boolean = value.isFinite() && this > 0.dp
+
+private fun Dp.safeNonNegative(): Dp {
+    return if (value.isFinite() && this > 0.dp) this else 0.dp
+}
+
+internal fun safeTimedEventHeight(
+    durationMinutes: Long,
+    hourHeightDp: Float,
+    minimumHeightDp: Float,
+): Dp {
+    val safeMin = minimumHeightDp.takeIf { it.isFinite() && it >= 0f } ?: 0f
+    val safeHourHeight = hourHeightDp.takeIf { it.isFinite() && it > 0f } ?: return safeMin.dp
+    val boundedMinutes = durationMinutes.coerceIn(15L, 24L * 60L)
+    val rawHeight = (boundedMinutes / 60f) * safeHourHeight
+    val boundedHeight = rawHeight
+        .takeIf { it.isFinite() }
+        ?.coerceIn(safeMin, 24f * safeHourHeight)
+        ?: safeMin
+    return boundedHeight.dp
+}
+
 @Composable
 internal fun ThreeDayView(
     selectedDate: LocalDate,
@@ -1573,8 +1688,15 @@ internal fun ThreeDayView(
     onEventClick: (CalendarEvent) -> Unit,
 ) {
     val days = remember(selectedDate) { List(3) { selectedDate.plusDays(it.toLong()) } }
+    val allDayEventsByDay = remember(eventsByDate, days) {
+        days.associateWith { day ->
+            eventsByDate[day].orEmpty().filter { it.isAllDay == 1 || it.isMultiDayVisible() }.distinctBy { it.id }
+        }
+    }
     val rangeEvents = remember(eventsByDate, days) {
-        days.flatMap { eventsByDate[it].orEmpty() }.filter { it.isAllDay == 0 }
+        days.flatMap { eventsByDate[it].orEmpty() }
+            .filter { it.isAllDay == 0 && !it.isMultiDayVisible() }
+            .distinctBy { it.id }
     }
     val rangeEventsByDayHour = remember(rangeEvents) {
         rangeEvents.groupBy { event -> event.localDate() to event.startLocalTime().hour }
@@ -1607,6 +1729,35 @@ internal fun ThreeDayView(
                     onClick = { onDateSelected(day) },
                     modifier = Modifier.weight(1f),
                 )
+            }
+        }
+        if (allDayEventsByDay.any { it.value.isNotEmpty() }) {
+            Row(modifier = Modifier.fillMaxWidth().height(36.dp).background(palette.calendarSurface)) {
+                days.forEach { day ->
+                    val event = allDayEventsByDay[day].orEmpty().firstOrNull()
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .padding(vertical = 4.dp)
+                            .clip(event?.visibleSegmentShape(day, days, 4.dp) ?: RoundedCornerShape(0.dp))
+                            .background(if (event == null) Color.Transparent else event.displayColor(palette).copy(alpha = if (event.isGhost) 0.32f else 0.75f))
+                            .then(if (event?.isGhost == true) Modifier.ghostDottedBorder(palette, 4f) else Modifier),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (event != null && event.shouldShowStripTitle(day, days)) {
+                            Text(
+                                event.title,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp),
+                                color = NWhite,
+                                fontFamily = mono,
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
             }
         }
         LazyColumn(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {

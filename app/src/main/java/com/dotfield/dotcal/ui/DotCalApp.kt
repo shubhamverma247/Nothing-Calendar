@@ -1007,7 +1007,7 @@ fun DotCalApp(
             quickAddPrefill = null
             duplicateDraftPrefill = null
             templatePrefill = template
-            addStartTime = template.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60) } ?: LocalTime.of(9, 0)
+            addStartTime = minuteOfDayToLocalTimeOrNull(template.startMinuteOfDay) ?: LocalTime.of(9, 0)
             addEditorDateOverride = selectedDate
             editingEvent = null
             addSheet = true
@@ -1313,7 +1313,7 @@ fun DotCalApp(
 
     // Group events by day once at the top level so the buckets survive Calendar <-> Tasks
     // <-> Settings switches and every calendar view reuses them instead of re-deriving.
-    val eventsByDate = remember(events) { events.groupBy { it.localDate() } }
+    val eventsByDate = remember(events) { eventsByVisibleDate(events) }
     val shiftEventIds = remember(shiftEventMetadata) { shiftEventMetadata.keys }
     val appFontFamily = rememberAppFontFamily(appFont)
     CompositionLocalProvider(LocalHeadingFont provides appFontFamily) {
@@ -1878,15 +1878,19 @@ fun DotCalApp(
                     }
                 },
                 onRateDotCal = {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.dotfield.dotcal")),
-                    )
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.dotfield.dotcal")),
+                        )
+                    }
                 },
                 onCheckForUpdates = { checkForUpdates(true) },
                 onMoreApps = {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.dotfiles.app")),
-                    )
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.dotfiles.app")),
+                        )
+                    }
                 },
                 onRequestCalendarAccess = {
                     if (hasCalendarPermission) {
@@ -1894,11 +1898,13 @@ fun DotCalApp(
                         settingsScreen = SettingsScreen.CalendarAccounts
                     } else {
                         if (calendarPermissionRequested) {
-                            context.startActivity(
-                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    data = Uri.parse("package:${context.packageName}")
-                                },
-                            )
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    },
+                                )
+                            }
                         } else {
                             calendarPermissionRequested = true
                             calendarPermissionLauncher.launch(
@@ -3321,7 +3327,9 @@ private fun shareAvailabilityText(context: Context, text: String) {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, text)
     }
-    context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_availability_chooser)))
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_availability_chooser)))
+    }
 }
 
 private fun CalendarEvent.shareDateTimeLine(context: Context, use24HourFormat: Boolean): String {

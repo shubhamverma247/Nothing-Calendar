@@ -1474,7 +1474,7 @@ private fun templateSummaryLabel(t: EventTemplate): String {
     val timeLabel = if (t.startMinuteOfDay == null) {
         if (t.isTask) noTimeLabel else allDayLabel
     } else {
-        LocalTime.of(t.startMinuteOfDay / 60, t.startMinuteOfDay % 60).format(editorTimeFormatter)
+        minuteOfDayToLocalTimeOrNull(t.startMinuteOfDay)?.format(editorTimeFormatter).orEmpty()
     }
     val repeatsFallback = stringResource(R.string.template_repeats)
     val recurrenceLabel = t.rrule?.let { recurrenceHumanLabel(it) ?: repeatsFallback }
@@ -3064,7 +3064,7 @@ private fun ShiftChip(label: String, palette: DotCalPalette, selected: Boolean =
 private fun shiftTypeSummary(type: ShiftType): String {
     if (!type.generatesEvent) return stringResource(R.string.shift_summary_off)
     val allDay = stringResource(R.string.shift_summary_all_day)
-    val start = type.startMinuteOfDay?.let { LocalTime.of(it / 60, it % 60).format(editorTimeFormatter) } ?: allDay
+    val start = minuteOfDayToLocalTimeOrNull(type.startMinuteOfDay)?.format(editorTimeFormatter) ?: allDay
     val duration = type.durationMinutes?.let { formatDurationShort(it) } ?: allDay
     return stringResource(R.string.shift_summary_range, start, duration)
 }

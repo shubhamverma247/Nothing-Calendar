@@ -885,9 +885,11 @@ class DotCalViewModel(
 
     private fun CalendarEvent.startDate(): LocalDate {
         return java.time.Instant.ofEpochMilli(startTimeMs)
-            .atZone(java.time.ZoneId.of(timeZone))
+            .atZone(safeZoneId(timeZone))
             .toLocalDate()
     }
+
+    private fun safeZoneId(id: String): ZoneId = runCatching { ZoneId.of(id) }.getOrDefault(ZoneId.systemDefault())
 
     private fun buildDayDensityForecast(events: List<CalendarEvent>): List<DayDensityForecastItem> {
         val zoneId = ZoneId.systemDefault()

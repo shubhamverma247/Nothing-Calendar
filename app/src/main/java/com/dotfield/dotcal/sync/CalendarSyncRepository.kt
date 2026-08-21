@@ -105,7 +105,7 @@ class CalendarSyncRepository(
     }
 
     companion object {
-        private const val SYNC_RANGE_DAYS = 60L
+        private const val SYNC_RANGE_DAYS = 365L
         private const val TOMBSTONE_RETENTION_DAYS = 30L
     }
 }

@@ -1,6 +1,8 @@
 package com.dotfield.dotcal.data
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabaseLockedException
+import android.database.sqlite.SQLiteException
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.datastore.preferences.core.edit
@@ -63,10 +65,12 @@ import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
@@ -556,6 +560,7 @@ class DotCalRepository(
         val start = monthStart.minusMonths(1)
         val end = monthStart.plusMonths(2)
         return dao.observeEvents(start.atStartMs(), end.atStartMs())
+            .retryOnDatabaseLocked()
             .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
             .map { events ->
                 val expanded = withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
@@ -567,6 +572,7 @@ class DotCalRepository(
         val start = LocalDate.of(year, 1, 1)
         val end = start.plusYears(1)
         return dao.observeEvents(start.atStartMs(), end.atStartMs())
+            .retryOnDatabaseLocked()
             .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
             .map { events ->
                 val expanded = withContext(Dispatchers.Default) { expandRecurringEvents(events, start, end) }
@@ -598,7 +604,9 @@ class DotCalRepository(
         rangeEnd: LocalDate,
     ): List<BusyPeriod> {
         val rangeEndExclusive = rangeEnd.plusDays(1)
-        val events = dao.observeEvents(rangeStart.atStartMs(), rangeEndExclusive.atStartMs()).first()
+        val events = dao.observeEvents(rangeStart.atStartMs(), rangeEndExclusive.atStartMs())
+            .retryOnDatabaseLocked()
+            .first()
         val privateIds = privacyManager.observePrivateVaultIds().first()
         val ghostIds = sideStore.readNamespace(GHOST_FLAGS_NAMESPACE)
             .filterValues { it == "1" }
@@ -608,7 +616,7 @@ class DotCalRepository(
             rangeStart,
             rangeEndExclusive,
         ).map { event ->
-            val zone = runCatching { ZoneId.of(event.timeZone) }.getOrDefault(ZoneId.systemDefault())
+            val zone = safeZoneId(event.timeZone)
             BusyPeriod(
                 start = Instant.ofEpochMilli(event.startTimeMs).atZone(zone).toLocalDateTime(),
                 end = Instant.ofEpochMilli(event.endTimeMs).atZone(zone).toLocalDateTime(),
@@ -623,6 +631,7 @@ class DotCalRepository(
         val end = start.plusMonths(6)
         val startMs = start.atStartMs()
         return dao.observeEvents(startMs, end.atStartMs())
+            .retryOnDatabaseLocked()
             .combine(privacyManager.observePrivateVaultIds()) { events, privateIds -> events.filterOutPrivate(privateIds) }
             .map { events ->
                 val expanded = withContext(Dispatchers.Default) {
@@ -1221,7 +1230,7 @@ class DotCalRepository(
             null
         }
         val targetRange = if (event.isRecurrenceOccurrence() && recurringEditScope == RecurringEditScope.WholeSeries) {
-            val zoneId = ZoneId.of(event.timeZone)
+            val zoneId = safeZoneId(event.timeZone)
             val occurrenceStart = Instant.ofEpochMilli(event.startTimeMs).atZone(zoneId).toLocalDateTime()
             val occurrenceEnd = Instant.ofEpochMilli(event.endTimeMs).atZone(zoneId).toLocalDateTime()
             val masterStart = Instant.ofEpochMilli(master.startTimeMs).atZone(zoneId).toLocalDateTime()
@@ -2037,7 +2046,7 @@ class DotCalRepository(
     }
 
     private fun CalendarEvent.occurrenceOn(date: LocalDate): CalendarEvent? {
-        val zoneId = ZoneId.of(timeZone)
+        val zoneId = safeZoneId(timeZone)
         val startDateTime = java.time.Instant.ofEpochMilli(startTimeMs).atZone(zoneId).toLocalDateTime()
         val durationMs = endTimeMs - startTimeMs
         val occurrenceStart = date.atTime(startDateTime.toLocalTime()).atZone(zoneId).toInstant().toEpochMilli()
@@ -2050,7 +2059,7 @@ class DotCalRepository(
     }
 
     private fun CalendarEvent.startDate(): LocalDate {
-        return java.time.Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.of(timeZone)).toLocalDate()
+        return java.time.Instant.ofEpochMilli(startTimeMs).atZone(safeZoneId(timeZone)).toLocalDate()
     }
 
     private suspend fun disableBirthdayCalendar() {
@@ -2074,7 +2083,7 @@ class DotCalRepository(
     }
 
     private fun nextBirthdayStartMs(event: CalendarEvent): Long? {
-        val zoneId = ZoneId.of(event.timeZone)
+        val zoneId = safeZoneId(event.timeZone)
         val birthday = java.time.Instant.ofEpochMilli(event.startTimeMs).atZone(zoneId).toLocalDate()
         val today = LocalDate.now(zoneId)
         var year = today.year
@@ -2087,6 +2096,8 @@ class DotCalRepository(
         }
         return null
     }
+
+    private fun safeZoneId(id: String): ZoneId = runCatching { ZoneId.of(id) }.getOrDefault(ZoneId.systemDefault())
 
     companion object {
         const val LOCAL_ACCOUNT_ID = "local-primary"
@@ -2125,6 +2136,28 @@ private fun CalendarAccount.isReadOnlyGeneratedAccount(): Boolean {
 }
 
 private const val RECURRENCE_OCCURRENCE_SEPARATOR = "::occurrence::"
+private const val DATABASE_LOCK_RETRY_LIMIT = 4L
+private const val DATABASE_LOCK_RETRY_BASE_DELAY_MS = 120L
+
+private fun Flow<List<CalendarEvent>>.retryOnDatabaseLocked(): Flow<List<CalendarEvent>> =
+    retryWhen { cause, attempt ->
+        if (attempt >= DATABASE_LOCK_RETRY_LIMIT || !cause.hasDatabaseLockedCause()) {
+            false
+        } else {
+            delay(DATABASE_LOCK_RETRY_BASE_DELAY_MS * (attempt + 1))
+            true
+        }
+    }
+
+private fun Throwable.hasDatabaseLockedCause(): Boolean {
+    var current: Throwable? = this
+    while (current != null) {
+        if (current is SQLiteDatabaseLockedException) return true
+        if (current is SQLiteException && current.message?.contains("database is locked", ignoreCase = true) == true) return true
+        current = current.cause
+    }
+    return false
+}
 
 fun recurrenceOccurrenceId(eventId: String, occurrenceStartMs: Long): String {
     return "$eventId$RECURRENCE_OCCURRENCE_SEPARATOR$occurrenceStartMs"

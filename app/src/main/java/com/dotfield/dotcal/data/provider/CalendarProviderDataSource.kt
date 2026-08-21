@@ -62,6 +62,7 @@ class CalendarProviderDataSource(private val context: Context) {
 
     fun getEventsInRange(calendarId: Long, startMs: Long, endMs: Long): List<CalendarEvent> {
         if (!hasCalendarReadPermission()) return emptyList()
+        val calendarColor = getCalendarColor(calendarId)
         val cursor = runCatching {
             contentResolver.query(
                 CalendarContract.Events.CONTENT_URI,
@@ -74,7 +75,7 @@ class CalendarProviderDataSource(private val context: Context) {
         return cursor.use { events ->
             buildList {
                 while (events.moveToNext()) {
-                    events.toCalendarEvent(calendarId, startMs, endMs)?.let(::add)
+                    events.toCalendarEvent(calendarId, calendarColor, startMs, endMs)?.let(::add)
                 }
             }
         }
@@ -126,10 +127,25 @@ class CalendarProviderDataSource(private val context: Context) {
         }.getOrNull() ?: return null
         return cursor.use { events ->
             if (events.moveToFirst()) {
-                events.toCalendarEvent(calendarId, Long.MIN_VALUE, Long.MAX_VALUE)
+                events.toCalendarEvent(calendarId, getCalendarColor(calendarId), Long.MIN_VALUE, Long.MAX_VALUE)
             } else {
                 null
             }
+        }
+    }
+
+    private fun getCalendarColor(calendarId: Long): String {
+        val cursor = runCatching {
+            contentResolver.query(
+                CalendarContract.Calendars.CONTENT_URI,
+                arrayOf(CalendarContract.Calendars.CALENDAR_COLOR),
+                "${CalendarContract.Calendars._ID} = ?",
+                arrayOf(calendarId.toString()),
+                null,
+            )
+        }.getOrNull() ?: return DEFAULT_PROVIDER_COLOR
+        return cursor.use { calendars ->
+            if (calendars.moveToFirst()) calendars.getColorHex(0) else DEFAULT_PROVIDER_COLOR
         }
     }
 
@@ -158,10 +174,18 @@ class CalendarProviderDataSource(private val context: Context) {
         }
     }
 
-    private fun Cursor.toCalendarEvent(calendarId: Long, rangeStartMs: Long, rangeEndMs: Long): CalendarEvent? {
+    private fun Cursor.toCalendarEvent(
+        calendarId: Long,
+        calendarColor: String,
+        rangeStartMs: Long,
+        rangeEndMs: Long,
+    ): CalendarEvent? {
         val providerEventId = getLong(EVENT_ID_INDEX).toString()
         val start = getLongOrNull(EVENT_DTSTART_INDEX) ?: return null
-        val end = getLongOrNull(EVENT_DTEND_INDEX) ?: getLongOrNull(EVENT_LAST_DATE_INDEX) ?: start + DEFAULT_EVENT_DURATION_MS
+        val end = getLongOrNull(EVENT_DTEND_INDEX)
+            ?: getStringOrNull(EVENT_DURATION_INDEX)?.let { duration -> providerDurationMillis(duration)?.let(start::plus) }
+            ?: getLongOrNull(EVENT_LAST_DATE_INDEX)
+            ?: start + DEFAULT_EVENT_DURATION_MS
         if (end < rangeStartMs || start >= rangeEndMs) return null
         val timeZone = getStringOrNull(EVENT_TIMEZONE_INDEX).takeUnless { it.isNullOrBlank() } ?: TimeZone.getDefault().id
         val now = System.currentTimeMillis()
@@ -175,7 +199,7 @@ class CalendarProviderDataSource(private val context: Context) {
             endTimeMs = end.coerceAtLeast(start + MIN_EVENT_DURATION_MS),
             timeZone = timeZone,
             isAllDay = getIntOrDefault(EVENT_ALL_DAY_INDEX, 0),
-            colorHex = getLongOrNull(EVENT_COLOR_INDEX)?.let { colorIntToHex(it.toInt()) },
+            colorHex = getLongOrNull(EVENT_COLOR_INDEX)?.let { colorIntToHex(it.toInt()) } ?: calendarColor,
             rrule = getStringOrNull(EVENT_RRULE_INDEX),
             exceptionDates = "[]",
             source = "GOOGLE",
@@ -242,6 +266,7 @@ class CalendarProviderDataSource(private val context: Context) {
             CalendarContract.Events.EVENT_COLOR,
             CalendarContract.Events.RRULE,
             CalendarContract.Events.LAST_DATE,
+            CalendarContract.Events.DURATION,
         )
         private const val EVENT_ID_INDEX = 0
         private const val EVENT_TITLE_INDEX = 1
@@ -254,6 +279,7 @@ class CalendarProviderDataSource(private val context: Context) {
         private const val EVENT_COLOR_INDEX = 8
         private const val EVENT_RRULE_INDEX = 9
         private const val EVENT_LAST_DATE_INDEX = 10
+        private const val EVENT_DURATION_INDEX = 11
         private val EVENT_HASH_COLUMNS = EVENT_PROJECTION.indices.toList()
     }
 }
@@ -264,6 +290,8 @@ fun providerCalendarId(accountId: String): Long? = accountId.substringAfter("pro
 
 fun providerEventRoomId(calendarId: Long, eventId: String): String = "provider-calendar-$calendarId-event-$eventId"
 
+private const val DEFAULT_PROVIDER_COLOR = "#FF3B30"
+
 private fun colorIntToHex(color: Int): String = "#%06X".format(0xFFFFFF and color)
 
 private fun String.toProviderColor(): Int? {
@@ -273,5 +301,24 @@ private fun String.toProviderColor(): Int? {
 
 private fun CalendarEvent.providerDuration(): String {
     val seconds = ((endTimeMs - startTimeMs).coerceAtLeast(60_000L)) / 1000L
-    return "P${seconds}S"
+    return "PT${seconds}S"
 }
+
+internal fun providerDurationMillis(duration: String?): Long? {
+    val value = duration?.trim()?.uppercase().takeUnless { it.isNullOrBlank() } ?: return null
+    val match = PROVIDER_DURATION_PATTERN.matchEntire(value) ?: return null
+    val weeks = match.groupValues[1].toLongOrNull() ?: 0L
+    val days = match.groupValues[2].toLongOrNull() ?: 0L
+    val hours = match.groupValues[3].toLongOrNull() ?: 0L
+    val minutes = match.groupValues[4].toLongOrNull() ?: 0L
+    val seconds = match.groupValues[5].toLongOrNull() ?: 0L
+    val totalSeconds = weeks * 7L * 24L * 60L * 60L +
+        days * 24L * 60L * 60L +
+        hours * 60L * 60L +
+        minutes * 60L +
+        seconds
+    return totalSeconds.takeIf { it > 0L }?.times(1000L)
+}
+
+private val PROVIDER_DURATION_PATTERN =
+    Regex("""P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?""")

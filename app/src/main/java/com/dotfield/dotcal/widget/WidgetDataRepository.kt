@@ -215,7 +215,7 @@ class WidgetDataRepository(
     }
 
     private fun CalendarEvent.occurrenceOn(date: LocalDate): CalendarEvent? {
-        val zoneId = ZoneId.of(timeZone)
+        val zoneId = safeZoneId(timeZone)
         val startDateTime = Instant.ofEpochMilli(startTimeMs).atZone(zoneId).toLocalDateTime()
         val occurrenceStart = date.atTime(startDateTime.toLocalTime()).atZone(zoneId).toInstant().toEpochMilli()
         if (occurrenceStart in exceptionStartTimes()) return null
@@ -227,8 +227,10 @@ class WidgetDataRepository(
     }
 
     private fun CalendarEvent.startDate(): LocalDate {
-        return Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.of(timeZone)).toLocalDate()
+        return Instant.ofEpochMilli(startTimeMs).atZone(safeZoneId(timeZone)).toLocalDate()
     }
+
+    private fun safeZoneId(id: String): ZoneId = runCatching { ZoneId.of(id) }.getOrDefault(ZoneId.systemDefault())
 
     private fun CalendarEvent.exceptionStartTimes(): Set<Long> {
         return exceptionDates.removePrefix("[").removeSuffix("]").split(',').mapNotNull { it.trim().toLongOrNull() }.toSet()
