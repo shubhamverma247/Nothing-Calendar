@@ -118,6 +118,11 @@ internal data class EventDragChange(
     val targetEnd: LocalDateTime,
 )
 
+private const val WEEK_ALL_DAY_MAX_ROWS = 3
+private const val WEEK_ALL_DAY_ROW_HEIGHT_DP = 24
+private const val WEEK_ALL_DAY_VERTICAL_PADDING_DP = 4
+private const val WEEK_ALL_DAY_ROW_GAP_DP = 3
+
 private enum class EventDragMode {
     Move,
     ResizeStart,
@@ -183,6 +188,15 @@ internal fun MonthView(
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
             val weekNumberWidth = if (showWeekNumbers) weekNumberColumnWidth else 0.dp
             val dayCellMetrics = monthDayCellMetrics(maxWidth, maxHeight, weekNumberWidth)
+            val eventSlotsByDate = remember(eventsByDate, days, dayCellMetrics.visibleChipCount) {
+                days.chunked(7).flatMap { week ->
+                    monthEventSlotsByDate(
+                        weekDates = week,
+                        eventsByDate = eventsByDate,
+                        visibleSlotCount = dayCellMetrics.visibleChipCount,
+                    ).entries
+                }.associate { it.key to it.value }
+            }
             Column(modifier = Modifier.fillMaxWidth()) {
                 days.chunked(7).forEach { week ->
                     Row(modifier = Modifier.fillMaxWidth().height(dayCellMetrics.height)) {
@@ -204,6 +218,7 @@ internal fun MonthView(
                                 isBulkSelected = day in selectedBulkDates,
                                 isHighlighted = day == highlightDate,
                                 events = eventsByDate[day].orEmpty(),
+                                eventSlots = eventSlotsByDate[day].orEmpty(),
                                 shiftEventIds = shiftEventIds,
                                 visibleChipCount = dayCellMetrics.visibleChipCount,
                                 palette = palette,
@@ -253,6 +268,7 @@ private fun DayCell(
     isBulkSelected: Boolean,
     isHighlighted: Boolean,
     events: List<CalendarEvent>,
+    eventSlots: List<CalendarEvent?>,
     shiftEventIds: Set<String>,
     visibleChipCount: Int,
     palette: DotCalPalette,
@@ -270,10 +286,12 @@ private fun DayCell(
     val notSelectedLabel = stringResource(R.string.a11y_not_selected)
     val noEventsLabel = stringResource(R.string.a11y_no_events)
     val eventCountLabel = pluralStringResource(R.plurals.a11y_event_count, events.size, events.size)
+    val visibleEventCount = eventSlots.count { it != null }
+    val hiddenEventCount = (events.size - visibleEventCount).coerceAtLeast(0)
     val moreEventsLabel = pluralStringResource(
         R.plurals.a11y_more_events,
-        (events.size - visibleChipCount.coerceAtMost(events.size)).coerceAtLeast(0),
-        (events.size - visibleChipCount.coerceAtMost(events.size)).coerceAtLeast(0),
+        hiddenEventCount,
+        hiddenEventCount,
     )
     val untitledEventLabel = stringResource(R.string.a11y_untitled_event)
     val openDayLabel = stringResource(R.string.a11y_open_day)
@@ -281,6 +299,7 @@ private fun DayCell(
     val accessibilityLabel = remember(
         date,
         events,
+        eventSlots,
         visibleChipCount,
         inMonth,
         isToday,
@@ -298,6 +317,7 @@ private fun DayCell(
         monthDayAccessibilityLabel(
             date = date,
             events = events,
+            eventSlots = eventSlots,
             visibleChipCount = visibleChipCount,
             inMonth = inMonth,
             isToday = isToday,
@@ -393,22 +413,26 @@ private fun DayCell(
                     )
                 }
                 Spacer(modifier = Modifier.height(3.dp))
-                events.take(visibleChipCount).forEach { event ->
-                    MonthEventChip(
-                        event = event,
-                        date = date,
-                        weekDates = weekDates,
-                        isShift = event.baseEventId() in shiftEventIds,
-                        palette = palette,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = if (event.isMultiDayVisible()) 0.dp else 3.dp),
-                    )
+                eventSlots.take(visibleChipCount).forEach { event ->
+                    if (event == null) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                    } else {
+                        MonthEventChip(
+                            event = event,
+                            date = date,
+                            weekDates = weekDates,
+                            isShift = event.baseEventId() in shiftEventIds,
+                            palette = palette,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(event.visibleSegmentPadding(date, weekDates, 3.dp)),
+                        )
+                    }
                     Spacer(modifier = Modifier.height(1.dp))
                 }
-                if (events.size > visibleChipCount) {
+                if (hiddenEventCount > 0) {
                     Text(
-                        stringResource(R.string.month_day_more_count, events.size - visibleChipCount),
+                        stringResource(R.string.month_day_more_count, hiddenEventCount),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp),
                         fontFamily = mono,
                         fontSize = 8.sp,
@@ -446,6 +470,7 @@ private fun DayCell(
 private fun monthDayAccessibilityLabel(
     date: LocalDate,
     events: List<CalendarEvent>,
+    eventSlots: List<CalendarEvent?>,
     visibleChipCount: Int,
     inMonth: Boolean,
     isToday: Boolean,
@@ -467,7 +492,7 @@ private fun monthDayAccessibilityLabel(
     if (isBulkSelected) append(", ").append(bulkSelectedLabel)
     append(", ")
     append(if (events.isEmpty()) noEventsLabel else eventCountLabel)
-    val visibleTitles = events.take(visibleChipCount).map { it.title.ifBlank { untitledEventLabel } }
+    val visibleTitles = eventSlots.mapNotNull { it?.title?.ifBlank { untitledEventLabel } }
     if (visibleTitles.isNotEmpty()) {
         append(": ")
         append(visibleTitles.joinToString())
@@ -547,6 +572,59 @@ private fun CalendarEvent.visibleSegmentShape(date: LocalDate, segmentDates: Lis
     )
 }
 
+private fun CalendarEvent.visibleSegmentPadding(date: LocalDate, segmentDates: List<LocalDate>, edgePadding: Dp): PaddingValues {
+    val dates = visibleDates().filter { it in segmentDates }
+    if (dates.size <= 1) return PaddingValues(horizontal = edgePadding)
+    val index = dates.indexOf(date).takeIf { it >= 0 } ?: return PaddingValues(horizontal = edgePadding)
+    return PaddingValues(
+        start = if (index == 0) edgePadding else 0.dp,
+        top = 0.dp,
+        end = if (index == dates.lastIndex) edgePadding else 0.dp,
+        bottom = 0.dp,
+    )
+}
+
+internal fun monthEventSlotsByDate(
+    weekDates: List<LocalDate>,
+    eventsByDate: Map<LocalDate, List<CalendarEvent>>,
+    visibleSlotCount: Int,
+): Map<LocalDate, List<CalendarEvent?>> {
+    if (visibleSlotCount <= 0) return weekDates.associateWith { emptyList() }
+    val slotsByDate = weekDates.associateWith { MutableList<CalendarEvent?>(visibleSlotCount) { null } }
+    val weekEvents = weekDates
+        .flatMap { eventsByDate[it].orEmpty() }
+        .distinctBy { it.id }
+    val multiDayEvents = weekEvents
+        .filter { it.isMultiDayVisible() }
+        .sortedWith(compareBy<CalendarEvent>(
+            { event -> event.visibleDates().firstOrNull { it in weekDates } ?: LocalDate.MAX },
+            { event -> -event.visibleDates().count { it in weekDates } },
+            { it.startTimeMs },
+            { it.id },
+        ))
+
+    multiDayEvents.forEach { event ->
+        val dates = event.visibleDates().filter { it in weekDates }
+        val lane = (0 until visibleSlotCount).firstOrNull { index ->
+            dates.all { date -> slotsByDate[date]?.get(index) == null }
+        } ?: return@forEach
+        dates.forEach { date -> slotsByDate[date]?.set(lane, event) }
+    }
+
+    weekDates.forEach { date ->
+        val occupiedEventIds = slotsByDate[date].orEmpty().mapNotNull { it?.id }.toSet()
+        val singles = eventsByDate[date].orEmpty()
+            .filter { !it.isMultiDayVisible() && it.id !in occupiedEventIds }
+        val daySlots = slotsByDate.getValue(date)
+        singles.forEach { event ->
+            val lane = daySlots.indexOfFirst { it == null }
+            if (lane >= 0) daySlots[lane] = event
+        }
+    }
+
+    return slotsByDate.mapValues { it.value.toList() }
+}
+
 @Composable
 internal fun WeekView(
     selectedDate: LocalDate,
@@ -573,6 +651,12 @@ internal fun WeekView(
         days.associateWith { day ->
             eventsByDate[day].orEmpty().filter { it.isAllDay == 1 || it.isMultiDayVisible() }.distinctBy { it.id }
         }
+    }
+    val allDayRowCount = remember(allDayEventsByDay) {
+        allDayEventsByDay.values.maxOfOrNull { it.size }?.coerceIn(1, WEEK_ALL_DAY_MAX_ROWS) ?: 0
+    }
+    val allDayEventSlotsByDay = remember(allDayEventsByDay, days, allDayRowCount) {
+        monthEventSlotsByDate(days, allDayEventsByDay, allDayRowCount)
     }
     val eventLayouts = remember(timedEvents) { layoutTimedEvents(timedEvents) }
     val timedEventsByDay = remember(eventsByDate, days) {
@@ -618,40 +702,14 @@ internal fun WeekView(
             }
         }
 
-        if (allDayEventsByDay.any { it.value.isNotEmpty() }) {
-            Row(modifier = Modifier.fillMaxWidth().height(36.dp).background(palette.calendarSurface)) {
-                Spacer(modifier = Modifier.width(if (showWeekNumbers) 36.dp else 32.dp))
-                days.forEach { day ->
-                    val event = allDayEventsByDay[day].orEmpty().firstOrNull()
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .padding(vertical = 4.dp)
-                            .clip(event?.visibleSegmentShape(day, days, 4.dp) ?: RoundedCornerShape(0.dp))
-                            .background(if (event == null) Color.Transparent else event.displayColor(palette).copy(alpha = if (event.isGhost) 0.32f else 0.75f))
-                            .then(if (event?.isGhost == true) Modifier.ghostDottedBorder(palette, 4f) else Modifier),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (event != null && event.shouldShowStripTitle(day, days)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    event.title,
-                                    modifier = Modifier.weight(1f),
-                                    color = NWhite,
-                                    fontFamily = mono,
-                                    fontSize = 9.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+        if (allDayRowCount > 0) {
+            AllDayStripRows(
+                days = days,
+                eventSlotsByDate = allDayEventSlotsByDay,
+                leadingWidth = if (showWeekNumbers) 36.dp else 32.dp,
+                palette = palette,
+                onEventClick = onEventClick,
+            )
         }
 
         Box(
@@ -694,6 +752,65 @@ internal fun WeekView(
                 Spacer(modifier = Modifier.height(TIMELINE_BOTTOM_CLEARANCE_DP.dp))
             }
             TimelineBottomBoundary(palette = palette, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+    }
+}
+
+@Composable
+private fun AllDayStripRows(
+    days: List<LocalDate>,
+    eventSlotsByDate: Map<LocalDate, List<CalendarEvent?>>,
+    leadingWidth: Dp,
+    palette: DotCalPalette,
+    onEventClick: (CalendarEvent) -> Unit,
+) {
+    val rowCount = eventSlotsByDate.values.maxOfOrNull { it.size } ?: 0
+    val stripHeight = (
+        WEEK_ALL_DAY_VERTICAL_PADDING_DP * 2 +
+            rowCount * WEEK_ALL_DAY_ROW_HEIGHT_DP +
+            (rowCount - 1).coerceAtLeast(0) * WEEK_ALL_DAY_ROW_GAP_DP
+        ).dp
+    Row(modifier = Modifier.fillMaxWidth().height(stripHeight).background(palette.calendarSurface)) {
+        if (leadingWidth > 0.dp) {
+            Spacer(modifier = Modifier.width(leadingWidth))
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(vertical = WEEK_ALL_DAY_VERTICAL_PADDING_DP.dp),
+            verticalArrangement = Arrangement.spacedBy(WEEK_ALL_DAY_ROW_GAP_DP.dp),
+        ) {
+            repeat(rowCount) { rowIndex ->
+                Row(modifier = Modifier.fillMaxWidth().height(WEEK_ALL_DAY_ROW_HEIGHT_DP.dp)) {
+                    days.forEach { day ->
+                        val event = eventSlotsByDate[day].orEmpty().getOrNull(rowIndex)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .padding(event?.visibleSegmentPadding(day, days, 2.dp) ?: PaddingValues(horizontal = 2.dp))
+                                .clip(event?.visibleSegmentShape(day, days, 4.dp) ?: RoundedCornerShape(0.dp))
+                                .background(if (event == null) Color.Transparent else event.displayColor(palette).copy(alpha = if (event.isGhost) 0.32f else 0.75f))
+                                .then(if (event?.isGhost == true) Modifier.ghostDottedBorder(palette, 4f) else Modifier)
+                                .then(if (event == null) Modifier else Modifier.clickable { onEventClick(event) }),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (event != null && event.shouldShowStripTitle(day, days)) {
+                                Text(
+                                    event.title,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                                    color = monthEventContentColor(event.displayColor(palette)),
+                                    fontFamily = mono,
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1693,6 +1810,12 @@ internal fun ThreeDayView(
             eventsByDate[day].orEmpty().filter { it.isAllDay == 1 || it.isMultiDayVisible() }.distinctBy { it.id }
         }
     }
+    val allDayRowCount = remember(allDayEventsByDay) {
+        allDayEventsByDay.values.maxOfOrNull { it.size }?.coerceIn(1, WEEK_ALL_DAY_MAX_ROWS) ?: 0
+    }
+    val allDayEventSlotsByDay = remember(allDayEventsByDay, days, allDayRowCount) {
+        monthEventSlotsByDate(days, allDayEventsByDay, allDayRowCount)
+    }
     val rangeEvents = remember(eventsByDate, days) {
         days.flatMap { eventsByDate[it].orEmpty() }
             .filter { it.isAllDay == 0 && !it.isMultiDayVisible() }
@@ -1731,34 +1854,14 @@ internal fun ThreeDayView(
                 )
             }
         }
-        if (allDayEventsByDay.any { it.value.isNotEmpty() }) {
-            Row(modifier = Modifier.fillMaxWidth().height(36.dp).background(palette.calendarSurface)) {
-                days.forEach { day ->
-                    val event = allDayEventsByDay[day].orEmpty().firstOrNull()
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .padding(vertical = 4.dp)
-                            .clip(event?.visibleSegmentShape(day, days, 4.dp) ?: RoundedCornerShape(0.dp))
-                            .background(if (event == null) Color.Transparent else event.displayColor(palette).copy(alpha = if (event.isGhost) 0.32f else 0.75f))
-                            .then(if (event?.isGhost == true) Modifier.ghostDottedBorder(palette, 4f) else Modifier),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (event != null && event.shouldShowStripTitle(day, days)) {
-                            Text(
-                                event.title,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp),
-                                color = NWhite,
-                                fontFamily = mono,
-                                fontSize = 9.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
+        if (allDayRowCount > 0) {
+            AllDayStripRows(
+                days = days,
+                eventSlotsByDate = allDayEventSlotsByDay,
+                leadingWidth = 0.dp,
+                palette = palette,
+                onEventClick = onEventClick,
+            )
         }
         LazyColumn(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
             items(24) { hour ->

@@ -13,7 +13,7 @@ android {
         applicationId = "com.dotfield.dotcal"
         minSdk = 30
         targetSdk = 36
-        versionCode = 29
+        versionCode = 30
         versionName = "1.3.1"
     }
 

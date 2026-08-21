@@ -162,6 +162,84 @@ class CalendarLayoutConstraintTest {
     }
 
     @Test
+    fun monthEventSlotsKeepMultiDayStripAlignedAcrossBusyAndEmptyDays() {
+        val weekDays = (0L..6L).map { LocalDate.of(2026, 10, 12).plusDays(it) }
+        val busyDay = LocalDate.of(2026, 10, 14)
+        val nextDay = busyDay.plusDays(1)
+        val multiDay = testEvent(
+            id = "multi",
+            title = "Multi",
+            start = busyDay.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(),
+            end = busyDay.plusDays(3).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(),
+            isAllDay = 1,
+            source = "GOOGLE",
+        )
+        val firstSingle = testEvent(
+            id = "single-1",
+            title = "Single 1",
+            start = busyDay.atTime(10, 0).toInstant(ZoneOffset.UTC).toEpochMilli(),
+            end = busyDay.atTime(11, 0).toInstant(ZoneOffset.UTC).toEpochMilli(),
+            isAllDay = 0,
+            source = "LOCAL",
+        )
+        val secondSingle = testEvent(
+            id = "single-2",
+            title = "Single 2",
+            start = busyDay.atTime(12, 0).toInstant(ZoneOffset.UTC).toEpochMilli(),
+            end = busyDay.atTime(13, 0).toInstant(ZoneOffset.UTC).toEpochMilli(),
+            isAllDay = 0,
+            source = "LOCAL",
+        )
+
+        val slots = monthEventSlotsByDate(
+            weekDates = weekDays,
+            eventsByDate = mapOf(
+                busyDay to listOf(firstSingle, secondSingle, multiDay),
+                nextDay to listOf(multiDay),
+            ),
+            visibleSlotCount = 3,
+        )
+
+        assertEquals(listOf(multiDay, firstSingle, secondSingle), slots[busyDay])
+        assertEquals(multiDay, slots[nextDay]?.get(0))
+    }
+
+    @Test
+    fun monthEventSlotsPreserveBlankRowsUnderMultiDayContinuations() {
+        val weekDays = (0L..6L).map { LocalDate.of(2026, 10, 12).plusDays(it) }
+        val startDay = LocalDate.of(2026, 10, 14)
+        val continuationDay = startDay.plusDays(1)
+        val multiDay = testEvent(
+            id = "multi",
+            title = "Multi",
+            start = startDay.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(),
+            end = startDay.plusDays(3).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(),
+            isAllDay = 1,
+            source = "GOOGLE",
+        )
+        val single = testEvent(
+            id = "single",
+            title = "Single",
+            start = startDay.atTime(10, 0).toInstant(ZoneOffset.UTC).toEpochMilli(),
+            end = startDay.atTime(11, 0).toInstant(ZoneOffset.UTC).toEpochMilli(),
+            isAllDay = 0,
+            source = "LOCAL",
+        )
+
+        val slots = monthEventSlotsByDate(
+            weekDates = weekDays,
+            eventsByDate = mapOf(
+                startDay to listOf(single, multiDay),
+                continuationDay to listOf(multiDay),
+            ),
+            visibleSlotCount = 2,
+        )
+
+        assertEquals(listOf(multiDay, single), slots[startDay])
+        assertEquals(listOf(multiDay, null), slots[continuationDay])
+    }
+
+    @Test
     fun timedOvernightEventIsVisibleOnStartAndEndDate() {
         val event = testEvent(
             start = LocalDate.of(2026, 8, 21).atTime(23, 0).toInstant(ZoneOffset.UTC).toEpochMilli(),
@@ -177,15 +255,17 @@ class CalendarLayoutConstraintTest {
     }
 
     private fun testEvent(
+        id: String? = null,
+        title: String = "Multi-day",
         start: Long,
         end: Long,
         isAllDay: Int,
         source: String,
     ): CalendarEvent {
         return CalendarEvent(
-            id = "event-$start",
+            id = id ?: "event-$start",
             accountId = "local",
-            title = "Multi-day",
+            title = title,
             startTimeMs = start,
             endTimeMs = end,
             timeZone = "UTC",
