@@ -52,4 +52,10 @@ data class CalendarEvent(
 ) {
     @Ignore
     var isGhost: Boolean = false
+
+    @Ignore
+    var providerOriginalGoogleEventId: String? = null
+
+    @Ignore
+    var providerOriginalInstanceTimeMs: Long? = null
 }

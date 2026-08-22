@@ -11,6 +11,13 @@ import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
+import kotlin.math.absoluteValue
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.TimeZone
 
 class CalendarProviderDataSource(private val context: Context) {
@@ -81,7 +88,7 @@ class CalendarProviderDataSource(private val context: Context) {
         }
     }
 
-    fun saveEvent(calendarId: Long, event: CalendarEvent): CalendarEvent? {
+    fun saveEvent(calendarId: Long, event: CalendarEvent, reminderMinutes: List<Int>): CalendarEvent? {
         if (!hasCalendarWritePermission()) return null
         val existingProviderId = event.googleEventId?.toLongOrNull()
         val savedProviderId = if (existingProviderId == null) {
@@ -90,6 +97,7 @@ class CalendarProviderDataSource(private val context: Context) {
             updateEvent(existingProviderId, calendarId, event).takeIf { it }?.let { existingProviderId }
                 ?: insertEvent(calendarId, event)
         } ?: return null
+        replaceReminders(savedProviderId, reminderMinutes)
         return getEvent(calendarId, savedProviderId.toString())
     }
 
@@ -134,6 +142,57 @@ class CalendarProviderDataSource(private val context: Context) {
         }
     }
 
+    fun getReminderMinutes(googleEventId: String): List<Int> {
+        if (!hasCalendarReadPermission()) return emptyList()
+        val providerEventId = googleEventId.toLongOrNull() ?: return emptyList()
+        val cursor = runCatching {
+            contentResolver.query(
+                CalendarContract.Reminders.CONTENT_URI,
+                REMINDER_PROJECTION,
+                "${CalendarContract.Reminders.EVENT_ID} = ?",
+                arrayOf(providerEventId.toString()),
+                "${CalendarContract.Reminders.MINUTES} ASC",
+            )
+        }.getOrNull() ?: return emptyList()
+        return cursor.use { reminders ->
+            buildList {
+                while (reminders.moveToNext()) {
+                    reminders.getIntOrDefault(REMINDER_MINUTES_INDEX, -1).takeIf { it >= 0 }?.let(::add)
+                }
+            }.normalizedProviderReminderMinutes()
+        }
+    }
+
+    private fun replaceReminders(providerEventId: Long, reminderMinutes: List<Int>) {
+        val normalizedMinutes = reminderMinutes.normalizedProviderReminderMinutes()
+        val eventUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, providerEventId)
+        runCatching {
+            contentResolver.delete(
+                CalendarContract.Reminders.CONTENT_URI,
+                "${CalendarContract.Reminders.EVENT_ID} = ?",
+                arrayOf(providerEventId.toString()),
+            )
+            normalizedMinutes.forEach { minutes ->
+                contentResolver.insert(
+                    CalendarContract.Reminders.CONTENT_URI,
+                    ContentValues().apply {
+                        put(CalendarContract.Reminders.EVENT_ID, providerEventId)
+                        put(CalendarContract.Reminders.MINUTES, minutes)
+                        put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
+                    },
+                )
+            }
+            contentResolver.update(
+                eventUri,
+                ContentValues().apply {
+                    put(CalendarContract.Events.HAS_ALARM, if (normalizedMinutes.isEmpty()) 0 else 1)
+                },
+                null,
+                null,
+            )
+        }
+    }
+
     private fun getCalendarColor(calendarId: Long): String {
         val cursor = runCatching {
             contentResolver.query(
@@ -171,6 +230,9 @@ class CalendarProviderDataSource(private val context: Context) {
                 ?: putNull(CalendarContract.Events.EVENT_COLOR)
             event.rrule?.takeUnless { it.isBlank() }?.let { put(CalendarContract.Events.RRULE, it) }
                 ?: putNull(CalendarContract.Events.RRULE)
+            providerExdateFromExceptionDates(event.exceptionDates, event.isAllDay, event.timeZone)
+                ?.let { put(CalendarContract.Events.EXDATE, it) }
+                ?: putNull(CalendarContract.Events.EXDATE)
         }
     }
 
@@ -189,6 +251,8 @@ class CalendarProviderDataSource(private val context: Context) {
         if (end < rangeStartMs || start >= rangeEndMs) return null
         val timeZone = getStringOrNull(EVENT_TIMEZONE_INDEX).takeUnless { it.isNullOrBlank() } ?: TimeZone.getDefault().id
         val now = System.currentTimeMillis()
+        val originalGoogleEventId = getLongOrNull(EVENT_ORIGINAL_ID_INDEX)?.toString()
+        val originalInstanceTimeMs = getLongOrNull(EVENT_ORIGINAL_INSTANCE_TIME_INDEX)
         return CalendarEvent(
             id = providerEventRoomId(calendarId, providerEventId),
             accountId = providerAccountId(calendarId),
@@ -201,11 +265,15 @@ class CalendarProviderDataSource(private val context: Context) {
             isAllDay = getIntOrDefault(EVENT_ALL_DAY_INDEX, 0),
             colorHex = getLongOrNull(EVENT_COLOR_INDEX)?.let { colorIntToHex(it.toInt()) } ?: calendarColor,
             rrule = getStringOrNull(EVENT_RRULE_INDEX),
-            exceptionDates = "[]",
+            exceptionDates = exceptionDatesFromProviderExdate(
+                exdate = getStringOrNull(EVENT_EXDATE_INDEX),
+                isAllDay = getIntOrDefault(EVENT_ALL_DAY_INDEX, 0),
+                timeZone = timeZone,
+            ),
             source = "GOOGLE",
             googleEventId = providerEventId,
             googleCalendarId = calendarId.toString(),
-            syncVersion = providerSyncVersion(),
+            syncVersion = providerSyncVersion(getReminderMinutes(providerEventId)),
             isTask = 0,
             isCompleted = 0,
             completedAtMs = null,
@@ -213,14 +281,18 @@ class CalendarProviderDataSource(private val context: Context) {
             voiceNotePath = null,
             createdAtMs = now,
             updatedAtMs = now,
-        )
+        ).apply {
+            providerOriginalGoogleEventId = originalGoogleEventId
+            providerOriginalInstanceTimeMs = originalInstanceTimeMs
+        }
     }
 
-    private fun Cursor.providerSyncVersion(): Int {
+    private fun Cursor.providerSyncVersion(reminderMinutes: List<Int>): Int {
         var hash = 17
         EVENT_HASH_COLUMNS.forEach { index ->
             hash = 31 * hash + getStringOrNull(index).orEmpty().hashCode()
         }
+        hash = 31 * hash + reminderMinutes.hashCode()
         return hash
     }
 
@@ -267,6 +339,9 @@ class CalendarProviderDataSource(private val context: Context) {
             CalendarContract.Events.RRULE,
             CalendarContract.Events.LAST_DATE,
             CalendarContract.Events.DURATION,
+            CalendarContract.Events.EXDATE,
+            CalendarContract.Events.ORIGINAL_ID,
+            CalendarContract.Events.ORIGINAL_INSTANCE_TIME,
         )
         private const val EVENT_ID_INDEX = 0
         private const val EVENT_TITLE_INDEX = 1
@@ -280,7 +355,15 @@ class CalendarProviderDataSource(private val context: Context) {
         private const val EVENT_RRULE_INDEX = 9
         private const val EVENT_LAST_DATE_INDEX = 10
         private const val EVENT_DURATION_INDEX = 11
+        private const val EVENT_EXDATE_INDEX = 12
+        private const val EVENT_ORIGINAL_ID_INDEX = 13
+        private const val EVENT_ORIGINAL_INSTANCE_TIME_INDEX = 14
         private val EVENT_HASH_COLUMNS = EVENT_PROJECTION.indices.toList()
+
+        private val REMINDER_PROJECTION = arrayOf(
+            CalendarContract.Reminders.MINUTES,
+        )
+        private const val REMINDER_MINUTES_INDEX = 0
     }
 }
 
@@ -304,6 +387,45 @@ private fun CalendarEvent.providerDuration(): String {
     return "PT${seconds}S"
 }
 
+internal fun List<Int>.normalizedProviderReminderMinutes(): List<Int> {
+    return distinct().filter { it >= 0 }.sorted()
+}
+
+fun providerReminderAlarmRequestCode(eventId: String, minutes: Int): Int {
+    return "$eventId-$minutes".hashCode().absoluteValue
+}
+
+internal fun providerExdateFromExceptionDates(exceptionDates: String, isAllDay: Int, timeZone: String): String? {
+    val zone = safeProviderZone(timeZone)
+    val exceptions = exceptionDates
+        .removePrefix("[")
+        .removeSuffix("]")
+        .split(',')
+        .mapNotNull { it.trim().toLongOrNull() }
+        .distinct()
+        .sorted()
+    if (exceptions.isEmpty()) return null
+    return exceptions.joinToString(",") { ms ->
+        val instant = Instant.ofEpochMilli(ms)
+        if (isAllDay == 1) {
+            PROVIDER_DATE_ONLY.format(instant.atZone(zone).toLocalDate())
+        } else {
+            PROVIDER_UTC_STAMP.format(instant)
+        }
+    }
+}
+
+internal fun exceptionDatesFromProviderExdate(exdate: String?, isAllDay: Int, timeZone: String): String {
+    val zone = safeProviderZone(timeZone)
+    val values = exdate
+        ?.split(',')
+        ?.mapNotNull { token -> parseProviderExdateToken(token.trim(), isAllDay, zone) }
+        ?.distinct()
+        ?.sorted()
+        .orEmpty()
+    return values.joinToString(prefix = "[", postfix = "]")
+}
+
 internal fun providerDurationMillis(duration: String?): Long? {
     val value = duration?.trim()?.uppercase().takeUnless { it.isNullOrBlank() } ?: return null
     val match = PROVIDER_DURATION_PATTERN.matchEntire(value) ?: return null
@@ -322,3 +444,28 @@ internal fun providerDurationMillis(duration: String?): Long? {
 
 private val PROVIDER_DURATION_PATTERN =
     Regex("""P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?""")
+
+private val PROVIDER_UTC_STAMP: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC)
+private val PROVIDER_LOCAL_STAMP: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
+private val PROVIDER_DATE_ONLY: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyyMMdd")
+
+private fun parseProviderExdateToken(token: String, isAllDay: Int, zone: ZoneId): Long? {
+    if (token.isBlank()) return null
+    if (isAllDay == 1 || (token.length == 8 && !token.contains('T'))) {
+        val date = runCatching { LocalDate.parse(token, PROVIDER_DATE_ONLY) }.getOrNull() ?: return null
+        return date.atStartOfDay(zone).toInstant().toEpochMilli()
+    }
+    if (token.endsWith("Z", ignoreCase = true)) {
+        val dateTime = runCatching { LocalDateTime.parse(token.uppercase(), PROVIDER_UTC_STAMP) }.getOrNull() ?: return null
+        return dateTime.toInstant(ZoneOffset.UTC).toEpochMilli()
+    }
+    val localDateTime = runCatching { LocalDateTime.parse(token, PROVIDER_LOCAL_STAMP) }.getOrNull() ?: return null
+    return localDateTime.atZone(zone).toInstant().toEpochMilli()
+}
+
+private fun safeProviderZone(id: String): ZoneId {
+    return runCatching { ZoneId.of(id) }.getOrDefault(ZoneId.systemDefault())
+}

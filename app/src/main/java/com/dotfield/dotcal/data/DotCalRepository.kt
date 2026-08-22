@@ -27,6 +27,7 @@ import com.dotfield.dotcal.data.insights.OnThisDayCandidate
 import com.dotfield.dotcal.data.insights.OnThisDayFinder
 import com.dotfield.dotcal.data.insights.OnThisDayMemory
 import com.dotfield.dotcal.data.provider.providerCalendarId
+import com.dotfield.dotcal.data.provider.providerReminderAlarmRequestCode
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource.Companion.BIRTHDAY_BASE_YEAR
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import com.dotfield.dotcal.data.profiles.FocusProfile
@@ -154,6 +155,7 @@ class DotCalRepository(
     private val syncRepository = CalendarSyncRepository(
         dao = dao,
         providerDataSource = calendarProviderDataSource,
+        reminderScheduler = reminderScheduler,
     )
 
     fun observeIsPro(): Flow<Boolean> =
@@ -976,7 +978,12 @@ class DotCalRepository(
                 createdAtMs = now,
                 updatedAtMs = now,
             )
-        val event = syncProviderBackedEvent(existingMaster ?: existing, draftEvent)
+        val reminderMinutes = data.reminderMinutesList
+            ?.distinct()
+            ?.sorted()
+            ?: data.reminderMinutes?.let { listOf(it) }
+            ?: emptyList()
+        val event = syncProviderBackedEvent(existingMaster ?: existing, draftEvent, reminderMinutes)
         if (event.id != eventId) {
             dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
             dao.deleteRemindersForEvent(eventId)
@@ -989,17 +996,12 @@ class DotCalRepository(
         writeGhostFlag(event.id, data.isGhost)
         replaceEventFileAttachments(event.id, data.fileAttachments, previousEventId = eventId)
         dao.deleteRemindersForEvent(event.id)
-        val reminderMinutes = data.reminderMinutesList
-            ?.distinct()
-            ?.sorted()
-            ?: data.reminderMinutes?.let { listOf(it) }
-            ?: emptyList()
         reminderMinutes.forEach { minutes ->
             val reminder = EventReminder(
                 eventId = event.id,
                 minutesBefore = minutes,
                 triggerAtMs = start - minutes * 60_000L,
-                alarmRequestCode = "${event.id}-$minutes".hashCode().absoluteValue,
+                alarmRequestCode = providerReminderAlarmRequestCode(event.id, minutes),
             )
             dao.insertReminders(listOf(reminder))
             reminderScheduler.scheduleReminder(reminder, event)
@@ -1037,7 +1039,11 @@ class DotCalRepository(
         updateWidgets()
     }
 
-    private suspend fun syncProviderBackedEvent(previous: CalendarEvent?, event: CalendarEvent): CalendarEvent {
+    private suspend fun syncProviderBackedEvent(
+        previous: CalendarEvent?,
+        event: CalendarEvent,
+        reminderMinutes: List<Int> = emptyList(),
+    ): CalendarEvent {
         val targetCalendarId = providerCalendarId(event.accountId)
         if (targetCalendarId == null) {
             previous?.googleEventId?.let { googleEventId ->
@@ -1060,7 +1066,7 @@ class DotCalRepository(
             googleCalendarId = targetCalendarId.toString(),
         )
         val providerEvent = withContext(Dispatchers.IO) {
-            calendarProviderDataSource.saveEvent(targetCalendarId, providerDraft)
+            calendarProviderDataSource.saveEvent(targetCalendarId, providerDraft, reminderMinutes)
         } ?: return event
         if (previous?.googleEventId != null && previousCalendarId != targetCalendarId.toString()) {
             withContext(Dispatchers.IO) {
@@ -1806,14 +1812,15 @@ class DotCalRepository(
             createdAtMs = now,
             updatedAtMs = now,
         )
-        val saved = syncProviderBackedEvent(null, event)
+        val providerReminderMinutes = draft.reminderMinutes?.let(::listOf).orEmpty()
+        val saved = syncProviderBackedEvent(null, event, providerReminderMinutes)
         dao.upsertEvent(saved)
         draft.reminderMinutes?.let { minutes ->
             val reminder = EventReminder(
                 eventId = saved.id,
                 minutesBefore = minutes,
                 triggerAtMs = start - minutes * 60_000L,
-                alarmRequestCode = "${saved.id}-$minutes".hashCode().absoluteValue,
+                alarmRequestCode = providerReminderAlarmRequestCode(saved.id, minutes),
             )
             dao.insertReminders(listOf(reminder))
             reminderScheduler.scheduleReminder(reminder, saved)
@@ -1870,23 +1877,24 @@ class DotCalRepository(
             createdAtMs = now,
             updatedAtMs = now,
         )
-        dao.upsertEvent(detachedEvent)
-        writeGhostFlag(detachedId, data.isGhost)
-        replaceEventFileAttachments(detachedId, data.fileAttachments)
         val reminderMinutes = data.reminderMinutesList
             ?.distinct()
             ?.sorted()
             ?: data.reminderMinutes?.let(::listOf)
             ?: emptyList()
+        val syncedDetachedEvent = syncProviderBackedEvent(null, detachedEvent, reminderMinutes)
+        dao.upsertEvent(syncedDetachedEvent)
+        writeGhostFlag(syncedDetachedEvent.id, data.isGhost)
+        replaceEventFileAttachments(syncedDetachedEvent.id, data.fileAttachments, previousEventId = detachedId)
         reminderMinutes.forEach { minutes ->
             val reminder = EventReminder(
-                eventId = detachedId,
+                eventId = syncedDetachedEvent.id,
                 minutesBefore = minutes,
                 triggerAtMs = start - minutes * 60_000L,
-                alarmRequestCode = "$detachedId-$minutes".hashCode().absoluteValue,
+                alarmRequestCode = providerReminderAlarmRequestCode(syncedDetachedEvent.id, minutes),
             )
             dao.insertReminders(listOf(reminder))
-            reminderScheduler.scheduleReminder(reminder, detachedEvent)
+            reminderScheduler.scheduleReminder(reminder, syncedDetachedEvent)
         }
         updateWidgets()
     }
@@ -1900,9 +1908,11 @@ class DotCalRepository(
             exceptionDates = exceptions.sorted().joinToString(prefix = "[", postfix = "]"),
             updatedAtMs = System.currentTimeMillis(),
         )
-        dao.upsertEvent(updatedMaster)
+        val reminderMinutes = dao.getRemindersForEvent(master.id).map { it.minutesBefore }
+        val syncedMaster = syncProviderBackedEvent(master, updatedMaster, reminderMinutes)
+        dao.upsertEvent(syncedMaster)
         updateWidgets()
-        return updatedMaster
+        return syncedMaster
     }
 
     private fun updateWidgets() {

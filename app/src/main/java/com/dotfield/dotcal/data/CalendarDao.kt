@@ -327,12 +327,17 @@ interface CalendarDao {
     suspend fun applyProviderCalendarSync(
         account: CalendarAccount,
         upserts: List<CalendarEvent>,
+        remindersByEventId: Map<String, List<EventReminder>>,
         deleteIds: List<String>,
         metadata: SyncMetadata,
         tombstoneCutoffMs: Long,
     ) {
         upsertAccountPreservingEvents(account)
         if (upserts.isNotEmpty()) upsertEvents(upserts)
+        remindersByEventId.forEach { (eventId, reminders) ->
+            deleteRemindersForEvent(eventId)
+            if (reminders.isNotEmpty()) insertReminders(reminders)
+        }
         if (deleteIds.isNotEmpty()) deleteEvents(deleteIds)
         deleteOldDeletedEventLogs(tombstoneCutoffMs)
         upsertSyncMetadata(metadata)

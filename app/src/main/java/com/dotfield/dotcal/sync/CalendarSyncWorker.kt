@@ -13,6 +13,7 @@ import com.dotfield.dotcal.data.DotCalDatabase
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import com.dotfield.dotcal.reminders.ReminderScheduler
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
@@ -27,6 +28,7 @@ class CalendarSyncWorker(
             val syncRepository = CalendarSyncRepository(
                 dao = dao,
                 providerDataSource = CalendarProviderDataSource(applicationContext),
+                reminderScheduler = ReminderScheduler(applicationContext),
             )
             val result = syncRepository.sync()
             if (!result.permissionDenied) {
