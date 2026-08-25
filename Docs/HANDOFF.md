@@ -306,28 +306,101 @@ Product pillars:
 Free must stay a complete calendar. Pro should unlock planning leverage, advanced controls, privacy
 depth, and power-user workflows.
 
-## Next Roadmap
+## Next Roadmap (Phase-wise, merged)
 
-Decision source: `D:\chrome downloads\DotCal_Product_Roadmap_Handoff(1).md` plus current competitor
-review. Business Calendar 2 is strong in widgets/custom views/tasks/attachments; Notion Calendar and
-Google Calendar emphasize scheduling/availability; Proton Calendar owns privacy; TimeTree monetizes
-sharing/premium utility; Supershift owns deep shift workflows.
+Decision sources: `D:\chrome downloads\DotCal_Product_Roadmap_Handoff(1).md`, competitor review
+(Business Calendar 2, DigiCal, aCalendar+, Fantastical, Motion/Reclaim, Any.do, TimeTree, Proton,
+Apple/Google Calendar 2026 state), and the 2026-08-25 new-feature research pass. Items marked NEW
+were not in any prior DotCal roadmap. Each phase reuses the previous phase's infrastructure to keep
+cost low and updates regular. The old flat list and the "Planned: Product Roadmap Free/Pro" section
+below are absorbed into these phases.
 
-1. Unified Configurable Widget System + 14-Day Widget.
-2. Advanced Reminders / Ringtone Controls.
-3. Find-a-Time.
-4. Smart Quick Add 3.0.
-5. Calendar Health.
-6. Template Assistant.
-7. Protect Free Time.
-8. Free Time Map.
-9. Manual Travel Blocks + Custom Conference Links.
-10. Expanded Attachments.
-11. Life-in-Dots.
-12. Year Wrapped.
-13. Vault Decoy PIN.
+### Phase 0 — Finish Current Work
 
-## Planned: Product Roadmap Free/Pro
+- Unified Configurable Widget System completion + pending theme-toggle manual QA (MIUI Autostart +
+  battery no-restrictions verify on device `4ab0d020`).
+
+### Phase 1 — Free Quick Wins (one small release each; retention/acquisition)
+
+1. Rich notification actions: Snooze presets (5/15/30 min), Complete task, Open — directly from
+   reminder notifications. No storage change.
+2. Voice dictation into Smart Quick Add: mic button -> on-device `SpeechRecognizer` ->
+   existing NL parser. No new parser work.
+3. Quick Settings Tile + app long-press shortcut for Quick Add.
+4. Export view as image: share Month/Week/Agenda snapshot as a dot-matrix branded card. Free basic;
+   Pro unlocks custom ranges/styling. Reuses the shared CardImageExporter approach.
+
+### Phase 2 — Reminder / Scheduling Core (Pro value build-up)
+
+5. Advanced Reminders / Ringtone Controls (Pro):
+   - Custom tune picker per event / per calendar: system notification sounds or user audio file
+     (MP3/OGG/WAV) from device storage.
+   - Per-calendar default tunes (Work = one tone, Personal = another).
+   - Repeating alarm until dismissed; custom snooze presets; vibration patterns; stronger
+     notification behavior (full-screen intent, high priority).
+   - Android caveat: notification-channel sound is hard to change after channel creation — design
+     per-calendar channel ids deliberately before implementation. Keep it local/offline only.
+6. Auto-Buffers (NEW): global rule to pad X minutes before/after every meeting; surfaced in conflict
+   warnings and later Find-a-Time. DataStore rule + FreeSlotEngine reuse. Pre-work for Find-a-Time.
+7. Find-a-Time (existing plan): Free gets basic slot suggestions + working hours; Pro gets preferred
+   days/times, Calendar Sets, minimum gap, ghost policy, multiple candidate slots, best-slot ranking.
+
+### Phase 3 — Flagship Differentiators
+
+8. Smart Quick Add 3.0 MERGED with Conversational Edit Commands (NEW): extend the local parser from
+   create-only to edit/move/delete/query ("move my 2pm to kal", "add 30 min prep before it",
+   "delete tomorrow's gym"). Hinglish support is a differentiator no global competitor offers.
+   Marketing hero feature.
+9. SMS-to-Event Parser (NEW): on-device regex reads booking/train/movie/appointment SMS and creates
+   Ghost Event drafts with one-tap pencil-in. Fully offline, Hinglish SMS aware, zero cloud.
+   Requires explicit user opt-in (notification/SMS access) given privacy posture — discuss tiering
+   before build.
+
+### Phase 4 — Insights Cluster (FreeSlotEngine family; cheap together)
+
+10. Calendar Health (existing plan): local weekly/monthly analytics; never leaves the phone.
+11. Task Auto-Scheduling (NEW, Motion-lite): pull unscheduled tasks into Dead-Time slots via
+    FreeSlotEngine; one-tap confirm. Uses existing `isTask = 1` rows; no schema change.
+12. Protect Free Time + Free Time Map (existing plans).
+
+### Phase 5 — Sharing & Niche Domination
+
+13. Template Assistant (existing plan): Free limited templates; Pro unlimited + suggestions +
+    create-from-event.
+14. Availability QR Card (NEW): encode Availability Text Generator output as QR; scanning shows the
+    slots without app/internet. Extends the offline-Calendly concept using existing QR infra.
+15. Shift-Swap QR (NEW): two shift workers exchange shifts via QR; accepting updates both calendars.
+    Exact fit for the shift-worker niche; BC2/Supershift do not have this.
+
+### Phase 6 — Power / Privacy Depth
+
+16. Manual Travel Blocks + Custom Conference Links (existing plan).
+17. Expanded Attachments (existing plan): DOC/DOCX/XLS/XLSX/TXT/ZIP, higher limits, still
+    app-private. No Drive/OneDrive sync.
+18. Scheduled Encrypted Auto-Backup (NEW): nightly/weekly AES-encrypted backup to a user-chosen SAF
+    folder. Automates existing backup/restore; deepens "private by default"; no cloud.
+19. Vault Decoy PIN (existing plan) + App Lock PIN hardening (PBKDF2 migration + failed-attempt
+    backoff).
+
+### Phase 7 — Delight / Seasonal (timing-sensitive last)
+
+20. Ghost Week Planner (NEW): next-week dry run — drag tentative events in as ghosts, confirm-all in
+    one tap. Evolution of Ghost Events; nobody ships a week-rehearsal view.
+21. Dual-Timezone Mode (NEW): second timezone column/labels in Day/Week + event timezone override.
+22. Geofence Reminders (NEW): arrive/leave location reminders via Play Services geofencing, offline.
+    Adds location permission — needs explicit user approval before build because it touches the
+    privacy posture.
+23. Life-in-Dots (existing plan) with share-as-image export.
+24. Year Wrapped (existing plan) — December launch with free teaser card conversion moment.
+
+### Explicitly Rejected by Research (do not build)
+
+- Weather-in-calendar (DigiCal/BC2 sell it): requires INTERNET permission; breaks offline-first
+  identity and Play listing claims. Skip unless an opt-in network module is ever approved.
+- Scheduling/booking links (Calendly-style): needs backend; already in Backlog Boundaries.
+- AI chatbot / cloud LLM anything: conversational edits give the same wow locally.
+
+## Planned: Product Roadmap Free/Pro (absorbed into phase-wise roadmap above)
 
 1. **Unified Configurable Widget System + 14-Day Widget** - highest priority.
    - Free: all six core widget categories (Calendar, Schedule, Today, Tasks, Countdown, Quick
