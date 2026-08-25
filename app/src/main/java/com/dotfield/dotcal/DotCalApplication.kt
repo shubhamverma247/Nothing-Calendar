@@ -1,6 +1,11 @@
 package com.dotfield.dotcal
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
 import com.dotfield.dotcal.data.DotCalDatabase
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.billing.ProManager
@@ -25,6 +30,26 @@ class DotCalApplication : Application() {
         runStartupTask { repository.rescheduleFutureReminders() }
         runStartupTask { CalendarSyncWorkScheduler.syncFromPreferences(this@DotCalApplication) }
         runStartupTask { WidgetUpdateWorker.enqueue(this@DotCalApplication) }
+        registerSystemThemeChangeReceiver()
+    }
+
+    private fun registerSystemThemeChangeReceiver() {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+                    // Apply the new dark/light palette immediately. CONFIGURATION_CHANGED is not
+                    // exempt from implicit-broadcast limits, so this runtime receiver is the only
+                    // reliable delivery path and must not wait behind a WorkManager queue.
+                    runStartupTask { WidgetUpdateWorker.updateNow(this@DotCalApplication) }
+                }
+            }
+        }
+        ContextCompat.registerReceiver(
+            this,
+            receiver,
+            IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
     }
 
     private fun runStartupTask(block: suspend () -> Unit) {

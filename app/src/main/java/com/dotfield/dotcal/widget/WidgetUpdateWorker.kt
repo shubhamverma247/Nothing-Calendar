@@ -25,10 +25,12 @@ class WidgetUpdateWorker(
         private const val UNIQUE_WORK = "dotcal_widget_update"
 
         fun enqueue(context: Context) {
+            // KEEP (not REPLACE): several receivers enqueue on the same trigger; REPLACE would
+            // cancel and restart an already-running update, delaying widget refreshes.
             val request = OneTimeWorkRequestBuilder<WidgetUpdateWorker>().build()
             WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
                 UNIQUE_WORK,
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,
                 request,
             )
         }
