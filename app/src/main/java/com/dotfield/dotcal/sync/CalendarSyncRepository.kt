@@ -5,7 +5,11 @@ import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
+import com.dotfield.dotcal.data.provider.providerAvailabilityIsNonBlocking
 import com.dotfield.dotcal.data.provider.providerReminderAlarmRequestCode
+import com.dotfield.dotcal.data.provider.providerStatusIsCancelled
+import com.dotfield.dotcal.data.sidestore.EventSideStoreNamespaces
+import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import com.dotfield.dotcal.reminders.ReminderScheduler
 import java.util.concurrent.TimeUnit
 
@@ -21,6 +25,7 @@ class CalendarSyncRepository(
     private val dao: CalendarDao,
     private val providerDataSource: CalendarProviderDataSource,
     private val reminderScheduler: ReminderScheduler,
+    private val sideStore: SharedSideStore,
 ) {
     suspend fun sync(): CalendarSyncResult {
         if (!providerDataSource.hasCalendarReadPermission()) {
@@ -40,34 +45,7 @@ class CalendarSyncRepository(
             if (account.isVisible == 0) return@forEach
             val calendarId = account.googleCalendarId() ?: return@forEach
             val providerEvents = providerDataSource.getEventsInRange(calendarId, now, rangeEndMs)
-            val modifiedOccurrenceExceptions = providerEvents
-                .mapNotNull { event ->
-                    val originalId = event.providerOriginalGoogleEventId ?: return@mapNotNull null
-                    val originalStartMs = event.providerOriginalInstanceTimeMs ?: return@mapNotNull null
-                    originalId to originalStartMs
-                }
-                .groupBy({ it.first }, { it.second })
-            val providerEventsWithExceptions = providerEvents.map { event ->
-                val externalExceptions = modifiedOccurrenceExceptions[event.googleEventId].orEmpty()
-                if (event.providerOriginalGoogleEventId != null) {
-                    event.copy(
-                        rrule = null,
-                        exceptionDates = "[]",
-                        syncVersion = event.syncVersion.withProviderExceptionMetadata(
-                            event.providerOriginalGoogleEventId,
-                            event.providerOriginalInstanceTimeMs,
-                        ),
-                    )
-                } else if (externalExceptions.isNotEmpty()) {
-                    val exceptionDates = mergeExceptionDates(event.exceptionDates, externalExceptions)
-                    event.copy(
-                        exceptionDates = exceptionDates,
-                        syncVersion = 31 * event.syncVersion + exceptionDates.hashCode(),
-                    )
-                } else {
-                    event
-                }
-            }
+            val providerEventsWithExceptions = applyProviderRecurringExceptionMetadata(providerEvents)
             val localEvents = dao.getGoogleEventsInRange(calendarId.toString(), now, rangeEndMs)
             val providerByGoogleId = providerEventsWithExceptions.mapNotNull { event ->
                 event.googleEventId?.let { it to event }
@@ -78,6 +56,16 @@ class CalendarSyncRepository(
             val localByGoogleId = localEvents.mapNotNull { event ->
                 event.googleEventId?.let { it to event }
             }.toMap()
+            val staleDuplicateIds = providerByGoogleId.keys
+                .takeIf { it.isNotEmpty() }
+                ?.let { providerIds ->
+                    staleProviderDuplicateIds(
+                        providerByGoogleId = providerByGoogleId,
+                        existingProviderEvents = dao.getGoogleEventsByGoogleIds(providerIds.toList()),
+                        localByGoogleId = localByGoogleId,
+                    )
+                }
+                .orEmpty()
             val deletedGoogleIds = providerByGoogleId.keys
                 .takeIf { it.isNotEmpty() }
                 ?.let { dao.getDeletedGoogleEventIds(it.toList()).toSet() }
@@ -107,12 +95,15 @@ class CalendarSyncRepository(
             val deleteIds = localEvents
                 .filter { localEvent -> localEvent.googleEventId !in providerIds }
                 .map { it.id }
+                .plus(staleDuplicateIds)
+                .distinct()
             val accountDeleted = deleteIds.size
             val remindersByEventId = upserts.associate { event ->
                 event.id to providerReminderMinutesByGoogleId[event.googleEventId].orEmpty().toEventReminders(event)
             }
             val replacedReminderEvents = upserts.map { it.id } + deleteIds
             val remindersToCancel = replacedReminderEvents.flatMap { eventId -> dao.getRemindersForEvent(eventId) }
+            syncProviderMetadataFlags(providerByGoogleId, localByGoogleId, deletedGoogleIds)
             inserted += accountInserted
             updated += accountUpdated
             deleted += accountDeleted
@@ -158,25 +149,26 @@ class CalendarSyncRepository(
         }
     }
 
-    private fun mergeExceptionDates(exceptionDates: String, additionalExceptions: List<Long>): String {
-        return (exceptionDates.toExceptionStartTimes() + additionalExceptions)
-            .distinct()
-            .sorted()
-            .joinToString(prefix = "[", postfix = "]")
-    }
-
-    private fun String.toExceptionStartTimes(): List<Long> {
-        return removePrefix("[")
-            .removeSuffix("]")
-            .split(',')
-            .mapNotNull { it.trim().toLongOrNull() }
-    }
-
-    private fun Int.withProviderExceptionMetadata(originalGoogleEventId: String?, originalInstanceTimeMs: Long?): Int {
-        var hash = this
-        hash = 31 * hash + originalGoogleEventId.orEmpty().hashCode()
-        hash = 31 * hash + (originalInstanceTimeMs?.hashCode() ?: 0)
-        return hash
+    private suspend fun syncProviderMetadataFlags(
+        providerByGoogleId: Map<String, CalendarEvent>,
+        localByGoogleId: Map<String, CalendarEvent>,
+        deletedGoogleIds: Set<String>,
+    ) {
+        providerByGoogleId.forEach { (googleEventId, providerEvent) ->
+            if (googleEventId in deletedGoogleIds) return@forEach
+            val eventId = localByGoogleId[googleEventId]?.id ?: providerEvent.id
+            if (providerAvailabilityIsNonBlocking(providerEvent.providerAvailability)) {
+                sideStore.write(EventSideStoreNamespaces.GhostFlags, eventId, "1")
+            } else {
+                sideStore.remove(EventSideStoreNamespaces.GhostFlags, eventId)
+            }
+            providerEvent.providerStatus?.let { status ->
+                sideStore.write(EventSideStoreNamespaces.ProviderStatuses, eventId, status.toString())
+            } ?: sideStore.remove(EventSideStoreNamespaces.ProviderStatuses, eventId)
+            providerEvent.providerRdate?.let { rdate ->
+                sideStore.write(EventSideStoreNamespaces.ProviderRdates, eventId, rdate)
+            } ?: sideStore.remove(EventSideStoreNamespaces.ProviderRdates, eventId)
+        }
     }
 
     private fun com.dotfield.dotcal.data.CalendarAccount.googleCalendarId(): Long? {
@@ -187,4 +179,74 @@ class CalendarSyncRepository(
         private const val SYNC_RANGE_DAYS = 365L
         private const val TOMBSTONE_RETENTION_DAYS = 30L
     }
+}
+
+internal fun applyProviderRecurringExceptionMetadata(providerEvents: List<CalendarEvent>): List<CalendarEvent> {
+    val occurrenceExceptions = providerEvents
+        .mapNotNull { event ->
+            val originalId = event.providerOriginalGoogleEventId ?: return@mapNotNull null
+            val originalStartMs = event.providerOriginalInstanceTimeMs ?: return@mapNotNull null
+            originalId to originalStartMs
+        }
+        .groupBy({ it.first }, { it.second })
+    return providerEvents.mapNotNull { event ->
+        val externalExceptions = occurrenceExceptions[event.googleEventId].orEmpty()
+        if (event.providerOriginalGoogleEventId != null) {
+            if (providerStatusIsCancelled(event.providerStatus)) {
+                null
+            } else {
+                event.copy(
+                    rrule = null,
+                    exceptionDates = "[]",
+                    syncVersion = event.syncVersion.withProviderExceptionMetadata(
+                        event.providerOriginalGoogleEventId,
+                        event.providerOriginalInstanceTimeMs,
+                    ),
+                )
+            }
+        } else if (externalExceptions.isNotEmpty()) {
+            val exceptionDates = mergeExceptionDates(event.exceptionDates, externalExceptions)
+            event.copy(
+                exceptionDates = exceptionDates,
+                syncVersion = 31 * event.syncVersion + exceptionDates.hashCode(),
+            )
+        } else {
+            event
+        }
+    }
+}
+
+private fun mergeExceptionDates(exceptionDates: String, additionalExceptions: List<Long>): String {
+    return (exceptionDates.toExceptionStartTimes() + additionalExceptions)
+        .distinct()
+        .sorted()
+        .joinToString(separator = ",", prefix = "[", postfix = "]")
+}
+
+private fun String.toExceptionStartTimes(): List<Long> {
+    return removePrefix("[")
+        .removeSuffix("]")
+        .split(',')
+        .mapNotNull { it.trim().toLongOrNull() }
+}
+
+private fun Int.withProviderExceptionMetadata(originalGoogleEventId: String?, originalInstanceTimeMs: Long?): Int {
+    var hash = this
+    hash = 31 * hash + originalGoogleEventId.orEmpty().hashCode()
+    hash = 31 * hash + (originalInstanceTimeMs?.hashCode() ?: 0)
+    return hash
+}
+
+internal fun staleProviderDuplicateIds(
+    providerByGoogleId: Map<String, CalendarEvent>,
+    existingProviderEvents: List<CalendarEvent>,
+    localByGoogleId: Map<String, CalendarEvent>,
+): List<String> {
+    if (providerByGoogleId.isEmpty()) return emptyList()
+    return existingProviderEvents.mapNotNull { existing ->
+        val googleEventId = existing.googleEventId ?: return@mapNotNull null
+        val providerEvent = providerByGoogleId[googleEventId] ?: return@mapNotNull null
+        val keepId = localByGoogleId[googleEventId]?.id ?: providerEvent.id
+        existing.id.takeIf { it != keepId }
+    }.distinct()
 }

@@ -58,4 +58,13 @@ data class CalendarEvent(
 
     @Ignore
     var providerOriginalInstanceTimeMs: Long? = null
+
+    @Ignore
+    var providerAvailability: Int? = null
+
+    @Ignore
+    var providerStatus: Int? = null
+
+    @Ignore
+    var providerRdate: String? = null
 }

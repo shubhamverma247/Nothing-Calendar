@@ -290,6 +290,15 @@ interface CalendarDao {
         rangeEndMs: Long,
     ): List<CalendarEvent>
 
+    @Query(
+        """
+        SELECT * FROM calendar_events
+        WHERE source = 'GOOGLE'
+        AND googleEventId IN (:googleEventIds)
+        """,
+    )
+    suspend fun getGoogleEventsByGoogleIds(googleEventIds: List<String>): List<CalendarEvent>
+
     @Query("DELETE FROM event_reminders WHERE eventId = :eventId")
     suspend fun deleteRemindersForEvent(eventId: String)
 

@@ -55,6 +55,7 @@ import com.dotfield.dotcal.data.shifts.expandShiftPattern
 import com.dotfield.dotcal.data.shifts.parseShiftEventMetadata
 import com.dotfield.dotcal.data.shifts.shiftMetadataFor
 import com.dotfield.dotcal.data.sidestore.SharedSideStore
+import com.dotfield.dotcal.data.sidestore.EventSideStoreNamespaces
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.templates.EventTemplateStore
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
@@ -156,6 +157,7 @@ class DotCalRepository(
         dao = dao,
         providerDataSource = calendarProviderDataSource,
         reminderScheduler = reminderScheduler,
+        sideStore = sideStore,
     )
 
     fun observeIsPro(): Flow<Boolean> =
@@ -1064,7 +1066,13 @@ class DotCalRepository(
             source = "GOOGLE",
             googleEventId = previous?.googleEventId.takeIf { previousCalendarId == targetCalendarId.toString() },
             googleCalendarId = targetCalendarId.toString(),
-        )
+        ).apply {
+            val previousBaseId = previous?.baseEventId()
+            providerStatus = previousBaseId
+                ?.let { sideStore.read(EventSideStoreNamespaces.ProviderStatuses, it)?.toIntOrNull() }
+            providerRdate = previousBaseId
+                ?.let { sideStore.read(EventSideStoreNamespaces.ProviderRdates, it) }
+        }
         val providerEvent = withContext(Dispatchers.IO) {
             calendarProviderDataSource.saveEvent(targetCalendarId, providerDraft, reminderMinutes)
         } ?: return event
@@ -2113,7 +2121,7 @@ class DotCalRepository(
         const val LOCAL_ACCOUNT_ID = "local-primary"
         private const val HOLIDAY_ACCOUNT_PREFIX = "holiday-"
         private const val DEFAULT_EVENT_COLOR = "#FF0000"
-        private const val GHOST_FLAGS_NAMESPACE = "ghost_flags"
+        private const val GHOST_FLAGS_NAMESPACE = EventSideStoreNamespaces.GhostFlags
         private const val SHIFT_EVENT_METADATA_NAMESPACE = "shift_event_metadata"
         private const val EVENT_FILE_ATTACHMENTS_NAMESPACE = "event_file_attachments"
         private const val EVENT_FILE_PDF_MIME = "application/pdf"

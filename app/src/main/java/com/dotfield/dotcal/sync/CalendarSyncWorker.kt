@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.dotfield.dotcal.data.DotCalDatabase
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
+import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.reminders.ReminderScheduler
@@ -29,6 +30,7 @@ class CalendarSyncWorker(
                 dao = dao,
                 providerDataSource = CalendarProviderDataSource(applicationContext),
                 reminderScheduler = ReminderScheduler(applicationContext),
+                sideStore = SharedSideStore(applicationContext),
             )
             val result = syncRepository.sync()
             if (!result.permissionDenied) {

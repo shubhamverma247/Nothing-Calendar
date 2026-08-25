@@ -5,6 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 
 class CalendarProviderDataSourceTest {
@@ -44,6 +45,21 @@ class CalendarProviderDataSourceTest {
     }
 
     @Test
+    fun providerAvailabilityMapsFreeToNonBlockingOnly() {
+        assertEquals(true, providerAvailabilityIsNonBlocking(1))
+        assertEquals(false, providerAvailabilityIsNonBlocking(0))
+        assertEquals(false, providerAvailabilityIsNonBlocking(2))
+        assertEquals(false, providerAvailabilityIsNonBlocking(null))
+    }
+
+    @Test
+    fun normalizedProviderRdateTrimsAndDropsBlankValues() {
+        assertEquals("20260822T093000Z", normalizedProviderRdate(" 20260822T093000Z "))
+        assertNull(normalizedProviderRdate(""))
+        assertNull(normalizedProviderRdate(null))
+    }
+
+    @Test
     fun providerReminderAlarmRequestCodeIsStableForEventAndMinutes() {
         assertEquals(
             providerReminderAlarmRequestCode("event-1", 15),
@@ -71,5 +87,17 @@ class CalendarProviderDataSourceTest {
 
         assertEquals("20260822", providerExdateFromExceptionDates("[$ms]", 1, "UTC"))
         assertEquals("[$ms]", exceptionDatesFromProviderExdate("20260822", 1, "UTC"))
+    }
+
+    @Test
+    fun providerExdateParsesLocalTimedExceptionsAcrossDstBoundary() {
+        val zone = ZoneId.of("America/New_York")
+        val beforeDst = LocalDateTime.of(2026, 3, 7, 9, 0).atZone(zone).toInstant().toEpochMilli()
+        val afterDst = LocalDateTime.of(2026, 3, 9, 9, 0).atZone(zone).toInstant().toEpochMilli()
+
+        assertEquals(
+            "[$beforeDst,$afterDst]",
+            exceptionDatesFromProviderExdate("20260307T090000,20260309T090000", 0, zone.id),
+        )
     }
 }

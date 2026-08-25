@@ -233,6 +233,18 @@ class CalendarProviderDataSource(private val context: Context) {
             providerExdateFromExceptionDates(event.exceptionDates, event.isAllDay, event.timeZone)
                 ?.let { put(CalendarContract.Events.EXDATE, it) }
                 ?: putNull(CalendarContract.Events.EXDATE)
+            put(
+                CalendarContract.Events.AVAILABILITY,
+                if (event.isGhost) {
+                    CalendarContract.Events.AVAILABILITY_FREE
+                } else {
+                    CalendarContract.Events.AVAILABILITY_BUSY
+                },
+            )
+            put(CalendarContract.Events.STATUS, event.providerStatus ?: CalendarContract.Events.STATUS_CONFIRMED)
+            normalizedProviderRdate(event.providerRdate)
+                ?.let { put(CalendarContract.Events.RDATE, it) }
+                ?: putNull(CalendarContract.Events.RDATE)
         }
     }
 
@@ -284,6 +296,10 @@ class CalendarProviderDataSource(private val context: Context) {
         ).apply {
             providerOriginalGoogleEventId = originalGoogleEventId
             providerOriginalInstanceTimeMs = originalInstanceTimeMs
+            providerAvailability = getIntOrDefault(EVENT_AVAILABILITY_INDEX, CalendarContract.Events.AVAILABILITY_BUSY)
+            providerStatus = getIntOrDefault(EVENT_STATUS_INDEX, CalendarContract.Events.STATUS_CONFIRMED)
+            providerRdate = normalizedProviderRdate(getStringOrNull(EVENT_RDATE_INDEX))
+            isGhost = providerAvailabilityIsNonBlocking(providerAvailability)
         }
     }
 
@@ -342,6 +358,9 @@ class CalendarProviderDataSource(private val context: Context) {
             CalendarContract.Events.EXDATE,
             CalendarContract.Events.ORIGINAL_ID,
             CalendarContract.Events.ORIGINAL_INSTANCE_TIME,
+            CalendarContract.Events.AVAILABILITY,
+            CalendarContract.Events.STATUS,
+            CalendarContract.Events.RDATE,
         )
         private const val EVENT_ID_INDEX = 0
         private const val EVENT_TITLE_INDEX = 1
@@ -358,6 +377,9 @@ class CalendarProviderDataSource(private val context: Context) {
         private const val EVENT_EXDATE_INDEX = 12
         private const val EVENT_ORIGINAL_ID_INDEX = 13
         private const val EVENT_ORIGINAL_INSTANCE_TIME_INDEX = 14
+        private const val EVENT_AVAILABILITY_INDEX = 15
+        private const val EVENT_STATUS_INDEX = 16
+        private const val EVENT_RDATE_INDEX = 17
         private val EVENT_HASH_COLUMNS = EVENT_PROJECTION.indices.toList()
 
         private val REMINDER_PROJECTION = arrayOf(
@@ -389,6 +411,18 @@ private fun CalendarEvent.providerDuration(): String {
 
 internal fun List<Int>.normalizedProviderReminderMinutes(): List<Int> {
     return distinct().filter { it >= 0 }.sorted()
+}
+
+internal fun providerAvailabilityIsNonBlocking(availability: Int?): Boolean {
+    return availability == CalendarContract.Events.AVAILABILITY_FREE
+}
+
+internal fun providerStatusIsCancelled(status: Int?): Boolean {
+    return status == CalendarContract.Events.STATUS_CANCELED
+}
+
+internal fun normalizedProviderRdate(rdate: String?): String? {
+    return rdate?.trim()?.takeIf { it.isNotBlank() }
 }
 
 fun providerReminderAlarmRequestCode(eventId: String, minutes: Int): Int {
@@ -423,7 +457,7 @@ internal fun exceptionDatesFromProviderExdate(exdate: String?, isAllDay: Int, ti
         ?.distinct()
         ?.sorted()
         .orEmpty()
-    return values.joinToString(prefix = "[", postfix = "]")
+    return values.joinToString(separator = ",", prefix = "[", postfix = "]")
 }
 
 internal fun providerDurationMillis(duration: String?): Long? {
