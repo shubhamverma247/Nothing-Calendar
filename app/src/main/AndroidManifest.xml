@@ -78,6 +78,11 @@
             android:exported="true"
             android:theme="@style/Theme.DotCal" />
 
+        <activity
+            android:name=".widget.WidgetManagerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DotCal" />
+
         <receiver
             android:name=".reminders.ReminderReceiver"
             android:exported="false" />

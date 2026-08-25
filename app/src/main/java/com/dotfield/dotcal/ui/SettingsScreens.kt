@@ -980,6 +980,33 @@ private fun WidgetSettings(
         }
         item {
             SettingsPanel(title = stringResource(R.string.settings_panel_widget_style), palette = palette, framed = false) {
+                val context = LocalContext.current
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { com.dotfield.dotcal.widget.WidgetManagerActivity.start(context) }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Customize placed widgets",
+                            color = palette.primaryText,
+                            fontSize = 16.sp,
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            "Choose content, range and actions per widget",
+                            color = palette.secondaryText,
+                            fontSize = 13.sp,
+                        )
+                    }
+                    Text("›", color = palette.secondaryText, fontSize = 22.sp)
+                }
+            }
+        }
+        item {
+            SettingsPanel(title = stringResource(R.string.settings_panel_widget_style), palette = palette, framed = false) {
                 SettingsWidgetToggleRow(
                     title = stringResource(R.string.settings_transparent_widgets),
                     subtitle = stringResource(R.string.settings_transparent_widgets_subtitle),
