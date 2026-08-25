@@ -45,9 +45,6 @@ import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.dotfield.dotcal.R
-import com.dotfield.dotcal.prefs.CalendarPreferences
-import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
-import kotlinx.coroutines.flow.first
 import java.time.Duration
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -60,14 +57,15 @@ enum class DotCalWidgetSize(val maxItems: Int) {
     Large(maxItems = 3),
 }
 
-class SmallDotCalWidget : DotCalWidget(DotCalWidgetSize.Small, DpSize(110.dp, 110.dp))
-class MediumDotCalWidget : DotCalWidget(DotCalWidgetSize.Medium, DpSize(250.dp, 140.dp))
-class LargeDotCalWidget : DotCalWidget(DotCalWidgetSize.Large, DpSize(250.dp, 250.dp))
-class EventCountdownDotCalWidget : DotCalWidget(DotCalWidgetSize.Countdown, DpSize(110.dp, 110.dp))
-class AgendaListDotCalWidget : DotCalWidget(DotCalWidgetSize.Medium, DpSize(250.dp, 140.dp))
-class MonthGridDotCalWidget : DotCalWidget(DotCalWidgetSize.Large, DpSize(250.dp, 250.dp))
+class SmallDotCalWidget : DotCalWidget(LegacyWidgetKind.Small, DotCalWidgetSize.Small, DpSize(110.dp, 110.dp))
+class MediumDotCalWidget : DotCalWidget(LegacyWidgetKind.Medium, DotCalWidgetSize.Medium, DpSize(250.dp, 140.dp))
+class LargeDotCalWidget : DotCalWidget(LegacyWidgetKind.Large, DotCalWidgetSize.Large, DpSize(250.dp, 250.dp))
+class EventCountdownDotCalWidget : DotCalWidget(LegacyWidgetKind.Countdown, DotCalWidgetSize.Countdown, DpSize(110.dp, 110.dp))
+class AgendaListDotCalWidget : DotCalWidget(LegacyWidgetKind.Agenda, DotCalWidgetSize.Medium, DpSize(250.dp, 140.dp))
+class MonthGridDotCalWidget : DotCalWidget(LegacyWidgetKind.MonthGrid, DotCalWidgetSize.Large, DpSize(250.dp, 250.dp))
 
 abstract class DotCalWidget(
+    private val legacyKind: LegacyWidgetKind,
     private val widgetSize: DotCalWidgetSize,
     private val minSize: DpSize,
 ) : GlanceAppWidget() {
@@ -75,20 +73,40 @@ abstract class DotCalWidget(
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val settings = syncDotCalWidgetState(context, id)
-        val data = WidgetDataRepository.create(context).load(widgetSize, settings.accountId)
-        val isPro = context.calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_IS_PRO] ?: false
+        val settings = syncDotCalWidgetState(context, id, legacyKind)
+        val config = settings.instanceConfig
+        val data = WidgetDataRepository.create(context).load(config, widgetSize.maxItems)
         provideContent {
             val palette = dotCalWidgetPalette(context, currentDotCalWidgetSettings())
             DotCalGlanceTheme {
-                when (widgetSize) {
-                    DotCalWidgetSize.Small -> SmallWidget(context, data, palette)
-                    DotCalWidgetSize.Countdown -> CountdownWidget(context, data, palette)
-                    DotCalWidgetSize.Medium -> MediumWidget(context, data, palette)
-                    DotCalWidgetSize.Large -> if (isPro) LargeWidget(context, data, palette) else LargeWidgetLocked(context, palette)
-                }
+                ConfiguredWidget(context, config, widgetSize, data, palette)
             }
         }
+    }
+}
+
+@Composable
+private fun ConfiguredWidget(
+    context: Context,
+    config: WidgetInstanceConfig,
+    widgetSize: DotCalWidgetSize,
+    data: WidgetCalendarData,
+    palette: DotCalWidgetPalette,
+) {
+    when (config.category) {
+        WidgetCategory.Calendar -> if (widgetSize == DotCalWidgetSize.Small) {
+            TodayWidget(context, data, palette, widgetSize)
+        } else {
+            LargeWidget(context, data, palette)
+        }
+        WidgetCategory.Schedule -> when (config.viewType) {
+            WidgetViewType.NextEvent -> SmallWidget(context, data, palette)
+            else -> if (widgetSize == DotCalWidgetSize.Small) SmallWidget(context, data, palette) else MediumWidget(context, data, palette)
+        }
+        WidgetCategory.Today -> TodayWidget(context, data, palette, widgetSize)
+        WidgetCategory.Tasks -> TasksWidget(context, data, palette, widgetSize)
+        WidgetCategory.Countdown -> CountdownWidget(context, data, palette)
+        WidgetCategory.QuickActions -> QuickActionWidget(context, config, palette)
     }
 }
 
@@ -214,6 +232,94 @@ private fun CountdownWidget(context: Context, data: WidgetCalendarData, palette:
 }
 
 @Composable
+private fun TodayWidget(
+    context: Context,
+    data: WidgetCalendarData,
+    palette: DotCalWidgetPalette,
+    widgetSize: DotCalWidgetSize,
+) {
+    WidgetSurfaceBox(palette) {
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .padding(start = 16.dp, top = 14.dp, end = 14.dp, bottom = 14.dp)
+                .clickable(actionStartActivity(openCalendarTodayIntent(context))),
+        ) {
+            Text(todayDayAbbrev(), maxLines = 1, style = monoStyle(palette.secondary, 12, FontWeight.Bold))
+            Spacer(GlanceModifier.height(3.dp))
+            Text(data.todayLabel, maxLines = 1, style = monoStyle(palette.accent, if (widgetSize == DotCalWidgetSize.Small) 34 else 42, FontWeight.Bold))
+            Spacer(GlanceModifier.height(4.dp))
+            Text(todaySummary(data), maxLines = 1, style = monoStyle(palette.primary, 12, FontWeight.Bold))
+            if (widgetSize != DotCalWidgetSize.Small) {
+                Spacer(GlanceModifier.height(10.dp))
+                data.nextEvent?.let { item ->
+                    Text(item.timeLabel, maxLines = 1, style = monoStyle(palette.accent, 10, FontWeight.Bold))
+                    Text(item.title, maxLines = 1, style = primaryStyle(palette, 14, FontWeight.Bold))
+                } ?: Text("NOTHING SCHEDULED", maxLines = 1, style = monoStyle(palette.secondary, 11, FontWeight.Bold))
+            }
+        }
+    }
+}
+
+@Composable
+private fun TasksWidget(
+    context: Context,
+    data: WidgetCalendarData,
+    palette: DotCalWidgetPalette,
+    widgetSize: DotCalWidgetSize,
+) {
+    WidgetSurfaceBox(palette) {
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .padding(start = 16.dp, top = 14.dp, end = 14.dp, bottom = 14.dp)
+                .clickable(actionStartActivity(openCalendarTasksIntent(context))),
+        ) {
+            Text("TASKS", maxLines = 1, style = monoStyle(palette.secondary, 12, FontWeight.Bold))
+            Spacer(GlanceModifier.height(6.dp))
+            if (data.tasks.isEmpty()) {
+                Text("ALL CAUGHT UP", maxLines = 1, style = monoStyle(palette.primary, 15, FontWeight.Bold))
+                Spacer(GlanceModifier.height(4.dp))
+                Text("No open tasks", maxLines = 1, style = monoStyle(palette.secondary, 11, FontWeight.Normal))
+            } else if (widgetSize == DotCalWidgetSize.Small) {
+                Text(data.tasks.size.toString(), maxLines = 1, style = monoStyle(palette.accent, 34, FontWeight.Bold))
+                Text("OPEN", maxLines = 1, style = monoStyle(palette.secondary, 11, FontWeight.Bold))
+            } else {
+                data.tasks.take(3).forEach { task ->
+                    Text(task.title, maxLines = 1, style = primaryStyle(palette, 14, FontWeight.Bold))
+                    Text(task.dateLabel.uppercase(Locale.getDefault()), maxLines = 1, style = monoStyle(palette.secondary, 9, FontWeight.Normal))
+                    Spacer(GlanceModifier.height(5.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionWidget(
+    context: Context,
+    config: WidgetInstanceConfig,
+    palette: DotCalWidgetPalette,
+) {
+    val action = config.interaction.tapAction
+    WidgetSurfaceBox(palette) {
+        Box(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .padding(12.dp)
+                .clickable(actionStartActivity(widgetTapIntent(context, action))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                RingBadge(quickActionGlyph(action), 42, palette, textSize = 22)
+                Spacer(GlanceModifier.height(8.dp))
+                Text(quickActionLabel(action), maxLines = 1, style = monoStyle(palette.secondary, 10, FontWeight.Bold, TextAlign.Center))
+            }
+        }
+    }
+}
+
+@Composable
 private fun MediumWidget(context: Context, data: WidgetCalendarData, palette: DotCalWidgetPalette) {
     WidgetSurfaceBox(palette) {
         Row(
@@ -307,40 +413,6 @@ private fun LargeWidget(context: Context, data: WidgetCalendarData, palette: Dot
     }
 }
 
-@Composable
-private fun LargeWidgetLocked(context: Context, palette: DotCalWidgetPalette) {
-    WidgetSurfaceBox(palette) {
-        Column(
-            modifier = GlanceModifier
-                .fillMaxSize()
-                .padding(24.dp)
-                .clickable(actionStartActivity(openPaywallIntent(context))),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text("🔒", style = monoStyle(palette.accent, 28, FontWeight.Bold, TextAlign.Center))
-            Spacer(GlanceModifier.height(12.dp))
-            Text("DotCal Pro", style = primaryStyle(palette, 18, FontWeight.Bold))
-            Spacer(GlanceModifier.height(6.dp))
-            Text(
-                "Unlock the Large widget in DotCal Pro",
-                maxLines = 2,
-                style = monoStyle(palette.secondary, 12, FontWeight.Normal, TextAlign.Center),
-            )
-            Spacer(GlanceModifier.height(18.dp))
-            Box(
-                modifier = GlanceModifier
-                    .background(palette.accent)
-                    .cornerRadius(20.dp)
-                    .padding(horizontal = 22.dp, vertical = 10.dp)
-                    .clickable(actionStartActivity(openPaywallIntent(context))),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("Unlock", style = monoStyle(ColorProvider(Color.White), 14, FontWeight.Bold, TextAlign.Center))
-            }
-        }
-    }
-}
 
 @Composable
 private fun MediumVerticalDivider() {
@@ -638,8 +710,16 @@ private fun openCalendarMonthIntent(context: Context): Intent {
     return Intent(Intent.ACTION_VIEW, Uri.parse("dotcal://calendar/month")).setPackage(context.packageName)
 }
 
-private fun openPaywallIntent(context: Context): Intent {
-    return Intent(Intent.ACTION_VIEW, Uri.parse("dotcal://paywall")).setPackage(context.packageName)
+private fun openCalendarTodayIntent(context: Context): Intent {
+    return Intent(Intent.ACTION_VIEW, Uri.parse("dotcal://calendar/day?date=${LocalDate.now()}")).setPackage(context.packageName)
+}
+
+private fun openCalendarAgendaIntent(context: Context): Intent {
+    return Intent(Intent.ACTION_VIEW, Uri.parse("dotcal://calendar/agenda")).setPackage(context.packageName)
+}
+
+private fun openCalendarTasksIntent(context: Context): Intent {
+    return Intent(Intent.ACTION_VIEW, Uri.parse("dotcal://tasks")).setPackage(context.packageName)
 }
 
 private fun openCalendarDateIntent(context: Context, dateIso: String?): Intent {
@@ -668,6 +748,51 @@ private fun countdownLabel(item: WidgetEventItem): String {
 private fun openAddEventIntent(context: Context): Intent {
     val today = LocalDate.now().toString()
     return Intent(Intent.ACTION_VIEW, Uri.parse("dotcal://event/new?date=$today")).setPackage(context.packageName)
+}
+
+private fun widgetTapIntent(context: Context, action: WidgetTapAction): Intent {
+    return when (action) {
+        WidgetTapAction.OpenCalendar -> openCalendarMonthIntent(context)
+        WidgetTapAction.OpenToday -> openCalendarTodayIntent(context)
+        WidgetTapAction.OpenAgenda -> openCalendarAgendaIntent(context)
+        WidgetTapAction.QuickAdd,
+        WidgetTapAction.CreateEvent,
+        WidgetTapAction.CreateTask -> openAddEventIntent(context)
+        WidgetTapAction.Search -> openCalendarMonthIntent(context)
+    }
+}
+
+private fun quickActionGlyph(action: WidgetTapAction): String {
+    return when (action) {
+        WidgetTapAction.OpenCalendar -> "DC"
+        WidgetTapAction.OpenToday -> LocalDate.now().dayOfMonth.toString()
+        WidgetTapAction.OpenAgenda -> "AG"
+        WidgetTapAction.QuickAdd,
+        WidgetTapAction.CreateEvent,
+        WidgetTapAction.CreateTask -> "+"
+        WidgetTapAction.Search -> "?"
+    }
+}
+
+private fun quickActionLabel(action: WidgetTapAction): String {
+    return when (action) {
+        WidgetTapAction.OpenCalendar -> "CALENDAR"
+        WidgetTapAction.OpenToday -> "TODAY"
+        WidgetTapAction.OpenAgenda -> "AGENDA"
+        WidgetTapAction.QuickAdd -> "QUICK ADD"
+        WidgetTapAction.CreateEvent -> "ADD EVENT"
+        WidgetTapAction.CreateTask -> "ADD TASK"
+        WidgetTapAction.Search -> "SEARCH"
+    }
+}
+
+private fun todaySummary(data: WidgetCalendarData): String {
+    return when {
+        data.remainingEventCount > 0 && data.tasks.isNotEmpty() -> "${data.remainingEventCount} EVENTS - ${data.tasks.size} TASKS"
+        data.remainingEventCount > 0 -> "${data.remainingEventCount} EVENTS LEFT"
+        data.tasks.isNotEmpty() -> "${data.tasks.size} TASKS"
+        else -> "OPEN DAY"
+    }
 }
 
 private fun WidgetEventItem.detailLine(): String {

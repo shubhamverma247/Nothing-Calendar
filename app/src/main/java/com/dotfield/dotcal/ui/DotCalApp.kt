@@ -317,6 +317,7 @@ fun DotCalApp(
     initialAddEvent: Boolean = false,
     initialAddEventDate: String? = null,
     initialPaywall: Boolean = false,
+    initialTasksTab: Boolean = false,
     initialRouteToken: Long? = null,
 ) {
     val month by viewModel.month.collectAsStateWithLifecycle()
@@ -400,7 +401,10 @@ fun DotCalApp(
     var handledTaskDeepLinkId by remember { mutableStateOf<String?>(null) }
     var handledRouteToken by remember { mutableStateOf<Long?>(null) }
     var routePending by remember(initialRouteToken) {
-        mutableStateOf(initialRouteToken != null && (initialEventId != null || !initialTaskId.isNullOrBlank() || initialAddEvent || initialCalendarDate != null || initialPaywall))
+        mutableStateOf(
+            initialRouteToken != null &&
+                (initialEventId != null || !initialTaskId.isNullOrBlank() || initialAddEvent || initialCalendarDate != null || initialPaywall || initialTasksTab),
+        )
     }
     var isSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -915,6 +919,17 @@ fun DotCalApp(
             initialCalendarDate?.let { date ->
                 runCatching { LocalDate.parse(date) }.getOrNull()?.let(viewModel::selectDate)
             }
+            handledRouteToken = initialRouteToken
+            routePending = false
+        }
+    }
+    LaunchedEffect(initialRouteToken, initialTasksTab) {
+        if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialTasksTab) {
+            viewModel.closeEventDetail()
+            taskDetail = null
+            settingsScreen = SettingsScreen.Root
+            previousScreenTab = ScreenTab.Calendar
+            screenTab = ScreenTab.Tasks
             handledRouteToken = initialRouteToken
             routePending = false
         }

@@ -17,8 +17,8 @@ class WidgetUpdateWorker(
     workerParameters: WorkerParameters,
 ) : CoroutineWorker(appContext, workerParameters) {
     override suspend fun doWork(): Result {
-        updateNow(applicationContext)
-        return Result.success()
+            updateNow(applicationContext)
+            return Result.success()
     }
 
     companion object {
@@ -35,12 +35,12 @@ class WidgetUpdateWorker(
 
         suspend fun updateNow(context: Context) {
             val appContext = context.applicationContext
-            updateWidget(appContext, SmallDotCalWidget(), SmallDotCalWidget::class.java)
-            updateWidget(appContext, MediumDotCalWidget(), MediumDotCalWidget::class.java)
-            updateWidget(appContext, LargeDotCalWidget(), LargeDotCalWidget::class.java)
-            updateWidget(appContext, EventCountdownDotCalWidget(), EventCountdownDotCalWidget::class.java)
-            updateWidget(appContext, AgendaListDotCalWidget(), AgendaListDotCalWidget::class.java)
-            updateWidget(appContext, MonthGridDotCalWidget(), MonthGridDotCalWidget::class.java)
+            updateWidget(appContext, SmallDotCalWidget(), SmallDotCalWidget::class.java, LegacyWidgetKind.Small)
+            updateWidget(appContext, MediumDotCalWidget(), MediumDotCalWidget::class.java, LegacyWidgetKind.Medium)
+            updateWidget(appContext, LargeDotCalWidget(), LargeDotCalWidget::class.java, LegacyWidgetKind.Large)
+            updateWidget(appContext, EventCountdownDotCalWidget(), EventCountdownDotCalWidget::class.java, LegacyWidgetKind.Countdown)
+            updateWidget(appContext, AgendaListDotCalWidget(), AgendaListDotCalWidget::class.java, LegacyWidgetKind.Agenda)
+            updateWidget(appContext, MonthGridDotCalWidget(), MonthGridDotCalWidget::class.java, LegacyWidgetKind.MonthGrid)
             notifyWidgetHosts(appContext)
         }
 
@@ -48,9 +48,10 @@ class WidgetUpdateWorker(
             context: Context,
             widget: GlanceAppWidget,
             widgetClass: Class<out GlanceAppWidget>,
+            legacyKind: LegacyWidgetKind,
         ) {
             GlanceAppWidgetManager(context).getGlanceIds(widgetClass).forEach { glanceId ->
-                syncDotCalWidgetState(context, glanceId)
+                syncDotCalWidgetState(context, glanceId, legacyKind)
                 widget.update(context, glanceId)
             }
         }

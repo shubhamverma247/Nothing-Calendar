@@ -121,6 +121,21 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - Added DST/local-time EXDATE regression coverage.
   - No Room schema change; side data uses `dotcal_side_store.json`.
 - Language picker exists, but most app UI strings are still hardcoded English.
+- Unified configurable widget system work started:
+  - Added unified per-widget config model for Calendar, Schedule, Today, Tasks, Countdown, and Quick
+    Actions.
+  - Existing widget receivers/classes are preserved for backward compatibility; placed widgets
+    migrate legacy per-widget calendar state into `KEY_WIDGET_INSTANCE_CONFIG`.
+  - Widget config screen now saves category, time range, layout, and calendar filter per widget.
+  - Added basic config-aware rendering for Today, Tasks, Quick Actions, Schedule, Calendar, and
+    Countdown categories.
+  - Added Next 14 Days as a widget time range and kept core large widget rendering Free.
+  - Added pure responsive size-classifier foundation for later Glance size-aware rendering.
+  - Verification so far:
+    `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest --tests com.dotfield.dotcal.widget.WidgetInstanceConfigTest --tests com.dotfield.dotcal.widget.WidgetResponsiveSizeTest`
+    passed, and
+    `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug`
+    passed.
 
 ## Verification Baseline
 
@@ -245,14 +260,14 @@ review. Business Calendar 2 is strong in widgets/custom views/tasks/attachments;
 Google Calendar emphasize scheduling/availability; Proton Calendar owns privacy; TimeTree monetizes
 sharing/premium utility; Supershift owns deep shift workflows.
 
-1. Find-a-Time.
-2. 14-Day Widget.
-3. Smart Quick Add 3.0.
-4. Calendar Health.
-5. Template Assistant.
-6. Protect Free Time.
-7. Free Time Map.
-8. Advanced Reminders.
+1. Unified Configurable Widget System + 14-Day Widget.
+2. Advanced Reminders / Ringtone Controls.
+3. Find-a-Time.
+4. Smart Quick Add 3.0.
+5. Calendar Health.
+6. Template Assistant.
+7. Protect Free Time.
+8. Free Time Map.
 9. Manual Travel Blocks + Custom Conference Links.
 10. Expanded Attachments.
 11. Life-in-Dots.
@@ -261,42 +276,48 @@ sharing/premium utility; Supershift owns deep shift workflows.
 
 ## Planned: Product Roadmap Free/Pro
 
-1. **Find-a-Time** - highest priority.
-   - Free: basic slot suggestions and working-hour constraints.
-   - Pro: preferred days/time of day, Calendar Sets, minimum gap, ghost-event policy, multiple
-     candidate slots, and best-slot ranking.
-   - Architecture: reuse existing Availability / FreeSlot / Dead Time infrastructure. No backend and
-     no Room schema change expected.
-2. **14-Day Widget**.
-   - Free: basic two-week widget plus core large widget utility.
-   - Pro: opacity, transparent background, calendar filter, event density, compact/expanded modes,
-     privacy masking, saved advanced presets if implemented, and shift mode.
-   - Architecture: reuse current widget settings/configuration where possible.
-3. **Smart Quick Add 3.0**.
-   - Free: basic English natural-language event creation.
-   - Pro: advanced recurrence, calendar selection, task creation, countdown, Pencil-In, and template
-     detection.
-   - Constraint: deterministic/local parser first. Do not market multilingual parsing until shipped.
-4. **Calendar Health**.
-   - Pro: local weekly/monthly analytics such as scheduled hours, free hours, meetings, back-to-back
-     blocks, overloaded days, busiest day, and comparison with previous week.
-   - Privacy copy: calendar analytics never leave the phone.
-5. **Template Assistant**.
-   - Free: limited templates.
-   - Pro: unlimited templates, smart suggestions, and create-template-from-event workflow.
-6. **Protect Free Time**.
-   - Pro: find daily/weekly focus-time blocks and create Focus Time events.
-   - Reuse free-slot logic.
-7. **Free Time Map**.
-   - Free: optional basic weekly free-time total.
-   - Pro: per-day free-time map with tappable blocks and filters.
-8. **Advanced Reminders**.
+1. **Unified Configurable Widget System + 14-Day Widget** - highest priority.
+   - Free: all six core widget categories (Calendar, Schedule, Today, Tasks, Countdown, Quick
+     Actions), multiple independent widget instances, supported 1x1 through large sizes, calendar
+     selection/basic filters, Minimal/Compact/Detailed layouts, basic appearance, opacity, tap
+     actions, and a useful 14-day/two-week view.
+   - Pro later: Free Time intelligence, Focus Window, advanced 14-day density/privacy/shift modes,
+     advanced smart rules, advanced privacy masking, and other genuinely smart widget behavior.
+   - Architecture: reuse current Glance/widget providers and configuration flow; do not create a
+     parallel widget system or dozens of launcher-facing widget types. Preserve existing widgets,
+     per-widget calendar selection where present, opacity behavior, and migrate legacy widget state
+     into a unified per-instance config when possible. No Room schema change expected.
+2. **Advanced Reminders / Ringtone Controls**.
    - Free: basic event/task reminders stay useful.
    - Pro: per-calendar custom reminder sound/ring, repeating alarms, custom snooze presets,
      vibration pattern, and stronger notification behavior options.
    - Architecture: local settings in DataStore/side-store first. Do not add backend/cloud push.
    - Android caveat: notification-channel sound behavior can be hard to change after channel
      creation, so design channel ids/settings deliberately before implementation.
+3. **Find-a-Time**.
+   - Free: basic slot suggestions and working-hour constraints.
+   - Pro: preferred days/time of day, Calendar Sets, minimum gap, ghost-event policy, multiple
+     candidate slots, and best-slot ranking.
+   - Architecture: reuse existing Availability / FreeSlot / Dead Time infrastructure. No backend and
+     no Room schema change expected.
+4. **Smart Quick Add 3.0**.
+   - Free: basic English natural-language event creation.
+   - Pro: advanced recurrence, calendar selection, task creation, countdown, Pencil-In, and template
+     detection.
+   - Constraint: deterministic/local parser first. Do not market multilingual parsing until shipped.
+5. **Calendar Health**.
+   - Pro: local weekly/monthly analytics such as scheduled hours, free hours, meetings, back-to-back
+     blocks, overloaded days, busiest day, and comparison with previous week.
+   - Privacy copy: calendar analytics never leave the phone.
+6. **Template Assistant**.
+   - Free: limited templates.
+   - Pro: unlimited templates, smart suggestions, and create-template-from-event workflow.
+7. **Protect Free Time**.
+   - Pro: find daily/weekly focus-time blocks and create Focus Time events.
+   - Reuse free-slot logic.
+8. **Free Time Map**.
+   - Free: optional basic weekly free-time total.
+   - Pro: per-day free-time map with tappable blocks and filters.
 9. **Manual Travel Blocks + Custom Conference Links**.
    - Free: custom meeting URL and manual travel blocks such as 15/30/45/60 minutes.
    - Pro later: provider link generation and smart maps/location-based travel estimate only if the

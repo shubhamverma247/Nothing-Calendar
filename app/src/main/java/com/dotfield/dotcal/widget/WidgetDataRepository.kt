@@ -43,6 +43,9 @@ data class WidgetCalendarData(
     val todayLabel: String,
     val nextEvent: WidgetEventItem?,
     val events: List<WidgetEventItem>,
+    val tasks: List<WidgetEventItem> = emptyList(),
+    val todayEventCount: Int = 0,
+    val remainingEventCount: Int = 0,
     val moreItemCount: Int,
     val days: List<WidgetCalendarDay> = emptyList(),
 )
@@ -54,34 +57,61 @@ class WidgetDataRepository(
     private val privacyManager = AppPrivacyManager(context.applicationContext)
     private val sideStore = SharedSideStore(context.applicationContext)
 
-    suspend fun load(size: DotCalWidgetSize, accountId: String? = null, nowMs: Long = System.currentTimeMillis()): WidgetCalendarData = withContext(Dispatchers.IO) {
+    suspend fun load(
+        config: WidgetInstanceConfig,
+        defaultMaxItems: Int,
+        nowMs: Long = System.currentTimeMillis(),
+    ): WidgetCalendarData = withContext(Dispatchers.IO) {
         val zoneId = ZoneId.systemDefault()
         val now = Instant.ofEpochMilli(nowMs).atZone(zoneId)
         val today = now.toLocalDate()
-        val rangeEnd = today.plusDays(WIDGET_RANGE_DAYS)
+        val rangeEnd = today.plusDays(config.effectiveRangeDays())
         val privateIds = privacyManager.observePrivateVaultIds().first()
+        val accountId = config.calendarFilter.accountId
         val visibleItems = dao.getVisibleEventsForWidget(today.atStartMs(zoneId), rangeEnd.atStartMs(zoneId), accountId)
             .filterNot { it.id.substringBefore(RECURRENCE_SEPARATOR) in privateIds }
             .expandRecurring(today, rangeEnd)
             .filter { it.endTimeMs >= nowMs }
+            .filter { config.content.showAllDayEvents || it.isAllDay == 0 }
             .sortedForWidget(zoneId)
         val use24Hour = DateFormat.is24HourFormat(context)
         val items = visibleItems.asWidgetItems(zoneId, use24Hour, nowMs)
-        val pinnedCountdownItems = if (size == DotCalWidgetSize.Countdown) {
+        val maxItems = config.maxVisibleItems(defaultMaxItems)
+        val pinnedCountdownItems = if (config.category == WidgetCategory.Countdown) {
             loadPinnedCountdownItems(today, rangeEnd, zoneId, use24Hour, nowMs, privateIds)
         } else {
             emptyList()
         }
+        val tasks = if (config.content.showTasks || config.category == WidgetCategory.Tasks) {
+            dao.getOpenTasksForWidget(rangeEnd.atStartMs(zoneId))
+                .filterNot { it.id.substringBefore(RECURRENCE_SEPARATOR) in privateIds }
+                .asWidgetItems(zoneId, use24Hour, nowMs)
+                .take(maxItems)
+        } else {
+            emptyList()
+        }
         val displayItems = pinnedCountdownItems.ifEmpty { items }
+        val todayEndMs = today.plusDays(1).atStartMs(zoneId)
+        val remainingEventsToday = visibleItems.count { it.startTimeMs < todayEndMs && it.endTimeMs >= nowMs }
         WidgetCalendarData(
             header = today.format(DateTimeFormatter.ofPattern("EEE, MMM d")),
             monthLabel = today.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
             todayLabel = today.dayOfMonth.toString(),
             nextEvent = displayItems.firstOrNull(),
-            events = displayItems.take(size.maxItems),
-            moreItemCount = (displayItems.size - size.maxItems).coerceAtLeast(0),
-            days = if (size == DotCalWidgetSize.Large) monthDays(today, visibleItems, zoneId) else emptyList(),
+            events = displayItems.take(maxItems),
+            tasks = tasks,
+            todayEventCount = visibleItems.count { it.startTimeMs < todayEndMs },
+            remainingEventCount = remainingEventsToday,
+            moreItemCount = (displayItems.size - maxItems).coerceAtLeast(0),
+            days = if (config.category == WidgetCategory.Calendar) monthDays(today, visibleItems, zoneId) else emptyList(),
         )
+    }
+
+    private fun WidgetInstanceConfig.effectiveRangeDays(): Long {
+        return when {
+            category == WidgetCategory.Calendar && viewType == WidgetViewType.Month -> WIDGET_RANGE_DAYS
+            else -> timeRange.days
+        }
     }
 
     private fun List<CalendarEvent>.sortedForWidget(zoneId: ZoneId): List<CalendarEvent> {
