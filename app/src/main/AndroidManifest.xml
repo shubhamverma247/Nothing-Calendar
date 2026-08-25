@@ -103,8 +103,48 @@
         </receiver>
 
         <receiver
+            android:name=".widget.DateOnlyDotCalWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_date_only_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/dotcal_widget_date_only" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.CompactMonthDotCalWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_month_compact_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/dotcal_widget_month_compact" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.ShiftWideWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_shift_wide_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/dotcal_widget_shift_wide" />
+        </receiver>
+
+        <receiver
             android:name=".widget.SmallDotCalWidgetReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_small_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
@@ -116,7 +156,8 @@
 
         <receiver
             android:name=".widget.MediumDotCalWidgetReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_medium_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
@@ -128,7 +169,8 @@
 
         <receiver
             android:name=".widget.LargeDotCalWidgetReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_large_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.intent.action.CONFIGURATION_CHANGED" />

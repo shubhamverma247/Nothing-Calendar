@@ -35,6 +35,9 @@ class WidgetUpdateWorker(
 
         suspend fun updateNow(context: Context) {
             val appContext = context.applicationContext
+            updateWidget(appContext, DateOnlyDotCalWidget(), DateOnlyDotCalWidget::class.java, LegacyWidgetKind.DateOnly)
+            updateWidget(appContext, CompactMonthDotCalWidget(), CompactMonthDotCalWidget::class.java, LegacyWidgetKind.MonthCompact)
+            updateWidget(appContext, ShiftWideDotCalWidget(), ShiftWideDotCalWidget::class.java, LegacyWidgetKind.ShiftWide)
             updateWidget(appContext, SmallDotCalWidget(), SmallDotCalWidget::class.java, LegacyWidgetKind.Small)
             updateWidget(appContext, MediumDotCalWidget(), MediumDotCalWidget::class.java, LegacyWidgetKind.Medium)
             updateWidget(appContext, LargeDotCalWidget(), LargeDotCalWidget::class.java, LegacyWidgetKind.Large)
@@ -42,6 +45,12 @@ class WidgetUpdateWorker(
             updateWidget(appContext, AgendaListDotCalWidget(), AgendaListDotCalWidget::class.java, LegacyWidgetKind.Agenda)
             updateWidget(appContext, MonthGridDotCalWidget(), MonthGridDotCalWidget::class.java, LegacyWidgetKind.MonthGrid)
             notifyWidgetHosts(appContext)
+        }
+
+        suspend fun updateCompactMonthNow(context: Context) {
+            val appContext = context.applicationContext
+            updateWidget(appContext, CompactMonthDotCalWidget(), CompactMonthDotCalWidget::class.java, LegacyWidgetKind.MonthCompact)
+            notifyWidgetHost(appContext, CompactMonthDotCalWidgetReceiver::class.java)
         }
 
         private suspend fun updateWidget(
@@ -57,8 +66,10 @@ class WidgetUpdateWorker(
         }
 
         private fun notifyWidgetHosts(context: Context) {
-            val appWidgetManager = AppWidgetManager.getInstance(context)
             listOf(
+                DateOnlyDotCalWidgetReceiver::class.java,
+                CompactMonthDotCalWidgetReceiver::class.java,
+                ShiftWideWidgetReceiver::class.java,
                 SmallDotCalWidgetReceiver::class.java,
                 MediumDotCalWidgetReceiver::class.java,
                 LargeDotCalWidgetReceiver::class.java,
@@ -66,15 +77,20 @@ class WidgetUpdateWorker(
                 AgendaListWidgetReceiver::class.java,
                 MonthGridWidgetReceiver::class.java,
             ).forEach { receiverClass ->
-                val provider = ComponentName(context, receiverClass)
-                val ids = appWidgetManager.getAppWidgetIds(provider)
-                if (ids.isNotEmpty()) {
-                    context.sendBroadcast(
-                        Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE)
-                            .setComponent(provider)
-                            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids),
-                    )
-                }
+                notifyWidgetHost(context, receiverClass)
+            }
+        }
+
+        private fun notifyWidgetHost(context: Context, receiverClass: Class<*>) {
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val provider = ComponentName(context, receiverClass)
+            val ids = appWidgetManager.getAppWidgetIds(provider)
+            if (ids.isNotEmpty()) {
+                context.sendBroadcast(
+                    Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE)
+                        .setComponent(provider)
+                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids),
+                )
             }
         }
     }

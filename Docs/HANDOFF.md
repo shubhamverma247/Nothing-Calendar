@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-08-22
+Updated: 2026-08-25
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 `Docs/HANDOFF.original.md`. Do not touch `Docs/HANDOFF - Copy.md` or user-owned
@@ -11,8 +11,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Branch: `main`.
 - All work happens on `main`. Do not create or switch branches.
 - Do not commit or push unless the user explicitly asks.
-- Latest pushed commit before this handoff cleanup: `a899faf chore(release): bump version code to 34`.
-- Local release target after this cleanup: `versionCode 35`, `versionName 1.3.1`.
+- Latest pushed commit before current local widget work: `2b61b79 feat(widgets): start unified widget configuration`.
+- Local release target: `versionCode 35`, `versionName 1.3.1`.
 - Expected untracked user file: `Docs/FEEDBACK.md`; leave it untouched.
 
 ## Hard Rules
@@ -126,16 +126,52 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     Actions.
   - Existing widget receivers/classes are preserved for backward compatibility; placed widgets
     migrate legacy per-widget calendar state into `KEY_WIDGET_INSTANCE_CONFIG`.
-  - Widget config screen now saves category, time range, layout, and calendar filter per widget.
+  - Widget config model exists for migration/defaults, but widget picker providers no longer launch
+    `WidgetConfigActivity`; all `android:configure` entries were removed from widget provider XML
+    after user review.
   - Added basic config-aware rendering for Today, Tasks, Quick Actions, Schedule, Calendar, and
     Countdown categories.
   - Added Next 14 Days as a widget time range and kept core large widget rendering Free.
   - Added pure responsive size-classifier foundation for later Glance size-aware rendering.
+  - Polished real 14-day Schedule presentation:
+    - `2x2` stays single-event density.
+    - `4x2` now uses one dominant event plus compact upcoming rows.
+    - `4x4` Schedule has a dedicated `SCHEDULE / NEXT 14 DAYS` agenda renderer with capped rows
+      and `+X MORE`.
+  - Month-grid `4x4` calendar agenda is capped short so the calendar grid remains readable.
+  - Added Quick Actions deep links and config options for Quick Add, Add Task, and Search:
+    - `dotcal://quick-add`
+    - `dotcal://task/new`
+    - `dotcal://search`
+  - Heavy preview/dropdown widget config UI was removed after phone/user review, and add-widget now
+    skips the configuration screen entirely.
+  - Widget picker now has purpose-specific labels/descriptions instead of generic `Configurable`:
+    - `DC 1x1 Date`: date tile.
+    - `DC 2x2 Event`: today, next event, countdown, tasks, or quick action.
+    - `DC 4x2 Agenda`: wide agenda/today/tasks/countdown/action.
+    - `DC 4x4 Month`: month grid/schedule/today/tasks/countdown/action.
+    - Existing legacy picker entries are restored, so picker count is 7 total with 1x1:
+      `DC Count`, `DC Agenda`, and `DC Month`.
+  - Added picker entry:
+    - `DateOnlyDotCalWidgetReceiver` / `DateOnlyDotCalWidget`, provider `@xml/dotcal_widget_date_only`.
+  - Removed dedicated `DC 14 Day` picker entry/provider per user request.
+  - Fixed 2x2 Month chevron month navigation:
+    - Root cause: label/grid rendered from `data` captured in `provideGlance`, so glance-state
+      offset changes recomposed palette but not the visible month until a full reload.
+    - Fix: compact month derives `monthLabel`/`days` in composition from
+      `currentDotCalWidgetSettings().monthOffset`; grid is drawn as a bitmap; header uses a
+      non-overlapping Row; offset clamped to ±12 months (saturates silently at the limits).
   - Verification so far:
     `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest --tests com.dotfield.dotcal.widget.WidgetInstanceConfigTest --tests com.dotfield.dotcal.widget.WidgetResponsiveSizeTest`
     passed, and
     `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug`
     passed.
+  - Latest widget verification:
+    `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest --tests com.dotfield.dotcal.widget.WidgetInstanceConfigTest :app:assembleDebug`
+    passed.
+    `git diff --check` passed with CRLF warnings only.
+  - Latest local install succeeded on device `4ab0d020`:
+    `C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk`.
 
 ## Verification Baseline
 
@@ -161,6 +197,23 @@ local app data.
 
 After next debug install, prioritize:
 
+- Open phone widget picker.
+  - Expected: 7 entries visible: `DC 1x1 Date`, `DC 2x2 Event`, `DC 4x2 Agenda`,
+    `DC 4x4 Month`, `DC Count`, `DC Agenda`, and `DC Month`.
+- Add `DC 1x1 Date`.
+  - Expected: compact date tile; no generic configurable label.
+- Add any widget.
+  - Expected: no widget configuration screen opens; widget is placed directly.
+- Add `2x2` Schedule widget.
+  - Expected: one strongest upcoming event only; no cramped list.
+- Add `4x2` Schedule widget with `Next 14 Days`.
+  - Expected: date badge at left; first event dominant; up to two compact rows; no clipping.
+- Add `4x4` Schedule widget with `Next 14 Days`.
+  - Expected: `SCHEDULE / NEXT 14 DAYS` header; up to four rows; `+X MORE` when needed.
+- Add `4x4` Calendar widget.
+  - Expected: month grid readable; short agenda only; no overflow below grid.
+- Configure Quick Actions for Quick Add, Add Task, and Search.
+  - Expected: each tap opens the matching app screen, not a fallback calendar screen.
 - DotCal reminder -> Google reminder.
 - Google reminder -> DotCal reminder.
 - DotCal delete one recurring occurrence -> Google hides that occurrence.

@@ -316,6 +316,9 @@ fun DotCalApp(
     initialCalendarDate: String? = null,
     initialAddEvent: Boolean = false,
     initialAddEventDate: String? = null,
+    initialQuickAdd: Boolean = false,
+    initialAddTask: Boolean = false,
+    initialSearch: Boolean = false,
     initialPaywall: Boolean = false,
     initialTasksTab: Boolean = false,
     initialRouteToken: Long? = null,
@@ -403,7 +406,17 @@ fun DotCalApp(
     var routePending by remember(initialRouteToken) {
         mutableStateOf(
             initialRouteToken != null &&
-                (initialEventId != null || !initialTaskId.isNullOrBlank() || initialAddEvent || initialCalendarDate != null || initialPaywall || initialTasksTab),
+                (
+                    initialEventId != null ||
+                        !initialTaskId.isNullOrBlank() ||
+                        initialAddEvent ||
+                        initialQuickAdd ||
+                        initialAddTask ||
+                        initialSearch ||
+                        initialCalendarDate != null ||
+                        initialPaywall ||
+                        initialTasksTab
+                    ),
         )
     }
     var isSyncing by remember { mutableStateOf(false) }
@@ -687,6 +700,21 @@ fun DotCalApp(
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
         )
     }
+    var onboardingPageIndex by remember { mutableStateOf(0) }
+    fun finishOnboarding() {
+        scope.launch {
+            context.calendarPreferencesDataStore.edit { preferences ->
+                preferences[CalendarPreferences.KEY_ONBOARDING_DONE] = true
+            }
+        }
+    }
+    fun advanceOnboarding() {
+        if (onboardingPageIndex < onboardingPages.lastIndex) {
+            onboardingPageIndex += 1
+        } else {
+            finishOnboarding()
+        }
+    }
     var calendarPermissionRequested by remember { mutableStateOf(false) }
     var pendingAddAccountAfterPermission by remember { mutableStateOf(false) }
     fun launchGoogleAddAccount() {
@@ -746,17 +774,19 @@ fun DotCalApp(
         hasCalendarPermission = grants[Manifest.permission.READ_CALENDAR] == true ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
         if (hasCalendarPermission) viewModel.syncNow()
+        advanceOnboarding()
     }
     val onboardingNotificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasNotificationPermission = granted ||
             Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        advanceOnboarding()
     }
     val onboardingContactsPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasContactsPermission = granted ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+        advanceOnboarding()
     }
-    var onboardingPageIndex by remember { mutableStateOf(0) }
     var selectedDateRestored by remember { mutableStateOf(false) }
 
     fun openIcsPreview(icsText: String, errorMessage: String) {
@@ -1044,6 +1074,39 @@ fun DotCalApp(
             routePending = false
         }
     }
+    LaunchedEffect(initialRouteToken, initialQuickAdd) {
+        if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialQuickAdd) {
+            viewModel.closeEventDetail()
+            taskDetail = null
+            settingsScreen = SettingsScreen.Root
+            showQuickAdd = true
+            handledRouteToken = initialRouteToken
+            routePending = false
+        }
+    }
+    LaunchedEffect(initialRouteToken, initialAddTask) {
+        if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialAddTask) {
+            viewModel.closeEventDetail()
+            taskDetail = null
+            editingTask = null
+            settingsScreen = SettingsScreen.Root
+            previousScreenTab = ScreenTab.Calendar
+            screenTab = ScreenTab.Tasks
+            showTaskEditor = true
+            handledRouteToken = initialRouteToken
+            routePending = false
+        }
+    }
+    LaunchedEffect(initialRouteToken, initialSearch) {
+        if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialSearch) {
+            viewModel.closeEventDetail()
+            taskDetail = null
+            settingsScreen = SettingsScreen.Root
+            showSearch = true
+            handledRouteToken = initialRouteToken
+            routePending = false
+        }
+    }
     LaunchedEffect(initialRouteToken, initialPaywall) {
         if (initialRouteToken != null && handledRouteToken != initialRouteToken && initialPaywall) {
             viewModel.closeEventDetail()
@@ -1271,20 +1334,6 @@ fun DotCalApp(
     }
     val onboardingPreferenceLoaded = onboardingDone != null
     val showOnboarding = onboardingDone == false && initialRouteToken == null
-    fun finishOnboarding() {
-        scope.launch {
-            context.calendarPreferencesDataStore.edit { preferences ->
-                preferences[CalendarPreferences.KEY_ONBOARDING_DONE] = true
-            }
-        }
-    }
-    fun advanceOnboarding() {
-        if (onboardingPageIndex < onboardingPages.lastIndex) {
-            onboardingPageIndex += 1
-        } else {
-            finishOnboarding()
-        }
-    }
     fun requestCurrentOnboardingPermission() {
         when (onboardingPages[onboardingPageIndex]) {
             OnboardingPage.CalendarPermission -> {

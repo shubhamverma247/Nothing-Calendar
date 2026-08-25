@@ -1,14 +1,23 @@
 <resources>
     <string name="app_name">DotCal</string>
-    <string name="widget_small_description">Next Event</string>
-    <string name="widget_medium_description">Event Details</string>
-    <string name="widget_large_description">Calendar Dashboard</string>
-    <string name="widget_countdown_label">DotCal Countdown</string>
-    <string name="widget_countdown_description">Event Countdown</string>
-    <string name="widget_agenda_label">DotCal Agenda</string>
-    <string name="widget_agenda_description">Agenda List</string>
-    <string name="widget_month_grid_label">DotCal Month Grid</string>
-    <string name="widget_month_grid_description">Month Grid</string>
+    <string name="widget_small_label">DC 2x2 Event</string>
+    <string name="widget_small_description">Today, next event, countdown, tasks, or quick action</string>
+    <string name="widget_medium_label">DC 4x2 Agenda</string>
+    <string name="widget_medium_description">Wide agenda, today, tasks, countdown, or quick action</string>
+    <string name="widget_large_label">DC 4x4 Month</string>
+    <string name="widget_large_description">Month grid, schedule, today, tasks, countdown, or action</string>
+    <string name="widget_date_only_label">DC 1x1 Date</string>
+    <string name="widget_date_only_description">Date tile or quick action</string>
+    <string name="widget_month_compact_label">DC 2x2 Month</string>
+    <string name="widget_month_compact_description">Compact month grid</string>
+    <string name="widget_shift_wide_label">DC 4x1 Shift</string>
+    <string name="widget_shift_wide_description">Upcoming shifts</string>
+    <string name="widget_countdown_label">DC Count</string>
+    <string name="widget_countdown_description">Countdown</string>
+    <string name="widget_agenda_label">DC Agenda</string>
+    <string name="widget_agenda_description">Legacy list</string>
+    <string name="widget_month_grid_label">DC Month</string>
+    <string name="widget_month_grid_description">Legacy grid</string>
     <string name="glyph_toy_name">DotCal</string>
     <string name="glyph_toy_summary">Shows a live countdown to your next DotCal event.</string>
 

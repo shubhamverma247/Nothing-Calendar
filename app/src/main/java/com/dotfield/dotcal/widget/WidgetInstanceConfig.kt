@@ -10,6 +10,7 @@ enum class WidgetCategory {
     Today,
     Tasks,
     Countdown,
+    Shift,
     QuickActions,
 }
 
@@ -23,6 +24,7 @@ enum class WidgetViewType {
     Today,
     TaskList,
     Countdown,
+    ShiftList,
     QuickAction,
 }
 
@@ -57,6 +59,9 @@ enum class WidgetTapAction {
 }
 
 enum class LegacyWidgetKind {
+    DateOnly,
+    MonthCompact,
+    ShiftWide,
     Small,
     Medium,
     Large,
@@ -84,6 +89,8 @@ data class WidgetCalendarFilter(
 )
 
 data class WidgetAppearanceConfig(
+    val themeMode: String? = null,
+    val accentColor: String? = null,
     val transparent: Boolean? = null,
     val opacityPercent: Int? = null,
     val showDotTexture: Boolean? = null,
@@ -147,6 +154,30 @@ data class WidgetInstanceConfig(
         fun legacyDefault(kind: LegacyWidgetKind, accountId: String? = null): WidgetInstanceConfig {
             val filter = WidgetCalendarFilter(accountId)
             return when (kind) {
+                LegacyWidgetKind.DateOnly -> WidgetInstanceConfig(
+                    category = WidgetCategory.Today,
+                    viewType = WidgetViewType.Today,
+                    calendarFilter = filter,
+                    timeRange = WidgetTimeRange.Today,
+                    layoutMode = WidgetLayoutMode.Minimal,
+                    interaction = WidgetInteractionConfig(WidgetTapAction.OpenToday),
+                )
+                LegacyWidgetKind.MonthCompact -> WidgetInstanceConfig(
+                    category = WidgetCategory.Calendar,
+                    viewType = WidgetViewType.Month,
+                    calendarFilter = filter,
+                    timeRange = WidgetTimeRange.Next7Days,
+                    layoutMode = WidgetLayoutMode.Minimal,
+                    interaction = WidgetInteractionConfig(WidgetTapAction.OpenCalendar),
+                )
+                LegacyWidgetKind.ShiftWide -> WidgetInstanceConfig(
+                    category = WidgetCategory.Shift,
+                    viewType = WidgetViewType.ShiftList,
+                    calendarFilter = filter,
+                    timeRange = WidgetTimeRange.Next7Days,
+                    layoutMode = WidgetLayoutMode.Compact,
+                    interaction = WidgetInteractionConfig(WidgetTapAction.OpenAgenda),
+                )
                 LegacyWidgetKind.Small -> WidgetInstanceConfig(
                     category = WidgetCategory.Schedule,
                     viewType = WidgetViewType.NextEvent,
@@ -195,6 +226,13 @@ internal fun WidgetInstanceConfig.maxVisibleItems(defaultMax: Int): Int {
         WidgetLayoutMode.Minimal -> 1
         WidgetLayoutMode.Compact -> densityMax
         WidgetLayoutMode.Detailed -> densityMax + 1
+    }.let { max ->
+        when {
+            defaultMax <= 1 -> 1
+            category == WidgetCategory.Calendar -> max.coerceAtMost(2)
+            category == WidgetCategory.Shift -> max.coerceAtMost(2)
+            else -> max
+        }
     }.coerceIn(1, 8)
 }
 
@@ -216,6 +254,8 @@ private fun WidgetContentOptions.entries(): List<Pair<String, String>> {
 
 private fun WidgetAppearanceConfig.entries(): List<Pair<String, String>> {
     return listOf(
+        "appearance.themeMode" to themeMode.orEmpty(),
+        "appearance.accentColor" to accentColor.orEmpty(),
         "appearance.transparent" to transparent?.toString().orEmpty(),
         "appearance.opacityPercent" to opacityPercent?.toString().orEmpty(),
         "appearance.showDotTexture" to showDotTexture?.toString().orEmpty(),
@@ -240,6 +280,8 @@ private fun Map<String, String>.decodeContent(fallback: WidgetContentOptions): W
 
 private fun Map<String, String>.decodeAppearance(fallback: WidgetAppearanceConfig): WidgetAppearanceConfig {
     return WidgetAppearanceConfig(
+        themeMode = this["appearance.themeMode"]?.takeIf(String::isNotBlank) ?: fallback.themeMode,
+        accentColor = this["appearance.accentColor"]?.takeIf(String::isNotBlank) ?: fallback.accentColor,
         transparent = nullableBoolean("appearance.transparent") ?: fallback.transparent,
         opacityPercent = this["appearance.opacityPercent"]?.toIntOrNull()?.coerceIn(0, 100) ?: fallback.opacityPercent,
         showDotTexture = nullableBoolean("appearance.showDotTexture") ?: fallback.showDotTexture,

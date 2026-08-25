@@ -38,6 +38,7 @@ data class DotCalWidgetSettings(
     val opacityPercent: Int = 35,
     val showDotTexture: Boolean = true,
     val accountId: String? = null,
+    val monthOffset: Int = 0,
     val instanceConfig: WidgetInstanceConfig = WidgetInstanceConfig.legacyDefault(LegacyWidgetKind.Medium),
 )
 
@@ -57,9 +58,11 @@ suspend fun syncDotCalWidgetState(
 ): DotCalWidgetSettings {
     val settings = readDotCalWidgetSettings(context)
     var accountId: String? = null
+    var monthOffset = 0
     var instanceConfig = WidgetInstanceConfig.legacyDefault(legacyKind)
     updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { preferences ->
         accountId = preferences[CalendarPreferences.KEY_WIDGET_ACCOUNT_ID]
+        monthOffset = preferences[CalendarPreferences.KEY_WIDGET_MONTH_OFFSET] ?: 0
         val fallback = WidgetInstanceConfig.legacyDefault(legacyKind, accountId)
         instanceConfig = WidgetInstanceConfig.decodeOrDefault(
             preferences[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG],
@@ -78,7 +81,7 @@ suspend fun syncDotCalWidgetState(
             this[CalendarPreferences.KEY_WIDGET_DOT_TEXTURE] = settings.showDotTexture
         }
     }
-    return settings.copy(accountId = accountId, instanceConfig = instanceConfig)
+    return settings.copy(accountId = accountId, monthOffset = monthOffset, instanceConfig = instanceConfig)
 }
 
 @Composable
@@ -87,8 +90,8 @@ fun currentDotCalWidgetSettings(): DotCalWidgetSettings {
 }
 
 fun dotCalWidgetPalette(context: Context, settings: DotCalWidgetSettings): DotCalWidgetPalette {
-    val mode = settings.themeMode
-    val accent = widgetAccentColor(settings.accentColor)
+    val mode = settings.instanceConfig.appearance.themeMode ?: settings.themeMode
+    val accent = widgetAccentColor(settings.instanceConfig.appearance.accentColor ?: settings.accentColor)
     val transparent = settings.instanceConfig.appearance.transparent ?: settings.transparent
     val opacity = (settings.instanceConfig.appearance.opacityPercent ?: settings.opacityPercent).coerceIn(0, 100) / 100f
     val showDotTexture = settings.instanceConfig.appearance.showDotTexture ?: settings.showDotTexture
@@ -172,6 +175,7 @@ private fun Preferences.toDotCalWidgetSettings(): DotCalWidgetSettings {
         opacityPercent = (this[CalendarPreferences.KEY_WIDGET_OPACITY_PERCENT] ?: if (transparent) 0 else 35).coerceIn(0, 100),
         showDotTexture = this[CalendarPreferences.KEY_WIDGET_DOT_TEXTURE] ?: true,
         accountId = accountId,
+        monthOffset = this[CalendarPreferences.KEY_WIDGET_MONTH_OFFSET] ?: 0,
         instanceConfig = WidgetInstanceConfig.decodeOrDefault(
             this[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG],
             fallback,

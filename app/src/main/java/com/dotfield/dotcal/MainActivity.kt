@@ -120,6 +120,9 @@ class MainActivity : ComponentActivity() {
                     initialCalendarDate = target?.calendarDate,
                     initialAddEvent = target?.addEvent == true,
                     initialAddEventDate = target?.addEventDate,
+                    initialQuickAdd = target?.quickAdd == true,
+                    initialAddTask = target?.addTask == true,
+                    initialSearch = target?.search == true,
                     initialPaywall = target?.paywall == true,
                     initialTasksTab = target?.tasksTab == true,
                     initialRouteToken = target?.routeToken,
@@ -178,8 +181,14 @@ class MainActivity : ComponentActivity() {
             )
             uri.scheme == "dotcal" && uri.host == "event" -> DotCalDeepLinkTarget(eventId = uri.lastPathSegment, routeToken = token)
             uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "event" -> DotCalDeepLinkTarget(eventId = uri.pathSegments.getOrNull(1), routeToken = token)
+            uri.scheme == "dotcal" && uri.host == "quick-add" -> DotCalDeepLinkTarget(quickAdd = true, routeToken = token)
+            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "quick-add" -> DotCalDeepLinkTarget(quickAdd = true, routeToken = token)
+            uri.scheme == "dotcal" && uri.host == "task" && uri.lastPathSegment == "new" -> DotCalDeepLinkTarget(addTask = true, routeToken = token)
+            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "task" && uri.pathSegments.getOrNull(1) == "new" -> DotCalDeepLinkTarget(addTask = true, routeToken = token)
             uri.scheme == "dotcal" && uri.host == "task" -> DotCalDeepLinkTarget(taskId = uri.lastPathSegment, routeToken = token)
             uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "task" -> DotCalDeepLinkTarget(taskId = uri.pathSegments.getOrNull(1), routeToken = token)
+            uri.scheme == "dotcal" && uri.host == "search" -> DotCalDeepLinkTarget(search = true, routeToken = token)
+            uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "search" -> DotCalDeepLinkTarget(search = true, routeToken = token)
             uri.scheme == "dotcal" && uri.host == "tasks" -> DotCalDeepLinkTarget(tasksTab = true, routeToken = token)
             uri.scheme == "dotcal" && uri.pathSegments.firstOrNull() == "tasks" -> DotCalDeepLinkTarget(tasksTab = true, routeToken = token)
             uri.scheme == "dotcal" && uri.host == "paywall" -> DotCalDeepLinkTarget(paywall = true, routeToken = token)
@@ -198,6 +207,9 @@ private data class DotCalDeepLinkTarget(
     val calendarDate: String? = null,
     val addEvent: Boolean = false,
     val addEventDate: String? = null,
+    val quickAdd: Boolean = false,
+    val addTask: Boolean = false,
+    val search: Boolean = false,
     val paywall: Boolean = false,
     val tasksTab: Boolean = false,
     val routeToken: Long,

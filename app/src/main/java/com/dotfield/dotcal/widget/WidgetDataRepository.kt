@@ -60,19 +60,31 @@ class WidgetDataRepository(
     suspend fun load(
         config: WidgetInstanceConfig,
         defaultMaxItems: Int,
+        monthOffset: Int = 0,
         nowMs: Long = System.currentTimeMillis(),
     ): WidgetCalendarData = withContext(Dispatchers.IO) {
         val zoneId = ZoneId.systemDefault()
         val now = Instant.ofEpochMilli(nowMs).atZone(zoneId)
         val today = now.toLocalDate()
-        val rangeEnd = today.plusDays(config.effectiveRangeDays())
+        val displayMonthDate = today.plusMonths(monthOffset.toLong())
+        val displayMonth = YearMonth.from(displayMonthDate)
+        val displayMonthStart = displayMonth.atDay(1)
+        val displayMonthEndExclusive = displayMonth.atEndOfMonth().plusDays(1)
+        val rangeStart = minOf(today, displayMonthStart)
+        val rangeEnd = maxOf(today.plusDays(config.effectiveRangeDays()), displayMonthEndExclusive)
         val privateIds = privacyManager.observePrivateVaultIds().first()
         val accountId = config.calendarFilter.accountId
-        val visibleItems = dao.getVisibleEventsForWidget(today.atStartMs(zoneId), rangeEnd.atStartMs(zoneId), accountId)
+        val shiftEventIds = if (config.category == WidgetCategory.Shift) {
+            sideStore.readNamespace(SHIFT_EVENT_METADATA_NAMESPACE).keys
+        } else {
+            emptySet()
+        }
+        val visibleItems = dao.getVisibleEventsForWidget(rangeStart.atStartMs(zoneId), rangeEnd.atStartMs(zoneId), accountId)
             .filterNot { it.id.substringBefore(RECURRENCE_SEPARATOR) in privateIds }
-            .expandRecurring(today, rangeEnd)
+            .expandRecurring(rangeStart, rangeEnd)
             .filter { it.endTimeMs >= nowMs }
             .filter { config.content.showAllDayEvents || it.isAllDay == 0 }
+            .filter { config.category != WidgetCategory.Shift || it.id.substringBefore(RECURRENCE_SEPARATOR) in shiftEventIds }
             .sortedForWidget(zoneId)
         val use24Hour = DateFormat.is24HourFormat(context)
         val items = visibleItems.asWidgetItems(zoneId, use24Hour, nowMs)
@@ -95,7 +107,7 @@ class WidgetDataRepository(
         val remainingEventsToday = visibleItems.count { it.startTimeMs < todayEndMs && it.endTimeMs >= nowMs }
         WidgetCalendarData(
             header = today.format(DateTimeFormatter.ofPattern("EEE, MMM d")),
-            monthLabel = today.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+            monthLabel = displayMonthDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
             todayLabel = today.dayOfMonth.toString(),
             nextEvent = displayItems.firstOrNull(),
             events = displayItems.take(maxItems),
@@ -103,13 +115,14 @@ class WidgetDataRepository(
             todayEventCount = visibleItems.count { it.startTimeMs < todayEndMs },
             remainingEventCount = remainingEventsToday,
             moreItemCount = (displayItems.size - maxItems).coerceAtLeast(0),
-            days = if (config.category == WidgetCategory.Calendar) monthDays(today, visibleItems, zoneId) else emptyList(),
+            days = if (config.category == WidgetCategory.Calendar) monthDays(displayMonthDate, today, visibleItems, zoneId) else emptyList(),
         )
     }
 
     private fun WidgetInstanceConfig.effectiveRangeDays(): Long {
         return when {
             category == WidgetCategory.Calendar && viewType == WidgetViewType.Month -> WIDGET_RANGE_DAYS
+            category == WidgetCategory.Shift -> WidgetTimeRange.Next14Days.days
             else -> timeRange.days
         }
     }
@@ -266,18 +279,18 @@ class WidgetDataRepository(
         return exceptionDates.removePrefix("[").removeSuffix("]").split(',').mapNotNull { it.trim().toLongOrNull() }.toSet()
     }
 
-    private fun monthDays(today: LocalDate, events: List<CalendarEvent>, zoneId: ZoneId): List<WidgetCalendarDay> {
-        val month = YearMonth.from(today)
+    private fun monthDays(displayMonthDate: LocalDate, today: LocalDate, events: List<CalendarEvent>, zoneId: ZoneId): List<WidgetCalendarDay> {
+        val month = YearMonth.from(displayMonthDate)
         val monthStart = month.atDay(1)
         val leadingBlanks = monthStart.dayOfWeek.value % 7
         val eventDays = events
-            .filter { Instant.ofEpochMilli(it.startTimeMs).atZone(zoneId).month == today.month }
+            .filter { YearMonth.from(Instant.ofEpochMilli(it.startTimeMs).atZone(zoneId)) == month }
             .map { Instant.ofEpochMilli(it.startTimeMs).atZone(zoneId).dayOfMonth }
             .toSet()
         val days = MutableList(leadingBlanks) { WidgetCalendarDay(dayOfMonth = null) }
         days += (1..month.lengthOfMonth()).map { day ->
             val date = month.atDay(day)
-            WidgetCalendarDay(dayOfMonth = day, dateIso = date.toString(), isToday = day == today.dayOfMonth, hasEvents = day in eventDays)
+            WidgetCalendarDay(dayOfMonth = day, dateIso = date.toString(), isToday = date == today, hasEvents = day in eventDays)
         }
         while (days.size % 7 != 0) days += WidgetCalendarDay(dayOfMonth = null)
         return days
@@ -288,6 +301,7 @@ class WidgetDataRepository(
     companion object {
         private const val WIDGET_RANGE_DAYS = 45L
         private const val RECURRENCE_SEPARATOR = "::occurrence::"
+        private const val SHIFT_EVENT_METADATA_NAMESPACE = "shift_event_metadata"
 
         fun create(context: Context): WidgetDataRepository {
             return WidgetDataRepository(context.applicationContext, DotCalDatabase.create(context).calendarDao())
