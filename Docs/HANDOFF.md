@@ -45,6 +45,13 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Pro entitlement: `KEY_IS_PRO`.
 - Paywall route: `dotcal://paywall`.
 
+## Current Priorities
+
+- 1. Fix provider-backed custom event colors so new CalDav/Google events do not fall back to red.
+- 2. Verify Week/Day event tap behavior on device; detail open should work consistently outside Agenda.
+- 3. Track the whole-day one-day-early report as the next sync/timezone bug to reproduce with device and timezone details.
+- 4. Add a faster edit action in the event detail flow if it fits the current UI pattern.
+
 ## Billing Products
 
 - Lifetime Pro: `dotcal_pro` as `INAPP` one-time product.
