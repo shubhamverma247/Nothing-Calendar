@@ -238,6 +238,7 @@ import com.dotfield.dotcal.prefs.AppLanguage
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
+import com.dotfield.dotcal.widget.WidgetManagerActivity
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import java.time.DayOfWeek
 import java.time.Instant
@@ -977,6 +978,33 @@ private fun WidgetSettings(
     ) {
         item {
             SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_widgets))
+        }
+        item {
+            SettingsPanel(title = stringResource(R.string.settings_panel_customize_widgets), palette = palette, framed = false) {
+                val context = LocalContext.current
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { WidgetManagerActivity.start(context) }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.settings_panel_customize_widgets_row),
+                            color = palette.primaryText,
+                            fontSize = 16.sp,
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            stringResource(R.string.settings_panel_customize_widgets_subtitle),
+                            color = palette.secondaryText,
+                            fontSize = 13.sp,
+                        )
+                    }
+                    Text("›", color = palette.secondaryText, fontSize = 22.sp)
+                }
+            }
         }
         item {
             SettingsPanel(title = stringResource(R.string.settings_panel_widget_style), palette = palette, framed = false) {

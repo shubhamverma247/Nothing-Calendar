@@ -182,7 +182,7 @@ data class WidgetInstanceConfig(
                     category = WidgetCategory.Schedule,
                     viewType = WidgetViewType.NextEvent,
                     calendarFilter = filter,
-                    timeRange = WidgetTimeRange.Next7Days,
+                    timeRange = WidgetTimeRange.Next3Days,
                     layoutMode = WidgetLayoutMode.Minimal,
                     interaction = WidgetInteractionConfig(WidgetTapAction.CreateEvent),
                 )

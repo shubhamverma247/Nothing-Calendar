@@ -1144,7 +1144,139 @@
         <item quantity="other">%1$d days before start date</item>
     </plurals>
     <plurals name="calc_days_after_start">
-        <item quantity="one">%1$d day after start date</item>
+        <item quantity="one">%1$d day before start date</item>
         <item quantity="other">%1$d days after start date</item>
     </plurals>
+
+    <!-- Widget manager + per-widget config editor -->
+    <string name="settings_panel_customize_widgets">Customize Widgets</string>
+    <string name="settings_panel_customize_widgets_row">Customize placed widgets</string>
+    <string name="settings_panel_customize_widgets_subtitle">Choose content, range and actions per widget</string>
+    <string name="widget_manager_back">&lt; Back</string>
+    <string name="widget_manager_title">Your Widgets</string>
+    <string name="widget_manager_subtitle">Tap a widget to customize what it shows.</string>
+    <string name="widget_manager_empty_title">No widgets yet</string>
+    <string name="widget_manager_empty_body">Add a DotCal widget from your home screen, then customize it here.</string>
+    <string name="widget_config_title">Customize Widget</string>
+    <string name="widget_config_cancel">Cancel</string>
+    <string name="widget_config_save">Save</string>
+    <string name="widget_config_section_type">Widget type</string>
+    <string name="widget_config_section_content">Content</string>
+    <string name="widget_config_section_style">Style &amp; actions</string>
+    <string name="widget_config_badge_pro">PRO</string>
+    <string name="widget_config_selected">SELECTED</string>
+    <string name="widget_config_type_fixed">%1$s · Fixed content</string>
+    <string name="widget_config_reset">Reset</string>
+
+    <!-- Widget editor: sections, preview -->
+    <string name="widget_config_section_preview">Preview</string>
+    <string name="widget_preview_sample_date">Tue 26</string>
+
+    <!-- Widget editor: content rows -->
+    <string name="widget_row_time_range">Time range</string>
+    <string name="widget_row_calendar">Calendar</string>
+    <string name="widget_row_display">Display</string>
+    <string name="widget_row_density">Density</string>
+    <string name="widget_row_appearance">Appearance</string>
+    <string name="widget_row_advanced">Advanced</string>
+    <string name="widget_row_tap_action">Tap action</string>
+
+    <!-- Widget editor: time ranges -->
+    <string name="widget_range_today">Today</string>
+    <string name="widget_range_3days">Next 3 days</string>
+    <string name="widget_range_7days">Next 7 days</string>
+    <string name="widget_range_14days">Next 14 days</string>
+    <string name="widget_range_24h">Next 24 hours</string>
+    <string name="widget_range_short_3">3 days</string>
+    <string name="widget_range_short_7">7 days</string>
+    <string name="widget_range_short_14">14 days</string>
+
+    <!-- Widget editor: calendar filter sheet -->
+    <string name="widget_calendar_all">All Calendars</string>
+    <string name="widget_calendar_all_subtitle">Use visible calendars</string>
+    <string name="widget_calendar_pro_hint">Included in DotCal Pro</string>
+
+    <!-- Widget editor: display toggles -->
+    <string name="widget_display_show_time">Show time</string>
+    <string name="widget_display_show_location">Show location</string>
+    <string name="widget_display_colorize">Colorize titles</string>
+    <string name="widget_display_colorize_sub">Event titles use calendar colors</string>
+    <string name="widget_display_show_titles">Show event titles</string>
+    <string name="widget_display_allday">Show all-day events</string>
+    <string name="widget_display_tasks">Show tasks</string>
+    <string name="widget_display_completed">Show completed tasks</string>
+    <string name="widget_display_today_highlight">Highlight today</string>
+    <string name="widget_display_week_numbers">Show week numbers</string>
+
+    <!-- Widget editor: density -->
+    <string name="widget_density_low">Low</string>
+    <string name="widget_density_medium">Medium</string>
+    <string name="widget_density_high">High</string>
+
+    <!-- Widget editor: appearance -->
+    <string name="widget_appearance_follow_theme">Follow app theme</string>
+    <string name="widget_appearance_light">Light</string>
+    <string name="widget_appearance_dark">Dark</string>
+    <string name="widget_section_accent">Accent color</string>
+    <string name="widget_accent_follow">Follow app</string>
+    <string name="widget_accent_red">Red</string>
+    <string name="widget_accent_blue">Blue</string>
+    <string name="widget_accent_green">Green</string>
+    <string name="widget_accent_purple">Purple</string>
+    <string name="widget_accent_amber">Amber</string>
+    <string name="widget_accent_teal">Teal</string>
+    <string name="widget_accent_pink">Pink</string>
+    <string name="widget_accent_orange">Orange</string>
+    <string name="widget_accent_cyan">Cyan</string>
+    <string name="widget_accent_custom">Custom color</string>
+    <string name="widget_accent_custom_hint">#RRGGBB</string>
+    <string name="widget_accent_picker_title">Custom accent color</string>
+
+    <!-- Widget editor: advanced -->
+    <string name="widget_section_layout">Layout</string>
+    <string name="widget_layout_minimal">Minimal · single item</string>
+    <string name="widget_layout_compact">Compact</string>
+    <string name="widget_layout_detailed">Detailed</string>
+    <string name="widget_section_background">Background</string>
+    <string name="widget_background_follow">Follow app</string>
+    <string name="widget_background_solid">Solid</string>
+    <string name="widget_background_transparent">Transparent</string>
+    <string name="widget_opacity_label">Opacity %1$d%%</string>
+    <string name="widget_summary_percent">%1$d%%</string>
+    <string name="widget_section_texture">Dot texture</string>
+    <string name="widget_texture_on">On</string>
+    <string name="widget_texture_off">Off</string>
+
+    <!-- Widget editor: tap actions -->
+    <string name="widget_tap_open_calendar">Open calendar</string>
+    <string name="widget_tap_open_today">Open today</string>
+    <string name="widget_tap_open_agenda">Open agenda</string>
+    <string name="widget_tap_quick_add">Quick add</string>
+    <string name="widget_tap_new_event">New event</string>
+    <string name="widget_tap_new_task">New task</string>
+    <string name="widget_tap_search">Search</string>
+
+    <!-- Widget editor: summaries -->
+    <string name="widget_summary_app_theme">App theme</string>
+    <string name="widget_summary_default">Default</string>
+    <string name="widget_summary_custom">Custom</string>
+    <string name="widget_summary_basic">Basic</string>
+    <string name="widget_summary_time">Time</string>
+    <string name="widget_summary_location">Location</string>
+
+    <!-- Widget categories + subtitles -->
+    <string name="widget_cat_month">Month calendar</string>
+    <string name="widget_cat_schedule">Upcoming events</string>
+    <string name="widget_cat_today">Today</string>
+    <string name="widget_cat_tasks">Tasks</string>
+    <string name="widget_cat_countdown">Countdown</string>
+    <string name="widget_cat_shift">Shifts</string>
+    <string name="widget_cat_quick_actions">Quick actions</string>
+    <string name="widget_sub_month">Month grid</string>
+    <string name="widget_sub_schedule">Upcoming list</string>
+    <string name="widget_sub_today">Day summary</string>
+    <string name="widget_sub_tasks">Task list</string>
+    <string name="widget_sub_countdown">D-Day timer</string>
+    <string name="widget_sub_shift">Shift roster</string>
+    <string name="widget_sub_quick">Shortcut buttons</string>
 </resources>
