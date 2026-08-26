@@ -911,5 +911,22 @@
     <string name="settings_reset">Reset</string>
     <string name="settings_calendar_menu">Calendar menu</string>
     <string name="settings_calendar_menu_visible_count">%1$d/%2$d visible</string>
-    <string name="settings_panel_calendar_menu">Visible menu actions</string>
+    <string name="settings_panel_calendar_menu">Visible menu actions</string>    <!-- Widget manager + per-widget config editor -->
+<string name="settings_panel_customize_widgets">Widget\'ları özelleştir</string>
+<string name="settings_panel_customize_widgets_row">Yerleşen widget\'ları özelleştir</string>
+<string name="settings_panel_customize_widgets_subtitle">Her widget için içerik, aralık ve eylemleri seçin</string>
+<string name="widget_manager_back">&lt; Geri</string>
+<string name="widget_manager_title">Widget\'larınız</string>
+<string name="widget_manager_subtitle">Gösterdiklerini özelleştirmek için bir widget\'a dokunun.</string>
+<string name="widget_manager_empty_title">Henüz widget yok</string>
+<string name="widget_manager_empty_body">Ana ekrana bir DotCal widget\'ı ekleyin, ardından buradan özelleştirin.</string>
+<string name="widget_config_title">Widget\'ı özelleştir</string>
+<string name="widget_config_cancel">İptal</string>
+<string name="widget_config_save">Kaydet</string>
+<string name="widget_config_section_type">Widget türü</string>
+<string name="widget_config_section_content">İçerik</string>
+<string name="widget_config_section_style">Stil ve eylemler</string>
+<string name="widget_config_badge_pro">PRO</string>
+<string name="widget_config_selected">SEÇİLİ</string>
+<string name="widget_config_type_fixed">%1$s · Sabit içerik</string>
 </resources>

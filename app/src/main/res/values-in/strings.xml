@@ -911,5 +911,22 @@
     <string name="settings_reset">Reset</string>
     <string name="settings_calendar_menu">Calendar menu</string>
     <string name="settings_calendar_menu_visible_count">%1$d/%2$d visible</string>
-    <string name="settings_panel_calendar_menu">Visible menu actions</string>
+    <string name="settings_panel_calendar_menu">Visible menu actions</string>    <!-- Widget manager + per-widget config editor -->
+<string name="settings_panel_customize_widgets">Sesuaikan widget</string>
+<string name="settings_panel_customize_widgets_row">Sesuaikan widget yang terpasang</string>
+<string name="settings_panel_customize_widgets_subtitle">Pilih konten, rentang, dan aksi per widget</string>
+<string name="widget_manager_back">&lt; Kembali</string>
+<string name="widget_manager_title">Widget Anda</string>
+<string name="widget_manager_subtitle">Ketuk widget untuk menyesuaikan tampilannya.</string>
+<string name="widget_manager_empty_title">Belum ada widget</string>
+<string name="widget_manager_empty_body">Tambahkan widget DotCal dari layar utama, lalu sesuaikan di sini.</string>
+<string name="widget_config_title">Sesuaikan widget</string>
+<string name="widget_config_cancel">Batal</string>
+<string name="widget_config_save">Simpan</string>
+<string name="widget_config_section_type">Jenis widget</string>
+<string name="widget_config_section_content">Konten</string>
+<string name="widget_config_section_style">Gaya &amp; aksi</string>
+<string name="widget_config_badge_pro">PRO</string>
+<string name="widget_config_selected">DIPILIH</string>
+<string name="widget_config_type_fixed">%1$s · Konten tetap</string>
 </resources>

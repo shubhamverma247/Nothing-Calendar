@@ -1144,7 +1144,26 @@
         <item quantity="other">%1$d days before start date</item>
     </plurals>
     <plurals name="calc_days_after_start">
-        <item quantity="one">%1$d day after start date</item>
+        <item quantity="one">%1$d day before start date</item>
         <item quantity="other">%1$d days after start date</item>
     </plurals>
+
+    <!-- Widget manager + per-widget config editor -->
+    <string name="settings_panel_customize_widgets">Customize Widgets</string>
+    <string name="settings_panel_customize_widgets_row">Customize placed widgets</string>
+    <string name="settings_panel_customize_widgets_subtitle">Choose content, range and actions per widget</string>
+    <string name="widget_manager_back">&lt; Back</string>
+    <string name="widget_manager_title">Your Widgets</string>
+    <string name="widget_manager_subtitle">Tap a widget to customize what it shows.</string>
+    <string name="widget_manager_empty_title">No widgets yet</string>
+    <string name="widget_manager_empty_body">Add a DotCal widget from your home screen, then customize it here.</string>
+    <string name="widget_config_title">Customize Widget</string>
+    <string name="widget_config_cancel">Cancel</string>
+    <string name="widget_config_save">Save</string>
+    <string name="widget_config_section_type">Widget type</string>
+    <string name="widget_config_section_content">Content</string>
+    <string name="widget_config_section_style">Style &amp; actions</string>
+    <string name="widget_config_badge_pro">PRO</string>
+    <string name="widget_config_selected">SELECTED</string>
+    <string name="widget_config_type_fixed">%1$s · Fixed content</string>
 </resources>

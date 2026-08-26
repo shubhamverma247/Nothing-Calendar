@@ -979,5 +979,22 @@
     <string name="settings_reset">Reset</string>
     <string name="settings_calendar_menu">Calendar menu</string>
     <string name="settings_calendar_menu_visible_count">%1$d/%2$d visible</string>
-    <string name="settings_panel_calendar_menu">Visible menu actions</string>
+    <string name="settings_panel_calendar_menu">Visible menu actions</string>    <!-- Widget manager + per-widget config editor -->
+<string name="settings_panel_customize_widgets">Настройка виджетов</string>
+<string name="settings_panel_customize_widgets_row">Настроить добавленные виджеты</string>
+<string name="settings_panel_customize_widgets_subtitle">Выбирайте содержимое, период и действия для каждого виджета</string>
+<string name="widget_manager_back">&lt; Назад</string>
+<string name="widget_manager_title">Ваши виджеты</string>
+<string name="widget_manager_subtitle">Нажмите на виджет, чтобы настроить его.</string>
+<string name="widget_manager_empty_title">Виджетов пока нет</string>
+<string name="widget_manager_empty_body">Добавьте виджет DotCal на главный экран и настройте его здесь.</string>
+<string name="widget_config_title">Настройка виджета</string>
+<string name="widget_config_cancel">Отмена</string>
+<string name="widget_config_save">Сохранить</string>
+<string name="widget_config_section_type">Тип виджета</string>
+<string name="widget_config_section_content">Содержимое</string>
+<string name="widget_config_section_style">Стиль и действия</string>
+<string name="widget_config_badge_pro">PRO</string>
+<string name="widget_config_selected">ВЫБРАНО</string>
+<string name="widget_config_type_fixed">%1$s · Фиксированное содержимое</string>
 </resources>

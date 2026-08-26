@@ -911,5 +911,22 @@
     <string name="settings_reset">Reset</string>
     <string name="settings_calendar_menu">Calendar menu</string>
     <string name="settings_calendar_menu_visible_count">%1$d/%2$d visible</string>
-    <string name="settings_panel_calendar_menu">Visible menu actions</string>
+    <string name="settings_panel_calendar_menu">Visible menu actions</string>    <!-- Widget manager + per-widget config editor -->
+<string name="settings_panel_customize_widgets">Personnaliser les widgets</string>
+<string name="settings_panel_customize_widgets_row">Personnaliser les widgets ajoutés</string>
+<string name="settings_panel_customize_widgets_subtitle">Choisissez le contenu, la période et les actions par widget</string>
+<string name="widget_manager_back">&lt; Retour</string>
+<string name="widget_manager_title">Vos widgets</string>
+<string name="widget_manager_subtitle">Touchez un widget pour personnaliser son affichage.</string>
+<string name="widget_manager_empty_title">Aucun widget pour le moment</string>
+<string name="widget_manager_empty_body">Ajoutez un widget DotCal à votre écran d\'accueil, puis personnalisez-le ici.</string>
+<string name="widget_config_title">Personnaliser le widget</string>
+<string name="widget_config_cancel">Annuler</string>
+<string name="widget_config_save">Enregistrer</string>
+<string name="widget_config_section_type">Type de widget</string>
+<string name="widget_config_section_content">Contenu</string>
+<string name="widget_config_section_style">Style et actions</string>
+<string name="widget_config_badge_pro">PRO</string>
+<string name="widget_config_selected">SÉLECTIONNÉ</string>
+<string name="widget_config_type_fixed">%1$s · Contenu fixe</string>
 </resources>

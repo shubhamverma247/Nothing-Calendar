@@ -1047,5 +1047,22 @@
     <string name="settings_reset">Reset</string>
     <string name="settings_calendar_menu">Calendar menu</string>
     <string name="settings_calendar_menu_visible_count">%1$d/%2$d visible</string>
-    <string name="settings_panel_calendar_menu">Visible menu actions</string>
+    <string name="settings_panel_calendar_menu">Visible menu actions</string>    <!-- Widget manager + per-widget config editor -->
+<string name="settings_panel_customize_widgets">تخصيص الأدوات</string>
+<string name="settings_panel_customize_widgets_row">تخصيص الأدوات المضافة</string>
+<string name="settings_panel_customize_widgets_subtitle">اختر المحتوى والنطاق والإجراءات لكل أداة</string>
+<string name="widget_manager_back">&lt; رجوع</string>
+<string name="widget_manager_title">أدواتك</string>
+<string name="widget_manager_subtitle">انقر على أداة لتخصيص ما تعرضه.</string>
+<string name="widget_manager_empty_title">لا توجد أدوات بعد</string>
+<string name="widget_manager_empty_body">أضف أداة DotCal من الشاشة الرئيسية ثم خصصها هنا.</string>
+<string name="widget_config_title">تخصيص الأداة</string>
+<string name="widget_config_cancel">إلغاء</string>
+<string name="widget_config_save">حفظ</string>
+<string name="widget_config_section_type">نوع الأداة</string>
+<string name="widget_config_section_content">المحتوى</string>
+<string name="widget_config_section_style">النمط والإجراءات</string>
+<string name="widget_config_badge_pro">PRO</string>
+<string name="widget_config_selected">محدد</string>
+<string name="widget_config_type_fixed">%1$s · محتوى ثابت</string>
 </resources>

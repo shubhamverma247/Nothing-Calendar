@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -19,22 +20,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalMinimumInteractiveComponentEnforcement
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,16 +54,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.datastore.preferences.core.Preferences
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.lifecycle.lifecycleScope
+import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.DotCalDatabase
 import com.dotfield.dotcal.prefs.CalendarPreferences
@@ -64,20 +76,22 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 
-private object ConfigTheme {
-    var isDark by androidx.compose.runtime.mutableStateOf(true)
+internal val EditorAccent = Color(0xFFFF3B30)
+
+/** Shared light/dark chrome palette for the widget config editor and manager screens. */
+internal data class EditorPalette(val isDark: Boolean) {
+    val ink get() = if (isDark) Color(0xFF000000) else Color(0xFFFFFFFF)
+    val paper get() = if (isDark) Color(0xFFFFFFFF) else Color(0xFF101010)
+    val muted get() = if (isDark) Color(0xFFB3B3B3) else Color(0xFF6B6B6B)
+    val faint get() = if (isDark) Color(0xFF777777) else Color(0xFFA0A0A0)
+    val panel get() = if (isDark) Color(0xFF141414) else Color(0xFFF4F4F4)
+    val divider get() = if (isDark) Color(0xFF262626) else Color(0xFFECECEC)
+    val sheetBg get() = if (isDark) Color(0xFF161616) else Color(0xFFFFFFFF)
 }
 
-private val Ink get() = if (ConfigTheme.isDark) Color(0xFF000000) else Color(0xFFFFFFFF)
-private val Paper get() = if (ConfigTheme.isDark) Color(0xFFFFFFFF) else Color(0xFF101010)
-private val Muted get() = if (ConfigTheme.isDark) Color(0xFFB3B3B3) else Color(0xFF6B6B6B)
-private val Faint get() = if (ConfigTheme.isDark) Color(0xFF777777) else Color(0xFFA0A0A0)
-private val Panel get() = if (ConfigTheme.isDark) Color(0xFF141414) else Color(0xFFF4F4F4)
-private val Divider get() = if (ConfigTheme.isDark) Color(0xFF262626) else Color(0xFFECECEC)
-private val SheetBg get() = if (ConfigTheme.isDark) Color(0xFF161616) else Color(0xFFFFFFFF)
-private val Accent = Color(0xFFFF3B30)
-private fun resolveIsDark(context: android.content.Context, storedMode: String?): Boolean {
+internal fun resolveIsDark(context: android.content.Context, storedMode: String?): Boolean {
     val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
     return when (storedMode) {
         "Light" -> false
@@ -103,6 +117,7 @@ internal fun configDialogPalette(isDark: Boolean): com.dotfield.dotcal.ui.DotCal
             eventCardBorder = Color(0xFFECECEC),
             textFieldBorder = Color(0xFFD9D9D9),
             segmentSelected = Color(0xFFF4F4F4),
+            cell = Color(0xFFFFFFFF),
             switchOffTrack = Color(0xFFD9D9D9),
             isDark = false,
         )
@@ -111,6 +126,7 @@ internal fun configDialogPalette(isDark: Boolean): com.dotfield.dotcal.ui.DotCal
 
 class WidgetConfigActivity : ComponentActivity() {
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+    private var initialIsDark by mutableStateOf(true)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -125,14 +141,17 @@ class WidgetConfigActivity : ComponentActivity() {
         }
 
         lifecycleScope.launch {
-            val mode = calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_THEME_MODE]
-            ConfigTheme.isDark = resolveIsDark(this@WidgetConfigActivity, mode)
+            initialIsDark = resolveIsDark(
+                this@WidgetConfigActivity,
+                calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_THEME_MODE],
+            )
         }
 
         setContent {
             WidgetConfigScreen(
                 appWidgetId = appWidgetId,
                 widgetLabel = resolveWidgetLabel(),
+                initialIsDark = initialIsDark,
                 onSave = { config -> saveConfig(config) },
                 onCancel = { finish() },
                 onRequestPro = { requestPro() },
@@ -152,21 +171,27 @@ class WidgetConfigActivity : ComponentActivity() {
 
     private fun saveConfig(config: WidgetInstanceConfig) {
         lifecycleScope.launch {
-            val glanceId = GlanceAppWidgetManager(this@WidgetConfigActivity).getGlanceIdBy(appWidgetId)
-            updateAppWidgetState(this@WidgetConfigActivity, glanceId) { preferences ->
-                val accountId = config.calendarFilter.accountId
-                if (accountId == null) {
-                    preferences.remove(CalendarPreferences.KEY_WIDGET_ACCOUNT_ID)
-                } else {
-                    preferences[CalendarPreferences.KEY_WIDGET_ACCOUNT_ID] = accountId
+            runCatching {
+                val glanceId = GlanceAppWidgetManager(this@WidgetConfigActivity).getGlanceIdBy(appWidgetId)
+                updateAppWidgetState(this@WidgetConfigActivity, glanceId) { preferences ->
+                    val accountId = config.calendarFilter.accountId
+                    if (accountId == null) {
+                        preferences.remove(CalendarPreferences.KEY_WIDGET_ACCOUNT_ID)
+                    } else {
+                        preferences[CalendarPreferences.KEY_WIDGET_ACCOUNT_ID] = accountId
+                    }
+                    preferences[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG] = config.encode()
                 }
-                preferences[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG] = config.encode()
-            }
+            }.onFailure { Log.e(TAG, "Failed to persist config for widget $appWidgetId", it) }
             WidgetUpdateWorker.updateNow(this@WidgetConfigActivity)
             val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             setResult(Activity.RESULT_OK, result)
             finish()
         }
+    }
+
+    companion object {
+        private const val TAG = "WidgetConfigActivity"
     }
 }
 
@@ -270,7 +295,7 @@ private fun profileForKind(kind: LegacyWidgetKind): WidgetProfile {
             showContent = false,
             showTimeRange = true,
             showCalendar = true,
-            showDisplay = true,
+            showDisplay = false,
             showDensity = true,
             showTapAction = false,
             showAdvanced = true,
@@ -285,15 +310,18 @@ private fun profileForKind(kind: LegacyWidgetKind): WidgetProfile {
 private fun WidgetConfigScreen(
     appWidgetId: Int,
     widgetLabel: String,
+    initialIsDark: Boolean,
     onSave: (WidgetInstanceConfig) -> Unit,
     onCancel: () -> Unit,
     onRequestPro: () -> Unit,
 ) {
     val context = LocalContext.current
-    val view = androidx.compose.ui.platform.LocalView.current
-    LaunchedEffect(ConfigTheme.isDark) {
+    val view = LocalView.current
+    var isDark by remember { mutableStateOf(initialIsDark) }
+    val ui = remember(isDark) { EditorPalette(isDark) }
+    LaunchedEffect(isDark) {
         val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
-        androidx.core.view.WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !ConfigTheme.isDark
+        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDark
     }
     var accounts by remember { mutableStateOf<List<CalendarAccount>>(emptyList()) }
     var isPro by remember { mutableStateOf(false) }
@@ -302,23 +330,40 @@ private fun WidgetConfigScreen(
     var config by remember { mutableStateOf(WidgetInstanceConfig(WidgetCategory.Schedule, WidgetViewType.Agenda)) }
     var openSheet by remember { mutableStateOf<ConfigSheet?>(null) }
     var showColorPicker by remember { mutableStateOf(false) }
+    val proBadge = stringResource(R.string.widget_config_badge_pro)
 
     LaunchedEffect(Unit) {
-        val manager = GlanceAppWidgetManager(context)
-        val glanceId = manager.getGlanceIdBy(appWidgetId)
-        val state = getAppWidgetState<Preferences>(context, PreferencesGlanceStateDefinition, glanceId)
-        val encoded = state[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG]
-        kind = legacyKindForAppWidget(appWidgetId, context)
-        config = WidgetInstanceConfig.decodeOrDefault(encoded, WidgetInstanceConfig.legacyDefault(kind))
-        isPro = context.calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_IS_PRO] ?: false
-        ConfigTheme.isDark = resolveIsDark(context, context.calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_THEME_MODE])
-        accounts = withContext(Dispatchers.IO) {
-            DotCalDatabase.create(context).calendarDao().getAccountsForWidgetConfig()
+        val success = runCatching {
+            val manager = GlanceAppWidgetManager(context)
+            val glanceId = manager.getGlanceIdBy(appWidgetId)
+            val state = getAppWidgetState<Preferences>(context, PreferencesGlanceStateDefinition, glanceId)
+            val encoded = state[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG]
+            kind = legacyKindForAppWidget(appWidgetId, context)
+            val profile = profileForKind(kind)
+            var loadedConfig = WidgetInstanceConfig.decodeOrDefault(encoded, WidgetInstanceConfig.legacyDefault(kind))
+            if (profile.ranges.isNotEmpty() && loadedConfig.timeRange !in profile.ranges) {
+                loadedConfig = loadedConfig.copy(
+                    timeRange = profile.ranges.minByOrNull { abs(it.days - loadedConfig.timeRange.days) }
+                        ?: loadedConfig.timeRange,
+                )
+            }
+            config = loadedConfig
+            val prefs = context.calendarPreferencesDataStore.data.first()
+            isPro = prefs[CalendarPreferences.KEY_IS_PRO] ?: false
+            isDark = resolveIsDark(context, prefs[CalendarPreferences.KEY_THEME_MODE])
+            accounts = withContext(Dispatchers.IO) {
+                DotCalDatabase.create(context).calendarDao().getAccountsForWidgetConfig()
+            }
+        }.isSuccess
+        if (!success) {
+            (context as? Activity)?.finish()
+        } else {
+            loaded = true
         }
-        loaded = true
     }
 
     val profile = profileForKind(kind)
+    val hasContentRows = profile.showTimeRange || profile.showCalendar || profile.showDisplay || profile.showDensity
 
     fun accountName(id: String?): String {
         if (id == null) return "All Calendars"
@@ -328,20 +373,32 @@ private fun WidgetConfigScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Ink)
+            .background(ui.ink)
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp)) {
-            Text("Customize Widget", color = Paper, fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+            Text(
+                stringResource(R.string.widget_config_title),
+                color = ui.paper,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                fontSize = 22.sp,
+            )
             if (widgetLabel.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
-                Text(widgetLabel, color = Muted, fontFamily = FontFamily.SansSerif, fontSize = 13.sp)
+                Text(widgetLabel, color = ui.muted, fontFamily = FontFamily.SansSerif, fontSize = 13.sp)
             }
         }
 
         if (!loaded) {
-            Box(modifier = Modifier.fillMaxSize())
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    color = EditorAccent,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
             return@Column
         }
 
@@ -351,81 +408,100 @@ private fun WidgetConfigScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp),
         ) {
-            SectionHeader("WIDGET TYPE")
-            WidgetTypeGrid(
-                categories = profile.categories.ifEmpty { listOf(config.category) },
-                editable = profile.showContent,
-                selected = config.category,
-                onSelect = { config = withCategory(config, it) },
-            )
+            SectionHeader(ui, stringResource(R.string.widget_config_section_type))
+            if (profile.showContent) {
+                WidgetTypeGrid(
+                    ui = ui,
+                    selectedLabel = stringResource(R.string.widget_config_selected),
+                    categories = profile.categories,
+                    selected = config.category,
+                    onSelect = { config = withCategory(config, it) },
+                )
+            } else {
+                Text(
+                    stringResource(R.string.widget_config_type_fixed, categoryLabel(config.category)),
+                    color = ui.muted,
+                    fontFamily = FontFamily.SansSerif,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
             Spacer(Modifier.height(18.dp))
-            SectionHeader("CONTENT")
-            ConfigPanel {
+            if (hasContentRows) {
+            SectionHeader(ui, stringResource(R.string.widget_config_section_content))
+            ConfigPanel(ui) {
+                var prevRow = false
                 if (profile.showTimeRange) {
+                    if (prevRow) PanelDivider(ui)
                     SheetRow(
+                        ui = ui,
                         title = "Time range",
                         value = timeRangeLabel(config.timeRange),
-                        badge = if (!isPro && profile.ranges.contains(WidgetTimeRange.Next14Days)) "PRO" else null,
+                        badge = if (!isPro && profile.ranges.contains(WidgetTimeRange.Next14Days)) proBadge else null,
                         onClick = { openSheet = ConfigSheet.TimeRange },
                     )
-                    PanelDivider()
+                    prevRow = true
                 }
                 if (profile.showCalendar) {
+                    if (prevRow) PanelDivider(ui)
                     SheetRow(
+                        ui = ui,
                         title = "Calendar",
                         value = accountName(config.calendarFilter.accountId),
-                        badge = if (!isPro) "PRO" else null,
+                        badge = if (!isPro) proBadge else null,
                         onClick = { openSheet = ConfigSheet.Calendar },
                     )
-                    PanelDivider()
+                    prevRow = true
                 }
                 if (profile.showDisplay) {
+                    if (prevRow) PanelDivider(ui)
                     SheetRow(
+                        ui = ui,
                         title = "Display",
                         value = displaySummary(config),
                         onClick = { openSheet = ConfigSheet.Display },
                     )
-                    PanelDivider()
+                    prevRow = true
                 }
                 if (profile.showDensity) {
+                    if (prevRow) PanelDivider(ui)
                     SheetRow(
+                        ui = ui,
                         title = "Density",
                         value = densityLabel(config.density),
-                        badge = if (!isPro) "PRO" else null,
+                        badge = if (!isPro) proBadge else null,
                         onClick = { openSheet = ConfigSheet.Density },
                     )
-                    PanelDivider()
                 }
             }
-
-            if (!profile.showContent && !profile.showTimeRange && !profile.showCalendar && !profile.showDisplay && !profile.showDensity) {
-                SectionHeader("STYLE & ACTIONS")
-            } else {
                 Spacer(Modifier.height(18.dp))
-                SectionHeader("STYLE & ACTIONS")
             }
-            ConfigPanel {
+            SectionHeader(ui, stringResource(R.string.widget_config_section_style))
+            ConfigPanel(ui) {
                 SheetRow(
+                    ui = ui,
                     title = "Appearance",
                     value = appearanceSummary(config),
-                    badge = if (!isPro) "PRO" else null,
+                    badge = if (!isPro) proBadge else null,
                     onClick = { openSheet = ConfigSheet.Appearance },
                 )
                 if (profile.showAdvanced) {
-                    PanelDivider()
+                    PanelDivider(ui)
                     SheetRow(
+                        ui = ui,
                         title = "Advanced",
                         value = advancedSummary(config),
-                        badge = if (!isPro) "PRO" else null,
+                        badge = if (!isPro) proBadge else null,
                         onClick = { openSheet = ConfigSheet.Advanced },
                     )
                 }
                 if (profile.showTapAction) {
-                    PanelDivider()
+                    PanelDivider(ui)
                     SheetRow(
+                        ui = ui,
                         title = "Tap action",
                         value = tapActionLabel(config.interaction.tapAction),
-                        badge = if (!isPro) "PRO" else null,
+                        badge = if (!isPro) proBadge else null,
                         onClick = { openSheet = ConfigSheet.TapAction },
                     )
                 }
@@ -441,34 +517,36 @@ private fun WidgetConfigScreen(
         ) {
             Button(
                 onClick = onCancel,
-                colors = ButtonDefaults.buttonColors(containerColor = Panel, contentColor = Paper),
+                colors = ButtonDefaults.buttonColors(containerColor = ui.panel, contentColor = ui.paper),
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Cancel")
+                Text(stringResource(R.string.widget_config_cancel))
             }
             Button(
                 onClick = {
-                    val safe = if (isPro) config else config.copy(calendarFilter = WidgetCalendarFilter(null))
+                    val safe = if (isPro) config else sanitizeForFree(config)
                     onSave(safe)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Paper),
+                colors = ButtonDefaults.buttonColors(containerColor = EditorAccent, contentColor = Color.White),
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Save")
+                Text(stringResource(R.string.widget_config_save))
             }
         }
     }
 
     when (openSheet) {
         ConfigSheet.TimeRange -> ConfigBottomSheet(
+            ui = ui,
             title = "Time range",
             onDismiss = { openSheet = null },
         ) {
             timeRangeOptions().filter { it.first in profile.ranges }.forEach { (range, label) ->
                 val locked = !isPro && range == WidgetTimeRange.Next14Days
                 RadioRow(
+                    ui = ui,
                     title = label,
-                    badge = if (locked) "PRO" else null,
+                    badge = if (locked) proBadge else null,
                     selected = config.timeRange == range,
                     enabled = true,
                     onClick = {
@@ -484,10 +562,12 @@ private fun WidgetConfigScreen(
             }
         }
         ConfigSheet.Calendar -> ConfigBottomSheet(
+            ui = ui,
             title = "Calendar",
             onDismiss = { openSheet = null },
         ) {
             RadioRow(
+                ui = ui,
                 title = "All Calendars",
                 subtitle = "Use visible calendars",
                 selected = config.calendarFilter.accountId == null,
@@ -499,9 +579,10 @@ private fun WidgetConfigScreen(
             accounts.forEach { account ->
                 val locked = !isPro
                 RadioRow(
+                    ui = ui,
                     title = account.displayName.ifBlank { account.accountName },
                     subtitle = if (locked) "Included in DotCal Pro" else account.accountType,
-                    badge = if (locked) "PRO" else null,
+                    badge = if (locked) proBadge else null,
                     selected = config.calendarFilter.accountId == account.id,
                     onClick = {
                         if (locked) {
@@ -516,27 +597,32 @@ private fun WidgetConfigScreen(
             }
         }
         ConfigSheet.Display -> ConfigBottomSheet(
+            ui = ui,
             title = "Display",
             onDismiss = { openSheet = null },
         ) {
             ToggleRow(
+                ui = ui,
                 title = "Show time",
                 checked = config.content.showTime,
                 onChange = { config = config.copy(content = config.content.copy(showTime = it)) },
             )
             if (config.category == WidgetCategory.Schedule || config.category == WidgetCategory.Calendar) {
                 ToggleRow(
+                    ui = ui,
                     title = "Show location",
                     checked = config.content.showLocation,
                     onChange = { config = config.copy(content = config.content.copy(showLocation = it)) },
                 )
                 ToggleRow(
+                    ui = ui,
                     title = "Colorize titles",
                     subtitle = "Event titles use calendar colors",
                     checked = config.content.showEventColors,
                     onChange = { config = config.copy(content = config.content.copy(showEventColors = it)) },
                 )
                 ToggleRow(
+                    ui = ui,
                     title = "Show event titles",
                     checked = config.content.showEventTitle,
                     onChange = { config = config.copy(content = config.content.copy(showEventTitle = it)) },
@@ -544,6 +630,7 @@ private fun WidgetConfigScreen(
             }
             if (config.category == WidgetCategory.Calendar || config.category == WidgetCategory.Schedule) {
                 ToggleRow(
+                    ui = ui,
                     title = "Show all-day events",
                     checked = config.content.showAllDayEvents,
                     onChange = { config = config.copy(content = config.content.copy(showAllDayEvents = it)) },
@@ -551,6 +638,7 @@ private fun WidgetConfigScreen(
             }
             if (config.category == WidgetCategory.Today || config.category == WidgetCategory.Tasks) {
                 ToggleRow(
+                    ui = ui,
                     title = "Show tasks",
                     checked = config.content.showTasks,
                     onChange = { config = config.copy(content = config.content.copy(showTasks = it)) },
@@ -558,6 +646,7 @@ private fun WidgetConfigScreen(
             }
             if (config.category == WidgetCategory.Tasks) {
                 ToggleRow(
+                    ui = ui,
                     title = "Show completed tasks",
                     checked = config.content.showCompletedTasks,
                     onChange = { config = config.copy(content = config.content.copy(showCompletedTasks = it)) },
@@ -565,11 +654,13 @@ private fun WidgetConfigScreen(
             }
             if (config.category == WidgetCategory.Calendar) {
                 ToggleRow(
+                    ui = ui,
                     title = "Highlight today",
                     checked = config.content.showTodayHighlight,
                     onChange = { config = config.copy(content = config.content.copy(showTodayHighlight = it)) },
                 )
                 ToggleRow(
+                    ui = ui,
                     title = "Show week numbers",
                     checked = config.content.showWeekNumbers,
                     onChange = { config = config.copy(content = config.content.copy(showWeekNumbers = it)) },
@@ -577,6 +668,7 @@ private fun WidgetConfigScreen(
             }
         }
         ConfigSheet.Density -> ConfigBottomSheet(
+            ui = ui,
             title = "Density",
             onDismiss = { openSheet = null },
         ) {
@@ -587,8 +679,9 @@ private fun WidgetConfigScreen(
             ).forEach { (density, label) ->
                 val locked = !isPro && density == WidgetContentDensity.High
                 RadioRow(
+                    ui = ui,
                     title = label,
-                    badge = if (locked) "PRO" else null,
+                    badge = if (locked) proBadge else null,
                     selected = config.density == density,
                     onClick = {
                         if (locked) {
@@ -603,11 +696,13 @@ private fun WidgetConfigScreen(
             }
         }
         ConfigSheet.Appearance -> ConfigBottomSheet(
+            ui = ui,
             title = "Appearance",
             onDismiss = { openSheet = null },
         ) {
             listOf("System", "Light", "Dark").forEach { mode ->
                 RadioRow(
+                    ui = ui,
                     title = when (mode) {
                         "System" -> "Follow app theme"
                         else -> mode
@@ -627,12 +722,12 @@ private fun WidgetConfigScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(Divider),
+                    .background(ui.divider),
             )
             Spacer(Modifier.height(14.dp))
             Text(
                 "ACCENT COLOR",
-                color = Faint,
+                color = ui.faint,
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Bold,
                 fontSize = 10.sp,
@@ -642,8 +737,9 @@ private fun WidgetConfigScreen(
             accentOptions().forEach { (value, label) ->
                 val locked = !isPro && value != null
                 RadioRow(
+                    ui = ui,
                     title = label,
-                    badge = if (locked) "PRO" else null,
+                    badge = if (locked) proBadge else null,
                     selected = config.appearance.accentColor == value ||
                         (value == null && config.appearance.accentColor == null),
                     onClick = {
@@ -656,11 +752,12 @@ private fun WidgetConfigScreen(
                     },
                 )
             }
-            PanelDivider()
+            PanelDivider(ui)
             RadioRow(
+                ui = ui,
                 title = "Custom color",
                 subtitle = config.appearance.accentColor?.takeIf { it.startsWith("#") }?.uppercase() ?: "#RRGGBB",
-                badge = if (!isPro) "PRO" else null,
+                badge = if (!isPro) proBadge else null,
                 selected = config.appearance.accentColor?.startsWith("#") == true,
                 onClick = {
                     if (!isPro) {
@@ -673,12 +770,13 @@ private fun WidgetConfigScreen(
             )
         }
         ConfigSheet.Advanced -> ConfigBottomSheet(
+            ui = ui,
             title = "Advanced",
             onDismiss = { openSheet = null },
         ) {
             Text(
                 "LAYOUT",
-                color = Faint,
+                color = ui.faint,
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Bold,
                 fontSize = 10.sp,
@@ -690,6 +788,7 @@ private fun WidgetConfigScreen(
                 WidgetLayoutMode.Detailed to "Detailed",
             ).forEach { (mode, label) ->
                 RadioRow(
+                    ui = ui,
                     title = label,
                     selected = config.layoutMode == mode,
                     onClick = { config = config.copy(layoutMode = mode) },
@@ -700,12 +799,12 @@ private fun WidgetConfigScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(Divider),
+                    .background(ui.divider),
             )
             Spacer(Modifier.height(14.dp))
             Text(
                 "BACKGROUND",
-                color = Faint,
+                color = ui.faint,
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Bold,
                 fontSize = 10.sp,
@@ -718,8 +817,9 @@ private fun WidgetConfigScreen(
             ).forEach { (value, label) ->
                 val locked = !isPro && value != -1
                 RadioRow(
+                    ui = ui,
                     title = label,
-                    badge = if (locked) "PRO" else null,
+                    badge = if (locked) proBadge else null,
                     selected = when (value) {
                         -1 -> config.appearance.transparent == null
                         0 -> config.appearance.transparent == false
@@ -747,20 +847,21 @@ private fun WidgetConfigScreen(
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     Text(
                         "Opacity ${config.appearance.opacityPercent ?: 50}%",
-                        color = Muted,
+                        color = ui.muted,
                         fontFamily = FontFamily.SansSerif,
                         fontSize = 13.sp,
                     )
-                    androidx.compose.material3.Slider(
+                    Slider(
                         value = (config.appearance.opacityPercent ?: 50).toFloat(),
                         onValueChange = {
                             config = config.copy(appearance = config.appearance.copy(opacityPercent = it.toInt()))
                         },
                         valueRange = 0f..100f,
-                        colors = androidx.compose.material3.SliderDefaults.colors(
-                            thumbColor = Accent,
-                            activeTrackColor = Accent,
-                            inactiveTrackColor = Divider,
+                        steps = 9,
+                        colors = SliderDefaults.colors(
+                            thumbColor = EditorAccent,
+                            activeTrackColor = EditorAccent,
+                            inactiveTrackColor = ui.divider,
                         ),
                     )
                 }
@@ -770,12 +871,12 @@ private fun WidgetConfigScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(Divider),
+                    .background(ui.divider),
             )
             Spacer(Modifier.height(14.dp))
             Text(
                 "DOT TEXTURE",
-                color = Faint,
+                color = ui.faint,
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Bold,
                 fontSize = 10.sp,
@@ -788,8 +889,9 @@ private fun WidgetConfigScreen(
             ).forEach { (value, label) ->
                 val locked = !isPro && value != -1
                 RadioRow(
+                    ui = ui,
                     title = label,
-                    badge = if (locked) "PRO" else null,
+                    badge = if (locked) proBadge else null,
                     selected = when (value) {
                         -1 -> config.appearance.showDotTexture == null
                         else -> config.appearance.showDotTexture == (value == 1)
@@ -810,14 +912,16 @@ private fun WidgetConfigScreen(
             }
         }
         ConfigSheet.TapAction -> ConfigBottomSheet(
+            ui = ui,
             title = "Tap action",
             onDismiss = { openSheet = null },
         ) {
             tapActionOptions().forEach { action ->
                 val locked = !isPro && action != WidgetTapAction.OpenCalendar
                 RadioRow(
+                    ui = ui,
                     title = tapActionLabel(action),
-                    badge = if (locked) "PRO" else null,
+                    badge = if (locked) proBadge else null,
                     selected = config.interaction.tapAction == action,
                     onClick = {
                         if (locked) {
@@ -837,10 +941,10 @@ private fun WidgetConfigScreen(
     if (showColorPicker) {
         val initialColor = runCatching {
             Color(android.graphics.Color.parseColor(config.appearance.accentColor?.takeIf { it.startsWith("#") } ?: "#FF3B30"))
-        }.getOrDefault(Accent)
+        }.getOrDefault(EditorAccent)
         com.dotfield.dotcal.ui.CustomAccentPickerDialog(
             initial = initialColor,
-            palette = configDialogPalette(ConfigTheme.isDark),
+            palette = configDialogPalette(isDark),
             title = "Custom accent color",
             onDismiss = { showColorPicker = false },
             onConfirm = { hex ->
@@ -864,6 +968,29 @@ private fun accentOptions(): List<Pair<String?, String>> = listOf(
     "ORANGE" to "Orange",
     "CYAN" to "Cyan",
 )
+
+/**
+ * Free-tier save path: strips every Pro-gated override so a config saved while Pro
+ * (or tampered state) cannot keep gated values after the entitlement is gone.
+ */
+internal fun sanitizeForFree(config: WidgetInstanceConfig): WidgetInstanceConfig {
+    return config.copy(
+        calendarFilter = WidgetCalendarFilter(null),
+        timeRange = if (config.timeRange == WidgetTimeRange.Next14Days) {
+            WidgetTimeRange.Next7Days
+        } else {
+            config.timeRange
+        },
+        density = if (config.density == WidgetContentDensity.High) WidgetContentDensity.Medium else config.density,
+        interaction = config.interaction.copy(tapAction = WidgetTapAction.OpenCalendar),
+        appearance = config.appearance.copy(
+            accentColor = null,
+            transparent = null,
+            opacityPercent = null,
+            showDotTexture = null,
+        ),
+    )
+}
 
 private fun advancedSummary(config: WidgetInstanceConfig): String {
     val layout = when (config.layoutMode) {
@@ -960,7 +1087,7 @@ private fun withCategory(config: WidgetInstanceConfig, category: WidgetCategory)
     return config.copy(category = category, viewType = viewType)
 }
 
-private fun legacyKindForAppWidget(
+internal fun legacyKindForAppWidget(
     appWidgetId: Int,
     context: android.content.Context,
 ): LegacyWidgetKind {
@@ -985,8 +1112,9 @@ private fun legacyKindForAppWidget(
 
 @Composable
 private fun WidgetTypeGrid(
+    ui: EditorPalette,
+    selectedLabel: String,
     categories: List<WidgetCategory>,
-    editable: Boolean,
     selected: WidgetCategory,
     onSelect: (WidgetCategory) -> Unit,
 ) {
@@ -999,25 +1127,25 @@ private fun WidgetTypeGrid(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(if (isSelected) Accent.copy(alpha = 0.12f) else Panel)
+                            .background(if (isSelected) EditorAccent.copy(alpha = 0.12f) else ui.panel)
                             .border(
                                 width = if (isSelected) 1.dp else 0.dp,
-                                color = Accent,
+                                color = EditorAccent,
                                 shape = RoundedCornerShape(14.dp),
                             )
-                            .clickable(enabled = editable) { onSelect(category) }
+                            .clickable { onSelect(category) }
                             .padding(horizontal = 14.dp, vertical = 12.dp),
                     ) {
                         Text(
                             categoryLabel(category),
-                            color = if (isSelected) Accent else Paper,
+                            color = if (isSelected) EditorAccent else ui.paper,
                             fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp,
                         )
                         Text(
                             categorySubtitle(category),
-                            color = Muted,
+                            color = ui.muted,
                             fontFamily = FontFamily.SansSerif,
                             fontSize = 11.sp,
                             maxLines = 1,
@@ -1029,12 +1157,12 @@ private fun WidgetTypeGrid(
                                     modifier = Modifier
                                         .size(6.dp)
                                         .clip(CircleShape)
-                                        .background(Accent),
+                                        .background(EditorAccent),
                                 )
-                                Spacer(Modifier.size(4.dp))
+                                Spacer(Modifier.width(4.dp))
                                 Text(
-                                    "SELECTED",
-                                    color = Accent,
+                                    selectedLabel,
+                                    color = EditorAccent,
                                     fontFamily = FontFamily.SansSerif,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 9.sp,
@@ -1063,10 +1191,10 @@ private fun categorySubtitle(category: WidgetCategory): String = when (category)
 }
 
 @Composable
-private fun SectionHeader(title: String) {
+private fun SectionHeader(ui: EditorPalette, title: String) {
     Text(
-        title,
-        color = Faint,
+        title.uppercase(),
+        color = ui.faint,
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
         fontSize = 11.sp,
@@ -1076,12 +1204,12 @@ private fun SectionHeader(title: String) {
 }
 
 @Composable
-private fun ConfigPanel(content: @Composable () -> Unit) {
+private fun ConfigPanel(ui: EditorPalette, content: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Panel)
+            .background(ui.panel)
             .padding(vertical = 4.dp),
     ) {
         content()
@@ -1089,18 +1217,38 @@ private fun ConfigPanel(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun PanelDivider() {
+private fun PanelDivider(ui: EditorPalette) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .height(1.dp)
-            .background(Divider),
+            .background(ui.divider),
     )
 }
 
 @Composable
+private fun ProBadge(text: String, ui: EditorPalette) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(EditorAccent.copy(alpha = 0.16f))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text,
+            color = EditorAccent,
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.Bold,
+            fontSize = 9.sp,
+            letterSpacing = 1.sp,
+        )
+    }
+}
+
+@Composable
 private fun SheetRow(
+    ui: EditorPalette,
     title: String,
     value: String,
     badge: String? = null,
@@ -1115,7 +1263,7 @@ private fun SheetRow(
     ) {
         Text(
             title,
-            color = Paper,
+            color = ui.paper,
             fontFamily = FontFamily.SansSerif,
             fontWeight = FontWeight.SemiBold,
             fontSize = 15.sp,
@@ -1123,58 +1271,52 @@ private fun SheetRow(
         )
         Text(
             value,
-            color = Muted,
+            color = ui.muted,
             fontFamily = FontFamily.SansSerif,
             fontSize = 13.sp,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(0.5f),
         )
         if (badge != null) {
-            Box(
-                modifier = Modifier
-                    .padding(end = 10.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Accent.copy(alpha = 0.16f))
-                    .padding(horizontal = 7.dp, vertical = 3.dp),
-            ) {
-                Text(
-                    badge,
-                    color = Accent,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 9.sp,
-                    letterSpacing = 1.sp,
-                )
-            }
+            ProBadge(badge, ui)
         }
-        Text("›", color = Faint, fontSize = 18.sp)
+        Spacer(Modifier.width(10.dp))
+        Text("›", color = ui.faint, fontSize = 18.sp)
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ConfigBottomSheet(
+    ui: EditorPalette,
     title: String,
     onDismiss: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = SheetBg,
+        containerColor = ui.sheetBg,
         tonalElevation = 0.dp,
     ) {
         Column(modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 28.dp)) {
             Text(
                 title.uppercase(),
-                color = Faint,
+                color = ui.faint,
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
                 letterSpacing = 2.sp,
             )
             Spacer(Modifier.height(8.dp))
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                content()
+            CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 520.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    content()
+                }
             }
         }
     }
@@ -1182,6 +1324,7 @@ private fun ConfigBottomSheet(
 
 @Composable
 private fun ToggleRow(
+    ui: EditorPalette,
     title: String,
     subtitle: String? = null,
     checked: Boolean,
@@ -1191,20 +1334,20 @@ private fun ToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onChange(!checked) }
-            .padding(vertical = 12.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 title,
-                color = Paper,
+                color = ui.paper,
                 fontFamily = FontFamily.SansSerif,
                 fontSize = 15.sp,
             )
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     subtitle,
-                    color = Muted,
+                    color = ui.muted,
                     fontFamily = FontFamily.SansSerif,
                     fontSize = 12.sp,
                 )
@@ -1212,7 +1355,7 @@ private fun ToggleRow(
         }
         com.dotfield.dotcal.ui.DotCalSwitch(
             checked = checked,
-            palette = configDialogPalette(ConfigTheme.isDark),
+            palette = remember(ui) { configDialogPalette(ui.isDark) },
             onCheckedChange = onChange,
         )
     }
@@ -1220,6 +1363,7 @@ private fun ToggleRow(
 
 @Composable
 private fun RadioRow(
+    ui: EditorPalette,
     title: String,
     subtitle: String? = null,
     badge: String? = null,
@@ -1231,34 +1375,27 @@ private fun RadioRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 10.dp),
+            .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     title,
-                    color = Paper,
+                    color = ui.paper,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp,
                 )
                 if (badge != null) {
-                    Spacer(Modifier.height(0.dp))
-                    Text(
-                        "  $badge",
-                        color = Accent,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp,
-                        letterSpacing = 1.sp,
-                    )
+                    Spacer(Modifier.width(8.dp))
+                    ProBadge(badge, ui)
                 }
             }
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     subtitle,
-                    color = Muted,
+                    color = ui.muted,
                     fontFamily = FontFamily.SansSerif,
                     fontSize = 12.sp,
                 )
@@ -1268,7 +1405,7 @@ private fun RadioRow(
             selected = selected,
             onClick = onClick,
             enabled = enabled,
-            colors = RadioButtonDefaults.colors(selectedColor = Accent, unselectedColor = Faint),
+            colors = RadioButtonDefaults.colors(selectedColor = EditorAccent, unselectedColor = ui.faint),
         )
     }
 }
