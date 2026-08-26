@@ -1019,4 +1019,5 @@
 <string name="widget_config_badge_pro">PRO</string>
 <string name="widget_config_selected">SÉLECTIONNÉ</string>
 <string name="widget_config_type_fixed">%1$s · Contenu fixe</string>
+    <string name="widget_cat_today">Aujourd\'hui</string>
 </resources>

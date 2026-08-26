@@ -1087,4 +1087,5 @@
 <string name="widget_config_badge_pro">PRO</string>
 <string name="widget_config_selected">ВЫБРАНО</string>
 <string name="widget_config_type_fixed">%1$s · Фиксированное содержимое</string>
+    <string name="widget_cat_today">Сегодня</string>
 </resources>

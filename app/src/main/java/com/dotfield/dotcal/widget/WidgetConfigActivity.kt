@@ -71,6 +71,13 @@ import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.DotCalDatabase
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import com.dotfield.dotcal.ui.DotCalPalette
+import com.dotfield.dotcal.ui.DotCalSwitch
+import com.dotfield.dotcal.ui.DotCalThemeMode
+import com.dotfield.dotcal.ui.dotCalPalette
+import com.dotfield.dotcal.ui.secondaryActionBorder
+import com.dotfield.dotcal.ui.secondaryActionContainer
+import com.dotfield.dotcal.ui.secondaryActionContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -96,29 +103,6 @@ internal fun resolveIsDark(context: android.content.Context, storedMode: String?
         "Light" -> false
         "Dark" -> true
         else -> systemDark
-    }
-}
-
-internal fun configDialogPalette(isDark: Boolean): com.dotfield.dotcal.ui.DotCalPalette {
-    return com.dotfield.dotcal.ui.dotCalBootPalette().let { dark ->
-        if (isDark) dark else dark.copy(
-            background = Color(0xFFFFFFFF),
-            primaryText = Color(0xFF101010),
-            secondaryText = Color(0xFF6B6B6B),
-            dimText = Color(0xFFA0A0A0),
-            line = Color(0xFFECECEC),
-            calendarSurface = Color(0xFFFFFFFF),
-            topBarSurface = Color(0xFFFFFFFF),
-            dialogSurface = Color(0xFFFFFFFF),
-            cancelSurface = Color(0xFFF4F4F4),
-            cancelBorder = Color(0xFFECECEC),
-            eventCardSurface = Color(0xFFF9F9F9),
-            eventCardBorder = Color(0xFFECECEC),
-            textFieldBorder = Color(0xFFD9D9D9),
-            segmentSelected = Color(0xFFF4F4F4),
-            switchOffTrack = Color(0xFFD9D9D9),
-            isDark = false,
-        )
     }
 }
 
@@ -164,12 +148,12 @@ class WidgetConfigActivity : ComponentActivity() {
     }
 
     private fun resolveWidgetLabel(): String {
-        return AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)?.label.orEmpty()
+        return AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)?.loadLabel(packageManager).orEmpty()
     }
 
     private fun saveConfig(config: WidgetInstanceConfig) {
         lifecycleScope.launch {
-            runCatching {
+            val saved = runCatching {
                 val glanceId = GlanceAppWidgetManager(this@WidgetConfigActivity).getGlanceIdBy(appWidgetId)
                 updateAppWidgetState(this@WidgetConfigActivity, glanceId) { preferences ->
                     val accountId = config.calendarFilter.accountId
@@ -180,7 +164,17 @@ class WidgetConfigActivity : ComponentActivity() {
                     }
                     preferences[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG] = config.encode()
                 }
-            }.onFailure { Log.e(TAG, "Failed to persist config for widget $appWidgetId", it) }
+            }.onFailure { Log.e(TAG, "Failed to persist config for widget $appWidgetId", it) }.isSuccess
+            if (saved) {
+                val receiverClass = AppWidgetManager.getInstance(this@WidgetConfigActivity)
+                    .getAppWidgetInfo(appWidgetId)
+                    ?.provider
+                    ?.className
+                    ?.substringAfterLast('.')
+                    .orEmpty()
+                runCatching { registerConfiguredWidget(this@WidgetConfigActivity, receiverClass, appWidgetId) }
+                    .onFailure { Log.e(TAG, "Failed to register widget $appWidgetId", it) }
+            }
             WidgetUpdateWorker.updateNow(this@WidgetConfigActivity)
             val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             setResult(Activity.RESULT_OK, result)
@@ -341,6 +335,12 @@ private fun WidgetConfigScreen(
     val haptics = LocalHapticFeedback.current
     var isDark by remember { mutableStateOf(initialIsDark) }
     val ui = remember(isDark) { EditorPalette(isDark) }
+    val controlPalette = remember(isDark) {
+        dotCalPalette(
+            if (isDark) DotCalThemeMode.Dark else DotCalThemeMode.Light,
+            systemDark = isDark,
+        )
+    }
     LaunchedEffect(isDark) {
         val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
         WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDark
@@ -435,7 +435,6 @@ private fun WidgetConfigScreen(
             if (profile.showContent) {
                 WidgetTypeGrid(
                     ui = ui,
-                    selectedLabel = stringResource(R.string.widget_config_selected),
                     categories = profile.categories,
                     selected = config.category,
                     onSelect = { category ->
@@ -484,7 +483,6 @@ private fun WidgetConfigScreen(
                             value = displaySummary(config),
                             onClick = { openSheet = ConfigSheet.Display },
                         )
-                        PanelDivider(ui)
                     }
                     if (profile.showDensity) {
                         SheetRow(
@@ -543,15 +541,25 @@ private fun WidgetConfigScreen(
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     config = WidgetInstanceConfig.legacyDefault(kind)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = ui.panel, contentColor = ui.paper),
+                border = secondaryActionBorder(controlPalette),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = secondaryActionContainer(controlPalette),
+                    contentColor = secondaryActionContent(controlPalette),
+                ),
                 modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(18.dp),
             ) {
                 Text(stringResource(R.string.widget_config_reset), maxLines = 1)
             }
             Button(
                 onClick = onCancel,
-                colors = ButtonDefaults.buttonColors(containerColor = ui.panel, contentColor = ui.paper),
+                border = secondaryActionBorder(controlPalette),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = secondaryActionContainer(controlPalette),
+                    contentColor = secondaryActionContent(controlPalette),
+                ),
                 modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(18.dp),
             ) {
                 Text(stringResource(R.string.widget_config_cancel), maxLines = 1)
             }
@@ -560,8 +568,12 @@ private fun WidgetConfigScreen(
                     val safe = if (isPro) config else sanitizeForFree(config)
                     onSave(safe)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = EditorAccent, contentColor = ui.paper),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = controlPalette.accent,
+                    contentColor = controlPalette.onAccent,
+                ),
                 modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(18.dp),
             ) {
                 Text(stringResource(R.string.widget_config_save), maxLines = 1)
             }
@@ -578,6 +590,7 @@ private fun WidgetConfigScreen(
                 val locked = !isPro && range == WidgetTimeRange.Next14Days
                 RadioRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(labelRes),
                     badge = if (locked) proBadge else null,
                     selected = config.timeRange == range,
@@ -601,6 +614,7 @@ private fun WidgetConfigScreen(
         ) {
             RadioRow(
                 ui = ui,
+                controlPalette = controlPalette,
                 title = stringResource(R.string.widget_calendar_all),
                 subtitle = stringResource(R.string.widget_calendar_all_subtitle),
                 selected = config.calendarFilter.accountId == null,
@@ -613,6 +627,7 @@ private fun WidgetConfigScreen(
                 val locked = !isPro
                 RadioRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = account.displayName.ifBlank { account.accountName },
                     subtitle = if (locked) stringResource(R.string.widget_calendar_pro_hint) else account.accountType,
                     badge = if (locked) proBadge else null,
@@ -636,6 +651,7 @@ private fun WidgetConfigScreen(
         ) {
             ToggleRow(
                 ui = ui,
+                controlPalette = controlPalette,
                 title = stringResource(R.string.widget_display_show_time),
                 checked = config.content.showTime,
                 onChange = { config = config.copy(content = config.content.copy(showTime = it)) },
@@ -643,12 +659,14 @@ private fun WidgetConfigScreen(
             if (config.category == WidgetCategory.Schedule || config.category == WidgetCategory.Calendar) {
                 ToggleRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(R.string.widget_display_show_location),
                     checked = config.content.showLocation,
                     onChange = { config = config.copy(content = config.content.copy(showLocation = it)) },
                 )
                 ToggleRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(R.string.widget_display_colorize),
                     subtitle = stringResource(R.string.widget_display_colorize_sub),
                     checked = config.content.showEventColors,
@@ -656,6 +674,7 @@ private fun WidgetConfigScreen(
                 )
                 ToggleRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(R.string.widget_display_show_titles),
                     checked = config.content.showEventTitle,
                     onChange = { config = config.copy(content = config.content.copy(showEventTitle = it)) },
@@ -664,6 +683,7 @@ private fun WidgetConfigScreen(
             if (config.category == WidgetCategory.Calendar || config.category == WidgetCategory.Schedule) {
                 ToggleRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(R.string.widget_display_allday),
                     checked = config.content.showAllDayEvents,
                     onChange = { config = config.copy(content = config.content.copy(showAllDayEvents = it)) },
@@ -672,6 +692,7 @@ private fun WidgetConfigScreen(
             if (config.category == WidgetCategory.Today || config.category == WidgetCategory.Tasks) {
                 ToggleRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(R.string.widget_display_tasks),
                     checked = config.content.showTasks,
                     onChange = { config = config.copy(content = config.content.copy(showTasks = it)) },
@@ -680,6 +701,7 @@ private fun WidgetConfigScreen(
             if (config.category == WidgetCategory.Tasks) {
                 ToggleRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(R.string.widget_display_completed),
                     checked = config.content.showCompletedTasks,
                     onChange = { config = config.copy(content = config.content.copy(showCompletedTasks = it)) },
@@ -688,12 +710,14 @@ private fun WidgetConfigScreen(
             if (config.category == WidgetCategory.Calendar) {
                 ToggleRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(R.string.widget_display_today_highlight),
                     checked = config.content.showTodayHighlight,
                     onChange = { config = config.copy(content = config.content.copy(showTodayHighlight = it)) },
                 )
                 ToggleRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(R.string.widget_display_week_numbers),
                     checked = config.content.showWeekNumbers,
                     onChange = { config = config.copy(content = config.content.copy(showWeekNumbers = it)) },
@@ -713,6 +737,7 @@ private fun WidgetConfigScreen(
                 val locked = !isPro && density == WidgetContentDensity.High
                 RadioRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(labelRes),
                     badge = if (locked) proBadge else null,
                     selected = config.density == density,
@@ -740,6 +765,7 @@ private fun WidgetConfigScreen(
             ).forEach { (mode, label) ->
                 RadioRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = label,
                     selected = (config.appearance.themeMode ?: "System") == (mode ?: "System"),
                     onClick = {
@@ -760,6 +786,7 @@ private fun WidgetConfigScreen(
                 val locked = !isPro && value != null
                 RadioRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(labelRes),
                     badge = if (locked) proBadge else null,
                     selected = config.appearance.accentColor == value ||
@@ -777,6 +804,7 @@ private fun WidgetConfigScreen(
             PanelDivider(ui)
             RadioRow(
                 ui = ui,
+                controlPalette = controlPalette,
                 title = stringResource(R.string.widget_accent_custom),
                 subtitle = config.appearance.accentColor?.takeIf { it.startsWith("#") }?.uppercase()
                     ?: stringResource(R.string.widget_accent_custom_hint),
@@ -805,6 +833,7 @@ private fun WidgetConfigScreen(
             ).forEach { (mode, labelRes) ->
                 RadioRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(labelRes),
                     selected = config.layoutMode == mode,
                     onClick = { config = config.copy(layoutMode = mode) },
@@ -827,6 +856,7 @@ private fun WidgetConfigScreen(
                 val locked = !isPro && value != -1
                 RadioRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(labelRes),
                     badge = if (locked) proBadge else null,
                     selected = when (value) {
@@ -892,6 +922,7 @@ private fun WidgetConfigScreen(
                 val locked = !isPro && value != -1
                 RadioRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = stringResource(labelRes),
                     badge = if (locked) proBadge else null,
                     selected = when (value) {
@@ -922,6 +953,7 @@ private fun WidgetConfigScreen(
                 val locked = !isPro && action != WidgetTapAction.OpenCalendar
                 RadioRow(
                     ui = ui,
+                    controlPalette = controlPalette,
                     title = tapActionLabel(action),
                     badge = if (locked) proBadge else null,
                     selected = config.interaction.tapAction == action,
@@ -946,7 +978,7 @@ private fun WidgetConfigScreen(
         }.getOrDefault(EditorAccent)
         com.dotfield.dotcal.ui.CustomAccentPickerDialog(
             initial = initialColor,
-            palette = configDialogPalette(isDark),
+            palette = controlPalette,
             title = stringResource(R.string.widget_accent_picker_title),
             onDismiss = { showColorPicker = false },
             onConfirm = { hex ->
@@ -972,6 +1004,7 @@ private fun WidgetPreviewCard(ui: EditorPalette, config: WidgetInstanceConfig, a
     val baseBg = if (dark) Color(0xFF1A1A1A) else Color(0xFFFFFFFF)
     val bg = if (transparent) baseBg.copy(alpha = opacity) else baseBg
     val fg = if (dark) Color(0xFFFFFFFF) else Color(0xFF101010)
+    val rowCount = config.maxVisibleItems(3).coerceIn(1, 4)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -982,14 +1015,21 @@ private fun WidgetPreviewCard(ui: EditorPalette, config: WidgetInstanceConfig, a
     ) {
         Column {
             Text(
-                stringResource(R.string.widget_preview_sample_date),
+                stringResource(categoryLabelRes(config.category)),
                 color = fg,
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
             )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                timeRangeLabel(config.timeRange),
+                color = fg.copy(alpha = 0.55f),
+                fontFamily = FontFamily.SansSerif,
+                fontSize = 10.sp,
+            )
             Spacer(Modifier.height(10.dp))
-            repeat(3) { row ->
+            repeat(rowCount) { row ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(vertical = 5.dp),
@@ -1004,7 +1044,13 @@ private fun WidgetPreviewCard(ui: EditorPalette, config: WidgetInstanceConfig, a
                     Column {
                         Box(
                             modifier = Modifier
-                                .size(height = 6.dp, width = if (row == 0) 130.dp else 96.dp)
+                                .size(height = 6.dp, width = when (config.category) {
+                                    WidgetCategory.Calendar -> if (row == 0) 118.dp else 88.dp
+                                    WidgetCategory.Countdown -> if (row == 0) 92.dp else 58.dp
+                                    WidgetCategory.Shift -> if (row == 0) 126.dp else 102.dp
+                                    WidgetCategory.Tasks -> if (row == 0) 116.dp else 92.dp
+                                    else -> if (row == 0) 130.dp else 96.dp
+                                })
                                 .clip(RoundedCornerShape(3.dp))
                                 .background(fg.copy(alpha = 0.55f)),
                         )
@@ -1013,7 +1059,14 @@ private fun WidgetPreviewCard(ui: EditorPalette, config: WidgetInstanceConfig, a
                             modifier = Modifier
                                 .size(height = 5.dp, width = 58.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(fg.copy(alpha = 0.25f)),
+                                .background(
+                                    when {
+                                        config.content.showLocation -> fg.copy(alpha = 0.28f)
+                                        config.content.showTasks -> fg.copy(alpha = 0.34f)
+                                        config.content.showEventTitle -> fg.copy(alpha = 0.22f)
+                                        else -> fg.copy(alpha = 0.16f)
+                                    },
+                                ),
                         )
                     }
                 }
@@ -1179,7 +1232,6 @@ internal fun legacyKindForAppWidget(
 @Composable
 private fun WidgetTypeGrid(
     ui: EditorPalette,
-    selectedLabel: String,
     categories: List<WidgetCategory>,
     selected: WidgetCategory,
     onSelect: (WidgetCategory) -> Unit,
@@ -1216,26 +1268,6 @@ private fun WidgetTypeGrid(
                             fontSize = 11.sp,
                             maxLines = 1,
                         )
-                        if (isSelected) {
-                            Spacer(Modifier.height(2.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(EditorAccent),
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    selectedLabel,
-                                    color = EditorAccent,
-                                    fontFamily = FontFamily.SansSerif,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 9.sp,
-                                    letterSpacing = 1.sp,
-                                )
-                            }
-                        }
                     }
                 }
                 if (row.size == 1) {
@@ -1249,12 +1281,11 @@ private fun WidgetTypeGrid(
 @Composable
 private fun SectionHeader(ui: EditorPalette, title: String, topPadding: Boolean = false) {
     Text(
-        title.uppercase(),
+        title,
         color = ui.faint,
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
-        fontSize = 11.sp,
-        letterSpacing = 2.sp,
+        fontSize = 12.sp,
         modifier = Modifier.padding(top = if (topPadding) 12.dp else 0.dp, bottom = 8.dp),
     )
 }
@@ -1355,14 +1386,13 @@ private fun ConfigBottomSheet(
         containerColor = ui.sheetBg,
         tonalElevation = 0.dp,
     ) {
-        Column(modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 28.dp)) {
+            Column(modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 28.dp)) {
             Text(
-                title.uppercase(),
+                title,
                 color = ui.faint,
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Bold,
-                fontSize = 11.sp,
-                letterSpacing = 2.sp,
+                fontSize = 12.sp,
             )
             Spacer(Modifier.height(8.dp))
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -1375,6 +1405,7 @@ private fun ConfigBottomSheet(
 @Composable
 private fun ToggleRow(
     ui: EditorPalette,
+    controlPalette: DotCalPalette,
     title: String,
     subtitle: String? = null,
     checked: Boolean,
@@ -1405,7 +1436,7 @@ private fun ToggleRow(
         }
         com.dotfield.dotcal.ui.DotCalSwitch(
             checked = checked,
-            palette = remember(ui) { configDialogPalette(ui.isDark) },
+            palette = controlPalette,
             onCheckedChange = onChange,
         )
     }
@@ -1414,6 +1445,7 @@ private fun ToggleRow(
 @Composable
 private fun RadioRow(
     ui: EditorPalette,
+    controlPalette: DotCalPalette,
     title: String,
     subtitle: String? = null,
     badge: String? = null,
@@ -1459,7 +1491,10 @@ private fun RadioRow(
             selected = selected,
             onClick = null,
             enabled = enabled,
-            colors = RadioButtonDefaults.colors(selectedColor = EditorAccent, unselectedColor = ui.faint),
+            colors = RadioButtonDefaults.colors(
+                selectedColor = controlPalette.accent,
+                unselectedColor = controlPalette.secondaryText,
+            ),
         )
     }
 }

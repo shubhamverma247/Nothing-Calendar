@@ -1019,4 +1019,5 @@
 <string name="widget_config_badge_pro">PRO</string>
 <string name="widget_config_selected">DIPILIH</string>
 <string name="widget_config_type_fixed">%1$s · Konten tetap</string>
+    <string name="widget_cat_today">Hari ini</string>
 </resources>

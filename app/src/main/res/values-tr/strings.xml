@@ -1019,4 +1019,5 @@
 <string name="widget_config_badge_pro">PRO</string>
 <string name="widget_config_selected">SEÇİLİ</string>
 <string name="widget_config_type_fixed">%1$s · Sabit içerik</string>
+    <string name="widget_cat_today">Bugün</string>
 </resources>

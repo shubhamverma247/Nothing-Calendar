@@ -60,6 +60,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.runBlocking
 
 enum class DotCalWidgetSize(val maxItems: Int) {
     DateOnly(maxItems = 0),
@@ -168,7 +169,19 @@ private fun ConfiguredWidget(
     }
 }
 
-class DateOnlyDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
+abstract class DotCalWidgetReceiver : GlanceAppWidgetReceiver() {
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        runBlocking { unregisterConfiguredWidgets(context, appWidgetIds) }
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        runBlocking { clearConfiguredWidgetsForReceiver(context, javaClass.simpleName) }
+    }
+}
+
+class DateOnlyDotCalWidgetReceiver : DotCalWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = DateOnlyDotCalWidget()
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -179,7 +192,7 @@ class DateOnlyDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
     }
 }
 
-class CompactMonthDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
+class CompactMonthDotCalWidgetReceiver : DotCalWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = CompactMonthDotCalWidget()
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -190,7 +203,7 @@ class CompactMonthDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
     }
 }
 
-class SmallDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
+class SmallDotCalWidgetReceiver : DotCalWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = SmallDotCalWidget()
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -201,7 +214,7 @@ class SmallDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
     }
 }
 
-class MediumDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
+class MediumDotCalWidgetReceiver : DotCalWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = MediumDotCalWidget()
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -212,7 +225,7 @@ class MediumDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
     }
 }
 
-class LargeDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
+class LargeDotCalWidgetReceiver : DotCalWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = LargeDotCalWidget()
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -223,7 +236,7 @@ class LargeDotCalWidgetReceiver : GlanceAppWidgetReceiver() {
     }
 }
 
-class ShiftWideWidgetReceiver : GlanceAppWidgetReceiver() {
+class ShiftWideWidgetReceiver : DotCalWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = ShiftWideDotCalWidget()
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -768,7 +781,7 @@ private fun AgendaRow(
     }
 }
 
-class EventCountdownWidgetReceiver : GlanceAppWidgetReceiver() {
+class EventCountdownWidgetReceiver : DotCalWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = EventCountdownDotCalWidget()
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -779,7 +792,7 @@ class EventCountdownWidgetReceiver : GlanceAppWidgetReceiver() {
     }
 }
 
-class AgendaListWidgetReceiver : GlanceAppWidgetReceiver() {
+class AgendaListWidgetReceiver : DotCalWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = AgendaListDotCalWidget()
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -790,7 +803,7 @@ class AgendaListWidgetReceiver : GlanceAppWidgetReceiver() {
     }
 }
 
-class MonthGridWidgetReceiver : GlanceAppWidgetReceiver() {
+class MonthGridWidgetReceiver : DotCalWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = MonthGridDotCalWidget()
 
     override fun onReceive(context: Context, intent: Intent) {

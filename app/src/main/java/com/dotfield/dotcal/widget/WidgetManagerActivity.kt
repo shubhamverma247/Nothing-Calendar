@@ -2,7 +2,6 @@ package com.dotfield.dotcal.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -64,7 +63,6 @@ private data class PlacedWidgetUi(
 )
 
 class WidgetManagerActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -88,18 +86,6 @@ class WidgetManagerActivity : ComponentActivity() {
         }
     }
 }
-
-private val PLACED_WIDGET_RECEIVER_CLASSES = listOf(
-    "DateOnlyDotCalWidgetReceiver",
-    "CompactMonthDotCalWidgetReceiver",
-    "ShiftWideWidgetReceiver",
-    "SmallDotCalWidgetReceiver",
-    "MediumDotCalWidgetReceiver",
-    "LargeDotCalWidgetReceiver",
-    "EventCountdownWidgetReceiver",
-    "AgendaListWidgetReceiver",
-    "MonthGridWidgetReceiver",
-)
 
 @Composable
 private fun WidgetManagerScreen(
@@ -149,6 +135,7 @@ private fun WidgetManagerScreen(
                 modifier = Modifier.clickable(onClick = onBack),
             )
         }
+
         Column(modifier = Modifier.padding(horizontal = 22.dp)) {
             Text(
                 stringResource(R.string.widget_manager_title),
@@ -259,43 +246,24 @@ private fun WidgetManagerScreen(
     }
 }
 
-/** Friendly per-kind display names keyed by provider class suffix (manifest labels like
- *  "DC 2x2 Event" are launcher-picker names and read poorly inside the manager list). */
-private val RECEIVER_DISPLAY_NAMES = mapOf(
-    "DateOnlyDotCalWidgetReceiver" to "Date · 1x1",
-    "CompactMonthDotCalWidgetReceiver" to "Compact month · 2x2",
-    "ShiftWideWidgetReceiver" to "Shifts · 4x1",
-    "SmallDotCalWidgetReceiver" to "Event · 2x2",
-    "MediumDotCalWidgetReceiver" to "Agenda · 4x2",
-    "LargeDotCalWidgetReceiver" to "Month · 4x4",
-    "EventCountdownWidgetReceiver" to "Countdown",
-    "AgendaListWidgetReceiver" to "Agenda list",
-    "MonthGridWidgetReceiver" to "Month grid",
-)
-
 private suspend fun loadPlacedWidgets(context: Context): List<PlacedWidgetUi> {
     val appWidgetManager = AppWidgetManager.getInstance(context)
-    val glanceManager = GlanceAppWidgetManager(context)
     val result = mutableListOf<PlacedWidgetUi>()
-    for (className in PLACED_WIDGET_RECEIVER_CLASSES) {
-        val componentName = ComponentName(context, "com.dotfield.dotcal.widget.$className")
-        val ids = runCatching { appWidgetManager.getAppWidgetIds(componentName) }.getOrNull() ?: continue
-        for (id in ids) {
-            val info = appWidgetManager.getAppWidgetInfo(id)
-            val label = RECEIVER_DISPLAY_NAMES[className]
-                ?: info?.label.orEmpty().ifBlank { className }
-            var summary = ""
-            runCatching {
-                val glanceId = glanceManager.getGlanceIdBy(id)
-                val state = getAppWidgetState<Preferences>(context, PreferencesGlanceStateDefinition, glanceId)
-                val encoded = state[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG]
-                if (encoded != null) summary = summarize(context, encoded)
-            }
-            result.add(PlacedWidgetUi(id, label, gridSizeLabel(info?.minWidth, info?.minHeight), summary))
+    for (id in loadConfiguredWidgetIds(context).sorted()) {
+        val info = appWidgetManager.getAppWidgetInfo(id) ?: continue
+        val label = friendlyWidgetLabel(
+            info.provider?.className.orEmpty(),
+            info.loadLabel(context.packageManager)?.toString().orEmpty(),
+        )
+        var summary = ""
+        runCatching {
+            val glanceId = GlanceAppWidgetManager(context).getGlanceIdBy(id)
+            val state = getAppWidgetState<Preferences>(context, PreferencesGlanceStateDefinition, glanceId)
+            val encoded = state[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG]
+            if (encoded != null) summary = summarize(context, encoded)
         }
+        result.add(PlacedWidgetUi(id, label, gridSizeLabel(info.minWidth, info.minHeight), summary))
     }
-    // Number duplicate kinds ("Event · 2x2", "Event · 2x2 2", ...) so identical widget
-    // types stay distinguishable in the list.
     val totals = result.groupingBy { it.label }.eachCount()
     val seq = mutableMapOf<String, Int>()
     return result
@@ -311,12 +279,24 @@ private suspend fun loadPlacedWidgets(context: Context): List<PlacedWidgetUi> {
         .sortedWith(compareBy({ it.label }, { it.appWidgetId }))
 }
 
-/** Approximates launcher grid cells (70dp cell + 30dp spacing, launcher standard). */
 private fun gridSizeLabel(minWidthDp: Int?, minHeightDp: Int?): String {
     if (minWidthDp == null || minHeightDp == null || minWidthDp <= 0 || minHeightDp <= 0) return ""
     val cols = ((minWidthDp + 30) / 70).coerceIn(1, 5)
     val rows = ((minHeightDp + 30) / 70).coerceIn(1, 5)
     return "$cols×$rows"
+}
+
+private fun friendlyWidgetLabel(className: String, fallback: String): String = when {
+    className.endsWith("DateOnlyDotCalWidgetReceiver") -> "Date"
+    className.endsWith("CompactMonthDotCalWidgetReceiver") -> "Compact month"
+    className.endsWith("ShiftWideWidgetReceiver") -> "Shifts"
+    className.endsWith("SmallDotCalWidgetReceiver") -> "Event"
+    className.endsWith("MediumDotCalWidgetReceiver") -> "Agenda"
+    className.endsWith("LargeDotCalWidgetReceiver") -> "Month"
+    className.endsWith("EventCountdownWidgetReceiver") -> "Countdown"
+    className.endsWith("AgendaListWidgetReceiver") -> "Agenda list"
+    className.endsWith("MonthGridWidgetReceiver") -> "Month grid"
+    else -> fallback.ifBlank { className.substringAfterLast('.').ifBlank { className } }
 }
 
 internal fun summarize(context: Context, encoded: String): String {

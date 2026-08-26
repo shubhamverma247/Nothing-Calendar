@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 
 val Context.calendarPreferencesDataStore by preferencesDataStore(name = "calendar_preferences")
@@ -36,6 +37,7 @@ object CalendarPreferences {
     val KEY_WIDGET_DOT_TEXTURE = booleanPreferencesKey("widget_dot_texture")
     val KEY_WIDGET_ACCOUNT_ID = stringPreferencesKey("widget_account_id")
     val KEY_WIDGET_INSTANCE_CONFIG = stringPreferencesKey("widget_instance_config")
+    val KEY_WIDGET_CONFIGURED_ENTRIES = stringSetPreferencesKey("widget_configured_entries")
     val KEY_WIDGET_MONTH_OFFSET = intPreferencesKey("widget_month_offset")
     val KEY_APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
     val KEY_APP_LOCK_PIN_SALT = stringPreferencesKey("app_lock_pin_salt")
