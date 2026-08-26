@@ -59,6 +59,7 @@ import kotlinx.coroutines.withContext
 private data class PlacedWidgetUi(
     val appWidgetId: Int,
     val label: String,
+    val sizeLabel: String,
     val summary: String,
 )
 
@@ -219,13 +220,29 @@ private fun WidgetManagerScreen(
                         .clickable { onOpenWidget(widget.appWidgetId) }
                         .padding(horizontal = 18.dp, vertical = 16.dp),
                 ) {
-                    Text(
-                        widget.label,
-                        color = ui.paper,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            widget.label,
+                            color = ui.paper,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (widget.sizeLabel.isNotBlank()) {
+                            Text(
+                                widget.sizeLabel,
+                                color = ui.muted,
+                                fontFamily = FontFamily.SansSerif,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(ui.divider)
+                                    .padding(horizontal = 7.dp, vertical = 3.dp),
+                            )
+                        }
+                    }
                     if (widget.summary.isNotBlank()) {
                         Spacer(Modifier.height(3.dp))
                         Text(
@@ -264,16 +281,17 @@ private suspend fun loadPlacedWidgets(context: Context): List<PlacedWidgetUi> {
         val componentName = ComponentName(context, "com.dotfield.dotcal.widget.$className")
         val ids = runCatching { appWidgetManager.getAppWidgetIds(componentName) }.getOrNull() ?: continue
         for (id in ids) {
+            val info = appWidgetManager.getAppWidgetInfo(id)
             val label = RECEIVER_DISPLAY_NAMES[className]
-                ?: appWidgetManager.getAppWidgetInfo(id)?.label.orEmpty().ifBlank { className }
+                ?: info?.label.orEmpty().ifBlank { className }
             var summary = ""
             runCatching {
                 val glanceId = glanceManager.getGlanceIdBy(id)
                 val state = getAppWidgetState<Preferences>(context, PreferencesGlanceStateDefinition, glanceId)
                 val encoded = state[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG]
-                if (encoded != null) summary = summarize(encoded)
+                if (encoded != null) summary = summarize(context, encoded)
             }
-            result.add(PlacedWidgetUi(id, label, summary))
+            result.add(PlacedWidgetUi(id, label, gridSizeLabel(info?.minWidth, info?.minHeight), summary))
         }
     }
     // Number duplicate kinds ("Event · 2x2", "Event · 2x2 2", ...) so identical widget
@@ -293,14 +311,22 @@ private suspend fun loadPlacedWidgets(context: Context): List<PlacedWidgetUi> {
         .sortedWith(compareBy({ it.label }, { it.appWidgetId }))
 }
 
-internal fun summarize(encoded: String): String {
+/** Approximates launcher grid cells (70dp cell + 30dp spacing, launcher standard). */
+private fun gridSizeLabel(minWidthDp: Int?, minHeightDp: Int?): String {
+    if (minWidthDp == null || minHeightDp == null || minWidthDp <= 0 || minHeightDp <= 0) return ""
+    val cols = ((minWidthDp + 30) / 70).coerceIn(1, 5)
+    val rows = ((minHeightDp + 30) / 70).coerceIn(1, 5)
+    return "$cols×$rows"
+}
+
+internal fun summarize(context: Context, encoded: String): String {
     val config = WidgetInstanceConfig.decodeOrDefault(encoded, WidgetInstanceConfig(WidgetCategory.Schedule, WidgetViewType.Agenda))
     val range = when (config.timeRange) {
-        WidgetTimeRange.Today -> "Today"
-        WidgetTimeRange.Next24Hours -> "Next 24 hours"
-        WidgetTimeRange.Next3Days -> "3 days"
-        WidgetTimeRange.Next7Days -> "7 days"
-        WidgetTimeRange.Next14Days -> "14 days"
+        WidgetTimeRange.Today -> context.getString(R.string.widget_range_today)
+        WidgetTimeRange.Next24Hours -> context.getString(R.string.widget_range_24h)
+        WidgetTimeRange.Next3Days -> context.getString(R.string.widget_range_short_3)
+        WidgetTimeRange.Next7Days -> context.getString(R.string.widget_range_short_7)
+        WidgetTimeRange.Next14Days -> context.getString(R.string.widget_range_short_14)
     }
-    return "${config.category.name} · $range"
+    return "${context.getString(categoryLabelRes(config.category))} · $range"
 }

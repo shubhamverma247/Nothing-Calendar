@@ -189,7 +189,7 @@ private val DEFAULT_ACCENT = Color(0xFFFF3B30)
  * Resolves the stored accent value into a color. Accepts legacy preset enum names, the Pro extra
  * presets, and Pro custom "#RRGGBB" hex strings. Falls back to red on any unknown/invalid value.
  */
-private fun widgetAccentColor(value: String?): Color {
+internal fun widgetAccentColor(value: String?): Color {
     if (value == null) return DEFAULT_ACCENT
     when (value) {
         "RED" -> return DEFAULT_ACCENT

@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,7 +33,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LocalMinimumInteractiveComponentEnforcement
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -42,7 +40,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,7 +49,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -117,7 +116,6 @@ internal fun configDialogPalette(isDark: Boolean): com.dotfield.dotcal.ui.DotCal
             eventCardBorder = Color(0xFFECECEC),
             textFieldBorder = Color(0xFFD9D9D9),
             segmentSelected = Color(0xFFF4F4F4),
-            cell = Color(0xFFFFFFFF),
             switchOffTrack = Color(0xFFD9D9D9),
             isDark = false,
         )
@@ -205,7 +203,7 @@ private enum class ConfigSheet {
     TapAction,
 }
 
-private data class WidgetProfile(
+internal data class WidgetProfile(
     val showContent: Boolean,
     val showTimeRange: Boolean,
     val showCalendar: Boolean,
@@ -217,7 +215,7 @@ private data class WidgetProfile(
     val ranges: List<WidgetTimeRange>,
 )
 
-private fun profileForKind(kind: LegacyWidgetKind): WidgetProfile {
+internal fun profileForKind(kind: LegacyWidgetKind): WidgetProfile {
     val allCategories = listOf(
         WidgetCategory.Schedule,
         WidgetCategory.Today,
@@ -305,6 +303,29 @@ private fun profileForKind(kind: LegacyWidgetKind): WidgetProfile {
     }
 }
 
+/**
+ * Free-tier save path: strips every Pro-gated override so a config saved while Pro
+ * (or tampered state) cannot keep gated values after the entitlement is gone.
+ */
+internal fun sanitizeForFree(config: WidgetInstanceConfig): WidgetInstanceConfig {
+    return config.copy(
+        calendarFilter = WidgetCalendarFilter(null),
+        timeRange = if (config.timeRange == WidgetTimeRange.Next14Days) {
+            WidgetTimeRange.Next7Days
+        } else {
+            config.timeRange
+        },
+        density = if (config.density == WidgetContentDensity.High) WidgetContentDensity.Medium else config.density,
+        interaction = config.interaction.copy(tapAction = WidgetTapAction.OpenCalendar),
+        appearance = config.appearance.copy(
+            accentColor = null,
+            transparent = null,
+            opacityPercent = null,
+            showDotTexture = null,
+        ),
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WidgetConfigScreen(
@@ -317,6 +338,7 @@ private fun WidgetConfigScreen(
 ) {
     val context = LocalContext.current
     val view = LocalView.current
+    val haptics = LocalHapticFeedback.current
     var isDark by remember { mutableStateOf(initialIsDark) }
     val ui = remember(isDark) { EditorPalette(isDark) }
     LaunchedEffect(isDark) {
@@ -365,10 +387,8 @@ private fun WidgetConfigScreen(
     val profile = profileForKind(kind)
     val hasContentRows = profile.showTimeRange || profile.showCalendar || profile.showDisplay || profile.showDensity
 
-    fun accountName(id: String?): String {
-        if (id == null) return "All Calendars"
-        return accounts.firstOrNull { it.id == id }?.let { it.displayName.ifBlank { it.accountName } } ?: id
-    }
+    fun accountDisplayName(id: String): String =
+        accounts.firstOrNull { it.id == id }?.let { it.displayName.ifBlank { it.accountName } } ?: id
 
     Column(
         modifier = Modifier
@@ -408,6 +428,9 @@ private fun WidgetConfigScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp),
         ) {
+            SectionHeader(ui, stringResource(R.string.widget_config_section_preview))
+            WidgetPreviewCard(ui = ui, config = config, appIsDark = isDark)
+            Spacer(Modifier.height(18.dp))
             SectionHeader(ui, stringResource(R.string.widget_config_section_type))
             if (profile.showContent) {
                 WidgetTypeGrid(
@@ -415,11 +438,14 @@ private fun WidgetConfigScreen(
                     selectedLabel = stringResource(R.string.widget_config_selected),
                     categories = profile.categories,
                     selected = config.category,
-                    onSelect = { config = withCategory(config, it) },
+                    onSelect = { category ->
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        config = withCategory(config, category)
+                    },
                 )
             } else {
                 Text(
-                    stringResource(R.string.widget_config_type_fixed, categoryLabel(config.category)),
+                    stringResource(R.string.widget_config_type_fixed, stringResource(categoryLabelRes(config.category))),
                     color = ui.muted,
                     fontFamily = FontFamily.SansSerif,
                     fontSize = 13.sp,
@@ -428,59 +454,56 @@ private fun WidgetConfigScreen(
             }
             Spacer(Modifier.height(18.dp))
             if (hasContentRows) {
-            SectionHeader(ui, stringResource(R.string.widget_config_section_content))
-            ConfigPanel(ui) {
-                var prevRow = false
-                if (profile.showTimeRange) {
-                    if (prevRow) PanelDivider(ui)
-                    SheetRow(
-                        ui = ui,
-                        title = "Time range",
-                        value = timeRangeLabel(config.timeRange),
-                        badge = if (!isPro && profile.ranges.contains(WidgetTimeRange.Next14Days)) proBadge else null,
-                        onClick = { openSheet = ConfigSheet.TimeRange },
-                    )
-                    prevRow = true
+                SectionHeader(ui, stringResource(R.string.widget_config_section_content))
+                ConfigPanel(ui) {
+                    if (profile.showTimeRange) {
+                        SheetRow(
+                            ui = ui,
+                            title = stringResource(R.string.widget_row_time_range),
+                            value = timeRangeLabel(config.timeRange),
+                            badge = if (!isPro && profile.ranges.contains(WidgetTimeRange.Next14Days)) proBadge else null,
+                            onClick = { openSheet = ConfigSheet.TimeRange },
+                        )
+                        PanelDivider(ui)
+                    }
+                    if (profile.showCalendar) {
+                        SheetRow(
+                            ui = ui,
+                            title = stringResource(R.string.widget_row_calendar),
+                            value = config.calendarFilter.accountId?.let { accountDisplayName(it) }
+                                ?: stringResource(R.string.widget_calendar_all),
+                            badge = if (!isPro) proBadge else null,
+                            onClick = { openSheet = ConfigSheet.Calendar },
+                        )
+                        PanelDivider(ui)
+                    }
+                    if (profile.showDisplay) {
+                        SheetRow(
+                            ui = ui,
+                            title = stringResource(R.string.widget_row_display),
+                            value = displaySummary(config),
+                            onClick = { openSheet = ConfigSheet.Display },
+                        )
+                        PanelDivider(ui)
+                    }
+                    if (profile.showDensity) {
+                        SheetRow(
+                            ui = ui,
+                            title = stringResource(R.string.widget_row_density),
+                            value = densityLabel(config.density),
+                            badge = if (!isPro) proBadge else null,
+                            onClick = { openSheet = ConfigSheet.Density },
+                        )
+                        PanelDivider(ui)
+                    }
                 }
-                if (profile.showCalendar) {
-                    if (prevRow) PanelDivider(ui)
-                    SheetRow(
-                        ui = ui,
-                        title = "Calendar",
-                        value = accountName(config.calendarFilter.accountId),
-                        badge = if (!isPro) proBadge else null,
-                        onClick = { openSheet = ConfigSheet.Calendar },
-                    )
-                    prevRow = true
-                }
-                if (profile.showDisplay) {
-                    if (prevRow) PanelDivider(ui)
-                    SheetRow(
-                        ui = ui,
-                        title = "Display",
-                        value = displaySummary(config),
-                        onClick = { openSheet = ConfigSheet.Display },
-                    )
-                    prevRow = true
-                }
-                if (profile.showDensity) {
-                    if (prevRow) PanelDivider(ui)
-                    SheetRow(
-                        ui = ui,
-                        title = "Density",
-                        value = densityLabel(config.density),
-                        badge = if (!isPro) proBadge else null,
-                        onClick = { openSheet = ConfigSheet.Density },
-                    )
-                }
-            }
                 Spacer(Modifier.height(18.dp))
             }
             SectionHeader(ui, stringResource(R.string.widget_config_section_style))
             ConfigPanel(ui) {
                 SheetRow(
                     ui = ui,
-                    title = "Appearance",
+                    title = stringResource(R.string.widget_row_appearance),
                     value = appearanceSummary(config),
                     badge = if (!isPro) proBadge else null,
                     onClick = { openSheet = ConfigSheet.Appearance },
@@ -489,7 +512,7 @@ private fun WidgetConfigScreen(
                     PanelDivider(ui)
                     SheetRow(
                         ui = ui,
-                        title = "Advanced",
+                        title = stringResource(R.string.widget_row_advanced),
                         value = advancedSummary(config),
                         badge = if (!isPro) proBadge else null,
                         onClick = { openSheet = ConfigSheet.Advanced },
@@ -499,7 +522,7 @@ private fun WidgetConfigScreen(
                     PanelDivider(ui)
                     SheetRow(
                         ui = ui,
-                        title = "Tap action",
+                        title = stringResource(R.string.widget_row_tap_action),
                         value = tapActionLabel(config.interaction.tapAction),
                         badge = if (!isPro) proBadge else null,
                         onClick = { openSheet = ConfigSheet.TapAction },
@@ -510,27 +533,37 @@ private fun WidgetConfigScreen(
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 22.dp, vertical = 16.dp),
         ) {
             Button(
+                onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    config = WidgetInstanceConfig.legacyDefault(kind)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = ui.panel, contentColor = ui.paper),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.widget_config_reset), maxLines = 1)
+            }
+            Button(
                 onClick = onCancel,
                 colors = ButtonDefaults.buttonColors(containerColor = ui.panel, contentColor = ui.paper),
                 modifier = Modifier.weight(1f),
             ) {
-                Text(stringResource(R.string.widget_config_cancel))
+                Text(stringResource(R.string.widget_config_cancel), maxLines = 1)
             }
             Button(
                 onClick = {
                     val safe = if (isPro) config else sanitizeForFree(config)
                     onSave(safe)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = EditorAccent, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = EditorAccent, contentColor = ui.paper),
                 modifier = Modifier.weight(1f),
             ) {
-                Text(stringResource(R.string.widget_config_save))
+                Text(stringResource(R.string.widget_config_save), maxLines = 1)
             }
         }
     }
@@ -538,14 +571,14 @@ private fun WidgetConfigScreen(
     when (openSheet) {
         ConfigSheet.TimeRange -> ConfigBottomSheet(
             ui = ui,
-            title = "Time range",
+            title = stringResource(R.string.widget_row_time_range),
             onDismiss = { openSheet = null },
         ) {
-            timeRangeOptions().filter { it.first in profile.ranges }.forEach { (range, label) ->
+            timeRangeOptions().filter { it.first in profile.ranges }.forEach { (range, labelRes) ->
                 val locked = !isPro && range == WidgetTimeRange.Next14Days
                 RadioRow(
                     ui = ui,
-                    title = label,
+                    title = stringResource(labelRes),
                     badge = if (locked) proBadge else null,
                     selected = config.timeRange == range,
                     enabled = true,
@@ -563,13 +596,13 @@ private fun WidgetConfigScreen(
         }
         ConfigSheet.Calendar -> ConfigBottomSheet(
             ui = ui,
-            title = "Calendar",
+            title = stringResource(R.string.widget_row_calendar),
             onDismiss = { openSheet = null },
         ) {
             RadioRow(
                 ui = ui,
-                title = "All Calendars",
-                subtitle = "Use visible calendars",
+                title = stringResource(R.string.widget_calendar_all),
+                subtitle = stringResource(R.string.widget_calendar_all_subtitle),
                 selected = config.calendarFilter.accountId == null,
                 onClick = {
                     config = config.copy(calendarFilter = WidgetCalendarFilter(null))
@@ -581,7 +614,7 @@ private fun WidgetConfigScreen(
                 RadioRow(
                     ui = ui,
                     title = account.displayName.ifBlank { account.accountName },
-                    subtitle = if (locked) "Included in DotCal Pro" else account.accountType,
+                    subtitle = if (locked) stringResource(R.string.widget_calendar_pro_hint) else account.accountType,
                     badge = if (locked) proBadge else null,
                     selected = config.calendarFilter.accountId == account.id,
                     onClick = {
@@ -598,32 +631,32 @@ private fun WidgetConfigScreen(
         }
         ConfigSheet.Display -> ConfigBottomSheet(
             ui = ui,
-            title = "Display",
+            title = stringResource(R.string.widget_row_display),
             onDismiss = { openSheet = null },
         ) {
             ToggleRow(
                 ui = ui,
-                title = "Show time",
+                title = stringResource(R.string.widget_display_show_time),
                 checked = config.content.showTime,
                 onChange = { config = config.copy(content = config.content.copy(showTime = it)) },
             )
             if (config.category == WidgetCategory.Schedule || config.category == WidgetCategory.Calendar) {
                 ToggleRow(
                     ui = ui,
-                    title = "Show location",
+                    title = stringResource(R.string.widget_display_show_location),
                     checked = config.content.showLocation,
                     onChange = { config = config.copy(content = config.content.copy(showLocation = it)) },
                 )
                 ToggleRow(
                     ui = ui,
-                    title = "Colorize titles",
-                    subtitle = "Event titles use calendar colors",
+                    title = stringResource(R.string.widget_display_colorize),
+                    subtitle = stringResource(R.string.widget_display_colorize_sub),
                     checked = config.content.showEventColors,
                     onChange = { config = config.copy(content = config.content.copy(showEventColors = it)) },
                 )
                 ToggleRow(
                     ui = ui,
-                    title = "Show event titles",
+                    title = stringResource(R.string.widget_display_show_titles),
                     checked = config.content.showEventTitle,
                     onChange = { config = config.copy(content = config.content.copy(showEventTitle = it)) },
                 )
@@ -631,7 +664,7 @@ private fun WidgetConfigScreen(
             if (config.category == WidgetCategory.Calendar || config.category == WidgetCategory.Schedule) {
                 ToggleRow(
                     ui = ui,
-                    title = "Show all-day events",
+                    title = stringResource(R.string.widget_display_allday),
                     checked = config.content.showAllDayEvents,
                     onChange = { config = config.copy(content = config.content.copy(showAllDayEvents = it)) },
                 )
@@ -639,7 +672,7 @@ private fun WidgetConfigScreen(
             if (config.category == WidgetCategory.Today || config.category == WidgetCategory.Tasks) {
                 ToggleRow(
                     ui = ui,
-                    title = "Show tasks",
+                    title = stringResource(R.string.widget_display_tasks),
                     checked = config.content.showTasks,
                     onChange = { config = config.copy(content = config.content.copy(showTasks = it)) },
                 )
@@ -647,7 +680,7 @@ private fun WidgetConfigScreen(
             if (config.category == WidgetCategory.Tasks) {
                 ToggleRow(
                     ui = ui,
-                    title = "Show completed tasks",
+                    title = stringResource(R.string.widget_display_completed),
                     checked = config.content.showCompletedTasks,
                     onChange = { config = config.copy(content = config.content.copy(showCompletedTasks = it)) },
                 )
@@ -655,13 +688,13 @@ private fun WidgetConfigScreen(
             if (config.category == WidgetCategory.Calendar) {
                 ToggleRow(
                     ui = ui,
-                    title = "Highlight today",
+                    title = stringResource(R.string.widget_display_today_highlight),
                     checked = config.content.showTodayHighlight,
                     onChange = { config = config.copy(content = config.content.copy(showTodayHighlight = it)) },
                 )
                 ToggleRow(
                     ui = ui,
-                    title = "Show week numbers",
+                    title = stringResource(R.string.widget_display_week_numbers),
                     checked = config.content.showWeekNumbers,
                     onChange = { config = config.copy(content = config.content.copy(showWeekNumbers = it)) },
                 )
@@ -669,18 +702,18 @@ private fun WidgetConfigScreen(
         }
         ConfigSheet.Density -> ConfigBottomSheet(
             ui = ui,
-            title = "Density",
+            title = stringResource(R.string.widget_row_density),
             onDismiss = { openSheet = null },
         ) {
             listOf(
-                WidgetContentDensity.Low to "Low",
-                WidgetContentDensity.Medium to "Medium",
-                WidgetContentDensity.High to "High",
-            ).forEach { (density, label) ->
+                WidgetContentDensity.Low to R.string.widget_density_low,
+                WidgetContentDensity.Medium to R.string.widget_density_medium,
+                WidgetContentDensity.High to R.string.widget_density_high,
+            ).forEach { (density, labelRes) ->
                 val locked = !isPro && density == WidgetContentDensity.High
                 RadioRow(
                     ui = ui,
-                    title = label,
+                    title = stringResource(labelRes),
                     badge = if (locked) proBadge else null,
                     selected = config.density == density,
                     onClick = {
@@ -697,23 +730,20 @@ private fun WidgetConfigScreen(
         }
         ConfigSheet.Appearance -> ConfigBottomSheet(
             ui = ui,
-            title = "Appearance",
+            title = stringResource(R.string.widget_row_appearance),
             onDismiss = { openSheet = null },
         ) {
-            listOf("System", "Light", "Dark").forEach { mode ->
+            listOf(
+                null to stringResource(R.string.widget_appearance_follow_theme),
+                "Light" to stringResource(R.string.widget_appearance_light),
+                "Dark" to stringResource(R.string.widget_appearance_dark),
+            ).forEach { (mode, label) ->
                 RadioRow(
                     ui = ui,
-                    title = when (mode) {
-                        "System" -> "Follow app theme"
-                        else -> mode
-                    },
-                    selected = (config.appearance.themeMode ?: "System") == mode,
+                    title = label,
+                    selected = (config.appearance.themeMode ?: "System") == (mode ?: "System"),
                     onClick = {
-                        config = config.copy(
-                            appearance = config.appearance.copy(
-                                themeMode = if (mode == "System") null else mode,
-                            ),
-                        )
+                        config = config.copy(appearance = config.appearance.copy(themeMode = mode))
                     },
                 )
             }
@@ -725,20 +755,12 @@ private fun WidgetConfigScreen(
                     .background(ui.divider),
             )
             Spacer(Modifier.height(14.dp))
-            Text(
-                "ACCENT COLOR",
-                color = ui.faint,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp,
-                letterSpacing = 2.sp,
-                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-            )
-            accentOptions().forEach { (value, label) ->
+            SectionHeader(ui, stringResource(R.string.widget_section_accent), topPadding = true)
+            accentOptions().forEach { (value, labelRes) ->
                 val locked = !isPro && value != null
                 RadioRow(
                     ui = ui,
-                    title = label,
+                    title = stringResource(labelRes),
                     badge = if (locked) proBadge else null,
                     selected = config.appearance.accentColor == value ||
                         (value == null && config.appearance.accentColor == null),
@@ -755,8 +777,9 @@ private fun WidgetConfigScreen(
             PanelDivider(ui)
             RadioRow(
                 ui = ui,
-                title = "Custom color",
-                subtitle = config.appearance.accentColor?.takeIf { it.startsWith("#") }?.uppercase() ?: "#RRGGBB",
+                title = stringResource(R.string.widget_accent_custom),
+                subtitle = config.appearance.accentColor?.takeIf { it.startsWith("#") }?.uppercase()
+                    ?: stringResource(R.string.widget_accent_custom_hint),
                 badge = if (!isPro) proBadge else null,
                 selected = config.appearance.accentColor?.startsWith("#") == true,
                 onClick = {
@@ -771,25 +794,18 @@ private fun WidgetConfigScreen(
         }
         ConfigSheet.Advanced -> ConfigBottomSheet(
             ui = ui,
-            title = "Advanced",
+            title = stringResource(R.string.widget_row_advanced),
             onDismiss = { openSheet = null },
         ) {
-            Text(
-                "LAYOUT",
-                color = ui.faint,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp,
-                letterSpacing = 2.sp,
-            )
+            SectionHeader(ui, stringResource(R.string.widget_section_layout))
             listOf(
-                WidgetLayoutMode.Minimal to "Minimal · single item",
-                WidgetLayoutMode.Compact to "Compact",
-                WidgetLayoutMode.Detailed to "Detailed",
-            ).forEach { (mode, label) ->
+                WidgetLayoutMode.Minimal to R.string.widget_layout_minimal,
+                WidgetLayoutMode.Compact to R.string.widget_layout_compact,
+                WidgetLayoutMode.Detailed to R.string.widget_layout_detailed,
+            ).forEach { (mode, labelRes) ->
                 RadioRow(
                     ui = ui,
-                    title = label,
+                    title = stringResource(labelRes),
                     selected = config.layoutMode == mode,
                     onClick = { config = config.copy(layoutMode = mode) },
                 )
@@ -802,23 +818,16 @@ private fun WidgetConfigScreen(
                     .background(ui.divider),
             )
             Spacer(Modifier.height(14.dp))
-            Text(
-                "BACKGROUND",
-                color = ui.faint,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp,
-                letterSpacing = 2.sp,
-            )
+            SectionHeader(ui, stringResource(R.string.widget_section_background))
             listOf(
-                -1 to "Follow app",
-                0 to "Solid",
-                1 to "Transparent",
-            ).forEach { (value, label) ->
+                -1 to R.string.widget_background_follow,
+                0 to R.string.widget_background_solid,
+                1 to R.string.widget_background_transparent,
+            ).forEach { (value, labelRes) ->
                 val locked = !isPro && value != -1
                 RadioRow(
                     ui = ui,
-                    title = label,
+                    title = stringResource(labelRes),
                     badge = if (locked) proBadge else null,
                     selected = when (value) {
                         -1 -> config.appearance.transparent == null
@@ -846,7 +855,7 @@ private fun WidgetConfigScreen(
             if (config.appearance.transparent == true) {
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     Text(
-                        "Opacity ${config.appearance.opacityPercent ?: 50}%",
+                        stringResource(R.string.widget_opacity_label, config.appearance.opacityPercent ?: 50),
                         color = ui.muted,
                         fontFamily = FontFamily.SansSerif,
                         fontSize = 13.sp,
@@ -874,23 +883,16 @@ private fun WidgetConfigScreen(
                     .background(ui.divider),
             )
             Spacer(Modifier.height(14.dp))
-            Text(
-                "DOT TEXTURE",
-                color = ui.faint,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp,
-                letterSpacing = 2.sp,
-            )
+            SectionHeader(ui, stringResource(R.string.widget_section_texture))
             listOf(
-                -1 to "Follow app",
-                1 to "On",
-                0 to "Off",
-            ).forEach { (value, label) ->
+                -1 to R.string.widget_background_follow,
+                1 to R.string.widget_texture_on,
+                0 to R.string.widget_texture_off,
+            ).forEach { (value, labelRes) ->
                 val locked = !isPro && value != -1
                 RadioRow(
                     ui = ui,
-                    title = label,
+                    title = stringResource(labelRes),
                     badge = if (locked) proBadge else null,
                     selected = when (value) {
                         -1 -> config.appearance.showDotTexture == null
@@ -913,7 +915,7 @@ private fun WidgetConfigScreen(
         }
         ConfigSheet.TapAction -> ConfigBottomSheet(
             ui = ui,
-            title = "Tap action",
+            title = stringResource(R.string.widget_row_tap_action),
             onDismiss = { openSheet = null },
         ) {
             tapActionOptions().forEach { action ->
@@ -945,7 +947,7 @@ private fun WidgetConfigScreen(
         com.dotfield.dotcal.ui.CustomAccentPickerDialog(
             initial = initialColor,
             palette = configDialogPalette(isDark),
-            title = "Custom accent color",
+            title = stringResource(R.string.widget_accent_picker_title),
             onDismiss = { showColorPicker = false },
             onConfirm = { hex ->
                 config = config.copy(appearance = config.appearance.copy(accentColor = hex))
@@ -956,94 +958,154 @@ private fun WidgetConfigScreen(
     }
 }
 
-private fun accentOptions(): List<Pair<String?, String>> = listOf(
-    null to "Follow app",
-    "RED" to "Red",
-    "BLUE" to "Blue",
-    "GREEN" to "Green",
-    "PURPLE" to "Purple",
-    "AMBER" to "Amber",
-    "TEAL" to "Teal",
-    "PINK" to "Pink",
-    "ORANGE" to "Orange",
-    "CYAN" to "Cyan",
-)
-
-/**
- * Free-tier save path: strips every Pro-gated override so a config saved while Pro
- * (or tampered state) cannot keep gated values after the entitlement is gone.
- */
-internal fun sanitizeForFree(config: WidgetInstanceConfig): WidgetInstanceConfig {
-    return config.copy(
-        calendarFilter = WidgetCalendarFilter(null),
-        timeRange = if (config.timeRange == WidgetTimeRange.Next14Days) {
-            WidgetTimeRange.Next7Days
-        } else {
-            config.timeRange
-        },
-        density = if (config.density == WidgetContentDensity.High) WidgetContentDensity.Medium else config.density,
-        interaction = config.interaction.copy(tapAction = WidgetTapAction.OpenCalendar),
-        appearance = config.appearance.copy(
-            accentColor = null,
-            transparent = null,
-            opacityPercent = null,
-            showDotTexture = null,
-        ),
-    )
+/** Static mock of how the widget will look with the current config applied. */
+@Composable
+private fun WidgetPreviewCard(ui: EditorPalette, config: WidgetInstanceConfig, appIsDark: Boolean) {
+    val dark = when (config.appearance.themeMode) {
+        "Light" -> false
+        "Dark" -> true
+        else -> appIsDark
+    }
+    val accent = remember(config.appearance.accentColor) { widgetAccentColor(config.appearance.accentColor) }
+    val transparent = config.appearance.transparent ?: false
+    val opacity = (config.appearance.opacityPercent ?: 50) / 100f
+    val baseBg = if (dark) Color(0xFF1A1A1A) else Color(0xFFFFFFFF)
+    val bg = if (transparent) baseBg.copy(alpha = opacity) else baseBg
+    val fg = if (dark) Color(0xFFFFFFFF) else Color(0xFF101010)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(bg)
+            .border(width = 1.dp, color = ui.divider, shape = RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        Column {
+            Text(
+                stringResource(R.string.widget_preview_sample_date),
+                color = fg,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            repeat(3) { row ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 5.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(accent),
+                    )
+                    Spacer(Modifier.width(9.dp))
+                    Column {
+                        Box(
+                            modifier = Modifier
+                                .size(height = 6.dp, width = if (row == 0) 130.dp else 96.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(fg.copy(alpha = 0.55f)),
+                        )
+                        Spacer(Modifier.height(5.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(height = 5.dp, width = 58.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(fg.copy(alpha = 0.25f)),
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
+private fun accentOptions(): List<Pair<String?, Int>> = listOf(
+    null to R.string.widget_accent_follow,
+    "RED" to R.string.widget_accent_red,
+    "BLUE" to R.string.widget_accent_blue,
+    "GREEN" to R.string.widget_accent_green,
+    "PURPLE" to R.string.widget_accent_purple,
+    "AMBER" to R.string.widget_accent_amber,
+    "TEAL" to R.string.widget_accent_teal,
+    "PINK" to R.string.widget_accent_pink,
+    "ORANGE" to R.string.widget_accent_orange,
+    "CYAN" to R.string.widget_accent_cyan,
+)
+
+@Composable
 private fun advancedSummary(config: WidgetInstanceConfig): String {
-    val layout = when (config.layoutMode) {
-        WidgetLayoutMode.Minimal -> "Minimal"
-        WidgetLayoutMode.Compact -> "Compact"
-        WidgetLayoutMode.Detailed -> "Detailed"
-    }
+    val layout = stringResource(
+        when (config.layoutMode) {
+            WidgetLayoutMode.Minimal -> R.string.widget_layout_minimal
+            WidgetLayoutMode.Compact -> R.string.widget_layout_compact
+            WidgetLayoutMode.Detailed -> R.string.widget_layout_detailed
+        },
+    )
     val bg = when (config.appearance.transparent) {
-        null -> "App bg"
-        false -> "Solid"
-        true -> "${config.appearance.opacityPercent ?: 50}%"
+        null -> stringResource(R.string.widget_background_follow)
+        false -> stringResource(R.string.widget_background_solid)
+        else -> stringResource(R.string.widget_summary_percent, config.appearance.opacityPercent ?: 50)
     }
     return "$layout · $bg"
 }
 
+@Composable
 private fun appearanceSummary(config: WidgetInstanceConfig): String {
     val theme = when (config.appearance.themeMode) {
-        null, "System" -> "App theme"
-        else -> config.appearance.themeMode
+        "Light" -> stringResource(R.string.widget_appearance_light)
+        "Dark" -> stringResource(R.string.widget_appearance_dark)
+        else -> stringResource(R.string.widget_summary_app_theme)
     }
-    val accent = if (config.appearance.accentColor == null) {
-        "Default"
-    } else {
-        accentOptions().firstOrNull { it.first == config.appearance.accentColor }?.second ?: "Custom"
+    val accent = when {
+        config.appearance.accentColor == null -> stringResource(R.string.widget_summary_default)
+        config.appearance.accentColor?.startsWith("#") == true -> stringResource(R.string.widget_summary_custom)
+        else -> stringResource(accentOptions().firstOrNull { it.first == config.appearance.accentColor }?.second ?: R.string.widget_summary_default)
     }
     return "$theme · $accent"
 }
 
-private fun categoryLabel(category: WidgetCategory): String = when (category) {
-    WidgetCategory.Calendar -> "Month calendar"
-    WidgetCategory.Schedule -> "Upcoming events"
-    WidgetCategory.Today -> "Today"
-    WidgetCategory.Tasks -> "Tasks"
-    WidgetCategory.Countdown -> "Countdown"
-    WidgetCategory.Shift -> "Shifts"
-    WidgetCategory.QuickActions -> "Quick actions"
+internal fun categoryLabelRes(category: WidgetCategory): Int = when (category) {
+    WidgetCategory.Calendar -> R.string.widget_cat_month
+    WidgetCategory.Schedule -> R.string.widget_cat_schedule
+    WidgetCategory.Today -> R.string.widget_cat_today
+    WidgetCategory.Tasks -> R.string.widget_cat_tasks
+    WidgetCategory.Countdown -> R.string.widget_cat_countdown
+    WidgetCategory.Shift -> R.string.widget_cat_shift
+    WidgetCategory.QuickActions -> R.string.widget_cat_quick_actions
 }
 
-private fun timeRangeOptions(): List<Pair<WidgetTimeRange, String>> = listOf(
-    WidgetTimeRange.Today to "Today",
-    WidgetTimeRange.Next3Days to "Next 3 days",
-    WidgetTimeRange.Next7Days to "Next 7 days",
-    WidgetTimeRange.Next14Days to "Next 14 days",
+private fun categorySubtitleRes(category: WidgetCategory): Int = when (category) {
+    WidgetCategory.Calendar -> R.string.widget_sub_month
+    WidgetCategory.Schedule -> R.string.widget_sub_schedule
+    WidgetCategory.Today -> R.string.widget_sub_today
+    WidgetCategory.Tasks -> R.string.widget_sub_tasks
+    WidgetCategory.Countdown -> R.string.widget_sub_countdown
+    WidgetCategory.Shift -> R.string.widget_sub_shift
+    WidgetCategory.QuickActions -> R.string.widget_sub_quick
+}
+
+private fun timeRangeOptions(): List<Pair<WidgetTimeRange, Int>> = listOf(
+    WidgetTimeRange.Today to R.string.widget_range_today,
+    WidgetTimeRange.Next3Days to R.string.widget_range_3days,
+    WidgetTimeRange.Next7Days to R.string.widget_range_7days,
+    WidgetTimeRange.Next14Days to R.string.widget_range_14days,
 )
 
+@Composable
 private fun timeRangeLabel(range: WidgetTimeRange): String =
-    timeRangeOptions().firstOrNull { it.first == range }?.second ?: range.name
+    stringResource(timeRangeOptions().firstOrNull { it.first == range }?.second ?: R.string.widget_range_today)
 
-private fun densityLabel(density: WidgetContentDensity): String = when (density) {
-    WidgetContentDensity.Low -> "Low"
-    WidgetContentDensity.Medium -> "Medium"
-    WidgetContentDensity.High -> "High"
-}
+@Composable
+private fun densityLabel(density: WidgetContentDensity): String = stringResource(
+    when (density) {
+        WidgetContentDensity.Low -> R.string.widget_density_low
+        WidgetContentDensity.Medium -> R.string.widget_density_medium
+        WidgetContentDensity.High -> R.string.widget_density_high
+    },
+)
 
 private fun tapActionOptions(): List<WidgetTapAction> = listOf(
     WidgetTapAction.OpenCalendar,
@@ -1055,23 +1117,27 @@ private fun tapActionOptions(): List<WidgetTapAction> = listOf(
     WidgetTapAction.Search,
 )
 
-private fun tapActionLabel(action: WidgetTapAction): String = when (action) {
-    WidgetTapAction.OpenCalendar -> "Open calendar"
-    WidgetTapAction.OpenToday -> "Open today"
-    WidgetTapAction.OpenAgenda -> "Open agenda"
-    WidgetTapAction.QuickAdd -> "Quick add"
-    WidgetTapAction.CreateEvent -> "New event"
-    WidgetTapAction.CreateTask -> "New task"
-    WidgetTapAction.Search -> "Search"
-}
+@Composable
+private fun tapActionLabel(action: WidgetTapAction): String = stringResource(
+    when (action) {
+        WidgetTapAction.OpenCalendar -> R.string.widget_tap_open_calendar
+        WidgetTapAction.OpenToday -> R.string.widget_tap_open_today
+        WidgetTapAction.OpenAgenda -> R.string.widget_tap_open_agenda
+        WidgetTapAction.QuickAdd -> R.string.widget_tap_quick_add
+        WidgetTapAction.CreateEvent -> R.string.widget_tap_new_event
+        WidgetTapAction.CreateTask -> R.string.widget_tap_new_task
+        WidgetTapAction.Search -> R.string.widget_tap_search
+    },
+)
 
+@Composable
 private fun displaySummary(config: WidgetInstanceConfig): String {
     val parts = mutableListOf<String>()
-    if (config.content.showTime) parts.add("Time")
-    if (config.content.showLocation) parts.add("Location")
-    if (config.content.showTasks) parts.add("Tasks")
-    if (config.content.showCompletedTasks) parts.add("Completed")
-    return if (parts.isEmpty()) "Basic" else parts.joinToString(", ")
+    if (config.content.showTime) parts.add(stringResource(R.string.widget_summary_time))
+    if (config.content.showLocation) parts.add(stringResource(R.string.widget_summary_location))
+    if (config.content.showTasks) parts.add(stringResource(R.string.widget_display_tasks))
+    if (config.content.showCompletedTasks) parts.add(stringResource(R.string.widget_display_completed))
+    return if (parts.isEmpty()) stringResource(R.string.widget_summary_basic) else parts.joinToString(", ")
 }
 
 private fun withCategory(config: WidgetInstanceConfig, category: WidgetCategory): WidgetInstanceConfig {
@@ -1137,14 +1203,14 @@ private fun WidgetTypeGrid(
                             .padding(horizontal = 14.dp, vertical = 12.dp),
                     ) {
                         Text(
-                            categoryLabel(category),
+                            stringResource(categoryLabelRes(category)),
                             color = if (isSelected) EditorAccent else ui.paper,
                             fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp,
                         )
                         Text(
-                            categorySubtitle(category),
+                            stringResource(categorySubtitleRes(category)),
                             color = ui.muted,
                             fontFamily = FontFamily.SansSerif,
                             fontSize = 11.sp,
@@ -1180,18 +1246,8 @@ private fun WidgetTypeGrid(
     }
 }
 
-private fun categorySubtitle(category: WidgetCategory): String = when (category) {
-    WidgetCategory.Calendar -> "Month grid"
-    WidgetCategory.Schedule -> "Upcoming list"
-    WidgetCategory.Today -> "Day summary"
-    WidgetCategory.Tasks -> "Task list"
-    WidgetCategory.Countdown -> "D-Day timer"
-    WidgetCategory.Shift -> "Shift roster"
-    WidgetCategory.QuickActions -> "Shortcut buttons"
-}
-
 @Composable
-private fun SectionHeader(ui: EditorPalette, title: String) {
+private fun SectionHeader(ui: EditorPalette, title: String, topPadding: Boolean = false) {
     Text(
         title.uppercase(),
         color = ui.faint,
@@ -1199,7 +1255,7 @@ private fun SectionHeader(ui: EditorPalette, title: String) {
         fontWeight = FontWeight.Bold,
         fontSize = 11.sp,
         letterSpacing = 2.sp,
-        modifier = Modifier.padding(bottom = 8.dp),
+        modifier = Modifier.padding(top = if (topPadding) 12.dp else 0.dp, bottom = 8.dp),
     )
 }
 
@@ -1309,14 +1365,8 @@ private fun ConfigBottomSheet(
                 letterSpacing = 2.sp,
             )
             Spacer(Modifier.height(8.dp))
-            CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = 520.dp)
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    content()
-                }
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                content()
             }
         }
     }
@@ -1334,7 +1384,7 @@ private fun ToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onChange(!checked) }
-            .padding(vertical = 4.dp),
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -1371,11 +1421,15 @@ private fun RadioRow(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 2.dp),
+            .clickable(enabled = enabled) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            }
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -1403,7 +1457,7 @@ private fun RadioRow(
         }
         RadioButton(
             selected = selected,
-            onClick = onClick,
+            onClick = null,
             enabled = enabled,
             colors = RadioButtonDefaults.colors(selectedColor = EditorAccent, unselectedColor = ui.faint),
         )
