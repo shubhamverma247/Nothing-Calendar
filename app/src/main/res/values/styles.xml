@@ -1,6 +1,18 @@
 <resources>
     <style name="Theme.DotCal" parent="@style/DotCalLight" />
 
+    <style name="Theme.DotCal.SnoozeDialog" parent="android:style/Theme.Material.Dialog.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:colorAccent">#FF3B30</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="android:windowMinWidthMajor">92%</item>
+        <item name="android:windowMinWidthMinor">92%</item>
+    </style>
+
     <style name="DotCalDark" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>

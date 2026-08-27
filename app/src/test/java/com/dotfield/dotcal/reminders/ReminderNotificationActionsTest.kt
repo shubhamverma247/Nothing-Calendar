@@ -6,14 +6,9 @@ import org.junit.Test
 
 class ReminderNotificationActionsTest {
     @Test
-    fun eventNotificationsIncludeOpenAndSnoozeActions() {
+    fun eventNotificationsUseOneSnoozePickerAction() {
         assertEquals(
-            listOf(
-                ReminderNotificationActionType.Open,
-                ReminderNotificationActionType.Snooze(5),
-                ReminderNotificationActionType.Snooze(15),
-                ReminderNotificationActionType.Snooze(30),
-            ),
+            listOf(ReminderNotificationActionType.Snooze),
             ReminderNotificationActions.notificationActionTypes(isTask = false),
         )
     }
@@ -22,10 +17,7 @@ class ReminderNotificationActionsTest {
     fun taskNotificationsIncludeCompleteTaskAction() {
         assertEquals(
             listOf(
-                ReminderNotificationActionType.Open,
-                ReminderNotificationActionType.Snooze(5),
-                ReminderNotificationActionType.Snooze(15),
-                ReminderNotificationActionType.Snooze(30),
+                ReminderNotificationActionType.Snooze,
                 ReminderNotificationActionType.CompleteTask,
             ),
             ReminderNotificationActions.notificationActionTypes(isTask = true),
@@ -49,5 +41,17 @@ class ReminderNotificationActionsTest {
         assertEquals(5 * 60_000L, ReminderNotificationActions.snoozeDelayMs(5))
         assertEquals(15 * 60_000L, ReminderNotificationActions.snoozeDelayMs(15))
         assertEquals(30 * 60_000L, ReminderNotificationActions.snoozeDelayMs(30))
+    }
+
+    @Test
+    fun snoozePickerProvidesUsefulPresets() {
+        assertEquals(listOf(5, 10, 15, 30, 60), ReminderNotificationActions.SnoozePickerMinutes)
+    }
+
+    @Test
+    fun snoozeCannotScheduleInThePastOrAtCurrentTime() {
+        assertEquals(false, ReminderNotificationActions.canScheduleAt(1_000L, 1_000L))
+        assertEquals(false, ReminderNotificationActions.canScheduleAt(999L, 1_000L))
+        assertEquals(true, ReminderNotificationActions.canScheduleAt(1_001L, 1_000L))
     }
 }

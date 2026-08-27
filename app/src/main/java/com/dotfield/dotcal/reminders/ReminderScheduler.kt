@@ -86,10 +86,18 @@ class ReminderScheduler(private val context: Context) {
             minutesBefore = reminder.minutesBefore,
             alarmRequestCode = reminder.alarmRequestCode,
             isTask = event.isTask == 1,
+            eventStartTimeMs = event.startTimeMs,
         )
     }
 
-    fun showReminderNotification(eventId: String, eventTitle: String, minutesBefore: Int, alarmRequestCode: Int, isTask: Boolean = false) {
+    fun showReminderNotification(
+        eventId: String,
+        eventTitle: String,
+        minutesBefore: Int,
+        alarmRequestCode: Int,
+        isTask: Boolean = false,
+        eventStartTimeMs: Long = 0L,
+    ) {
         ensureChannel()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -107,15 +115,10 @@ class ReminderScheduler(private val context: Context) {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
         ReminderNotificationActions.notificationActionTypes(isTask).forEach { action ->
             when (action) {
-                ReminderNotificationActionType.Open -> builder.addAction(
+                ReminderNotificationActionType.Snooze -> builder.addAction(
                     R.drawable.ic_notification,
-                    appContext.getString(R.string.notification_action_open),
-                    viewReminderPendingIntent(eventId, isTask),
-                )
-                is ReminderNotificationActionType.Snooze -> builder.addAction(
-                    R.drawable.ic_notification,
-                    appContext.getString(R.string.notification_action_snooze_minutes, action.minutes),
-                    snoozePendingIntent(eventId, eventTitle, alarmRequestCode, action.minutes, isTask),
+                    appContext.getString(R.string.notification_action_snooze),
+                    snoozePickerPendingIntent(eventId, eventTitle, alarmRequestCode, isTask, eventStartTimeMs),
                 )
                 ReminderNotificationActionType.CompleteTask -> builder.addAction(
                     R.drawable.ic_notification,
@@ -169,19 +172,17 @@ class ReminderScheduler(private val context: Context) {
         )
     }
 
-    private fun snoozePendingIntent(eventId: String, eventTitle: String, alarmRequestCode: Int, snoozeMinutes: Int, isTask: Boolean): PendingIntent {
-        val intent = Intent(appContext, ReminderReceiver::class.java).apply {
-            action = ReminderReceiver.ACTION_SNOOZE_REMINDER
+    private fun snoozePickerPendingIntent(eventId: String, eventTitle: String, alarmRequestCode: Int, isTask: Boolean, eventStartTimeMs: Long): PendingIntent {
+        val intent = Intent(appContext, SnoozePickerActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
             putExtra(ReminderReceiver.EXTRA_EVENT_ID, eventId)
             putExtra(ReminderReceiver.EXTRA_ALARM_REQUEST_CODE, alarmRequestCode)
             putExtra(ReminderReceiver.EXTRA_EVENT_TITLE, eventTitle)
-            putExtra(ReminderReceiver.EXTRA_SNOOZE_MINUTES, snoozeMinutes)
             putExtra(ReminderReceiver.EXTRA_IS_TASK, isTask)
+            putExtra(ReminderReceiver.EXTRA_EVENT_START_TIME_MS, eventStartTimeMs)
         }
-        return PendingIntent.getBroadcast(
-            appContext,
-            ReminderNotificationActions.snoozeRequestCode(alarmRequestCode, snoozeMinutes),
-            intent,
+        return PendingIntent.getActivity(
+            appContext, alarmRequestCode xor 0x4B4B4B4B, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }

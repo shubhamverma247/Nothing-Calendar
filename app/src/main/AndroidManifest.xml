@@ -83,6 +83,14 @@
             android:exported="false"
             android:theme="@style/Theme.DotCal" />
 
+        <activity
+            android:name=".reminders.SnoozePickerActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:finishOnTaskLaunch="true"
+            android:taskAffinity="${applicationId}.snooze"
+            android:theme="@style/Theme.DotCal.SnoozeDialog" />
+
         <receiver
             android:name=".reminders.ReminderReceiver"
             android:exported="false" />

@@ -68,6 +68,7 @@ class ReminderReceiver : BroadcastReceiver() {
                                 minutesBefore = fallbackMinutes,
                                 alarmRequestCode = alarmRequestCode,
                                 isTask = fallbackIsTask,
+                                eventStartTimeMs = event?.startTimeMs ?: 0L,
                             )
                             if (reminder != null) repository.markReminderDelivered(alarmRequestCode)
                             return@runCatching
@@ -119,6 +120,7 @@ class ReminderReceiver : BroadcastReceiver() {
         const val EXTRA_MINUTES_BEFORE = "extra_minutes_before"
         const val EXTRA_SNOOZE_MINUTES = "extra_snooze_minutes"
         const val EXTRA_IS_TASK = "extra_is_task"
+        const val EXTRA_EVENT_START_TIME_MS = "extra_event_start_time_ms"
         private const val DEFAULT_SNOOZE_MINUTES = 15
     }
 }

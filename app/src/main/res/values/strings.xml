@@ -22,7 +22,27 @@
     <string name="glyph_toy_summary">Shows a live countdown to your next DotCal event.</string>
     <string name="notification_action_open">Open</string>
     <string name="notification_action_snooze_minutes">Snooze %1$d min</string>
+    <string name="notification_action_snooze">Snooze</string>
     <string name="notification_action_complete_task">Complete Task</string>
+    <string name="snooze_picker_title">Snooze reminder</string>
+    <string name="snooze_picker_for">Snooze for</string>
+    <string name="snooze_picker_until">Snooze until</string>
+    <string name="snooze_picker_event_start">Event start</string>
+    <string name="snooze_picker_event_start_subtitle">Remind me when this event begins</string>
+    <string name="snooze_picker_custom">Custom date and time</string>
+    <string name="snooze_picker_custom_subtitle">Choose an exact time</string>
+    <string name="snooze_picker_choose_date">Choose date</string>
+    <string name="snooze_picker_choose_time">Choose time</string>
+    <string name="snooze_picker_schedule">Schedule</string>
+    <string name="snooze_picker_invalid_time">Choose a future time</string>
+    <string name="snooze_picker_minutes">%1$d minutes</string>
+    <string name="snooze_picker_one_hour">1 hour</string>
+    <string name="snooze_picker_after_this_time">Remind me after this time</string>
+    <string name="snooze_picker_custom_minutes">%1$d minutes</string>
+    <string name="snooze_picker_custom_duration">Custom duration</string>
+    <string name="snooze_picker_custom_duration_subtitle">Choose a custom number of minutes</string>
+    <string name="snooze_picker_custom_duration_hint">Enter how many minutes from now.</string>
+    <string name="snooze_picker_minutes_label">Minutes</string>
 
     <!-- Language picker -->
     <string name="settings_language_title">Language</string>
