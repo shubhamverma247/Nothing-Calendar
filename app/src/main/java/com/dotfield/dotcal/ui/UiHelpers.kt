@@ -292,6 +292,7 @@ internal fun reminderLabel(minutes: Int?): String {
 internal fun RecurringEditScope.label(): String {
     return when (this) {
         RecurringEditScope.ThisEvent -> "This event"
+        RecurringEditScope.ThisAndFollowing -> "This and following"
         RecurringEditScope.WholeSeries -> "Whole series"
     }
 }

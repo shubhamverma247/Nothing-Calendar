@@ -327,6 +327,7 @@
     <string name="event_repeat_none">None</string>
     <string name="event_apply_to">Apply to</string>
     <string name="event_apply_series">Changes apply to the whole series</string>
+    <string name="event_apply_following">Changes apply to this and future events</string>
     <string name="event_apply_instance">Changes apply only to this event</string>
     <string name="event_error_end_before_start_date">End date must be on or after start date</string>
     <string name="event_error_end_before_start_time">End must be after start</string>

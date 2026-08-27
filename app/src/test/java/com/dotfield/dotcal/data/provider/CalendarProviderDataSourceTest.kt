@@ -40,6 +40,57 @@ class CalendarProviderDataSourceTest {
     }
 
     @Test
+    fun providerEventEndTimeUsesDurationForRecurringEvents() {
+        val start = 1_000L
+        val lastDate = start + 30L * 24L * 60L * 60L * 1000L
+
+        assertEquals(
+            start + 60L * 60L * 1000L,
+            providerEventEndTimeMs(
+                startTimeMs = start,
+                dtEndMs = null,
+                duration = "PT1H",
+                lastDateMs = lastDate,
+                rrule = "FREQ=DAILY;COUNT=30",
+            ),
+        )
+    }
+
+    @Test
+    fun providerEventEndTimeDoesNotTreatRecurringLastDateAsOccurrenceEnd() {
+        val start = 1_000L
+        val lastDate = start + 30L * 24L * 60L * 60L * 1000L
+
+        assertEquals(
+            start + 60L * 60L * 1000L,
+            providerEventEndTimeMs(
+                startTimeMs = start,
+                dtEndMs = null,
+                duration = null,
+                lastDateMs = lastDate,
+                rrule = "FREQ=DAILY;COUNT=30",
+            ),
+        )
+    }
+
+    @Test
+    fun providerEventEndTimeKeepsLastDateFallbackForNonRecurringEvents() {
+        val start = 1_000L
+        val lastDate = start + 2L * 60L * 60L * 1000L
+
+        assertEquals(
+            lastDate,
+            providerEventEndTimeMs(
+                startTimeMs = start,
+                dtEndMs = null,
+                duration = null,
+                lastDateMs = lastDate,
+                rrule = null,
+            ),
+        )
+    }
+
+    @Test
     fun normalizedProviderReminderMinutesDeduplicatesSortsAndRejectsNegativeValues() {
         assertEquals(listOf(0, 10, 30), listOf(30, -1, 10, 30, 0).normalizedProviderReminderMinutes())
     }
@@ -57,6 +108,30 @@ class CalendarProviderDataSourceTest {
         assertEquals("20260822T093000Z", normalizedProviderRdate(" 20260822T093000Z "))
         assertNull(normalizedProviderRdate(""))
         assertNull(normalizedProviderRdate(null))
+    }
+
+    @Test
+    fun providerRdateParsesTimedUtcAndLocalValues() {
+        val zone = ZoneId.of("America/New_York")
+        val utc = LocalDateTime.of(2026, 8, 22, 9, 30).toInstant(ZoneOffset.UTC).toEpochMilli()
+        val local = LocalDateTime.of(2026, 8, 23, 10, 0).atZone(zone).toInstant().toEpochMilli()
+
+        assertEquals(
+            listOf(utc, local),
+            providerRdateStartTimes("20260822T093000Z,20260823T100000", 0, zone.id),
+        )
+    }
+
+    @Test
+    fun providerRdateParsesAllDayValuesAsCalendarDates() {
+        val zone = ZoneId.of("Asia/Kolkata")
+        val first = LocalDate.of(2026, 8, 22).atStartOfDay(zone).toInstant().toEpochMilli()
+        val second = LocalDate.of(2026, 8, 23).atStartOfDay(zone).toInstant().toEpochMilli()
+
+        assertEquals(
+            listOf(first, second),
+            providerRdateStartTimes("20260822,20260823", 1, zone.id),
+        )
     }
 
     @Test

@@ -103,7 +103,7 @@ class CalendarSyncRepository(
             }
             val replacedReminderEvents = upserts.map { it.id } + deleteIds
             val remindersToCancel = replacedReminderEvents.flatMap { eventId -> dao.getRemindersForEvent(eventId) }
-            syncProviderMetadataFlags(providerByGoogleId, localByGoogleId, deletedGoogleIds)
+            syncProviderMetadataFlags(providerByGoogleId, localByGoogleId, deletedGoogleIds, deleteIds)
             inserted += accountInserted
             updated += accountUpdated
             deleted += accountDeleted
@@ -153,7 +153,11 @@ class CalendarSyncRepository(
         providerByGoogleId: Map<String, CalendarEvent>,
         localByGoogleId: Map<String, CalendarEvent>,
         deletedGoogleIds: Set<String>,
+        deletedLocalEventIds: List<String>,
     ) {
+        deletedLocalEventIds.forEach { eventId ->
+            removeProviderSideMetadata(eventId)
+        }
         providerByGoogleId.forEach { (googleEventId, providerEvent) ->
             if (googleEventId in deletedGoogleIds) return@forEach
             val eventId = localByGoogleId[googleEventId]?.id ?: providerEvent.id
@@ -168,7 +172,17 @@ class CalendarSyncRepository(
             providerEvent.providerRdate?.let { rdate ->
                 sideStore.write(EventSideStoreNamespaces.ProviderRdates, eventId, rdate)
             } ?: sideStore.remove(EventSideStoreNamespaces.ProviderRdates, eventId)
+            providerEvent.providerMeetingMetadataJson?.let { metadata ->
+                sideStore.write(EventSideStoreNamespaces.ProviderMeetingMetadata, eventId, metadata)
+            } ?: sideStore.remove(EventSideStoreNamespaces.ProviderMeetingMetadata, eventId)
         }
+    }
+
+    private suspend fun removeProviderSideMetadata(eventId: String) {
+        sideStore.remove(EventSideStoreNamespaces.GhostFlags, eventId)
+        sideStore.remove(EventSideStoreNamespaces.ProviderStatuses, eventId)
+        sideStore.remove(EventSideStoreNamespaces.ProviderRdates, eventId)
+        sideStore.remove(EventSideStoreNamespaces.ProviderMeetingMetadata, eventId)
     }
 
     private fun com.dotfield.dotcal.data.CalendarAccount.googleCalendarId(): Long? {

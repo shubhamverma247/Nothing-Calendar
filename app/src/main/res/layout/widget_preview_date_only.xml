@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="56dp"
     android:layout_height="56dp"
-    android:background="@drawable/widget_preview_date_only_bg"
+    android:background="@drawable/widget_preview_background"
     android:padding="6dp">
 
     <TextView

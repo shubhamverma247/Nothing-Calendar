@@ -33,4 +33,16 @@ class SharedSideStoreTest {
 
         assertEquals("1", SharedSideStore(file).read("ghost_flags", "event-2"))
     }
+
+    @Test
+    fun providerMeetingMetadataUsesDedicatedNamespace() = runBlocking {
+        val file = File.createTempFile("dotcal-side-store-meeting", ".json")
+        file.deleteOnExit()
+        val store = SharedSideStore(file)
+        val metadata = """{"organizer":"lead@example.com"}"""
+
+        store.write(EventSideStoreNamespaces.ProviderMeetingMetadata, "event-3", metadata)
+
+        assertEquals(metadata, SharedSideStore(file).read(EventSideStoreNamespaces.ProviderMeetingMetadata, "event-3"))
+    }
 }

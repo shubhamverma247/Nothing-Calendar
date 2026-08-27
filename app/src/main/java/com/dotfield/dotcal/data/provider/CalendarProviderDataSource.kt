@@ -256,15 +256,29 @@ class CalendarProviderDataSource(private val context: Context) {
     ): CalendarEvent? {
         val providerEventId = getLong(EVENT_ID_INDEX).toString()
         val start = getLongOrNull(EVENT_DTSTART_INDEX) ?: return null
-        val end = getLongOrNull(EVENT_DTEND_INDEX)
-            ?: getStringOrNull(EVENT_DURATION_INDEX)?.let { duration -> providerDurationMillis(duration)?.let(start::plus) }
-            ?: getLongOrNull(EVENT_LAST_DATE_INDEX)
-            ?: start + DEFAULT_EVENT_DURATION_MS
+        val end = providerEventEndTimeMs(
+            startTimeMs = start,
+            dtEndMs = getLongOrNull(EVENT_DTEND_INDEX),
+            duration = getStringOrNull(EVENT_DURATION_INDEX),
+            lastDateMs = getLongOrNull(EVENT_LAST_DATE_INDEX),
+            rrule = getStringOrNull(EVENT_RRULE_INDEX),
+        )
         if (end < rangeStartMs || start >= rangeEndMs) return null
         val timeZone = getStringOrNull(EVENT_TIMEZONE_INDEX).takeUnless { it.isNullOrBlank() } ?: TimeZone.getDefault().id
         val now = System.currentTimeMillis()
         val originalGoogleEventId = getLongOrNull(EVENT_ORIGINAL_ID_INDEX)?.toString()
         val originalInstanceTimeMs = getLongOrNull(EVENT_ORIGINAL_INSTANCE_TIME_INDEX)
+        val meetingMetadataJson = encodeProviderMeetingMetadata(
+            ProviderMeetingMetadata(
+                organizer = getStringOrNull(EVENT_ORGANIZER_INDEX),
+                accessLevel = getIntOrNull(EVENT_ACCESS_LEVEL_INDEX),
+                availability = getIntOrNull(EVENT_AVAILABILITY_INDEX),
+                guestsCanModify = getIntOrNull(EVENT_GUESTS_CAN_MODIFY_INDEX)?.toProviderBoolean(),
+                guestsCanInviteOthers = getIntOrNull(EVENT_GUESTS_CAN_INVITE_OTHERS_INDEX)?.toProviderBoolean(),
+                guestsCanSeeGuests = getIntOrNull(EVENT_GUESTS_CAN_SEE_GUESTS_INDEX)?.toProviderBoolean(),
+                attendees = getAttendees(providerEventId),
+            ),
+        )
         return CalendarEvent(
             id = providerEventRoomId(calendarId, providerEventId),
             accountId = providerAccountId(calendarId),
@@ -285,7 +299,7 @@ class CalendarProviderDataSource(private val context: Context) {
             source = "GOOGLE",
             googleEventId = providerEventId,
             googleCalendarId = calendarId.toString(),
-            syncVersion = providerSyncVersion(getReminderMinutes(providerEventId)),
+            syncVersion = providerSyncVersion(getReminderMinutes(providerEventId), meetingMetadataJson),
             isTask = 0,
             isCompleted = 0,
             completedAtMs = null,
@@ -299,16 +313,18 @@ class CalendarProviderDataSource(private val context: Context) {
             providerAvailability = getIntOrDefault(EVENT_AVAILABILITY_INDEX, CalendarContract.Events.AVAILABILITY_BUSY)
             providerStatus = getIntOrDefault(EVENT_STATUS_INDEX, CalendarContract.Events.STATUS_CONFIRMED)
             providerRdate = normalizedProviderRdate(getStringOrNull(EVENT_RDATE_INDEX))
+            providerMeetingMetadataJson = meetingMetadataJson
             isGhost = providerAvailabilityIsNonBlocking(providerAvailability)
         }
     }
 
-    private fun Cursor.providerSyncVersion(reminderMinutes: List<Int>): Int {
+    private fun Cursor.providerSyncVersion(reminderMinutes: List<Int>, meetingMetadataJson: String?): Int {
         var hash = 17
         EVENT_HASH_COLUMNS.forEach { index ->
             hash = 31 * hash + getStringOrNull(index).orEmpty().hashCode()
         }
         hash = 31 * hash + reminderMinutes.hashCode()
+        hash = 31 * hash + meetingMetadataJson.orEmpty().hashCode()
         return hash
     }
 
@@ -316,10 +332,39 @@ class CalendarProviderDataSource(private val context: Context) {
 
     private fun Cursor.getLongOrNull(index: Int): Long? = if (isNull(index)) null else getLong(index)
 
+    private fun Cursor.getIntOrNull(index: Int): Int? = if (isNull(index)) null else getInt(index)
+
     private fun Cursor.getIntOrDefault(index: Int, defaultValue: Int): Int = if (isNull(index)) defaultValue else getInt(index)
 
     private fun Cursor.getColorHex(index: Int): String {
         return getLongOrNull(index)?.let { colorIntToHex(it.toInt()) } ?: "#FF3B30"
+    }
+
+    private fun getAttendees(providerEventId: String): List<ProviderAttendee> {
+        val cursor = runCatching {
+            contentResolver.query(
+                CalendarContract.Attendees.CONTENT_URI,
+                ATTENDEE_PROJECTION,
+                "${CalendarContract.Attendees.EVENT_ID} = ?",
+                arrayOf(providerEventId),
+                "${CalendarContract.Attendees.ATTENDEE_NAME} ASC",
+            )
+        }.getOrNull() ?: return emptyList()
+        return cursor.use { attendees ->
+            buildList {
+                while (attendees.moveToNext()) {
+                    add(
+                        ProviderAttendee(
+                            name = attendees.getStringOrNull(ATTENDEE_NAME_INDEX),
+                            email = attendees.getStringOrNull(ATTENDEE_EMAIL_INDEX),
+                            status = attendees.getIntOrNull(ATTENDEE_STATUS_INDEX),
+                            type = attendees.getIntOrNull(ATTENDEE_TYPE_INDEX),
+                            relationship = attendees.getIntOrNull(ATTENDEE_RELATIONSHIP_INDEX),
+                        ),
+                    )
+                }
+            }
+        }
     }
 
     companion object {
@@ -361,6 +406,11 @@ class CalendarProviderDataSource(private val context: Context) {
             CalendarContract.Events.AVAILABILITY,
             CalendarContract.Events.STATUS,
             CalendarContract.Events.RDATE,
+            CalendarContract.Events.ORGANIZER,
+            CalendarContract.Events.ACCESS_LEVEL,
+            CalendarContract.Events.GUESTS_CAN_MODIFY,
+            CalendarContract.Events.GUESTS_CAN_INVITE_OTHERS,
+            CalendarContract.Events.GUESTS_CAN_SEE_GUESTS,
         )
         private const val EVENT_ID_INDEX = 0
         private const val EVENT_TITLE_INDEX = 1
@@ -380,12 +430,30 @@ class CalendarProviderDataSource(private val context: Context) {
         private const val EVENT_AVAILABILITY_INDEX = 15
         private const val EVENT_STATUS_INDEX = 16
         private const val EVENT_RDATE_INDEX = 17
+        private const val EVENT_ORGANIZER_INDEX = 18
+        private const val EVENT_ACCESS_LEVEL_INDEX = 19
+        private const val EVENT_GUESTS_CAN_MODIFY_INDEX = 20
+        private const val EVENT_GUESTS_CAN_INVITE_OTHERS_INDEX = 21
+        private const val EVENT_GUESTS_CAN_SEE_GUESTS_INDEX = 22
         private val EVENT_HASH_COLUMNS = EVENT_PROJECTION.indices.toList()
 
         private val REMINDER_PROJECTION = arrayOf(
             CalendarContract.Reminders.MINUTES,
         )
         private const val REMINDER_MINUTES_INDEX = 0
+
+        private val ATTENDEE_PROJECTION = arrayOf(
+            CalendarContract.Attendees.ATTENDEE_NAME,
+            CalendarContract.Attendees.ATTENDEE_EMAIL,
+            CalendarContract.Attendees.ATTENDEE_STATUS,
+            CalendarContract.Attendees.ATTENDEE_TYPE,
+            CalendarContract.Attendees.ATTENDEE_RELATIONSHIP,
+        )
+        private const val ATTENDEE_NAME_INDEX = 0
+        private const val ATTENDEE_EMAIL_INDEX = 1
+        private const val ATTENDEE_STATUS_INDEX = 2
+        private const val ATTENDEE_TYPE_INDEX = 3
+        private const val ATTENDEE_RELATIONSHIP_INDEX = 4
     }
 }
 
@@ -421,6 +489,8 @@ internal fun providerStatusIsCancelled(status: Int?): Boolean {
     return status == CalendarContract.Events.STATUS_CANCELED
 }
 
+private fun Int.toProviderBoolean(): Boolean = this != 0
+
 internal fun normalizedProviderRdate(rdate: String?): String? {
     return rdate?.trim()?.takeIf { it.isNotBlank() }
 }
@@ -453,11 +523,36 @@ internal fun exceptionDatesFromProviderExdate(exdate: String?, isAllDay: Int, ti
     val zone = safeProviderZone(timeZone)
     val values = exdate
         ?.split(',')
-        ?.mapNotNull { token -> parseProviderExdateToken(token.trim(), isAllDay, zone) }
+        ?.mapNotNull { token -> parseProviderDateToken(token.trim(), isAllDay, zone) }
         ?.distinct()
         ?.sorted()
         .orEmpty()
     return values.joinToString(separator = ",", prefix = "[", postfix = "]")
+}
+
+internal fun providerRdateStartTimes(rdate: String?, isAllDay: Int, timeZone: String): List<Long> {
+    val zone = safeProviderZone(timeZone)
+    return rdate
+        ?.split(',')
+        ?.mapNotNull { token -> parseProviderDateToken(token.trim(), isAllDay, zone) }
+        ?.distinct()
+        ?.sorted()
+        .orEmpty()
+}
+
+internal fun providerEventEndTimeMs(
+    startTimeMs: Long,
+    dtEndMs: Long?,
+    duration: String?,
+    lastDateMs: Long?,
+    rrule: String?,
+): Long {
+    dtEndMs?.let { return it }
+    providerDurationMillis(duration)?.let { return startTimeMs + it }
+    if (rrule.isNullOrBlank()) {
+        lastDateMs?.let { return it }
+    }
+    return startTimeMs + DEFAULT_PROVIDER_EVENT_DURATION_MS
 }
 
 internal fun providerDurationMillis(duration: String?): Long? {
@@ -476,6 +571,8 @@ internal fun providerDurationMillis(duration: String?): Long? {
     return totalSeconds.takeIf { it > 0L }?.times(1000L)
 }
 
+private const val DEFAULT_PROVIDER_EVENT_DURATION_MS = 60 * 60 * 1000L
+
 private val PROVIDER_DURATION_PATTERN =
     Regex("""P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?""")
 
@@ -486,7 +583,7 @@ private val PROVIDER_LOCAL_STAMP: DateTimeFormatter =
 private val PROVIDER_DATE_ONLY: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyyMMdd")
 
-private fun parseProviderExdateToken(token: String, isAllDay: Int, zone: ZoneId): Long? {
+private fun parseProviderDateToken(token: String, isAllDay: Int, zone: ZoneId): Long? {
     if (token.isBlank()) return null
     if (isAllDay == 1 || (token.length == 8 && !token.contains('T'))) {
         val date = runCatching { LocalDate.parse(token, PROVIDER_DATE_ONLY) }.getOrNull() ?: return null

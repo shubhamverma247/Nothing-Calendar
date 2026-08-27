@@ -114,14 +114,21 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - Keep this offline/local. Respect Android notification-channel limits when designing per-calendar
     sounds; avoid cloud notification infrastructure.
 - CalendarProvider sync hardening mini-pass completed:
+  - Recurring provider event end-time fallback no longer treats provider `LAST_DATE` as one
+    occurrence end when `DURATION` is missing; this fixes user-reported "super long ongoing"
+    recurring events from Google/system calendars.
   - Provider `AVAILABILITY_FREE` now imports as DotCal ghost/non-blocking side-store state so
     Find-a-Time / Free Time logic can avoid treating provider-free events as blockers.
   - DotCal ghost/Pencil-In provider-backed saves now export `AVAILABILITY_FREE`; normal events export
     `AVAILABILITY_BUSY`.
   - Provider status now imports/exports through `CalendarContract.Events.STATUS`; synced status is
     preserved in side-store for provider-backed edits.
-  - Provider `RDATE` is audited/preserved through side-store so edits do not casually erase provider
-    recurrence extras, but DotCal still does not generate local RDATE rules.
+  - Provider `RDATE` imports/exports through side-store, and local expansion now surfaces those
+    extra recurrence dates in Calendar/Agenda/availability conflict paths and widgets.
+  - Provider meeting metadata now imports read-only through side-store without a Room schema change:
+    organizer, access/private-public visibility, availability/transparency, guest permissions,
+    attendee name/email/status/type/relationship, and RSVP-ish attendee status are preserved under
+    `ProviderMeetingMetadata`.
   - Provider-cancelled recurring instances now become parent exceptions only; they no longer import
     as standalone visible events.
   - Calendar-move duplicate guard deletes stale local provider rows with the same `googleEventId`
@@ -134,9 +141,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     Actions.
   - Existing widget receivers/classes are preserved for backward compatibility; placed widgets
     migrate legacy per-widget calendar state into `KEY_WIDGET_INSTANCE_CONFIG`.
-  - Widget config model exists for migration/defaults, but widget picker providers no longer launch
-    `WidgetConfigActivity`; all `android:configure` entries were removed from widget provider XML
-    after user review.
+  - Widget config model exists for migration/defaults, and the per-widget config editor is restored:
+    widget provider XML entries now launch `WidgetConfigActivity` through `android:configure`.
   - Added basic config-aware rendering for Today, Tasks, Quick Actions, Schedule, Calendar, and
     Countdown categories.
   - Added Next 14 Days as a widget time range and kept core large widget rendering Free.
@@ -151,8 +157,9 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     - `dotcal://quick-add`
     - `dotcal://task/new`
     - `dotcal://search`
-  - Heavy preview/dropdown widget config UI was removed after phone/user review, and add-widget now
-    skips the configuration screen entirely.
+  - Widget configuration is now reachable both from the launcher add-widget flow and from
+    Settings -> Widgets -> Your Widgets (`WidgetManagerActivity` opens `WidgetConfigActivity` for
+    placed widgets).
   - Widget picker now has purpose-specific labels/descriptions instead of generic `Configurable`:
     - `DC 1x1 Date`: date tile.
     - `DC 2x2 Event`: today, next event, countdown, tasks, or quick action.
@@ -163,6 +170,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - Added picker entry:
     - `DateOnlyDotCalWidgetReceiver` / `DateOnlyDotCalWidget`, provider `@xml/dotcal_widget_date_only`.
   - Removed dedicated `DC 14 Day` picker entry/provider per user request.
+  - Fixed 1x1 Date widget picker preview to use the same dotted preview surface as the other widgets
+    instead of a plain black tile.
   - Fixed 2x2 Month chevron month navigation:
     - Root cause: label/grid rendered from `data` captured in `provideGlance`, so glance-state
       offset changes recomposed palette but not the visible month until a full reload.
@@ -210,8 +219,8 @@ After next debug install, prioritize:
     `DC 4x4 Month`, `DC Count`, `DC Agenda`, and `DC Month`.
 - Add `DC 1x1 Date`.
   - Expected: compact date tile; no generic configurable label.
-- Add any widget.
-  - Expected: no widget configuration screen opens; widget is placed directly.
+- Add any configurable widget.
+  - Expected: `WidgetConfigActivity` opens, saves configuration, then places/updates the widget.
 - Add `2x2` Schedule widget.
   - Expected: one strongest upcoming event only; no cramped list.
 - Add `4x2` Schedule widget with `Next 14 Days`.
@@ -247,13 +256,13 @@ Worth adding:
     Free Time logic.
   - Exported DotCal ghost/Pencil-In provider-backed events as `AVAILABILITY_FREE`; normal events as
     `AVAILABILITY_BUSY`.
-- Recurrence "this and following" edits.
+- Recurrence "this and following" edits. DONE for event edit/delete scope.
   - Implement clean series split: old parent ends before selected occurrence; new parent starts at
     selected occurrence.
   - Avoid creating many per-instance exceptions for a future range.
-- RDATE support. PRESERVE-ONLY in mini-pass.
+- RDATE support. DONE for provider-backed expansion/preservation.
   - Import/export provider RDATE string through side-store for provider-backed edits.
-  - Keep full local RDATE expansion/generation for a later recurrence-model pass.
+  - Local RDATE creation UI remains out of scope unless specifically requested.
 - Provider event status. DONE for preservation.
   - Preserve confirmed/tentative/cancelled status through side-store/provider writes.
   - Tentative remains separate from DotCal Pencil-In/Ghost.
@@ -261,9 +270,10 @@ Worth adding:
   - Provider-cancelled recurring instances remain parent exceptions and do not import as standalone
     visible events.
   - Manual repeated-sync QA still useful on device/provider.
-- Timezone/DST recurrence tests. STARTED.
+- Timezone/DST recurrence tests. STARTED + broadened for core recurrence rules.
   - Added local-time EXDATE parsing test across DST boundary.
-  - Add broader recurrence expansion tests when touching recurrence engine.
+  - Added pure recurrence-rule tests for weekly BYDAY, monthly ordinal BYDAY, yearly leap-day skip,
+    and interval fast-forward behavior.
 - Calendar-move duplicate guard. DONE in sync layer.
   - Moving a provider event between calendars deletes stale local duplicate rows with the same
     provider event id.
@@ -271,8 +281,9 @@ Worth adding:
 Lower priority unless user demand appears:
 
 - EXRULE import support.
-- Read-only attendee/organizer/RSVP display.
-- Provider privacy/visibility import for future privacy masking.
+- Read-only attendee/organizer/RSVP display UI.
+- Provider privacy/visibility import for future privacy masking. DONE for side-store import; UI and
+  masking behavior remain future work.
 
 ## Completed Roadmap Snapshot
 

@@ -6,7 +6,9 @@ import com.dotfield.dotcal.data.CalendarDao
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalDatabase
 import com.dotfield.dotcal.data.countdown.CountdownPinStore
+import com.dotfield.dotcal.data.provider.providerRdateStartTimes
 import com.dotfield.dotcal.data.privacy.AppPrivacyManager
+import com.dotfield.dotcal.data.sidestore.EventSideStoreNamespaces
 import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
@@ -79,9 +81,10 @@ class WidgetDataRepository(
         } else {
             emptySet()
         }
+        val providerRdates = sideStore.readNamespace(EventSideStoreNamespaces.ProviderRdates)
         val visibleItems = dao.getVisibleEventsForWidget(rangeStart.atStartMs(zoneId), rangeEnd.atStartMs(zoneId), accountId)
             .filterNot { it.id.substringBefore(RECURRENCE_SEPARATOR) in privateIds }
-            .expandRecurring(rangeStart, rangeEnd)
+            .expandRecurring(rangeStart, rangeEnd, providerRdates)
             .filter { it.endTimeMs >= nowMs }
             .filter { config.content.showAllDayEvents || it.isAllDay == 0 }
             .filter { config.category != WidgetCategory.Shift || it.id.substringBefore(RECURRENCE_SEPARATOR) in shiftEventIds }
@@ -158,7 +161,11 @@ class WidgetDataRepository(
             .mapNotNull { id -> dao.getEvent(id) }
             .filterNot { it.id.substringBefore(RECURRENCE_SEPARATOR) in privateIds }
             .filter { event -> dao.getAccount(event.accountId)?.isVisible == 1 }
-            .expandRecurring(rangeStart, rangeEndExclusive.plusYears(1))
+            .expandRecurring(
+                rangeStart,
+                rangeEndExclusive.plusYears(1),
+                sideStore.readNamespace(EventSideStoreNamespaces.ProviderRdates),
+            )
             .filter { it.endTimeMs >= nowMs }
             .sortedForWidget(zoneId)
             .asWidgetItems(zoneId, use24Hour, nowMs)
@@ -200,15 +207,23 @@ class WidgetDataRepository(
         }
     }
 
-    private fun List<CalendarEvent>.expandRecurring(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
+    private fun List<CalendarEvent>.expandRecurring(
+        rangeStart: LocalDate,
+        rangeEndExclusive: LocalDate,
+        providerRdates: Map<String, String> = emptyMap(),
+    ): List<CalendarEvent> {
+        val rangeStartMs = rangeStart.atStartMs(ZoneId.systemDefault())
+        val rangeEndMs = rangeEndExclusive.atStartMs(ZoneId.systemDefault())
         return flatMap { event ->
-            when (event.rrule?.trim()) {
+            val ruleEvents = when (event.rrule?.trim()) {
                 "FREQ=DAILY" -> event.generateOccurrences(rangeStart, rangeEndExclusive) { it.plusDays(1) }
                 "FREQ=WEEKLY" -> event.generateOccurrences(event.firstWeeklyDate(rangeStart), rangeEndExclusive) { it.plusWeeks(1) }
                 "FREQ=MONTHLY" -> event.expandMonthly(rangeStart, rangeEndExclusive)
                 "FREQ=YEARLY" -> event.expandYearly(rangeStart, rangeEndExclusive)
                 else -> listOf(event)
             }
+            val rdateEvents = event.expandProviderRdates(providerRdates[event.id.substringBefore(RECURRENCE_SEPARATOR)], rangeStartMs, rangeEndMs)
+            (ruleEvents + rdateEvents).distinctBy { it.id }
         }
     }
 
@@ -271,6 +286,22 @@ class WidgetDataRepository(
 
     private fun CalendarEvent.startDate(): LocalDate {
         return Instant.ofEpochMilli(startTimeMs).atZone(safeZoneId(timeZone)).toLocalDate()
+    }
+
+    private fun CalendarEvent.expandProviderRdates(rdate: String?, rangeStartMs: Long, rangeEndMs: Long): List<CalendarEvent> {
+        if (rdate.isNullOrBlank()) return emptyList()
+        val durationMs = endTimeMs - startTimeMs
+        val exceptions = exceptionStartTimes()
+        return providerRdateStartTimes(rdate, isAllDay, timeZone)
+            .filterNot { it in exceptions }
+            .map { occurrenceStart ->
+                copy(
+                    id = "$id$RECURRENCE_SEPARATOR$occurrenceStart",
+                    startTimeMs = occurrenceStart,
+                    endTimeMs = occurrenceStart + durationMs,
+                )
+            }
+            .filter { occurrence -> occurrence.startTimeMs < rangeEndMs && occurrence.endTimeMs >= rangeStartMs }
     }
 
     private fun safeZoneId(id: String): ZoneId = runCatching { ZoneId.of(id) }.getOrDefault(ZoneId.systemDefault())

@@ -1446,6 +1446,8 @@ internal fun EventEditorScreen(
         mutableStateOf(if (isRecurringInstance) RecurringEditScope.ThisEvent else RecurringEditScope.WholeSeries)
     }
     val editsWholeSeries = (event?.rrule != null || event?.isRecurrenceOccurrence() == true) &&
+        recurringEditScope != RecurringEditScope.ThisEvent
+    val deletesWholeSeries = (event?.rrule != null || event?.isRecurrenceOccurrence() == true) &&
         recurringEditScope == RecurringEditScope.WholeSeries
     fun clearEditorFocus() {
         keyboardController?.hide()
@@ -1840,7 +1842,7 @@ internal fun EventEditorScreen(
                     clearEditorFocus()
                     showRepeatPicker = true
                 },
-                enabled = recurringEditScope == RecurringEditScope.WholeSeries,
+                enabled = recurringEditScope != RecurringEditScope.ThisEvent,
             )
             if (canChooseRecurrenceScope) {
                 EditorValueRow(
@@ -1856,7 +1858,11 @@ internal fun EventEditorScreen(
             if (canChooseRecurrenceScope) {
                 Text(
                     stringResource(
-                        if (editsWholeSeries) R.string.event_apply_series else R.string.event_apply_instance,
+                        when (recurringEditScope) {
+                            RecurringEditScope.ThisEvent -> R.string.event_apply_instance
+                            RecurringEditScope.ThisAndFollowing -> R.string.event_apply_following
+                            RecurringEditScope.WholeSeries -> R.string.event_apply_series
+                        },
                     ),
                     color = palette.secondaryText,
                     fontFamily = mono,
@@ -1873,7 +1879,7 @@ internal fun EventEditorScreen(
             if (event != null && onDelete != null) {
                 Text(
                     stringResource(
-                        if (editsWholeSeries) R.string.event_delete_series_button else R.string.event_delete_event_button,
+                        if (deletesWholeSeries) R.string.event_delete_series_button else R.string.event_delete_event_button,
                     ),
                     color = palette.accent,
                     fontFamily = mono,
@@ -3302,7 +3308,11 @@ internal fun ApplyScopeChoiceSheet(
     ) {
         ChoiceSheetContent(
             title = stringResource(R.string.event_apply_to),
-            items = listOf(RecurringEditScope.ThisEvent, RecurringEditScope.WholeSeries),
+            items = listOf(
+                RecurringEditScope.ThisEvent,
+                RecurringEditScope.ThisAndFollowing,
+                RecurringEditScope.WholeSeries,
+            ),
             selected = selected,
             label = { it.label() },
             palette = palette,

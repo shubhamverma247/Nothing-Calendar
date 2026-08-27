@@ -29,10 +29,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -1368,6 +1371,13 @@ private fun SheetRow(
         if (badge != null) {
             ProBadge(badge, ui)
         }
+        Spacer(Modifier.width(10.dp))
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = ui.faint,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 

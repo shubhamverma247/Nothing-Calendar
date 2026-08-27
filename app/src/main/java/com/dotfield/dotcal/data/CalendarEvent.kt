@@ -67,4 +67,7 @@ data class CalendarEvent(
 
     @Ignore
     var providerRdate: String? = null
+
+    @Ignore
+    var providerMeetingMetadataJson: String? = null
 }
