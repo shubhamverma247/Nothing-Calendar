@@ -20,6 +20,9 @@
     <string name="widget_month_grid_description">Legacy grid</string>
     <string name="glyph_toy_name">DotCal</string>
     <string name="glyph_toy_summary">Shows a live countdown to your next DotCal event.</string>
+    <string name="notification_action_open">Open</string>
+    <string name="notification_action_snooze_minutes">Snooze %1$d min</string>
+    <string name="notification_action_complete_task">Complete Task</string>
 
     <!-- Language picker -->
     <string name="settings_language_title">Language</string>

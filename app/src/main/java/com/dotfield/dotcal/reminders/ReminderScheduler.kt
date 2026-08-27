@@ -45,15 +45,15 @@ class ReminderScheduler(private val context: Context) {
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, reminder.triggerAtMs, pendingIntent)
     }
 
-    fun scheduleSnooze(eventId: String, eventTitle: String, alarmRequestCode: Int, triggerAtMs: Long, isTask: Boolean = false) {
-        val requestCode = snoozeRequestCode(alarmRequestCode)
+    fun scheduleSnooze(eventId: String, eventTitle: String, alarmRequestCode: Int, triggerAtMs: Long, snoozeMinutes: Int, isTask: Boolean = false) {
+        val requestCode = ReminderNotificationActions.snoozeRequestCode(alarmRequestCode, snoozeMinutes)
         val pendingIntent = reminderPendingIntent(
             requestCode = requestCode,
             payload = ReminderAlarmPayload(
                 eventId = eventId,
                 alarmRequestCode = alarmRequestCode,
                 eventTitle = eventTitle,
-                minutesBefore = 10,
+                minutesBefore = snoozeMinutes,
                 isTask = isTask,
             ),
         )
@@ -69,7 +69,14 @@ class ReminderScheduler(private val context: Context) {
 
     fun cancelReminder(alarmRequestCode: Int) {
         alarmManager.cancel(reminderPendingIntent(alarmRequestCode, payload = ReminderAlarmPayload.EMPTY.copy(alarmRequestCode = alarmRequestCode)))
-        alarmManager.cancel(reminderPendingIntent(snoozeRequestCode(alarmRequestCode), payload = ReminderAlarmPayload.EMPTY.copy(alarmRequestCode = alarmRequestCode)))
+        ReminderNotificationActions.SnoozeMinutes.forEach { minutes ->
+            alarmManager.cancel(
+                reminderPendingIntent(
+                    ReminderNotificationActions.snoozeRequestCode(alarmRequestCode, minutes),
+                    payload = ReminderAlarmPayload.EMPTY.copy(alarmRequestCode = alarmRequestCode),
+                ),
+            )
+        }
     }
 
     fun showReminderNotification(event: CalendarEvent, reminder: EventReminder) {
@@ -90,7 +97,7 @@ class ReminderScheduler(private val context: Context) {
             Log.w(TAG, "Reminder notification blocked: POST_NOTIFICATIONS not granted")
             return
         }
-        val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(eventTitle)
             .setContentText(reminderText(minutesBefore))
@@ -98,9 +105,26 @@ class ReminderScheduler(private val context: Context) {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .addAction(R.drawable.ic_notification, if (isTask) "View Task" else "View", viewReminderPendingIntent(eventId, isTask))
-            .addAction(R.drawable.ic_notification, "Snooze 10 Min", snoozePendingIntent(eventId, eventTitle, alarmRequestCode, isTask))
-            .build()
+        ReminderNotificationActions.notificationActionTypes(isTask).forEach { action ->
+            when (action) {
+                ReminderNotificationActionType.Open -> builder.addAction(
+                    R.drawable.ic_notification,
+                    appContext.getString(R.string.notification_action_open),
+                    viewReminderPendingIntent(eventId, isTask),
+                )
+                is ReminderNotificationActionType.Snooze -> builder.addAction(
+                    R.drawable.ic_notification,
+                    appContext.getString(R.string.notification_action_snooze_minutes, action.minutes),
+                    snoozePendingIntent(eventId, eventTitle, alarmRequestCode, action.minutes, isTask),
+                )
+                ReminderNotificationActionType.CompleteTask -> builder.addAction(
+                    R.drawable.ic_notification,
+                    appContext.getString(R.string.notification_action_complete_task),
+                    completeTaskPendingIntent(eventId, alarmRequestCode),
+                )
+            }
+        }
+        val notification = builder.build()
         NotificationManagerCompat.from(appContext).notify(alarmRequestCode, notification)
     }
 
@@ -145,17 +169,32 @@ class ReminderScheduler(private val context: Context) {
         )
     }
 
-    private fun snoozePendingIntent(eventId: String, eventTitle: String, alarmRequestCode: Int, isTask: Boolean): PendingIntent {
+    private fun snoozePendingIntent(eventId: String, eventTitle: String, alarmRequestCode: Int, snoozeMinutes: Int, isTask: Boolean): PendingIntent {
         val intent = Intent(appContext, ReminderReceiver::class.java).apply {
             action = ReminderReceiver.ACTION_SNOOZE_REMINDER
             putExtra(ReminderReceiver.EXTRA_EVENT_ID, eventId)
             putExtra(ReminderReceiver.EXTRA_ALARM_REQUEST_CODE, alarmRequestCode)
             putExtra(ReminderReceiver.EXTRA_EVENT_TITLE, eventTitle)
+            putExtra(ReminderReceiver.EXTRA_SNOOZE_MINUTES, snoozeMinutes)
             putExtra(ReminderReceiver.EXTRA_IS_TASK, isTask)
         }
         return PendingIntent.getBroadcast(
             appContext,
-            snoozeRequestCode(alarmRequestCode),
+            ReminderNotificationActions.snoozeRequestCode(alarmRequestCode, snoozeMinutes),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun completeTaskPendingIntent(eventId: String, alarmRequestCode: Int): PendingIntent {
+        val intent = Intent(appContext, ReminderReceiver::class.java).apply {
+            action = ReminderReceiver.ACTION_COMPLETE_TASK_REMINDER
+            putExtra(ReminderReceiver.EXTRA_EVENT_ID, eventId)
+            putExtra(ReminderReceiver.EXTRA_ALARM_REQUEST_CODE, alarmRequestCode)
+        }
+        return PendingIntent.getBroadcast(
+            appContext,
+            completeTaskRequestCode(alarmRequestCode),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -174,7 +213,7 @@ class ReminderScheduler(private val context: Context) {
     companion object {
         private const val TAG = "ReminderScheduler"
         const val CHANNEL_ID = "dotcal_reminders"
-        private fun snoozeRequestCode(alarmRequestCode: Int): Int = alarmRequestCode xor 0x5A5A5A5A
+        private fun completeTaskRequestCode(alarmRequestCode: Int): Int = alarmRequestCode xor 0x7C7C7C7C
     }
 }
 

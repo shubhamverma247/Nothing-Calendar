@@ -22,6 +22,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val fallbackTitle = intent.getStringExtra(EXTRA_EVENT_TITLE)
         val fallbackMinutes = intent.getIntExtra(EXTRA_MINUTES_BEFORE, Int.MIN_VALUE)
         val fallbackIsTask = intent.getBooleanExtra(EXTRA_IS_TASK, false)
+        val snoozeMinutes = intent.getIntExtra(EXTRA_SNOOZE_MINUTES, DEFAULT_SNOOZE_MINUTES)
         val showedFromPayload = intent.action == ACTION_SHOW_REMINDER &&
             eventId != null &&
             !fallbackTitle.isNullOrBlank() &&
@@ -75,7 +76,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     }
                     ACTION_SNOOZE_REMINDER -> {
                         NotificationManagerCompat.from(context).cancel(alarmRequestCode)
-                        val snoozeAtMs = System.currentTimeMillis() + SNOOZE_DELAY_MS
+                        val snoozeAtMs = System.currentTimeMillis() + ReminderNotificationActions.snoozeDelayMs(snoozeMinutes)
                         val reminder = repository.getReminderByRequestCode(alarmRequestCode)
                         val targetEventId = eventId ?: reminder?.eventId ?: return@runCatching
                         val event = repository.getEvent(targetEventId)
@@ -85,8 +86,19 @@ class ReminderReceiver : BroadcastReceiver() {
                             eventTitle = eventTitle,
                             alarmRequestCode = alarmRequestCode,
                             triggerAtMs = snoozeAtMs,
+                            snoozeMinutes = snoozeMinutes,
                             isTask = event?.isTask == 1 || fallbackIsTask,
                         )
+                    }
+                    ACTION_COMPLETE_TASK_REMINDER -> {
+                        NotificationManagerCompat.from(context).cancel(alarmRequestCode)
+                        val targetEventId = eventId ?: repository.getReminderByRequestCode(alarmRequestCode)?.eventId ?: return@runCatching
+                        val task = repository.getEvent(targetEventId)
+                        if (task?.isTask == 1) {
+                            repository.setTaskCompleted(task, completed = true)
+                        } else {
+                            Log.w(TAG, "Complete task ignored: missing task for requestCode=$alarmRequestCode")
+                        }
                     }
                 }
             }.onFailure { throwable ->
@@ -100,11 +112,13 @@ class ReminderReceiver : BroadcastReceiver() {
         private const val TAG = "ReminderReceiver"
         const val ACTION_SHOW_REMINDER = "com.dotfield.dotcal.action.SHOW_REMINDER"
         const val ACTION_SNOOZE_REMINDER = "com.dotfield.dotcal.action.SNOOZE_REMINDER"
+        const val ACTION_COMPLETE_TASK_REMINDER = "com.dotfield.dotcal.action.COMPLETE_TASK_REMINDER"
         const val EXTRA_EVENT_ID = "extra_event_id"
         const val EXTRA_ALARM_REQUEST_CODE = "extra_alarm_request_code"
         const val EXTRA_EVENT_TITLE = "extra_event_title"
         const val EXTRA_MINUTES_BEFORE = "extra_minutes_before"
+        const val EXTRA_SNOOZE_MINUTES = "extra_snooze_minutes"
         const val EXTRA_IS_TASK = "extra_is_task"
-        private const val SNOOZE_DELAY_MS = 10 * 60_000L
+        private const val DEFAULT_SNOOZE_MINUTES = 15
     }
 }
