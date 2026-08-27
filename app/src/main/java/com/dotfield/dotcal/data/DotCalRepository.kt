@@ -630,9 +630,9 @@ class DotCalRepository(
         }
     }
 
-    fun observeUpcomingAgendaEvents(startDate: LocalDate): Flow<List<CalendarEvent>> {
-        val start = startDate
-        val end = start.plusMonths(6)
+    fun observeAgendaEvents(rangeStart: LocalDate, rangeEnd: LocalDate): Flow<List<CalendarEvent>> {
+        val start = rangeStart
+        val end = rangeEnd
         val startMs = start.atStartMs()
         return dao.observeEvents(startMs, end.atStartMs())
             .retryOnDatabaseLocked()
@@ -644,6 +644,10 @@ class DotCalRepository(
                 }
                 expanded.withGhostFlags()
             }
+    }
+
+    fun observeUpcomingAgendaEvents(startDate: LocalDate): Flow<List<CalendarEvent>> {
+        return observeAgendaEvents(startDate, startDate.plusMonths(6))
     }
 
     /**
@@ -1081,14 +1085,7 @@ class DotCalRepository(
                 calendarProviderDataSource.deleteEvent(previous.googleEventId)
             }
         }
-        return event.copy(
-            id = providerEvent.id,
-            accountId = providerEvent.accountId,
-            source = "GOOGLE",
-            googleEventId = providerEvent.googleEventId,
-            googleCalendarId = providerEvent.googleCalendarId,
-            syncVersion = providerEvent.syncVersion,
-        )
+        return event.withProviderSyncResult(providerEvent)
     }
 
     suspend fun addLocalEvent(title: String, date: LocalDate, startTime: LocalTime = LocalTime.of(9, 0)) {
@@ -2175,6 +2172,18 @@ private fun Throwable.hasDatabaseLockedCause(): Boolean {
         current = current.cause
     }
     return false
+}
+
+internal fun CalendarEvent.withProviderSyncResult(providerEvent: CalendarEvent): CalendarEvent {
+    return copy(
+        id = providerEvent.id,
+        accountId = providerEvent.accountId,
+        source = providerEvent.source,
+        googleEventId = providerEvent.googleEventId,
+        googleCalendarId = providerEvent.googleCalendarId,
+        syncVersion = providerEvent.syncVersion,
+        colorHex = providerEvent.colorHex,
+    )
 }
 
 fun recurrenceOccurrenceId(eventId: String, occurrenceStartMs: Long): String {

@@ -1368,8 +1368,6 @@ private fun SheetRow(
         if (badge != null) {
             ProBadge(badge, ui)
         }
-        Spacer(Modifier.width(10.dp))
-        Text("›", color = ui.faint, fontSize = 18.sp)
     }
 }
 

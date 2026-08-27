@@ -74,18 +74,7 @@
             <TextView style="@style/WidgetPreviewCompactDay" android:text="20" />
             <TextView style="@style/WidgetPreviewCompactDay" android:text="21" />
             <TextView style="@style/WidgetPreviewCompactDay" android:text="22" />
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="@drawable/widget_preview_red_circle"
-                android:fontFamily="monospace"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="23"
-                android:textColor="@android:color/white"
-                android:textSize="7sp"
-                android:textStyle="bold" />
+            <TextView style="@style/WidgetPreviewCompactDay" android:text="23" />
         </LinearLayout>
         <LinearLayout style="@style/WidgetPreviewCompactCalendarRow">
             <TextView style="@style/WidgetPreviewCompactAccentDay" android:text="24" />

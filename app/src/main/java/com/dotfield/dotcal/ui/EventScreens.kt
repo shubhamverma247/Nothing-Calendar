@@ -305,8 +305,20 @@ internal fun EventDetailScreen(
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                 )
-                Box(modifier = Modifier.width(48.dp).height(48.dp), contentAlignment = Alignment.Center) {
-                    IconButton(onClick = { showActions = true }, modifier = Modifier.size(48.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(0.dp),
+                ) {
+                    if (!isReadOnly) {
+                        IconButton(onClick = onEdit, modifier = Modifier.size(40.dp)) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = stringResource(R.string.action_edit),
+                                tint = palette.primaryText,
+                            )
+                        }
+                    }
+                    IconButton(onClick = { showActions = true }, modifier = Modifier.size(40.dp)) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More", tint = palette.primaryText)
                     }
                 }
@@ -380,12 +392,15 @@ internal fun EventDetailScreen(
                 item {
                     DetailDivider(palette)
                     DetailSection(label = stringResource(R.string.event_section_calendar), palette = palette) {
+                        val calendarDotColor = remember(account?.color) {
+                            account?.color?.let { Color(parseColor(it)) } ?: palette.accent
+                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
                                     .size(8.dp)
                                     .clip(CircleShape)
-                                    .background(palette.accent),
+                                    .background(calendarDotColor),
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(account?.displayName ?: event.accountId, color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)

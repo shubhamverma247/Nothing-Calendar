@@ -28,7 +28,11 @@ class DotCalApplication : Application() {
         ReminderScheduler(this).ensureChannel()
         proManager.initialize()
         runStartupTask { repository.rescheduleFutureReminders() }
-        runStartupTask { CalendarSyncWorkScheduler.syncFromPreferences(this@DotCalApplication) }
+        runStartupTask {
+            if (CalendarSyncWorkScheduler.syncFromPreferences(this@DotCalApplication)) {
+                CalendarSyncWorkScheduler.enqueueSyncNow(this@DotCalApplication)
+            }
+        }
         runStartupTask { WidgetUpdateWorker.enqueue(this@DotCalApplication) }
         registerSystemThemeChangeReceiver()
     }

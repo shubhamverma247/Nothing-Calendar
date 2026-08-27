@@ -55,7 +55,7 @@ class CalendarSyncWorker(
 }
 
 object CalendarSyncWorkScheduler {
-    suspend fun syncFromPreferences(context: Context) {
+    suspend fun syncFromPreferences(context: Context): Boolean {
         val preferences = context.calendarPreferencesDataStore.data.first()
         val interval = preferences[CalendarPreferences.KEY_SYNC_INTERVAL_MINS] ?: DEFAULT_SYNC_INTERVAL_MINS
         if (preferences[CalendarPreferences.KEY_SYNC_ENABLED] == true && interval > 0) {
@@ -63,8 +63,10 @@ object CalendarSyncWorkScheduler {
                 context = context,
                 intervalMinutes = interval,
             )
+            return true
         } else {
             cancelPeriodic(context)
+            return false
         }
     }
 

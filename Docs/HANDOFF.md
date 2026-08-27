@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-08-25
+Updated: 2026-08-27
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 `Docs/HANDOFF.original.md`. Do not touch `Docs/HANDOFF - Copy.md` or user-owned
@@ -12,7 +12,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - All work happens on `main`. Do not create or switch branches.
 - Do not commit or push unless the user explicitly asks.
 - Latest pushed commit before current local widget work: `2b61b79 feat(widgets): start unified widget configuration`.
-- Local release target: `versionCode 35`, `versionName 1.3.1`.
+- Local release target: `versionCode 36`, `versionName 1.4.0`.
 - Expected untracked user file: `Docs/FEEDBACK.md`; leave it untouched.
 
 ## Hard Rules
@@ -33,7 +33,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 
 - Android: Kotlin + Compose, `compileSdk 36`, `minSdk 30`, `targetSdk 36`.
 - Billing: `billing-ktx 8.0.0`; do not downgrade below v8.
-- Version: `versionCode 35`, `versionName 1.3.1`.
+- Version: `versionCode 36`, `versionName 1.4.0`.
 - Release build has `isMinifyEnabled=true`, `isShrinkResources=true`, and
   `proguard-android-optimize.txt`.
 - Tabs: Calendar, Tasks, Settings.
@@ -51,6 +51,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - 2. Verify Week/Day event tap behavior on device; detail open should work consistently outside Agenda.
 - 3. Track the whole-day one-day-early report as the next sync/timezone bug to reproduce with device and timezone details.
 - 4. Add a faster edit action in the event detail flow if it fits the current UI pattern.
+- 5. Play Console shows an R8 / optimized resource shrinking warning. Keep it on the release hygiene list for the AGP upgrade path.
 
 ## Billing Products
 

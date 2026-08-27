@@ -265,12 +265,12 @@ internal fun AgendaPreview(
 ) {
     val agendaStartDate = LocalDate.now()
     val selectionMode = selectedEventIds.isNotEmpty()
-    val upcomingEvents = remember(events, agendaStartDate) {
+    val visibleEvents = remember(events, agendaStartDate) {
         events
             .filter { it.isTask == 0 && !it.localDate().isBefore(agendaStartDate) }
             .sortedBy { it.startTimeMs }
     }
-    val eventsByDate = remember(upcomingEvents) { upcomingEvents.groupBy { it.localDate() } }
+    val eventsByDate = remember(visibleEvents) { visibleEvents.groupBy { it.localDate() } }
     val dateIndex = remember(eventsByDate) {
         buildMap {
             var index = 0
@@ -323,7 +323,7 @@ internal fun AgendaPreview(
                     )
                 }
             }
-            if (upcomingEvents.isEmpty()) {
+            if (visibleEvents.isEmpty()) {
                 item {
                     AgendaEndOfDayState(
                         palette = palette,
@@ -334,7 +334,11 @@ internal fun AgendaPreview(
             } else {
                 eventsByDate.forEach { (date, dateEvents) ->
                     item(key = "agenda-header-$date") {
-                        AgendaDateHeader(date = date, isFirst = date == agendaStartDate, palette = palette)
+                        AgendaDateHeader(
+                            date = date,
+                            isFirst = date == agendaStartDate,
+                            palette = palette,
+                        )
                     }
                     lazyItems(dateEvents, key = { it.id }) { event ->
                         AgendaEventCard(

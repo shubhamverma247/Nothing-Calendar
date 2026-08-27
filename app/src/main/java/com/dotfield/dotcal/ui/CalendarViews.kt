@@ -792,7 +792,7 @@ private fun AllDayStripRows(
                                 .padding(event?.visibleSegmentPadding(day, days, 2.dp) ?: PaddingValues(horizontal = 2.dp))
                                 .clip(event?.visibleSegmentShape(day, days, 4.dp) ?: RoundedCornerShape(0.dp))
                                 .background(if (event == null) Color.Transparent else event.displayColor(palette).copy(alpha = if (event.isGhost) 0.32f else 0.75f))
-                                .then(if (event?.isGhost == true) Modifier.ghostDottedBorder(palette, 4f) else Modifier)
+                                .then(if (event?.shouldShowGhostBorder() == true) Modifier.ghostDottedBorder(palette, 4f) else Modifier)
                                 .then(if (event == null) Modifier else Modifier.clickable { onEventClick(event) }),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -1048,7 +1048,7 @@ private fun WeekEventBlock(
             .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
             .background(eventColor.copy(alpha = if (event.isGhost) 0.34f else if (isShift) 0.90f else 0.80f))
-            .then(if (event.isGhost) Modifier.ghostDottedBorder(palette, 4f) else Modifier)
+            .then(if (event.shouldShowGhostBorder()) Modifier.ghostDottedBorder(palette, 4f) else Modifier)
             .noRippleClickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1195,13 +1195,13 @@ private fun DraggableEventRow(
                                 },
                             )
                         }
-                        .noRippleClickable(onClick = onClick),
                 ) {
                     WeekEventBlock(
                         event = event,
                         palette = palette,
                         isShift = isShift,
                         modifier = Modifier.fillMaxSize(),
+                        onClick = onClick,
                     )
                     if (draggable) {
                         DragResizeHandle(
@@ -1380,7 +1380,7 @@ internal fun DayView(
                             .padding(horizontal = 16.dp, vertical = 4.dp)
                             .clip(RoundedCornerShape(4.dp))
                             .background(event.displayColor(palette).copy(alpha = if (event.isGhost) 0.34f else if (isShift) 0.88f else 0.75f))
-                            .then(if (event.isGhost) Modifier.ghostDottedBorder(palette, 2f) else Modifier)
+                            .then(if (event.shouldShowGhostBorder()) Modifier.ghostDottedBorder(palette, 2f) else Modifier)
                             .clickable { onEventClick(event) }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,

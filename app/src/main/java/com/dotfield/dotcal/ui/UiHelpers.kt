@@ -34,7 +34,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.time.temporal.WeekFields
@@ -160,7 +159,7 @@ internal fun resolveWeekStartDay(option: WeekStartOption): DayOfWeek {
 private const val MAX_VISIBLE_EVENT_DAYS = 370L
 
 internal fun CalendarEvent.localDate(): LocalDate {
-    return Instant.ofEpochMilli(startTimeMs).atZone(ZoneId.systemDefault()).toLocalDate()
+    return Instant.ofEpochMilli(startTimeMs).atZone(displayZone()).toLocalDate()
 }
 
 internal fun eventsByVisibleDate(events: List<CalendarEvent>): Map<LocalDate, List<CalendarEvent>> {
@@ -204,7 +203,6 @@ internal fun CalendarEvent.shouldShowStripTitle(date: LocalDate, segmentDates: L
 }
 
 private fun CalendarEvent.displayZone(): ZoneId {
-    if (isAllDay == 1 && source == "GOOGLE") return ZoneOffset.UTC
     return runCatching { ZoneId.of(timeZone) }.getOrDefault(ZoneId.systemDefault())
 }
 
@@ -237,11 +235,16 @@ internal fun CalendarEvent.startLocalTime(): LocalTime {
 
 internal fun CalendarEvent.endLocalDateForEditor(): LocalDate {
     val endInstant = if (isAllDay == 1) endTimeMs - 1 else endTimeMs
-    return Instant.ofEpochMilli(endInstant).atZone(ZoneId.systemDefault()).toLocalDate()
+    val zone = if (isAllDay == 1) displayZone() else ZoneId.systemDefault()
+    return Instant.ofEpochMilli(endInstant).atZone(zone).toLocalDate()
 }
 
 internal fun CalendarEvent.endLocalTime(): LocalTime {
     return Instant.ofEpochMilli(endTimeMs).atZone(ZoneId.systemDefault()).toLocalTime()
+}
+
+internal fun CalendarEvent.shouldShowGhostBorder(): Boolean {
+    return isGhost && source != "GOOGLE"
 }
 
 internal fun LocalTime.toHour12(): Int {

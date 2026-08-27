@@ -25,7 +25,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -126,14 +130,13 @@ private fun WidgetManagerScreen(
                 .padding(horizontal = 22.dp, vertical = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                stringResource(R.string.widget_manager_back),
-                color = EditorAccent,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-                modifier = Modifier.clickable(onClick = onBack),
-            )
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.widget_manager_back),
+                    tint = ui.paper,
+                )
+            }
         }
 
         Column(modifier = Modifier.padding(horizontal = 22.dp)) {
@@ -216,19 +219,6 @@ private fun WidgetManagerScreen(
                             fontSize = 16.sp,
                             modifier = Modifier.weight(1f),
                         )
-                        if (widget.sizeLabel.isNotBlank()) {
-                            Text(
-                                widget.sizeLabel,
-                                color = ui.muted,
-                                fontFamily = FontFamily.SansSerif,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(ui.divider)
-                                    .padding(horizontal = 7.dp, vertical = 3.dp),
-                            )
-                        }
                     }
                     if (widget.summary.isNotBlank()) {
                         Spacer(Modifier.height(3.dp))
