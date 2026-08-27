@@ -20,6 +20,8 @@ import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.countdown.CountdownPinStore
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
+import com.dotfield.dotcal.data.provider.ProviderMeetingMetadata
+import com.dotfield.dotcal.data.provider.decodeProviderMeetingMetadata
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.privacy.AppPrivacyManager
 import com.dotfield.dotcal.data.punchcard.PunchCardStreak
@@ -225,6 +227,11 @@ class DotCalRepository(
         sideStore.read(EVENT_FILE_ATTACHMENTS_NAMESPACE, eventId)
             ?.let(::parseEventFileAttachments)
             .orEmpty()
+    }
+
+    suspend fun readProviderMeetingMetadata(eventId: String): ProviderMeetingMetadata? = withContext(Dispatchers.IO) {
+        sideStore.read(EventSideStoreNamespaces.ProviderMeetingMetadata, eventId)
+            ?.let(::decodeProviderMeetingMetadata)
     }
 
     suspend fun importEventFileAttachment(

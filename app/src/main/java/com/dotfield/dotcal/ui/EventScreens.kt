@@ -15,6 +15,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.CalendarContract
 import android.provider.Settings
 import android.os.SystemClock
 import android.util.Size
@@ -217,6 +218,8 @@ import com.dotfield.dotcal.data.attachments.EventFileAttachment
 import com.dotfield.dotcal.data.countdown.CountdownPinStore
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
+import com.dotfield.dotcal.data.provider.ProviderAttendee
+import com.dotfield.dotcal.data.provider.ProviderMeetingMetadata
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.recurrence.ByDay
 import com.dotfield.dotcal.data.recurrence.RecurrenceFreq
@@ -264,6 +267,7 @@ internal fun EventDetailScreen(
     isPrivate: Boolean,
     isCountdownPinned: Boolean,
     fileAttachments: List<EventFileAttachment> = emptyList(),
+    providerMeetingMetadata: ProviderMeetingMetadata? = null,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
@@ -386,6 +390,14 @@ internal fun EventDetailScreen(
                                 fontSize = 16.sp,
                                 lineHeight = 23.sp,
                             )
+                        }
+                    }
+                }
+                if (providerMeetingMetadata != null) {
+                    item {
+                        DetailDivider(palette)
+                        DetailSection(label = stringResource(R.string.event_section_meeting), palette = palette) {
+                            ProviderMeetingMetadataContent(metadata = providerMeetingMetadata, palette = palette)
                         }
                     }
                 }
@@ -586,6 +598,148 @@ internal fun CompactActionSheetContent(
             )
             HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
         }
+    }
+}
+
+@Composable
+private fun ProviderMeetingMetadataContent(metadata: ProviderMeetingMetadata, palette: DotCalPalette) {
+    val rows = buildProviderMeetingRows(metadata)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        rows.forEach { row ->
+            DetailMetadataRow(label = row.label, value = row.value, palette = palette)
+        }
+        metadata.attendees
+            .filter { it.displayName().isNotBlank() }
+            .take(12)
+            .forEach { attendee ->
+                DetailMetadataRow(
+                    label = stringResource(R.string.meeting_attendee),
+                    value = attendee.displayLabel(),
+                    palette = palette,
+                )
+            }
+    }
+}
+
+@Composable
+private fun DetailMetadataRow(label: String, value: String, palette: DotCalPalette) {
+    Column {
+        Text(
+            label,
+            color = palette.secondaryText,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            value,
+            color = palette.primaryText,
+            fontSize = 15.sp,
+            lineHeight = 21.sp,
+        )
+    }
+}
+
+private data class DetailMetadataLine(val label: String, val value: String)
+
+@Composable
+private fun buildProviderMeetingRows(metadata: ProviderMeetingMetadata): List<DetailMetadataLine> {
+    val organizerLabel = stringResource(R.string.meeting_organizer)
+    val visibilityLabel = stringResource(R.string.meeting_visibility)
+    val availabilityLabel = stringResource(R.string.meeting_availability)
+    val guestPermissionsLabel = stringResource(R.string.meeting_guest_permissions)
+    return buildList {
+        metadata.organizer?.takeUnless { it.isBlank() }?.let { add(DetailMetadataLine(organizerLabel, it)) }
+        metadata.accessLevel?.providerAccessLevelLabel()?.let { add(DetailMetadataLine(visibilityLabel, it)) }
+        metadata.availability?.providerAvailabilityLabel()?.let { add(DetailMetadataLine(availabilityLabel, it)) }
+        metadata.guestPermissionSummary()?.let { add(DetailMetadataLine(guestPermissionsLabel, it)) }
+    }
+}
+
+@Composable
+private fun Int.providerAccessLevelLabel(): String? {
+    return when (this) {
+        CalendarContract.Events.ACCESS_DEFAULT -> stringResource(R.string.meeting_visibility_default)
+        CalendarContract.Events.ACCESS_PRIVATE -> stringResource(R.string.meeting_visibility_private)
+        CalendarContract.Events.ACCESS_PUBLIC -> stringResource(R.string.meeting_visibility_public)
+        CalendarContract.Events.ACCESS_CONFIDENTIAL -> stringResource(R.string.meeting_visibility_confidential)
+        else -> null
+    }
+}
+
+@Composable
+private fun Int.providerAvailabilityLabel(): String? {
+    return when (this) {
+        CalendarContract.Events.AVAILABILITY_BUSY -> stringResource(R.string.meeting_availability_busy)
+        CalendarContract.Events.AVAILABILITY_FREE -> stringResource(R.string.meeting_availability_free)
+        CalendarContract.Events.AVAILABILITY_TENTATIVE -> stringResource(R.string.meeting_availability_tentative)
+        else -> null
+    }
+}
+
+@Composable
+private fun ProviderMeetingMetadata.guestPermissionSummary(): String? {
+    val permissions = buildList {
+        if (guestsCanModify == true) add(stringResource(R.string.meeting_permission_modify))
+        if (guestsCanInviteOthers == true) add(stringResource(R.string.meeting_permission_invite))
+        if (guestsCanSeeGuests == true) add(stringResource(R.string.meeting_permission_see_guests))
+    }
+    return when {
+        permissions.isNotEmpty() -> permissions.joinToString()
+        listOf(guestsCanModify, guestsCanInviteOthers, guestsCanSeeGuests).any { it != null } ->
+            stringResource(R.string.meeting_permission_none)
+        else -> null
+    }
+}
+
+@Composable
+private fun ProviderAttendee.displayLabel(): String {
+    val statusLabel = status?.providerAttendeeStatusLabel()
+    val typeLabel = type?.providerAttendeeTypeLabel()
+    val relationshipLabel = relationship?.providerAttendeeRelationshipLabel()
+    val details = listOfNotNull(statusLabel, typeLabel, relationshipLabel)
+    return buildString {
+        append(displayName())
+        email?.takeUnless { it.isBlank() || it == name }?.let { append(" <$it>") }
+        if (details.isNotEmpty()) append(" (${details.joinToString()})")
+    }
+}
+
+private fun ProviderAttendee.displayName(): String = name?.takeUnless { it.isBlank() }
+    ?: email?.takeUnless { it.isBlank() }
+    ?: ""
+
+@Composable
+private fun Int.providerAttendeeStatusLabel(): String? {
+    return when (this) {
+        CalendarContract.Attendees.ATTENDEE_STATUS_ACCEPTED -> stringResource(R.string.meeting_status_accepted)
+        CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED -> stringResource(R.string.meeting_status_declined)
+        CalendarContract.Attendees.ATTENDEE_STATUS_INVITED -> stringResource(R.string.meeting_status_invited)
+        CalendarContract.Attendees.ATTENDEE_STATUS_NONE -> stringResource(R.string.meeting_status_none)
+        CalendarContract.Attendees.ATTENDEE_STATUS_TENTATIVE -> stringResource(R.string.meeting_status_tentative)
+        else -> null
+    }
+}
+
+@Composable
+private fun Int.providerAttendeeTypeLabel(): String? {
+    return when (this) {
+        CalendarContract.Attendees.TYPE_REQUIRED -> stringResource(R.string.meeting_type_required)
+        CalendarContract.Attendees.TYPE_OPTIONAL -> stringResource(R.string.meeting_type_optional)
+        CalendarContract.Attendees.TYPE_RESOURCE -> stringResource(R.string.meeting_type_resource)
+        else -> null
+    }
+}
+
+@Composable
+private fun Int.providerAttendeeRelationshipLabel(): String? {
+    return when (this) {
+        CalendarContract.Attendees.RELATIONSHIP_ATTENDEE -> stringResource(R.string.meeting_relationship_attendee)
+        CalendarContract.Attendees.RELATIONSHIP_NONE -> stringResource(R.string.meeting_relationship_none)
+        CalendarContract.Attendees.RELATIONSHIP_ORGANIZER -> stringResource(R.string.meeting_relationship_organizer)
+        CalendarContract.Attendees.RELATIONSHIP_PERFORMER -> stringResource(R.string.meeting_relationship_performer)
+        CalendarContract.Attendees.RELATIONSHIP_SPEAKER -> stringResource(R.string.meeting_relationship_speaker)
+        else -> null
     }
 }
 

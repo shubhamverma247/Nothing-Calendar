@@ -345,6 +345,7 @@ fun DotCalApp(
     val detailEvent by viewModel.detailEvent.collectAsStateWithLifecycle()
     val shiftEventMetadata by viewModel.shiftEventMetadata.collectAsStateWithLifecycle()
     val eventFileAttachments by viewModel.eventFileAttachments.collectAsStateWithLifecycle()
+    val providerMeetingMetadata by viewModel.providerMeetingMetadata.collectAsStateWithLifecycle()
     var screenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var previousScreenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var showSheet by remember { mutableStateOf(false) }
@@ -2172,6 +2173,7 @@ fun DotCalApp(
                     isPrivate = event.baseEventId() in privateVaultIds,
                     isCountdownPinned = event.baseEventId() in countdownPins,
                     fileAttachments = eventFileAttachments[event.baseEventId()].orEmpty(),
+                    providerMeetingMetadata = providerMeetingMetadata[event.baseEventId()],
                     onBack = viewModel::closeEventDetail,
                     onEdit = {
                         openEditEditor(event)

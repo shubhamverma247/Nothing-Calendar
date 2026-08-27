@@ -416,6 +416,7 @@
     <string name="event_section_countdown">COUNTDOWN</string>
     <string name="event_section_location">LOCATION</string>
     <string name="event_section_reminder">REMINDER</string>
+    <string name="event_section_meeting">MEETING</string>
     <string name="event_section_calendar">CALENDAR</string>
     <string name="event_section_description">DESCRIPTION</string>
     <string name="event_section_images">IMAGES</string>
@@ -434,6 +435,35 @@
     <string name="action_duplicate">Duplicate</string>
     <string name="vault_restore_from">Restore From Private Vault</string>
     <string name="vault_move_to">Move to Private Vault</string>
+    <string name="meeting_organizer">Organizer</string>
+    <string name="meeting_attendee">Attendee</string>
+    <string name="meeting_visibility">Visibility</string>
+    <string name="meeting_visibility_default">Default</string>
+    <string name="meeting_visibility_private">Private</string>
+    <string name="meeting_visibility_public">Public</string>
+    <string name="meeting_visibility_confidential">Confidential</string>
+    <string name="meeting_availability">Availability</string>
+    <string name="meeting_availability_busy">Busy</string>
+    <string name="meeting_availability_free">Free</string>
+    <string name="meeting_availability_tentative">Tentative</string>
+    <string name="meeting_guest_permissions">Guest permissions</string>
+    <string name="meeting_permission_modify">modify event</string>
+    <string name="meeting_permission_invite">invite others</string>
+    <string name="meeting_permission_see_guests">see guest list</string>
+    <string name="meeting_permission_none">none</string>
+    <string name="meeting_status_accepted">accepted</string>
+    <string name="meeting_status_declined">declined</string>
+    <string name="meeting_status_invited">invited</string>
+    <string name="meeting_status_none">no response</string>
+    <string name="meeting_status_tentative">tentative</string>
+    <string name="meeting_type_required">required</string>
+    <string name="meeting_type_optional">optional</string>
+    <string name="meeting_type_resource">resource</string>
+    <string name="meeting_relationship_attendee">attendee</string>
+    <string name="meeting_relationship_none">no relationship</string>
+    <string name="meeting_relationship_organizer">organizer</string>
+    <string name="meeting_relationship_performer">performer</string>
+    <string name="meeting_relationship_speaker">speaker</string>
 
     <!-- Tasks tab and task details -->
     <string name="tasks_title">Tasks</string>

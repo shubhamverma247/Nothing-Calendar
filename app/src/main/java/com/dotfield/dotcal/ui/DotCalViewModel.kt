@@ -18,6 +18,7 @@ import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.attachments.EventFileAttachment
 import com.dotfield.dotcal.data.billing.ProManager
 import com.dotfield.dotcal.data.countdown.CountdownPinResult
+import com.dotfield.dotcal.data.provider.ProviderMeetingMetadata
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.scheduling.AvailabilityTextFormatter
@@ -185,6 +186,8 @@ class DotCalViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
     private val _eventFileAttachments = MutableStateFlow<Map<String, List<EventFileAttachment>>>(emptyMap())
     val eventFileAttachments: StateFlow<Map<String, List<EventFileAttachment>>> = _eventFileAttachments
+    private val _providerMeetingMetadata = MutableStateFlow<Map<String, ProviderMeetingMetadata>>(emptyMap())
+    val providerMeetingMetadata: StateFlow<Map<String, ProviderMeetingMetadata>> = _providerMeetingMetadata
 
     // ----- Pro / Billing -----
     val productDetails = proManager.productDetails
@@ -234,6 +237,7 @@ class DotCalViewModel(
 
     fun openEventDetail(event: CalendarEvent) {
         _detailEvent.value = event
+        refreshProviderMeetingMetadata(event.baseEventId())
     }
 
     fun dismissOnThisDay(date: LocalDate) {
@@ -258,6 +262,7 @@ class DotCalViewModel(
             event.let {
                 selectDate(event.startDate())
                 _detailEvent.value = event
+                refreshProviderMeetingMetadata(event.baseEventId())
             }
             onComplete()
         }
@@ -272,6 +277,17 @@ class DotCalViewModel(
             _eventFileAttachments.value = _eventFileAttachments.value + (
                 eventId to repository.readEventFileAttachments(eventId)
             )
+        }
+    }
+
+    private fun refreshProviderMeetingMetadata(eventId: String) {
+        viewModelScope.launch {
+            val metadata = repository.readProviderMeetingMetadata(eventId)
+            _providerMeetingMetadata.value = if (metadata == null) {
+                _providerMeetingMetadata.value - eventId
+            } else {
+                _providerMeetingMetadata.value + (eventId to metadata)
+            }
         }
     }
 
