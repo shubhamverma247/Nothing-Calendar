@@ -283,10 +283,55 @@ internal fun coerceEndAfterStart(start: LocalTime, end: LocalTime): LocalTime {
 internal fun reminderLabel(minutes: Int?): String {
     return when (minutes) {
         null -> stringResource(R.string.reminder_none)
-        60 -> stringResource(R.string.reminder_1_hour_before)
-        1440 -> stringResource(R.string.reminder_1_day_before)
-        else -> stringResource(R.string.reminder_minutes_before, minutes)
+        else -> {
+            val display = reminderOffsetDisplay(minutes)
+            when (display.unit) {
+                ReminderOffsetUnit.Minute -> stringResource(R.string.reminder_minutes_before, minutes)
+                ReminderOffsetUnit.Hour -> if (display.value == "1") {
+                    stringResource(R.string.reminder_1_hour_before)
+                } else {
+                    stringResource(R.string.reminder_hours_before, display.value)
+                }
+                ReminderOffsetUnit.Day -> if (display.value == "1") {
+                    stringResource(R.string.reminder_1_day_before)
+                } else {
+                    stringResource(R.string.reminder_days_before, display.value)
+                }
+                ReminderOffsetUnit.Week -> if (display.value == "1") {
+                    stringResource(R.string.reminder_1_week_before)
+                } else {
+                    stringResource(R.string.reminder_weeks_before, display.value)
+                }
+            }
+        }
     }
+}
+
+internal data class ReminderOffsetDisplay(
+    val value: String,
+    val unit: ReminderOffsetUnit,
+)
+
+internal enum class ReminderOffsetUnit {
+    Minute,
+    Hour,
+    Day,
+    Week,
+}
+
+internal fun reminderOffsetDisplay(minutes: Int): ReminderOffsetDisplay {
+    return when {
+        minutes < 60 -> ReminderOffsetDisplay(minutes.toString(), ReminderOffsetUnit.Minute)
+        minutes < 1_440 -> ReminderOffsetDisplay(formatOffsetAmount(minutes / 60.0), ReminderOffsetUnit.Hour)
+        minutes < 10_080 -> ReminderOffsetDisplay(formatOffsetAmount(minutes / 1_440.0), ReminderOffsetUnit.Day)
+        else -> ReminderOffsetDisplay(formatOffsetAmount(minutes / 10_080.0), ReminderOffsetUnit.Week)
+    }
+}
+
+private fun formatOffsetAmount(value: Double): String {
+    val roundedToTenth = kotlin.math.round(value * 10.0) / 10.0
+    val whole = roundedToTenth.toInt()
+    return if (roundedToTenth == whole.toDouble()) whole.toString() else String.format(Locale.US, "%.1f", roundedToTenth)
 }
 
 internal fun RecurringEditScope.label(): String {

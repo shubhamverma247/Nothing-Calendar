@@ -18,6 +18,8 @@ import com.dotfield.dotcal.MainActivity
 import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.EventReminder
+import java.text.DateFormat
+import java.util.Date
 
 class ReminderScheduler(private val context: Context) {
     private val appContext = context.applicationContext
@@ -46,7 +48,8 @@ class ReminderScheduler(private val context: Context) {
     }
 
     fun scheduleSnooze(eventId: String, eventTitle: String, alarmRequestCode: Int, triggerAtMs: Long, snoozeMinutes: Int, isTask: Boolean = false) {
-        val requestCode = ReminderNotificationActions.snoozeRequestCode(alarmRequestCode, snoozeMinutes)
+        cancelSnoozeAlarms(alarmRequestCode)
+        val requestCode = ReminderNotificationActions.snoozeAlarmRequestCode(alarmRequestCode)
         val pendingIntent = reminderPendingIntent(
             requestCode = requestCode,
             payload = ReminderAlarmPayload(
@@ -55,6 +58,7 @@ class ReminderScheduler(private val context: Context) {
                 eventTitle = eventTitle,
                 minutesBefore = snoozeMinutes,
                 isTask = isTask,
+                snoozedUntilMs = triggerAtMs,
             ),
         )
         if (isTask || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms())) {
@@ -69,14 +73,7 @@ class ReminderScheduler(private val context: Context) {
 
     fun cancelReminder(alarmRequestCode: Int) {
         alarmManager.cancel(reminderPendingIntent(alarmRequestCode, payload = ReminderAlarmPayload.EMPTY.copy(alarmRequestCode = alarmRequestCode)))
-        ReminderNotificationActions.SnoozeMinutes.forEach { minutes ->
-            alarmManager.cancel(
-                reminderPendingIntent(
-                    ReminderNotificationActions.snoozeRequestCode(alarmRequestCode, minutes),
-                    payload = ReminderAlarmPayload.EMPTY.copy(alarmRequestCode = alarmRequestCode),
-                ),
-            )
-        }
+        cancelSnoozeAlarms(alarmRequestCode)
     }
 
     fun showReminderNotification(event: CalendarEvent, reminder: EventReminder) {
@@ -97,6 +94,7 @@ class ReminderScheduler(private val context: Context) {
         alarmRequestCode: Int,
         isTask: Boolean = false,
         eventStartTimeMs: Long = 0L,
+        snoozedUntilMs: Long = 0L,
     ) {
         ensureChannel()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -108,7 +106,7 @@ class ReminderScheduler(private val context: Context) {
         val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(eventTitle)
-            .setContentText(reminderText(minutesBefore))
+            .setContentText(reminderText(minutesBefore, snoozedUntilMs))
             .setContentIntent(viewReminderPendingIntent(eventId, isTask))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -150,6 +148,9 @@ class ReminderScheduler(private val context: Context) {
             payload.eventTitle?.let { putExtra(ReminderReceiver.EXTRA_EVENT_TITLE, it) }
             putExtra(ReminderReceiver.EXTRA_MINUTES_BEFORE, payload.minutesBefore)
             putExtra(ReminderReceiver.EXTRA_IS_TASK, payload.isTask)
+            if (payload.snoozedUntilMs > 0L) {
+                putExtra(ReminderReceiver.EXTRA_SNOOZED_UNTIL_MS, payload.snoozedUntilMs)
+            }
         }
         return PendingIntent.getBroadcast(
             appContext,
@@ -201,7 +202,32 @@ class ReminderScheduler(private val context: Context) {
         )
     }
 
-    private fun reminderText(minutesBefore: Int): String {
+    private fun cancelSnoozeAlarms(alarmRequestCode: Int) {
+        val requestCodes = buildList {
+            add(ReminderNotificationActions.snoozeAlarmRequestCode(alarmRequestCode))
+            addAll(ReminderNotificationActions.SnoozeMinutes.map { minutes ->
+                ReminderNotificationActions.snoozeRequestCode(alarmRequestCode, minutes)
+            })
+            addAll(ReminderNotificationActions.SnoozePickerMinutes.map { minutes ->
+                ReminderNotificationActions.snoozeRequestCode(alarmRequestCode, minutes)
+            })
+        }.distinct()
+        requestCodes.forEach { requestCode ->
+            alarmManager.cancel(
+                reminderPendingIntent(
+                    requestCode,
+                    payload = ReminderAlarmPayload.EMPTY.copy(alarmRequestCode = alarmRequestCode),
+                ),
+            )
+        }
+    }
+
+    private fun reminderText(minutesBefore: Int, snoozedUntilMs: Long): String {
+        if (snoozedUntilMs > 0L) {
+            val formattedTime = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+                .format(Date(snoozedUntilMs))
+            return appContext.getString(R.string.notification_snoozed_until, formattedTime)
+        }
         return when (minutesBefore) {
             0 -> "Starting now"
             1 -> "Starts in 1 minute"
@@ -224,6 +250,7 @@ private data class ReminderAlarmPayload(
     val eventTitle: String?,
     val minutesBefore: Int,
     val isTask: Boolean,
+    val snoozedUntilMs: Long = 0L,
 ) {
     companion object {
         val EMPTY = ReminderAlarmPayload(
@@ -232,6 +259,7 @@ private data class ReminderAlarmPayload(
             eventTitle = null,
             minutesBefore = 0,
             isTask = false,
+            snoozedUntilMs = 0L,
         )
     }
 }

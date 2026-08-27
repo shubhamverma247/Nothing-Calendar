@@ -27,6 +27,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   planning, power features, advanced widgets, and privacy controls.
 - Do not start release hygiene, full i18n, AGP upgrade, backend sync, or manual phone QA unless
   requested or blocking.
+- After every implementation, always tell the user exactly what to test, how to test it, and the
+  expected result before moving to the next point.
 - Update this handoff after completed app work.
 
 ## Current State

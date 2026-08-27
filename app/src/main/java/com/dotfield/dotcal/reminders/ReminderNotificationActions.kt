@@ -6,6 +6,8 @@ internal object ReminderNotificationActions {
 
     fun snoozeDelayMs(minutes: Int): Long = minutes * 60_000L
 
+    fun snoozeAlarmRequestCode(alarmRequestCode: Int): Int = alarmRequestCode xor 0x6B6B6B6B
+
     fun canScheduleAt(triggerAtMs: Long, nowMs: Long): Boolean = triggerAtMs > nowMs
 
     fun snoozeRequestCode(alarmRequestCode: Int, minutes: Int): Int {

@@ -54,4 +54,14 @@ class ReminderNotificationActionsTest {
         assertEquals(false, ReminderNotificationActions.canScheduleAt(999L, 1_000L))
         assertEquals(true, ReminderNotificationActions.canScheduleAt(1_001L, 1_000L))
     }
+
+    @Test
+    fun repeatedSnoozesUseOneStableAlarmRequestCode() {
+        val alarmRequestCode = 1234
+
+        assertEquals(
+            ReminderNotificationActions.snoozeAlarmRequestCode(alarmRequestCode),
+            ReminderNotificationActions.snoozeAlarmRequestCode(alarmRequestCode),
+        )
+    }
 }

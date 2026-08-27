@@ -2710,6 +2710,13 @@ fun DotCalApp(
                 } else {
                     reminders.firstOrNull { it.eventId == editingEvent?.baseEventId() }?.minutesBefore
                 },
+                initialReminderMinutesList = if (editingEvent == null) {
+                    duplicateDraftPrefill?.reminderMinutesList
+                } else {
+                    reminders.filter { it.eventId == editingEvent?.baseEventId() }
+                        .map { it.minutesBefore }
+                        .takeIf { it.isNotEmpty() }
+                },
                 defaultEventDurationMinutes = defaultEventDurationMinutes,
                 accounts = assignableAccounts,
                 lastSelectedAccountId = lastSelectedEventAccountId,

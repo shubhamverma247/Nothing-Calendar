@@ -22,6 +22,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val fallbackTitle = intent.getStringExtra(EXTRA_EVENT_TITLE)
         val fallbackMinutes = intent.getIntExtra(EXTRA_MINUTES_BEFORE, Int.MIN_VALUE)
         val fallbackIsTask = intent.getBooleanExtra(EXTRA_IS_TASK, false)
+        val snoozedUntilMs = intent.getLongExtra(EXTRA_SNOOZED_UNTIL_MS, 0L)
         val snoozeMinutes = intent.getIntExtra(EXTRA_SNOOZE_MINUTES, DEFAULT_SNOOZE_MINUTES)
         val showedFromPayload = intent.action == ACTION_SHOW_REMINDER &&
             eventId != null &&
@@ -35,6 +36,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     minutesBefore = fallbackMinutes,
                     alarmRequestCode = alarmRequestCode,
                     isTask = fallbackIsTask,
+                    snoozedUntilMs = snoozedUntilMs,
                 )
             }.onFailure { throwable ->
                 Log.e(TAG, "Reminder payload notification failed for requestCode=$alarmRequestCode", throwable)
@@ -69,6 +71,7 @@ class ReminderReceiver : BroadcastReceiver() {
                                 alarmRequestCode = alarmRequestCode,
                                 isTask = fallbackIsTask,
                                 eventStartTimeMs = event?.startTimeMs ?: 0L,
+                                snoozedUntilMs = snoozedUntilMs,
                             )
                             if (reminder != null) repository.markReminderDelivered(alarmRequestCode)
                             return@runCatching
@@ -121,6 +124,7 @@ class ReminderReceiver : BroadcastReceiver() {
         const val EXTRA_SNOOZE_MINUTES = "extra_snooze_minutes"
         const val EXTRA_IS_TASK = "extra_is_task"
         const val EXTRA_EVENT_START_TIME_MS = "extra_event_start_time_ms"
+        const val EXTRA_SNOOZED_UNTIL_MS = "extra_snoozed_until_ms"
         private const val DEFAULT_SNOOZE_MINUTES = 15
     }
 }

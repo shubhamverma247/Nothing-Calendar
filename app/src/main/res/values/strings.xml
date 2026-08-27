@@ -23,6 +23,7 @@
     <string name="notification_action_open">Open</string>
     <string name="notification_action_snooze_minutes">Snooze %1$d min</string>
     <string name="notification_action_snooze">Snooze</string>
+    <string name="notification_snoozed_until">Snoozed until %1$s</string>
     <string name="notification_action_complete_task">Complete Task</string>
     <string name="snooze_picker_title">Snooze reminder</string>
     <string name="snooze_picker_for">Snooze for</string>
@@ -174,7 +175,11 @@
     <string name="reminder_none">None</string>
     <string name="reminder_1_hour_before">1 hour before</string>
     <string name="reminder_1_day_before">1 day before</string>
+    <string name="reminder_1_week_before">1 week before</string>
     <string name="reminder_minutes_before">%1$d minutes before</string>
+    <string name="reminder_hours_before">%1$s hours before</string>
+    <string name="reminder_days_before">%1$s days before</string>
+    <string name="reminder_weeks_before">%1$s weeks before</string>
 
     <!-- Widgets -->
     <string name="settings_panel_widget_style">Widget Style</string>
@@ -346,6 +351,10 @@
     <string name="event_starts">Starts</string>
     <string name="event_ends">Ends</string>
     <string name="event_reminder">Reminder</string>
+    <string name="event_add_reminder">Add reminder</string>
+    <string name="event_remove_reminder">Remove reminder</string>
+    <string name="event_custom_reminder">Custom date and time</string>
+    <string name="event_custom_reminder_minutes">%1$d minutes before</string>
     <string name="event_repeat">Repeat</string>
     <string name="event_repeat_none">None</string>
     <string name="event_apply_to">Apply to</string>

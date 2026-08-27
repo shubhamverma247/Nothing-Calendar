@@ -130,8 +130,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -242,6 +244,7 @@ import com.dotfield.dotcal.ui.theme.NBlack
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
@@ -1453,6 +1456,7 @@ internal fun EventEditorScreen(
     selectedDate: LocalDate,
     selectedTime: LocalTime,
     initialReminderMinutes: Int?,
+    initialReminderMinutesList: List<Int>? = null,
     defaultEventDurationMinutes: Int = 60,
     accounts: List<CalendarAccount>,
     lastSelectedAccountId: String?,
@@ -1506,9 +1510,16 @@ internal fun EventEditorScreen(
     }
     var allDay by remember(editorStateKey) { mutableStateOf(event?.let { it.isAllDay == 1 } ?: draft?.isAllDay ?: seed?.isAllDay ?: tpl?.isAllDay ?: false) }
     val draftReminderMinutes = remember(editorStateKey) { draft?.reminderMinutesList?.distinct()?.sorted() }
-    var reminderEdited by remember(editorStateKey) { mutableStateOf(false) }
+    val initialReminderSelection = remember(editorStateKey, initialReminderMinutes, initialReminderMinutesList, draftReminderMinutes) {
+        (if (tpl != null) listOfNotNull(tpl.reminderMinutes) else initialReminderMinutesList ?: draftReminderMinutes ?: listOfNotNull(initialReminderMinutes))
+            .distinct()
+            .sorted()
+    }
+    var reminderMinutesList by remember(editorStateKey, initialReminderSelection) {
+        mutableStateOf(initialReminderSelection)
+    }
     var reminderMinutes by remember(editorStateKey, initialReminderMinutes) {
-        mutableStateOf(if (tpl != null) tpl.reminderMinutes else draft?.reminderMinutes ?: draftReminderMinutes?.firstOrNull() ?: initialReminderMinutes)
+        mutableStateOf(if (tpl != null) tpl.reminderMinutes else reminderMinutesList.firstOrNull())
     }
     var recurrenceRule by remember(editorStateKey) { mutableStateOf(event?.rrule ?: draft?.rrule ?: seed?.rrule ?: tpl?.rrule) }
     var isGhost by remember(editorStateKey) { mutableStateOf(event?.isGhost ?: draft?.isGhost ?: false) }
@@ -1619,7 +1630,7 @@ internal fun EventEditorScreen(
         }
     }
     fun needsNotificationPermissionForReminder(): Boolean {
-        return reminderMinutes != null &&
+        return reminderMinutesList.isNotEmpty() &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
     }
@@ -1635,8 +1646,8 @@ internal fun EventEditorScreen(
             startTime = startTime,
             endTime = endTime,
             isAllDay = allDay,
-            reminderMinutes = reminderMinutes,
-            reminderMinutesList = if (!reminderEdited) draftReminderMinutes else null,
+            reminderMinutes = reminderMinutesList.firstOrNull(),
+            reminderMinutesList = reminderMinutesList,
             rrule = recurrenceRule,
             imageUris = imageUris.toJsonStringArray(),
             voiceNotePath = voiceNotePath,
@@ -1977,7 +1988,7 @@ internal fun EventEditorScreen(
             Spacer(modifier = Modifier.height(12.dp))
             EditorValueRow(
                 title = stringResource(R.string.event_reminder),
-                value = reminderLabel(reminderMinutes),
+                value = reminderMinutesSummary(reminderMinutesList),
                 palette = palette,
                 onClick = {
                     clearEditorFocus()
@@ -2092,13 +2103,14 @@ internal fun EventEditorScreen(
     }
     if (showReminderPicker) {
         ReminderChoiceSheet(
-            selected = reminderMinutes,
+            selected = reminderMinutesList,
+            eventStartDateTime = startDate.atTime(startTime),
             palette = palette,
             onDismiss = { showReminderPicker = false },
             onSelected = {
-                reminderEdited = true
-                reminderMinutes = it
-                if (it != null) requestNotificationPermissionForReminder()
+                reminderMinutesList = it
+                reminderMinutes = it.firstOrNull()
+                if (it.isNotEmpty()) requestNotificationPermissionForReminder()
                 showReminderPicker = false
             },
         )
@@ -3036,9 +3048,41 @@ private fun TimeChoiceSheet(
     }
 }
 
+@Composable
+internal fun reminderMinutesSummary(minutes: List<Int>): String {
+    if (minutes.isEmpty()) return reminderLabel(null)
+    val labels = ArrayList<String>(minutes.size)
+    minutes.sorted().forEach { labels += reminderLabel(it) }
+    return labels.joinToString()
+}
+
+internal fun reminderMinutesBeforeEvent(
+    reminderDateTime: LocalDateTime,
+    eventStartDateTime: LocalDateTime,
+): Int? {
+    val minutes = java.time.temporal.ChronoUnit.MINUTES
+        .between(reminderDateTime, eventStartDateTime)
+    return minutes.takeIf { it > 0 && it <= Int.MAX_VALUE }?.toInt()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ReminderChoiceSheet(selected: Int?, palette: DotCalPalette, onDismiss: () -> Unit, onSelected: (Int?) -> Unit) {
+internal fun ReminderChoiceSheet(
+    selected: List<Int>,
+    eventStartDateTime: LocalDateTime,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (List<Int>) -> Unit,
+) {
+    var selectedMinutes by remember(selected) { mutableStateOf(selected.distinct().sorted()) }
+    var showPresets by remember { mutableStateOf(false) }
+    var showCustomDateTime by remember { mutableStateOf(false) }
+    var customReminderDateTime by remember(selected, eventStartDateTime) {
+        val initialCustomMinutes = selected.firstOrNull { it !in eventReminderPresets } ?: 30
+        mutableStateOf(eventStartDateTime.minusMinutes(initialCustomMinutes.toLong()))
+    }
+    val reminderListState = rememberLazyListState()
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
@@ -3046,13 +3090,188 @@ internal fun ReminderChoiceSheet(selected: Int?, palette: DotCalPalette, onDismi
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         dragHandle = { BottomSheetDragHandle(palette) },
     ) {
-        ChoiceSheetContent(
-            title = stringResource(R.string.event_reminder),
-            items = reminderOptions,
-            selected = selected,
-            label = { reminderLabel(it) },
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(420.dp)
+                .background(palette.dialogSurface)
+                .padding(horizontal = 20.dp),
+        ) {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                state = reminderListState,
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.event_reminder),
+                        color = palette.primaryText,
+                        fontFamily = LocalHeadingFont.current,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 18.sp,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                if (selectedMinutes.isEmpty()) {
+                    item {
+                        Text(
+                            reminderLabel(null),
+                            color = palette.secondaryText,
+                            fontFamily = mono,
+                            fontSize = 15.sp,
+                            modifier = Modifier.padding(vertical = 12.dp),
+                        )
+                    }
+                } else {
+                    lazyItems(selectedMinutes, key = { "selected-$it" }) { minutes ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                reminderLabel(minutes),
+                                color = palette.primaryText,
+                                fontFamily = mono,
+                                fontSize = 15.sp,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(
+                                onClick = {
+                                    selectedMinutes = selectedMinutes - minutes
+                                },
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.event_remove_reminder),
+                                    tint = palette.secondaryText,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+                item {
+                    OutlinedButton(
+                        onClick = { showPresets = !showPresets },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        border = secondaryActionBorder(palette),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = secondaryActionContainer(palette),
+                            contentColor = secondaryActionContent(palette),
+                        ),
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.event_add_reminder), fontFamily = mono)
+                    }
+                }
+                if (showPresets) {
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                    lazyItems(
+                        eventReminderPresets.filterNot { it in selectedMinutes },
+                        key = { "option-$it" },
+                    ) { minutes ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedMinutes = (selectedMinutes + minutes).distinct().sorted()
+                                }
+                                .padding(horizontal = 12.dp, vertical = 13.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                reminderLabel(minutes),
+                                color = palette.primaryText,
+                                fontFamily = mono,
+                                fontSize = 15.sp,
+                                modifier = Modifier.weight(1f),
+                            )
+                            RadioButton(
+                                selected = false,
+                                onClick = null,
+                                colors = androidx.compose.material3.RadioButtonDefaults.colors(
+                                    selectedColor = palette.accent,
+                                    unselectedColor = palette.secondaryText,
+                                ),
+                            )
+                        }
+                    }
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showCustomDateTime = true }
+                                .padding(horizontal = 12.dp, vertical = 13.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                stringResource(R.string.event_custom_reminder),
+                                color = palette.primaryText,
+                                fontFamily = mono,
+                                fontSize = 15.sp,
+                                modifier = Modifier.weight(1f),
+                            )
+                            RadioButton(
+                                selected = false,
+                                onClick = null,
+                                colors = androidx.compose.material3.RadioButtonDefaults.colors(
+                                    selectedColor = palette.accent,
+                                    unselectedColor = palette.secondaryText,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    border = secondaryActionBorder(palette),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = secondaryActionContainer(palette),
+                        contentColor = secondaryActionContent(palette),
+                    ),
+                ) {
+                    Text(stringResource(R.string.action_cancel), fontFamily = mono, fontWeight = FontWeight.SemiBold)
+                }
+                Button(
+                    onClick = { onSelected(selectedMinutes) },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+                ) {
+                    Text(stringResource(R.string.action_done), fontFamily = mono, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+    if (showCustomDateTime) {
+        DateTimeChoiceSheet(
+            title = stringResource(R.string.event_custom_reminder),
+            selectedDate = customReminderDateTime.toLocalDate(),
+            selectedTime = customReminderDateTime.toLocalTime(),
+            minDate = null,
+            includeTime = true,
             palette = palette,
-            onSelected = onSelected,
+            onDismiss = { showCustomDateTime = false },
+            onSelected = { pickedDate, pickedTime ->
+                val pickedDateTime = pickedDate.atTime(pickedTime)
+                val minutes = reminderMinutesBeforeEvent(pickedDateTime, eventStartDateTime)
+                if (minutes != null) {
+                    customReminderDateTime = pickedDateTime
+                    selectedMinutes = (selectedMinutes + minutes).distinct().sorted()
+                    showCustomDateTime = false
+                } else {
+                    // Keep the wheel open until a time before the event is chosen.
+                }
+            },
         )
     }
 }
