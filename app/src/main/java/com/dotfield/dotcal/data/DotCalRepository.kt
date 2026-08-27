@@ -780,13 +780,18 @@ class DotCalRepository(
         includeTasks: Boolean,
         nowMs: Long = System.currentTimeMillis(),
         limit: Int = 5,
+        includeActive: Boolean = false,
     ): List<CalendarEvent> {
         val today = Instant.ofEpochMilli(nowMs).atZone(ZoneId.systemDefault()).toLocalDate()
         val events = observeUpcomingAgendaEvents(today).first()
-            .filter { it.isTask == 0 && it.startTimeMs > nowMs }
+            .filter { event ->
+                event.isTask == 0 && (event.startTimeMs > nowMs || (includeActive && event.endTimeMs > nowMs))
+            }
         val tasks = if (includeTasks) {
             observeUpcomingTasks(nowMs).first()
-                .filter { it.isCompleted == 0 && it.startTimeMs > nowMs }
+                .filter { task ->
+                    task.isCompleted == 0 && (task.startTimeMs > nowMs || (includeActive && task.endTimeMs > nowMs))
+                }
         } else {
             emptyList()
         }

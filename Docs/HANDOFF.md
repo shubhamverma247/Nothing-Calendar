@@ -17,6 +17,9 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 
 ## Hard Rules
 
+- Every future session: read this handoff first; load `$android-development`; inspect current task;
+  then continue work. Prompt user to confirm/read handoff and skill before task work.
+- Use `$caveman-ultra` communication mode for repo work.
 - Preserve app identity: black/white/red, minimal, offline-first Android calendar.
 - CalendarProvider sync only for Google/system calendar integration; no backend/cloud/account
   dependency unless the user explicitly approves it.
@@ -191,6 +194,20 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     `git diff --check` passed with CRLF warnings only.
   - Latest local install succeeded on device `4ab0d020`:
     `C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Nothing Glyph Matrix integration updated:
+  - Existing device-gated Glyph Toy keeps live countdown behavior on supported Nothing devices.
+  - App-to-toy bridge updates state immediately when a reminder is snoozed, opened, completed, or
+    delivered/expired; snoozed countdown displays until snooze time, then advances.
+  - Unsupported devices remain inert; no Room schema change.
+  - Debug unit tests and APK assembly passed after integration.
+- Nothing Phone (3) Glyph Progress path added:
+  - BC2-style path uses a device-gated ongoing custom `RemoteViews` notification; no direct Glyph
+    SDK or Glyph enable step is required on NP3.
+  - `POST_PROMOTED_NOTIFICATIONS` is not needed and is not declared; normal `POST_NOTIFICATIONS`
+    remains required for reminder notifications.
+  - The custom notification updates its progress state every 60 seconds, matching BC2's observed
+    `AlarmManager` cadence; it does not show a notification chronometer timer.
+  - Matrix Glyph Toy remains optional fallback for supported Nothing devices.
 
 ## Verification Baseline
 
@@ -245,6 +262,16 @@ After next debug install, prioritize:
 - Sync Google events with custom calendar colors; DotCal should not fall back to red when provider
   event color is missing.
 - Restore purchase on an account with old lifetime purchase.
+- On supported Nothing Glyph device, select DotCal Glyph Toy and create a future reminder.
+  - Expected: Glyph shows countdown; snooze updates countdown immediately; opening/completing item
+    clears it and advances to next item; reminder delivery advances/clears expired item.
+- On non-Nothing device, exercise reminder/open/task flows.
+  - Expected: no crash and no visible Glyph behavior.
+- On Nothing Phone (3) with Android 16/Nothing OS supporting Live Updates, do not enable DotCal Toy;
+  create a future reminder and let its reminder notification appear.
+  - Expected: Nothing Glyph Progress appears from the ongoing custom notification; its progress
+    advances without a visible timer; snooze updates its target time; opening/completing clears it.
+    If Glyph handling is unavailable, normal notification fallback remains.
 
 ## Planned: CalendarProvider Sync Hardening
 

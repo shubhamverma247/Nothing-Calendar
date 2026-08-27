@@ -265,6 +265,11 @@ internal fun parseStoredTime(value: String?): LocalTime? {
     return runCatching { LocalTime.parse(value) }.getOrNull()
 }
 
+internal fun defaultEventStartTime(now: LocalTime = LocalTime.now()): LocalTime {
+    val roundedMinutes = ((now.hour * 60 + now.minute + 14) / 15) * 15
+    return LocalTime.of((roundedMinutes / 60).coerceAtMost(23), roundedMinutes % 60)
+}
+
 internal fun minuteOfDayToLocalTimeOrNull(minuteOfDay: Int?): LocalTime? {
     val minute = minuteOfDay?.takeIf { it in 0..(23 * 60 + 59) } ?: return null
     return LocalTime.of(minute / 60, minute % 60)

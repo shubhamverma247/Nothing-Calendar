@@ -1,8 +1,11 @@
 package com.dotfield.dotcal.glyph
 
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
@@ -21,6 +24,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import androidx.core.content.ContextCompat
 
 /**
  * Glyph Matrix "toy" that shows a live countdown to the user's next DotCal item on
@@ -39,6 +43,15 @@ class DotCalGlyphToyService : Service() {
     private var manager: GlyphMatrixManager? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var renderJob: Job? = null
+    @Volatile private var snoozedEventId: String? = null
+    @Volatile private var snoozedUntilMs = 0L
+    @Volatile private var clearedEventId: String? = null
+    private val commandReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            applyCommand(intent)
+            scope.launch { runCatching { renderOnce() } }
+        }
+    }
 
     /** Pro long-press cycling: offset into the upcoming list. */
     @Volatile
@@ -54,6 +67,19 @@ class DotCalGlyphToyService : Service() {
             Common.is25111p() -> Glyph.DEVICE_25111p
             else -> null
         }
+
+    override fun onCreate() {
+        super.onCreate()
+        ContextCompat.registerReceiver(
+            this,
+            commandReceiver,
+            IntentFilter().apply {
+                addAction(DotCalGlyphBridge.ACTION_EVENT_SNOOZED)
+                addAction(DotCalGlyphBridge.ACTION_EVENT_CLEARED)
+            },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+    }
 
     override fun onBind(intent: Intent?): IBinder {
         val target = deviceTarget
@@ -78,6 +104,29 @@ class DotCalGlyphToyService : Service() {
         return messenger.binder
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        applyCommand(intent)
+        scope.launch { runCatching { renderOnce() } }
+        return START_NOT_STICKY
+    }
+
+    private fun applyCommand(intent: Intent?) {
+        when (intent?.action) {
+            DotCalGlyphBridge.ACTION_EVENT_SNOOZED -> {
+                snoozedEventId = intent.getStringExtra(DotCalGlyphBridge.EXTRA_EVENT_ID)
+                snoozedUntilMs = intent.getLongExtra(DotCalGlyphBridge.EXTRA_UNTIL_MS, 0L)
+                clearedEventId = null
+            }
+            DotCalGlyphBridge.ACTION_EVENT_CLEARED -> {
+                clearedEventId = intent.getStringExtra(DotCalGlyphBridge.EXTRA_EVENT_ID)
+                if (clearedEventId == snoozedEventId) {
+                    snoozedEventId = null
+                    snoozedUntilMs = 0L
+                }
+            }
+        }
+    }
+
     override fun onUnbind(intent: Intent?): Boolean {
         stopRenderLoop()
         runCatching { manager?.turnOff() }
@@ -87,6 +136,7 @@ class DotCalGlyphToyService : Service() {
     }
 
     override fun onDestroy() {
+        runCatching { unregisterReceiver(commandReceiver) }
         stopRenderLoop()
         scope.cancel()
         eventThread.quitSafely()
@@ -116,14 +166,63 @@ class DotCalGlyphToyService : Service() {
             includeTasks = isPro,
             nowMs = now,
             limit = if (isPro) PRO_CYCLE_LIMIT else 1,
+            includeActive = true,
         )
-        if (upcoming.isEmpty()) {
+        val visible = upcoming.filterNot { it.id == clearedEventId || it.id == snoozedEventId }
+        val snoozeTarget = upcoming.firstOrNull { it.id == snoozedEventId }
+        if (snoozeTarget != null && snoozedUntilMs > now) {
+            renderProgressFrame(
+                progress = 0f,
+                label = formatCountdown(snoozedUntilMs - now),
+            )
+            return
+        }
+        if (snoozeTarget != null) {
+            snoozedEventId = null
+            snoozedUntilMs = 0L
+        }
+        if (visible.isEmpty()) {
             renderText(EMPTY_GLYPH)
             return
         }
-        val index = if (isPro) cycleIndex % upcoming.size else 0
-        val target = upcoming[index]
-        renderText(formatCountdown(target.startTimeMs - now))
+        val index = if (isPro) cycleIndex % visible.size else 0
+        val target = visible[index]
+        renderProgressFrame(
+            progress = eventProgress(target.startTimeMs, target.endTimeMs, now),
+            label = formatCountdown(target.startTimeMs - now),
+        )
+    }
+
+    private fun eventProgress(startMs: Long, endMs: Long, nowMs: Long): Float {
+        if (endMs <= startMs || nowMs <= startMs) return 0f
+        return ((nowMs - startMs).toFloat() / (endMs - startMs).toFloat()).coerceIn(0f, 1f)
+    }
+
+    private fun renderProgressFrame(progress: Float, label: String) {
+        val size = matrixSize()
+        val frame = buildCountdownFrame(label)
+        val innerStart = (size * 0.12f).toInt().coerceAtLeast(1)
+        val innerEnd = (size * 0.88f).toInt().coerceAtMost(size - 2)
+        val width = (innerEnd - innerStart + 1).coerceAtLeast(1)
+        val filled = (width * progress.coerceIn(0f, 1f)).toInt()
+        for (x in innerStart..innerEnd) {
+            setPixel(frame, size, x, innerStart, TEXT_BRIGHTNESS)
+            setPixel(frame, size, x, innerEnd, TEXT_BRIGHTNESS)
+        }
+        for (y in innerStart..innerEnd) {
+            setPixel(frame, size, innerStart, y, TEXT_BRIGHTNESS)
+            setPixel(frame, size, innerEnd, y, TEXT_BRIGHTNESS)
+        }
+        for (x in innerStart until (innerStart + filled).coerceAtMost(innerEnd + 1)) {
+            for (y in (innerEnd - PROGRESS_THICKNESS + 1)..innerEnd) {
+                setPixel(frame, size, x, y, TEXT_BRIGHTNESS)
+            }
+        }
+        renderFrame(frame)
+    }
+
+    private fun renderFrame(frame: IntArray) {
+        runCatching { manager?.setMatrixFrame(frame) }
     }
 
     private fun renderText(text: String) {
@@ -235,6 +334,7 @@ class DotCalGlyphToyService : Service() {
         private const val TEXT_SCALE = 1
         private const val LETTER_SPACING = 1
         private const val TEXT_BRIGHTNESS = 4095
+        private const val PROGRESS_THICKNESS = 2
         private const val MINUTES_PER_HOUR = 60L
         private const val MINUTES_PER_DAY = 60L * 24L
         private const val MAX_DAYS = 99L

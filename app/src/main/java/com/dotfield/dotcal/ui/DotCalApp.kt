@@ -31,6 +31,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.dotfield.dotcal.glyph.DotCalGlyphBridge
 import com.google.android.play.core.appupdate.AppUpdateOptions
 import com.google.android.play.core.install.InstallStateUpdatedListener
 import com.google.android.play.core.install.model.AppUpdateType
@@ -350,7 +351,7 @@ fun DotCalApp(
     var previousScreenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var showSheet by remember { mutableStateOf(false) }
     var addSheet by remember { mutableStateOf(false) }
-    var addStartTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
+    var addStartTime by remember { mutableStateOf(defaultEventStartTime()) }
     var addEditorDateOverride by remember { mutableStateOf<LocalDate?>(null) }
     var editingEvent by remember { mutableStateOf<CalendarEvent?>(null) }
     var taskDetail by remember { mutableStateOf<CalendarEvent?>(null) }
@@ -910,6 +911,7 @@ fun DotCalApp(
     }
     LaunchedEffect(initialRouteToken, initialEventId) {
         if (initialRouteToken != null && handledRouteToken != initialRouteToken && !initialEventId.isNullOrBlank()) {
+            DotCalGlyphBridge.eventOpened(context, initialEventId)
             routePending = true
             viewModel.closeEventDetail()
             settingsScreen = SettingsScreen.Root
@@ -929,6 +931,7 @@ fun DotCalApp(
             previousScreenTab = ScreenTab.Calendar
             screenTab = ScreenTab.Tasks
             tasks.firstOrNull { it.baseEventId() == initialTaskId || it.id == initialTaskId }?.let { task ->
+                DotCalGlyphBridge.eventOpened(context, task.baseEventId())
                 taskDetail = task
                 handledTaskDeepLinkId = initialTaskId
                 handledRouteToken = initialRouteToken
@@ -1000,7 +1003,7 @@ fun DotCalApp(
             jumpHighlightDate = null
         }
     }
-    fun openAddEditor(startTime: LocalTime = LocalTime.of(9, 0), date: LocalDate? = null) {
+    fun openAddEditor(startTime: LocalTime = defaultEventStartTime(), date: LocalDate? = null) {
         editorSessionKey = UUID.randomUUID().toString()
         quickAddPrefill = null
         duplicateDraftPrefill = null
@@ -1015,7 +1018,7 @@ fun DotCalApp(
         quickAddPrefill = result
         duplicateDraftPrefill = null
         templatePrefill = null
-        addStartTime = result.startTime ?: LocalTime.of(9, 0)
+        addStartTime = result.startTime ?: defaultEventStartTime()
         addEditorDateOverride = result.date
         editingEvent = null
         showQuickAdd = false
@@ -1028,7 +1031,7 @@ fun DotCalApp(
         val hasDate = task.hasTaskDate()
         val blockDate = if (hasDate) task.localDate() else selectedDate
         val timed = hasDate && task.isAllDay == 0
-        val startTime = if (timed) task.startLocalTime() else LocalTime.of(9, 0)
+        val startTime = if (timed) task.startLocalTime() else defaultEventStartTime()
         val endTime = startTime.plusHours(1)
         val prefill = QuickAddResult(
             title = task.title,
@@ -1053,7 +1056,7 @@ fun DotCalApp(
             quickAddPrefill = null
             duplicateDraftPrefill = null
             templatePrefill = template
-            addStartTime = minuteOfDayToLocalTimeOrNull(template.startMinuteOfDay) ?: LocalTime.of(9, 0)
+            addStartTime = minuteOfDayToLocalTimeOrNull(template.startMinuteOfDay) ?: defaultEventStartTime()
             addEditorDateOverride = selectedDate
             editingEvent = null
             addSheet = true
@@ -2657,6 +2660,7 @@ fun DotCalApp(
                             viewModel.reopenTask(task)
                         } else {
                             viewModel.completeTask(task)
+                            DotCalGlyphBridge.taskCompleted(context, task.baseEventId())
                         }
                         taskDetail = null
                     },
@@ -3070,11 +3074,13 @@ fun DotCalApp(
                 accounts = searchAccounts,
                 onQueryChange = { viewModel.search(it) },
                 onOpenEvent = { event ->
+                    DotCalGlyphBridge.eventOpened(context, event.baseEventId())
                     showSearch = false
                     viewModel.clearSearch()
                     viewModel.openEventDetail(event)
                 },
                 onOpenTask = { task ->
+                    DotCalGlyphBridge.eventOpened(context, task.baseEventId())
                     showSearch = false
                     viewModel.clearSearch()
                     taskDetail = task
