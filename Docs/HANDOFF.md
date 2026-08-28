@@ -71,6 +71,14 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 
 ## Recently Completed
 
+- Phase 1 quick wins completed locally:
+  - Smart Quick Add voice dictation uses Android on-device SpeechRecognizer when supported, with
+    permission, unavailable, cancellation, empty-result, and failure handling.
+  - Quick Settings Tile and launcher long-press Quick Add shortcut reuse `dotcal://quick-add`.
+  - Month, Week, and Agenda export branded PNG cards through existing FileProvider sharing. Cards
+    use view-specific layouts and event time zones; basic export remains Free.
+  - Added unit coverage for voice error states and export layout selection.
+
 - Calendar sync handles reminders both ways:
   - DotCal -> Google writes `CalendarContract.Reminders`.
   - Google -> DotCal imports provider reminder minutes.

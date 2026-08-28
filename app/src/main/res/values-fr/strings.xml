@@ -1020,4 +1020,18 @@
 <string name="widget_config_selected">SÉLECTIONNÉ</string>
 <string name="widget_config_type_fixed">%1$s · Contenu fixe</string>
     <string name="widget_cat_today">Aujourd\'hui</string>
+<string name="share_view_chooser">Partager la vue du calendrier</string>
+<string name="toast_view_share_failed">Impossible de créer l’image du calendrier</string>
+<string name="share_card_brand">TEMPS PRIVÉ, EN POINTS</string>
+<string name="share_card_empty">AUCUN ÉVÉNEMENT DANS CETTE VUE</string>
+<string name="share_card_untitled">Sans titre</string>
+<string name="quick_add_voice_listening">ÉCOUTE…</string>
+<string name="quick_add_voice_empty">AUCUNE PAROLE ENTENDUE</string>
+<string name="quick_add_voice_cancelled">DICTÉE ANNULÉE</string>
+<string name="quick_add_voice_unavailable">SAISIE VOCALE INDISPONIBLE</string>
+<string name="quick_add_voice_denied">AUTORISATION MICRO REFUSÉE</string>
+<string name="quick_add_voice_failed">ÉCHEC DE LA SAISIE VOCALE</string>
+<string name="quick_add_voice_start">Dicter un ajout rapide</string>
+<string name="quick_add_voice_stop">Arrêter la dictée</string>
+<string name="share_view_action">Partager la vue</string>
 </resources>

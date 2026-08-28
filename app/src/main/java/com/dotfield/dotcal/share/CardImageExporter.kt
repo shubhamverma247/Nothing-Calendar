@@ -14,9 +14,176 @@ import com.dotfield.dotcal.data.countdown.CountdownPinStore
 import com.dotfield.dotcal.data.baseEventId
 import java.io.File
 import java.time.ZoneId
+import java.time.DayOfWeek
+import java.time.LocalDate
 import java.util.Locale
+import java.util.UUID
 
 object CardImageExporter {
+    fun createCalendarViewShareUri(
+        context: Context,
+        viewName: String,
+        events: List<CalendarEvent>,
+        viewDate: LocalDate,
+        weekStart: DayOfWeek = DayOfWeek.MONDAY,
+        accentColor: Int,
+        darkTheme: Boolean,
+    ): Uri {
+        val bitmap = renderCalendarViewShareBitmap(context, viewName, events, viewDate, weekStart, accentColor, darkTheme)
+        return writeCalendarViewShareUri(context, viewName, bitmap)
+    }
+
+    internal fun renderCalendarViewShareBitmap(
+        context: Context,
+        viewName: String,
+        events: List<CalendarEvent>,
+        viewDate: LocalDate,
+        weekStart: DayOfWeek,
+        accentColor: Int,
+        darkTheme: Boolean,
+    ): Bitmap = renderCalendarViewCard(
+            viewName = viewName,
+            events = events,
+            accentColor = accentColor,
+            darkTheme = darkTheme,
+            brandLabel = context.getString(com.dotfield.dotcal.R.string.share_card_brand),
+            emptyLabel = context.getString(com.dotfield.dotcal.R.string.share_card_empty),
+            untitledLabel = context.getString(com.dotfield.dotcal.R.string.share_card_untitled),
+            viewDate = viewDate,
+            weekStart = weekStart,
+        )
+
+    internal fun writeCalendarViewShareUri(context: Context, viewName: String, bitmap: Bitmap): Uri {
+        val shareDir = File(context.cacheDir, "shared_events").apply { mkdirs() }
+        val file = File(shareDir, "dotcal-${viewName.lowercase(Locale.US)}-${UUID.randomUUID()}.png")
+        try {
+            val compressed = file.outputStream().use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
+            check(compressed) { "Calendar view image compression failed" }
+        } finally {
+            bitmap.recycle()
+        }
+        return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    }
+
+    internal fun calendarViewLayout(viewName: String): String = when (viewName.lowercase(Locale.US)) {
+        "month" -> "month"
+        "week" -> "week"
+        "agenda" -> "agenda"
+        else -> "agenda"
+    }
+
+    private fun renderCalendarViewCard(
+        viewName: String,
+        events: List<CalendarEvent>,
+        accentColor: Int,
+        darkTheme: Boolean,
+        brandLabel: String,
+        emptyLabel: String,
+        untitledLabel: String,
+        viewDate: LocalDate,
+        weekStart: DayOfWeek,
+    ): Bitmap {
+        val width = 1080
+        val height = 1350
+        val background = if (darkTheme) Color.rgb(11, 11, 13) else Color.rgb(250, 250, 250)
+        val text = if (darkTheme) Color.WHITE else Color.rgb(17, 17, 17)
+        val secondary = if (darkTheme) Color.rgb(156, 163, 175) else Color.rgb(107, 114, 128)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD) }
+        canvas.drawColor(background)
+        paint.color = accentColor
+        canvas.drawRect(72f, 86f, 1008f, 96f, paint)
+        paint.color = text
+        paint.textSize = 58f
+        canvas.drawText("DOTCAL / ${viewName.uppercase(Locale.US)}", 72f, 190f, paint)
+        paint.color = secondary
+        paint.textSize = 30f
+        canvas.drawText(brandLabel, 72f, 242f, paint)
+        when (calendarViewLayout(viewName)) {
+            "month" -> drawMonthView(canvas, viewDate, weekStart, events, accentColor, text, secondary, untitledLabel)
+            "week" -> drawWeekView(canvas, viewDate, weekStart, events, accentColor, text, secondary, untitledLabel)
+            else -> drawAgendaView(canvas, events, accentColor, text, secondary, untitledLabel)
+        }
+        if (events.isEmpty()) {
+            paint.color = secondary
+            paint.textSize = 32f
+            canvas.drawText(emptyLabel, 72f, 390f, paint)
+        }
+        paint.color = text
+        paint.textSize = 34f
+        canvas.drawText("DotCal", 72f, 1275f, paint)
+        return bitmap
+    }
+
+    private fun drawAgendaView(canvas: Canvas, events: List<CalendarEvent>, accentColor: Int, text: Int, secondary: Int, untitledLabel: String) {
+        var y = 350f
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD) }
+        events.take(12).forEach { event ->
+            paint.color = accentColor; canvas.drawCircle(92f, y - 10f, 12f, paint)
+            paint.color = text; paint.textSize = 36f
+            canvas.drawText(event.title.ifBlank { untitledLabel }.take(30), 132f, y, paint)
+            paint.color = secondary; paint.textSize = 25f
+            canvas.drawText(event.shareCardDateLabel(), 132f, y + 42f, paint)
+            y += 112f
+        }
+    }
+
+    internal fun monthGridStart(date: LocalDate, weekStart: DayOfWeek = DayOfWeek.MONDAY): LocalDate {
+        val offset = (date.withDayOfMonth(1).dayOfWeek.value - weekStart.value + 7) % 7
+        return date.withDayOfMonth(1).minusDays(offset.toLong())
+    }
+
+    private fun drawMonthView(canvas: Canvas, viewDate: LocalDate, weekStart: DayOfWeek, events: List<CalendarEvent>, accentColor: Int, text: Int, secondary: Int, untitledLabel: String) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color = secondary; paint.textSize = 24f; paint.typeface = Typeface.DEFAULT_BOLD
+        val labels = (0..6).map { weekStart.plus(it.toLong()).name.take(1) }
+        labels.forEachIndexed { index, label -> canvas.drawText(label, 92f + index * 132f, 350f, paint) }
+        paint.color = text; paint.textSize = 22f
+        val start = monthGridStart(viewDate, weekStart)
+        val eventDates = events.map { eventDate(it) }.toSet()
+        (0 until 42).forEach { index ->
+            val day = start.plusDays(index.toLong()); val column = index % 7; val row = index / 7
+            paint.color = if (day.month == viewDate.month) text else secondary
+            canvas.drawText(day.dayOfMonth.toString(), 92f + column * 132f, 400f + row * 86f, paint)
+            if (day in eventDates) { paint.color = accentColor; canvas.drawCircle(100f + column * 132f, 418f + row * 86f, 7f, paint) }
+        }
+        paint.color = secondary; paint.textSize = 22f
+        canvas.drawText("${viewDate.month.name.take(3)} ${viewDate.year}  -  ${events.size} EVENTS", 72f, 930f, paint)
+        canvas.drawText(events.take(3).joinToString("  -  ") { it.title.ifBlank { untitledLabel }.take(16) }.take(78), 72f, 970f, paint)
+    }
+
+    private fun drawWeekView(canvas: Canvas, viewDate: LocalDate, weekStart: DayOfWeek, events: List<CalendarEvent>, accentColor: Int, text: Int, secondary: Int, untitledLabel: String) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color = secondary; paint.textSize = 22f; paint.typeface = Typeface.DEFAULT_BOLD
+        val start = viewDate.minusDays((viewDate.dayOfWeek.value - weekStart.value + 7L) % 7L)
+        (0..6).forEach { day ->
+            val date = start.plusDays(day.toLong())
+            canvas.drawText("${date.dayOfWeek.name.take(3)} ${date.dayOfMonth}", 70f + day * 140f, 350f, paint)
+        }
+        events.forEach { event ->
+            val eventDateTime = eventDateTime(event)
+            val column = (eventDateTime.toLocalDate().toEpochDay() - start.toEpochDay()).toInt()
+            if (column !in 0..6) return@forEach
+            val minutes = eventDateTime.hour * 60 + eventDateTime.minute
+            val row = ((minutes - 7 * 60).coerceIn(0, 9 * 60) / 60)
+            paint.color = accentColor; canvas.drawRoundRect(62f + column * 140f, 390f + row * 90f, 192f + column * 140f, 465f + row * 90f, 12f, 12f, paint)
+            paint.color = text; paint.textSize = 18f
+            canvas.drawText(event.title.ifBlank { untitledLabel }.take(12), 70f + column * 140f, 438f + row * 90f, paint)
+        }
+    }
+
+    private fun eventDate(event: CalendarEvent): LocalDate = eventDateTime(event).toLocalDate()
+
+    private fun eventDateTime(event: CalendarEvent) = java.time.Instant.ofEpochMilli(event.startTimeMs).atZone(
+        runCatching { java.time.ZoneId.of(event.timeZone) }.getOrDefault(java.time.ZoneId.systemDefault()),
+    )
+
+    private fun CalendarEvent.shareCardDateLabel(): String {
+        val zone = runCatching { java.time.ZoneId.of(timeZone) }.getOrDefault(java.time.ZoneId.systemDefault())
+        val dateTime = java.time.Instant.ofEpochMilli(startTimeMs).atZone(zone)
+        return if (isAllDay == 1) dateTime.toLocalDate().toString() else "${dateTime.toLocalDate()}  ${dateTime.toLocalTime().toString().take(5)}"
+    }
     fun createCountdownShareUri(
         context: Context,
         event: CalendarEvent,

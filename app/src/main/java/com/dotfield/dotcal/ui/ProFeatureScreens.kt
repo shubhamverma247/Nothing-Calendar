@@ -116,6 +116,8 @@ import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings as SettingsGearIcon
 import androidx.compose.material.icons.filled.Share
@@ -1088,7 +1090,21 @@ internal fun QuickAddScreen(
     onBack: () -> Unit,
     onContinue: (QuickAddResult) -> Unit,
 ) {
+    val context = LocalContext.current
     var text by remember { mutableStateOf("") }
+    var voiceState by remember { mutableStateOf(VoiceDictationState.Ready) }
+    val voiceController = remember(context) { VoiceDictationController(context, { voiceState = it }, { text = it }) }
+    val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) voiceController.start() else voiceState = VoiceDictationState.PermissionDenied
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(voiceController, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) voiceController.cancel()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); voiceController.destroy() }
+    }
     val trimmed = text.trim()
     // Re-parsed on every keystroke; pure and cheap.
     val parsed = remember(trimmed) { if (trimmed.isEmpty()) null else QuickAddParser.parse(trimmed) }
@@ -1130,6 +1146,7 @@ internal fun QuickAddScreen(
             CalcSectionLabel(stringResource(R.string.quick_add_describe_event), palette)
             Spacer(modifier = Modifier.height(10.dp))
             CalcFieldGroup(palette) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                 BasicTextField(
                     value = text,
                     onValueChange = { text = it.replace("\n", "") },
@@ -1144,6 +1161,7 @@ internal fun QuickAddScreen(
                     ),
                     cursorBrush = SolidColor(palette.accent),
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
                         .focusRequester(focusRequester)
                         .padding(vertical = 18.dp),
@@ -1159,6 +1177,27 @@ internal fun QuickAddScreen(
                         }
                         inner()
                     },
+                )
+                IconButton(onClick = {
+                    if (voiceState == VoiceDictationState.Listening) voiceController.cancel()
+                    else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) voiceController.start()
+                    else microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+                }) {
+                    Icon(
+                        if (voiceState == VoiceDictationState.Listening) Icons.Default.Stop else Icons.Default.Mic,
+                        contentDescription = stringResource(if (voiceState == VoiceDictationState.Listening) R.string.quick_add_voice_stop else R.string.quick_add_voice_start),
+                        tint = if (voiceState == VoiceDictationState.Listening) palette.accent else palette.primaryText,
+                    )
+                }
+                }
+            }
+            if (voiceState != VoiceDictationState.Ready) {
+                Text(
+                    stringResource(voiceState.stringRes()),
+                    color = if (voiceState == VoiceDictationState.Listening) palette.accent else palette.secondaryText,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
 

@@ -1478,6 +1478,29 @@ fun DotCalApp(
                                     showPaywall = true
                                 }
                             },
+                            onShareView = if (activeCalendarTab == CalendarTab.Month || activeCalendarTab == CalendarTab.Week || activeCalendarTab == CalendarTab.Agenda) {
+                                {
+                                    scope.launch {
+                                        runCatching {
+                                            val bitmap = withContext(Dispatchers.Default) {
+                                                CardImageExporter.renderCalendarViewShareBitmap(
+                                                    context = context,
+                                                    viewName = activeCalendarTab.name,
+                                                    events = if (activeCalendarTab == CalendarTab.Agenda) agendaEvents else events,
+                                                    viewDate = selectedDate,
+                                                    weekStart = weekStartDay,
+                                                    accentColor = palette.accent.toArgb(),
+                                                    darkTheme = palette.isDark,
+                                                )
+                                            }
+                                            withContext(Dispatchers.IO) {
+                                                CardImageExporter.writeCalendarViewShareUri(context, activeCalendarTab.name, bitmap)
+                                            }
+                                        }.onSuccess { uri -> shareCalendarView(context, uri, palette)
+                                        }.onFailure { showDotCalToast(context, palette, R.string.toast_view_share_failed) }
+                                    }
+                                }
+                            } else null,
                             visibleOverflowActions = visibleCalendarMenuActions,
                             showProBadges = !isPro,
                             onCalendarTabSelected = {
@@ -3409,6 +3432,16 @@ private fun shareAvailabilityText(context: Context, text: String) {
     runCatching {
         context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_availability_chooser)))
     }
+}
+
+private fun shareCalendarView(context: Context, uri: Uri, palette: DotCalPalette) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching { context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_view_chooser))) }
+        .onFailure { showDotCalToast(context, palette, R.string.share_no_target) }
 }
 
 private fun CalendarEvent.shareDateTimeLine(context: Context, use24HourFormat: Boolean): String {

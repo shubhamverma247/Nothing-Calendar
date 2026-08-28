@@ -122,6 +122,7 @@ internal fun CalendarTabContainer(
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
     onShiftPatterns: (() -> Unit)? = null,
+    onShareView: (() -> Unit)? = null,
     visibleOverflowActions: Set<CalendarOverflowAction> = CalendarOverflowAction.Defaults,
     showProBadges: Boolean = true,
     onCalendarTabSelected: (CalendarTab) -> Unit,
@@ -155,6 +156,7 @@ internal fun CalendarTabContainer(
                 onTimeInsights = onTimeInsights,
                 onDateCalculator = onDateCalculator,
                 onShiftPatterns = onShiftPatterns,
+                onShareView = onShareView,
                 visibleOverflowActions = visibleOverflowActions,
                 showProBadges = showProBadges,
             )
@@ -205,6 +207,7 @@ internal fun CalendarActionBar(
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
     onShiftPatterns: (() -> Unit)? = null,
+    onShareView: (() -> Unit)? = null,
     visibleOverflowActions: Set<CalendarOverflowAction> = CalendarOverflowAction.Defaults,
     showProBadges: Boolean = true,
 ) {
@@ -256,6 +259,11 @@ internal fun CalendarActionBar(
                     modifier = Modifier.size(44.dp),
                 ) {
                     Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan event QR", tint = topIconTint)
+                }
+            }
+            if (onShareView != null) {
+                IconButton(onClick = onShareView, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_view_action), tint = topIconTint)
                 }
             }
             IconButton(

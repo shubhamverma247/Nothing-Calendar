@@ -45,6 +45,9 @@
         android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.DotCal">
+        <meta-data
+            android:name="android.app.shortcuts"
+            android:resource="@xml/shortcuts" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -72,6 +75,17 @@
                 <data android:scheme="dotcal" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".quickadd.QuickAddTileService"
+            android:exported="true"
+            android:label="@string/quick_add_title"
+            android:icon="@mipmap/ic_launcher"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <activity
             android:name=".widget.WidgetConfigActivity"

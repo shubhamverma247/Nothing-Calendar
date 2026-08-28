@@ -431,6 +431,20 @@
 
     <!-- Countdown card -->
     <string name="countdown_share_image">Share as image</string>
+    <string name="share_view_chooser">Share calendar view</string>
+    <string name="toast_view_share_failed">Could not create calendar view image</string>
+    <string name="share_card_brand">PRIVATE TIME, IN DOTS</string>
+    <string name="share_card_empty">NO EVENTS IN THIS VIEW</string>
+    <string name="share_card_untitled">Untitled</string>
+    <string name="quick_add_voice_listening">LISTENING…</string>
+    <string name="quick_add_voice_empty">NO SPEECH HEARD</string>
+    <string name="quick_add_voice_cancelled">DICTATION CANCELLED</string>
+    <string name="quick_add_voice_unavailable">VOICE INPUT UNAVAILABLE</string>
+    <string name="quick_add_voice_denied">MICROPHONE PERMISSION DENIED</string>
+    <string name="quick_add_voice_failed">VOICE INPUT FAILED</string>
+    <string name="quick_add_voice_start">Dictate quick add</string>
+    <string name="quick_add_voice_stop">Stop dictation</string>
+    <string name="share_view_action">Share view</string>
 
     <!-- Calendar picker -->
     <string name="event_calendar_field">Calendar</string>
@@ -875,6 +889,8 @@
     <string name="search_hint">Search your events and tasks</string>
     <string name="search_no_results">No results for \"%1$s\"</string>
     <string name="quick_add_title">Quick Add</string>
+    <string name="shortcut_quick_add_short">Quick add</string>
+    <string name="shortcut_quick_add_long">Create with Quick Add</string>
     <string name="quick_add_continue">Continue</string>
     <string name="templates_title">Templates</string>
     <string name="calendar_sets_title">Calendar Sets</string>

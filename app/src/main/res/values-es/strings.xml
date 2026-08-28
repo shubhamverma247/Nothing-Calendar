@@ -1169,4 +1169,18 @@
 <string name="widget_config_selected">SELECCIONADO</string>
 <string name="widget_config_type_fixed">%1$s · Contenido fijo</string>
     <string name="widget_cat_today">Hoy</string>
+<string name="share_view_chooser">Compartir vista del calendario</string>
+<string name="toast_view_share_failed">No se pudo crear la imagen del calendario</string>
+<string name="share_card_brand">TIEMPO PRIVADO, EN PUNTOS</string>
+<string name="share_card_empty">NO HAY EVENTOS EN ESTA VISTA</string>
+<string name="share_card_untitled">Sin título</string>
+<string name="quick_add_voice_listening">ESCUCHANDO…</string>
+<string name="quick_add_voice_empty">NO SE OYÓ NINGÚN HABLA</string>
+<string name="quick_add_voice_cancelled">DICTADO CANCELADO</string>
+<string name="quick_add_voice_unavailable">ENTRADA DE VOZ NO DISPONIBLE</string>
+<string name="quick_add_voice_denied">PERMISO DE MICRÓFONO DENEGADO</string>
+<string name="quick_add_voice_failed">FALLÓ LA ENTRADA DE VOZ</string>
+<string name="quick_add_voice_start">Dictar añadido rápido</string>
+<string name="quick_add_voice_stop">Detener dictado</string>
+<string name="share_view_action">Compartir vista</string>
 </resources>
