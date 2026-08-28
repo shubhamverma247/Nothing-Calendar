@@ -1,5 +1,7 @@
 package com.dotfield.dotcal.data.provider
 
+import android.provider.CalendarContract
+
 data class ProviderAttendee(
     val name: String? = null,
     val email: String? = null,
@@ -17,6 +19,12 @@ data class ProviderMeetingMetadata(
     val guestsCanSeeGuests: Boolean? = null,
     val attendees: List<ProviderAttendee> = emptyList(),
 )
+
+internal fun ProviderMeetingMetadata.hasMeaningfulMeetingDetails(): Boolean {
+    return attendees.isNotEmpty() ||
+        accessLevel?.let { it != CalendarContract.Events.ACCESS_DEFAULT } == true ||
+        availability?.let { it != CalendarContract.Events.AVAILABILITY_BUSY } == true
+}
 
 internal fun encodeProviderMeetingMetadata(metadata: ProviderMeetingMetadata): String? {
     if (metadata.isBlank()) return null

@@ -222,6 +222,7 @@ import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
 import com.dotfield.dotcal.data.provider.ProviderAttendee
 import com.dotfield.dotcal.data.provider.ProviderMeetingMetadata
+import com.dotfield.dotcal.data.provider.hasMeaningfulMeetingDetails
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.recurrence.ByDay
 import com.dotfield.dotcal.data.recurrence.RecurrenceFreq
@@ -396,7 +397,7 @@ internal fun EventDetailScreen(
                         }
                     }
                 }
-                if (providerMeetingMetadata != null) {
+                if (providerMeetingMetadata?.hasMeaningfulMeetingDetails() == true) {
                     item {
                         DetailDivider(palette)
                         DetailSection(label = stringResource(R.string.event_section_meeting), palette = palette) {

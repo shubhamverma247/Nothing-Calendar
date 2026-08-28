@@ -117,6 +117,37 @@ class CalendarProviderDataSource(private val context: Context) {
         return getEvent(calendarId, savedProviderId.toString())
     }
 
+    /**
+     * Cancel one occurrence without updating the recurring master event. Provider-backed
+     * calendars need an exception row so Google/Outlook sync does not interpret EXDATE as a
+     * series rewrite.
+     */
+    fun cancelEventOccurrence(
+        googleEventId: String,
+        occurrenceStartMs: Long,
+        occurrenceEndMs: Long,
+        isAllDay: Int,
+        timeZone: String,
+    ): Boolean {
+        if (!hasCalendarWritePermission()) return false
+        val providerEventId = googleEventId.toLongOrNull() ?: return false
+        val exceptionUri = ContentUris.withAppendedId(
+            CalendarContract.Events.CONTENT_EXCEPTION_URI,
+            providerEventId,
+        )
+        val providerStartMs = providerCanceledOccurrenceTime(occurrenceStartMs, isAllDay, timeZone)
+        val providerTimeZone = if (isAllDay == 1) ZoneOffset.UTC.id else timeZone
+        val values = ContentValues().apply {
+            put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, providerStartMs)
+            put(CalendarContract.Events.DTSTART, providerStartMs)
+            put(CalendarContract.Events.DURATION, providerCanceledOccurrenceDuration(occurrenceStartMs, occurrenceEndMs, isAllDay))
+            put(CalendarContract.Events.STATUS, CalendarContract.Events.STATUS_CANCELED)
+            put(CalendarContract.Events.ALL_DAY, isAllDay)
+            put(CalendarContract.Events.EVENT_TIMEZONE, providerTimeZone)
+        }
+        return runCatching { contentResolver.insert(exceptionUri, values) != null }.getOrDefault(false)
+    }
+
     fun deleteEvent(googleEventId: String): Boolean {
         if (!hasCalendarWritePermission()) return false
         val providerEventId = googleEventId.toLongOrNull() ?: return false
@@ -621,6 +652,24 @@ internal fun providerExdateFromExceptionDates(exceptionDates: String, isAllDay: 
         } else {
             PROVIDER_UTC_STAMP.format(instant)
         }
+    }
+}
+
+internal fun providerCanceledOccurrenceDuration(startTimeMs: Long, endTimeMs: Long, isAllDay: Int): String {
+    val durationMs = (endTimeMs - startTimeMs).coerceAtLeast(1_000L)
+    return if (isAllDay == 1) {
+        val dayMs = 24L * 60L * 60L * 1_000L
+        "P${((durationMs + dayMs - 1L) / dayMs).coerceAtLeast(1L)}D"
+    } else {
+        "P${((durationMs + 999L) / 1_000L).coerceAtLeast(1L)}S"
+    }
+}
+
+internal fun providerCanceledOccurrenceTime(occurrenceStartMs: Long, isAllDay: Int, timeZone: String): Long {
+    return if (isAllDay == 1) {
+        convertAllDayBoundary(occurrenceStartMs, safeProviderZone(timeZone), ZoneOffset.UTC)
+    } else {
+        occurrenceStartMs
     }
 }
 

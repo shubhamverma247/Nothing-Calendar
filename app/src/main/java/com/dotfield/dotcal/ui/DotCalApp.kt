@@ -294,6 +294,11 @@ private data class PendingDelete(
     val scope: RecurringEditScope,
     val source: DeleteSource,
 )
+
+internal fun detailDeleteScope(event: CalendarEvent): RecurringEditScope? {
+    return event.takeIf { it.isRecurrenceOccurrence() }?.let { RecurringEditScope.ThisEvent }
+}
+
 private data class PendingEventDrag(
     val change: EventDragChange,
     val scope: RecurringEditScope,
@@ -403,6 +408,7 @@ fun DotCalApp(
     val privateVaultIds by viewModel.privateVaultIds.collectAsStateWithLifecycle()
     val privateVaultEvents by viewModel.privateVaultEvents.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
+    var pendingDeleteScopeEvent by remember { mutableStateOf<CalendarEvent?>(null) }
     var pendingTaskDelete by remember { mutableStateOf<CalendarEvent?>(null) }
     var pendingDragScope by remember { mutableStateOf<EventDragChange?>(null) }
     var pendingDragConflict by remember { mutableStateOf<Pair<PendingEventDrag, Int>?>(null) }
@@ -541,6 +547,7 @@ fun DotCalApp(
                 showQuickShiftAdd = false
                 editingTask = null
                 pendingDelete = null
+                pendingDeleteScopeEvent = null
                 pendingTaskDelete = null
             }
         }
@@ -2492,10 +2499,25 @@ fun DotCalApp(
                         openEventFileAttachment(context, attachment, palette)
                     },
                     onDelete = {
-                        pendingDelete = PendingDelete(event, RecurringEditScope.WholeSeries, DeleteSource.Detail)
+                        if (detailDeleteScope(event) != null) {
+                            pendingDeleteScopeEvent = event
+                        } else {
+                            pendingDelete = PendingDelete(event, RecurringEditScope.WholeSeries, DeleteSource.Detail)
+                        }
                     },
                 )
             }
+        }
+        pendingDeleteScopeEvent?.let { event ->
+            ApplyScopeChoiceSheet(
+                selected = RecurringEditScope.ThisEvent,
+                palette = palette,
+                onDismiss = { pendingDeleteScopeEvent = null },
+                onSelected = { selectedScope ->
+                    pendingDeleteScopeEvent = null
+                    pendingDelete = PendingDelete(event, selectedScope, DeleteSource.Detail)
+                },
+            )
         }
         pendingShareEvent?.let { event ->
             ModalBottomSheet(

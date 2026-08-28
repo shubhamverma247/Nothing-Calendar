@@ -190,4 +190,22 @@ class CalendarProviderDataSourceTest {
             exceptionDatesFromProviderExdate("20260307T090000,20260309T090000", 0, zone.id),
         )
     }
+
+    @Test
+    fun providerCanceledOccurrenceUsesItsOwnDurationAndProviderTime() {
+        val start = LocalDateTime.of(2026, 8, 22, 9, 30).toInstant(ZoneOffset.UTC).toEpochMilli()
+
+        assertEquals("P3600S", providerCanceledOccurrenceDuration(start, start + 60 * 60 * 1000L, 0))
+        assertEquals(start, providerCanceledOccurrenceTime(start, 0, "UTC"))
+    }
+
+    @Test
+    fun providerCanceledAllDayOccurrenceUsesUtcCalendarBoundary() {
+        val zone = ZoneId.of("Asia/Kolkata")
+        val localStart = LocalDate.of(2026, 8, 22).atStartOfDay(zone).toInstant().toEpochMilli()
+        val utcStart = LocalDate.of(2026, 8, 22).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+        assertEquals("P1D", providerCanceledOccurrenceDuration(localStart, localStart + 24 * 60 * 60 * 1000L, 1))
+        assertEquals(utcStart, providerCanceledOccurrenceTime(localStart, 1, zone.id))
+    }
 }

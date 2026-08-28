@@ -57,6 +57,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - 3. Track the whole-day one-day-early report as the next sync/timezone bug to reproduce with device and timezone details.
 - 4. Add a faster edit action in the event detail flow if it fits the current UI pattern.
 - 5. Play Console shows an R8 / optimized resource shrinking warning. Keep it on the release hygiene list for the AGP upgrade path.
+- 6. After manual QA, review customer request for responsive widget agenda density: use available
+  resized widget height instead of leaving unused lower space. No implementation committed yet.
 
 ## Billing Products
 
@@ -85,7 +87,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - Old local alarms are cancelled and future imported reminders are scheduled.
 - Calendar sync handles recurrence exceptions:
   - Google `EXDATE` imports into DotCal `exceptionDates`.
-  - DotCal skipped/deleted single occurrence pushes provider `EXDATE`.
+  - DotCal deleted provider-backed single occurrences use Android's recurring exception row with
+    `ORIGINAL_INSTANCE_TIME`/`STATUS_CANCELED`; local series still use `EXDATE`.
   - DotCal edited single occurrence excludes original and creates a standalone provider event.
   - Google modified recurring occurrences import using `ORIGINAL_ID` / `ORIGINAL_INSTANCE_TIME`.
   - Modified Google occurrence rows import as standalone non-recurring DotCal rows.
@@ -610,6 +613,14 @@ Confirmed defects fixed without adding features:
   issuing one reminder/attendee query per event.
 - All-day provider boundaries are converted by calendar date between provider UTC and the event
   timezone; recurring reminder Glyph lifecycle messages now use occurrence IDs.
+- Event Detail delete now opens the existing recurrence scope chooser for virtual occurrences;
+  single-occurrence deletion uses the existing exception path instead of defaulting to series delete.
+- Provider-backed single-occurrence deletion now inserts a canceled provider exception instead of
+  rewriting the recurring master with `EXDATE`, preventing Google/Outlook-backed series from
+  losing the selected occurrence and later occurrences.
+- Provider-backed DotCal events no longer show a Meeting section for default organizer,
+  visibility, availability, and guest fields; real attendees or non-default meeting metadata remain
+  visible.
 
 Verification: `:app:testDebugUnitTest :app:assembleDebug`, `:app:lintDebug`, and `git diff --check`
 pass after the localization and receiver fixes.

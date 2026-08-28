@@ -2,7 +2,10 @@ package com.dotfield.dotcal.data.provider
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import android.provider.CalendarContract
 
 class ProviderMeetingMetadataTest {
     @Test
@@ -43,5 +46,33 @@ class ProviderMeetingMetadataTest {
     @Test
     fun invalidMeetingMetadataJsonReturnsNull() {
         assertNull(decodeProviderMeetingMetadata("not-json"))
+    }
+
+    @Test
+    fun defaultProviderFieldsDoNotCountAsMeetingDetails() {
+        val metadata = ProviderMeetingMetadata(
+            organizer = "account@example.com",
+            accessLevel = CalendarContract.Events.ACCESS_DEFAULT,
+            availability = CalendarContract.Events.AVAILABILITY_BUSY,
+            guestsCanModify = true,
+            guestsCanInviteOthers = true,
+            guestsCanSeeGuests = true,
+        )
+
+        assertFalse(metadata.hasMeaningfulMeetingDetails())
+    }
+
+    @Test
+    fun attendeesOrNonDefaultProviderFieldsCountAsMeetingDetails() {
+        assertTrue(
+            ProviderMeetingMetadata(
+                attendees = listOf(ProviderAttendee(email = "guest@example.com")),
+            ).hasMeaningfulMeetingDetails(),
+        )
+        assertTrue(
+            ProviderMeetingMetadata(
+                availability = CalendarContract.Events.AVAILABILITY_TENTATIVE,
+            ).hasMeaningfulMeetingDetails(),
+        )
     }
 }

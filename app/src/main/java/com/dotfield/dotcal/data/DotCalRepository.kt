@@ -1104,7 +1104,20 @@ class DotCalRepository(
         recurringEditScope: RecurringEditScope = RecurringEditScope.WholeSeries,
     ) {
         if (event.isRecurrenceOccurrence() && recurringEditScope == RecurringEditScope.ThisEvent) {
-            excludeOccurrence(event)
+            val providerOccurrenceCanceled = event.googleEventId
+                ?.takeIf { event.source == "GOOGLE" }
+                ?.let { googleEventId ->
+                    withContext(Dispatchers.IO) {
+                        calendarProviderDataSource.cancelEventOccurrence(
+                            googleEventId = googleEventId,
+                            occurrenceStartMs = event.startTimeMs,
+                            occurrenceEndMs = event.endTimeMs,
+                            isAllDay = event.isAllDay,
+                            timeZone = event.timeZone,
+                        )
+                    }
+                } == true
+            excludeOccurrence(event, syncProvider = !providerOccurrenceCanceled)
             return
         }
         if (event.isRecurrenceOccurrence() && recurringEditScope == RecurringEditScope.ThisAndFollowing) {
@@ -1992,7 +2005,7 @@ class DotCalRepository(
         updateWidgets()
     }
 
-    private suspend fun excludeOccurrence(event: CalendarEvent): CalendarEvent? {
+    private suspend fun excludeOccurrence(event: CalendarEvent, syncProvider: Boolean = true): CalendarEvent? {
         val occurrenceStartMs = event.occurrenceStartMs() ?: return null
         val masterId = event.baseEventId()
         val master = dao.getEvent(masterId) ?: return null
@@ -2002,7 +2015,11 @@ class DotCalRepository(
             updatedAtMs = System.currentTimeMillis(),
         )
         val reminderMinutes = dao.getRemindersForEvent(master.id).map { it.minutesBefore }
-        val syncedMaster = syncProviderBackedEvent(master, updatedMaster, reminderMinutes)
+        val syncedMaster = if (syncProvider) {
+            syncProviderBackedEvent(master, updatedMaster, reminderMinutes)
+        } else {
+            updatedMaster
+        }
         dao.upsertEvent(syncedMaster)
         updateWidgets()
         return syncedMaster
