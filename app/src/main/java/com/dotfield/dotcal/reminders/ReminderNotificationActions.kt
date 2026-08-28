@@ -8,6 +8,8 @@ internal object ReminderNotificationActions {
 
     fun snoozeAlarmRequestCode(alarmRequestCode: Int): Int = alarmRequestCode xor 0x6B6B6B6B
 
+    fun repeatAlarmRequestCode(alarmRequestCode: Int): Int = alarmRequestCode xor 0x3C3C3C3C
+
     fun canScheduleAt(triggerAtMs: Long, nowMs: Long): Boolean = triggerAtMs > nowMs
 
     fun snoozeRequestCode(alarmRequestCode: Int, minutes: Int): Int {

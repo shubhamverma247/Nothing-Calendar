@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dotfield.dotcal.R
+import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -97,6 +98,7 @@ internal fun AvailabilityScreen(
     state: AvailabilityUiState,
     onBack: () -> Unit,
     onRefresh: (FreeSlotRequest) -> Unit,
+    onUseFreeSlot: (FreeSlot) -> Unit,
     onCopy: (String) -> Unit,
     onShare: (String) -> Unit,
 ) {
@@ -291,6 +293,38 @@ internal fun AvailabilityScreen(
                     )
                 }
             }
+            val suggestedSlots = state.days.flatMap { it.freeSlots }.take(6)
+            if (!state.isLoading && state.error == null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(palette.eventCardSurface)
+                        .border(1.dp, palette.eventCardBorder, RoundedCornerShape(8.dp))
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.availability_find_a_time),
+                        color = palette.primaryText,
+                        fontFamily = mono,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    if (suggestedSlots.isEmpty()) {
+                        Text(
+                            stringResource(R.string.availability_no_slots),
+                            color = palette.secondaryText,
+                            fontFamily = mono,
+                            fontSize = 12.sp,
+                        )
+                    } else {
+                        suggestedSlots.forEach { slot ->
+                            AvailabilitySlotRow(slot, palette, use24HourFormat, onUseFreeSlot)
+                        }
+                    }
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                 AvailabilityDateRow(stringResource(R.string.availability_from), rangeStart, palette, Modifier.weight(1f)) {
                     selectedPreset = null
@@ -471,6 +505,49 @@ internal fun AvailabilityScreen(
                 rangeEnd = date
                 pickingEnd = false
             },
+        )
+    }
+}
+
+@Composable
+private fun AvailabilitySlotRow(
+    slot: FreeSlot,
+    palette: DotCalPalette,
+    use24HourFormat: Boolean,
+    onUseSlot: (FreeSlot) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(palette.calendarSurface)
+            .border(1.dp, palette.line, RoundedCornerShape(6.dp))
+            .clickable { onUseSlot(slot) }
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                localizedFormatter("EEE d MMM").format(slot.date),
+                color = palette.primaryText,
+                fontFamily = mono,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "${formatAvailabilityTime(slot.start, use24HourFormat)} – ${formatAvailabilityTime(slot.end, use24HourFormat)}",
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 11.sp,
+            )
+        }
+        Text(
+            stringResource(R.string.availability_use_slot),
+            color = palette.accent,
+            fontFamily = mono,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
         )
     }
 }

@@ -234,6 +234,7 @@ import com.dotfield.dotcal.data.qr.QrEventPayloadCodec
 import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
+import com.dotfield.dotcal.data.nlp.SmartQuickAddCommand
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.recurrence.ByDay
 import com.dotfield.dotcal.data.recurrence.RecurrenceFreq
@@ -381,6 +382,9 @@ fun DotCalApp(
     var jumpHighlightDate by remember { mutableStateOf<LocalDate?>(null) }
     var showBulkTemplatePicker by remember { mutableStateOf(false) }
     var quickAddPrefill by remember { mutableStateOf<QuickAddResult?>(null) }
+    var quickAddCommandContextEvent by remember { mutableStateOf<CalendarEvent?>(null) }
+    var quickAddResolvedCandidates by remember { mutableStateOf<List<CalendarEvent>?>(null) }
+    var quickAddResolutionToken by remember { mutableStateOf(0) }
     var duplicateDraftPrefill by remember { mutableStateOf<EventEditorData?>(null) }
     var pendingCopyToDateEvent by remember { mutableStateOf<CalendarEvent?>(null) }
     var pendingShareEvent by remember { mutableStateOf<CalendarEvent?>(null) }
@@ -617,6 +621,46 @@ fun DotCalApp(
             stored.takeIf { it in defaultEventDurationOptions } ?: 60
         }
     }.collectAsStateWithLifecycle(initialValue = 60)
+    val storedQuickAddContextEventId by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_SMART_QUICK_ADD_CONTEXT_EVENT_ID]
+        }
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val autoBufferBeforeMinutes by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            (preferences[CalendarPreferences.KEY_AUTO_BUFFER_BEFORE_MINUTES] ?: 0).coerceIn(0, 240)
+        }
+    }.collectAsStateWithLifecycle(initialValue = 0)
+    val autoBufferAfterMinutes by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            (preferences[CalendarPreferences.KEY_AUTO_BUFFER_AFTER_MINUTES] ?: 0).coerceIn(0, 240)
+        }
+    }.collectAsStateWithLifecycle(initialValue = 0)
+    val reminderSoundUri by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_REMINDER_SOUND_URI].orEmpty()
+        }
+    }.collectAsStateWithLifecycle(initialValue = "")
+    val reminderRepeatEnabled by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_REMINDER_REPEAT_ENABLED] ?: false
+        }
+    }.collectAsStateWithLifecycle(initialValue = false)
+    val reminderRepeatMinutes by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            (preferences[CalendarPreferences.KEY_REMINDER_REPEAT_MINUTES] ?: 5).coerceIn(5, 60)
+        }
+    }.collectAsStateWithLifecycle(initialValue = 5)
+    val reminderVibrationEnabled by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_REMINDER_VIBRATION_ENABLED] ?: true
+        }
+    }.collectAsStateWithLifecycle(initialValue = true)
+    val reminderFullScreenEnabled by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_REMINDER_FULL_SCREEN_ENABLED] ?: false
+        }
+    }.collectAsStateWithLifecycle(initialValue = false)
     val defaultAllDayReminderTime by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             parseStoredTime(preferences[CalendarPreferences.KEY_DEFAULT_ALL_DAY_REMINDER_TIME]) ?: LocalTime.of(8, 0)
@@ -1268,6 +1312,105 @@ fun DotCalApp(
             else -> checkEventDrag(PendingEventDrag(change, RecurringEditScope.WholeSeries))
         }
     }
+    fun resolveQuickAddCommand(command: SmartQuickAddCommand?) {
+        val token = quickAddResolutionToken + 1
+        quickAddResolutionToken = token
+        quickAddResolvedCandidates = null
+        viewModel.resolveSmartQuickAddCandidates(
+            command,
+            quickAddCommandContextEvent?.baseEventId() ?: storedQuickAddContextEventId,
+        ) { candidates ->
+            if (token == quickAddResolutionToken) quickAddResolvedCandidates = candidates
+        }
+    }
+    fun rememberQuickAddContext(eventId: String?) {
+        scope.launch {
+            context.calendarPreferencesDataStore.edit { preferences ->
+                if (eventId == null) {
+                    preferences.remove(CalendarPreferences.KEY_SMART_QUICK_ADD_CONTEXT_EVENT_ID)
+                } else {
+                    preferences[CalendarPreferences.KEY_SMART_QUICK_ADD_CONTEXT_EVENT_ID] = eventId
+                }
+            }
+        }
+    }
+    fun applyQuickAddCommand(command: SmartQuickAddCommand, event: CalendarEvent?) {
+        if (event == null) {
+            showDotCalToast(context, palette, R.string.quick_add_no_match)
+            return
+        }
+        quickAddCommandContextEvent = event
+        rememberQuickAddContext(event.baseEventId())
+        quickAddResolutionToken += 1
+        quickAddResolvedCandidates = null
+        when (command) {
+            is SmartQuickAddCommand.Query -> {
+                showQuickAdd = false
+                viewModel.openEventDetail(event)
+            }
+            is SmartQuickAddCommand.Delete -> {
+                showQuickAdd = false
+                pendingDelete = PendingDelete(event, RecurringEditScope.WholeSeries, DeleteSource.Detail)
+                quickAddCommandContextEvent = null
+                rememberQuickAddContext(null)
+            }
+            is SmartQuickAddCommand.Move -> {
+                val durationMinutes = ((event.endTimeMs - event.startTimeMs) / 60_000L).coerceAtLeast(1L)
+                val targetStart = command.targetDate.atTime(command.targetTime ?: event.startLocalTime())
+                showQuickAdd = false
+                requestEventDrag(
+                    EventDragChange(
+                        event = event,
+                        targetStart = targetStart,
+                        targetEnd = targetStart.plusMinutes(durationMinutes),
+                    ),
+                )
+            }
+            is SmartQuickAddCommand.AddPrep -> {
+                val start = event.localDate().atTime(event.startLocalTime())
+                val end = start.plusMinutes(((event.endTimeMs - event.startTimeMs) / 60_000L).coerceAtLeast(1L))
+                val prepStart = if (command.before) start.minusMinutes(command.minutes) else end
+                val prepEnd = if (command.before) start else end.plusMinutes(command.minutes)
+                showQuickAdd = false
+                openQuickAddResult(
+                    QuickAddResult(
+                        title = resources.getString(R.string.quick_add_prep_title, event.title),
+                        date = prepStart.toLocalDate(),
+                        endDate = prepEnd.toLocalDate(),
+                        startTime = prepStart.toLocalTime(),
+                        endTime = prepEnd.toLocalTime(),
+                        isAllDay = false,
+                        rrule = null,
+                    ),
+                )
+            }
+            is SmartQuickAddCommand.SetDuration -> {
+                val targetStart = event.localDate().atTime(event.startLocalTime())
+                showQuickAdd = false
+                requestEventDrag(
+                    EventDragChange(
+                        event = event,
+                        targetStart = targetStart,
+                        targetEnd = targetStart.plusMinutes(command.minutes),
+                    ),
+                )
+            }
+            is SmartQuickAddCommand.Rename,
+            is SmartQuickAddCommand.SetLocation,
+            is SmartQuickAddCommand.SetReminder,
+            -> {
+                showQuickAdd = false
+                viewModel.applySmartQuickAddEdit(event, command) { success ->
+                    showDotCalToast(
+                        context,
+                        palette,
+                        if (success) R.string.quick_add_command_applied else R.string.quick_add_command_failed,
+                    )
+                }
+                quickAddCommandContextEvent = null
+            }
+        }
+    }
     fun closeTopSurface() {
         when {
             showPaywall -> showPaywall = false
@@ -1787,6 +1930,13 @@ fun DotCalApp(
                 birthdayEnabled = birthdayEnabled,
                 defaultReminderMinutes = defaultReminderMinutes,
                 defaultEventDurationMinutes = defaultEventDurationMinutes,
+                autoBufferBeforeMinutes = autoBufferBeforeMinutes,
+                autoBufferAfterMinutes = autoBufferAfterMinutes,
+                reminderSoundUri = reminderSoundUri,
+                reminderRepeatEnabled = reminderRepeatEnabled,
+                reminderRepeatMinutes = reminderRepeatMinutes,
+                reminderVibrationEnabled = reminderVibrationEnabled,
+                reminderFullScreenEnabled = reminderFullScreenEnabled,
                 defaultCalendarTab = storedCalendarTab,
                 hiddenCalendarMenuActions = hiddenCalendarMenuActions,
                 showWeekNumbers = showWeekNumbers,
@@ -1861,6 +2011,59 @@ fun DotCalApp(
                             val updated = if (visible) current - action else current + action
                             preferences[CalendarPreferences.KEY_HIDDEN_CALENDAR_MENU_ACTIONS] =
                                 CalendarOverflowAction.hiddenToStorage(updated)
+                        }
+                    }
+                },
+                onAutoBufferBeforeSelected = { minutes ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_AUTO_BUFFER_BEFORE_MINUTES] = minutes
+                        }
+                    }
+                },
+                onAutoBufferAfterSelected = { minutes ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_AUTO_BUFFER_AFTER_MINUTES] = minutes
+                        }
+                    }
+                },
+                onReminderSoundSelected = { uri ->
+                    if (!isPro) {
+                        showPaywall = true
+                    } else {
+                        scope.launch {
+                            context.calendarPreferencesDataStore.edit { preferences ->
+                                preferences[CalendarPreferences.KEY_REMINDER_SOUND_URI] = uri
+                            }
+                        }
+                    }
+                },
+                onReminderRepeatEnabledChange = { enabled ->
+                    if (!isPro) showPaywall = true else scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_REMINDER_REPEAT_ENABLED] = enabled
+                        }
+                    }
+                },
+                onReminderRepeatMinutesSelected = { minutes ->
+                    if (!isPro) showPaywall = true else scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_REMINDER_REPEAT_MINUTES] = minutes
+                        }
+                    }
+                },
+                onReminderVibrationEnabledChange = { enabled ->
+                    if (!isPro) showPaywall = true else scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_REMINDER_VIBRATION_ENABLED] = enabled
+                        }
+                    }
+                },
+                onReminderFullScreenEnabledChange = { enabled ->
+                    if (!isPro) showPaywall = true else scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_REMINDER_FULL_SCREEN_ENABLED] = enabled
                         }
                     }
                 },
@@ -2884,6 +3087,20 @@ fun DotCalApp(
                     viewModel.clearAvailability()
                 },
                 onRefresh = { request -> viewModel.refreshAvailability(request, use24HourFormat) },
+                onUseFreeSlot = { slot ->
+                    showAvailability = false
+                    openQuickAddResult(
+                        QuickAddResult(
+                            title = "",
+                            date = slot.date,
+                            endDate = slot.date,
+                            startTime = slot.start,
+                            endTime = slot.end,
+                            isAllDay = false,
+                            rrule = null,
+                        ),
+                    )
+                },
                 onCopy = { text ->
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                     clipboard.setPrimaryClip(android.content.ClipData.newPlainText("DotCal availability", text))
@@ -2902,6 +3119,14 @@ fun DotCalApp(
                 palette = palette,
                 onBack = { showQuickAdd = false },
                 onContinue = { result -> openQuickAddResult(result) },
+                eventCandidates = (events + agendaEvents + tasks).distinctBy { it.baseEventId() },
+                resolvedCommandCandidates = quickAddResolvedCandidates,
+                commandContextEvent = quickAddCommandContextEvent
+                    ?: (events + agendaEvents + tasks).firstOrNull {
+                        it.baseEventId() == storedQuickAddContextEventId
+                    },
+                onCommandDetected = ::resolveQuickAddCommand,
+                onCommand = ::applyQuickAddCommand,
             )
         }
         if (showQuickShiftAdd) {

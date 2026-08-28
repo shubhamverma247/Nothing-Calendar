@@ -38,6 +38,8 @@ data class FreeSlotRequest(
     val minimumSlotMinutes: Int = 30,
     val blockAllDayEvents: Boolean = true,
     val treatGhostsAsBusy: Boolean = true,
+    val bufferBeforeMinutes: Int = 0,
+    val bufferAfterMinutes: Int = 0,
 )
 
 object FreeSlotEngine {
@@ -48,6 +50,8 @@ object FreeSlotEngine {
         require(!request.rangeEnd.isBefore(request.rangeStart)) { "Range end must not precede range start" }
         require(request.workingEnd.isAfter(request.workingStart)) { "Working hours must end after they start" }
         require(request.minimumSlotMinutes > 0) { "Minimum slot length must be positive" }
+        require(request.bufferBeforeMinutes >= 0) { "Buffer before must not be negative" }
+        require(request.bufferAfterMinutes >= 0) { "Buffer after must not be negative" }
 
         return generateSequence(request.rangeStart) { it.plusDays(1) }
             .takeWhile { !it.isAfter(request.rangeEnd) }
@@ -67,8 +71,14 @@ object FreeSlotEngine {
             .filter { request.treatGhostsAsBusy || !it.isGhost }
             .filter { request.blockAllDayEvents || !it.isAllDay }
             .mapNotNull { period ->
-                val start = maxOf(period.start, windowStart)
-                val end = minOf(period.end, windowEnd)
+                val start = maxOf(
+                    period.start.minusMinutes(request.bufferBeforeMinutes.toLong()),
+                    windowStart,
+                )
+                val end = minOf(
+                    period.end.plusMinutes(request.bufferAfterMinutes.toLong()),
+                    windowEnd,
+                )
                 if (end.isAfter(start)) DateTimeInterval(start, end) else null
             }
             .sortedBy { it.start }

@@ -66,6 +66,17 @@ class ReminderNotificationActionsTest {
     }
 
     @Test
+    fun repeatAlarmRequestCodeStaysSeparateFromReminderAndSnoozeAlarms() {
+        val alarmRequestCode = 1234
+
+        assertNotEquals(alarmRequestCode, ReminderNotificationActions.repeatAlarmRequestCode(alarmRequestCode))
+        assertNotEquals(
+            ReminderNotificationActions.snoozeAlarmRequestCode(alarmRequestCode),
+            ReminderNotificationActions.repeatAlarmRequestCode(alarmRequestCode),
+        )
+    }
+
+    @Test
     fun multipleRemindersKeepSnoozeRequestCodesSeparate() {
         val first = ReminderNotificationActions.SnoozePickerMinutes.map {
             ReminderNotificationActions.snoozeRequestCode(100, it)

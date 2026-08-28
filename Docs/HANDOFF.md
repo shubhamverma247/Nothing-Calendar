@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-08-27
+Updated: 2026-08-28
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 `Docs/HANDOFF.original.md`. Do not touch `Docs/HANDOFF - Copy.md` or user-owned
@@ -202,6 +202,43 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     `git diff --check` passed with CRLF warnings only.
   - Latest local install succeeded on device `4ab0d020`:
     `C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk`.
+- Auto-Buffers foundation completed:
+  - Global before/after meeting buffers persist in DataStore; no Room schema change.
+  - Free-slot calculations pad busy periods, including recurrence-expanded and overnight events.
+  - Event conflict warnings include candidate and existing-event buffers.
+  - Settings live under `Settings > Reminder Defaults` and use existing DotCal option-sheet styling.
+  - Supported presets: Off, 5, 10, 15, 30, 45, and 60 minutes per side.
+  - Added unit coverage for ordinary and working-day-boundary buffer behavior.
+- Find-a-Time basic flow completed:
+  - Existing local Availability/FreeSlotEngine flow now retains computed day slots in UI state.
+  - Up to six free-slot candidates render as existing DotCal event-card rows.
+  - Tapping `Use slot` opens the existing event editor with date and time prefilled.
+  - Auto-Buffers, working hours, minimum duration, all-day handling, ghost handling, and recurrence
+    expansion flow through the existing local engine.
+  - No backend, account dependency, Room schema change, or Pro gate added.
+- Advanced reminder controls first pass completed:
+  - Pro-only local settings for custom notification sound, repeat-until-dismissed, repeat interval,
+    vibration, and strong/full-screen alert.
+  - Notification channels use config-specific IDs because Android channel sound/vibration settings
+    are effectively immutable after creation.
+  - Repeat alarms cancel on notification dismiss, open, snooze, task completion, or reminder cancel.
+  - Existing basic reminder behavior remains Free.
+  - Per-calendar/per-event sound overrides and custom vibration patterns remain future expansion.
+- Smart Quick Add 3.0 command foundation completed:
+  - Existing offline parser remains the create path; a deterministic command layer now recognizes
+    move/reschedule, delete/cancel, date queries, prep/buffer edits, title, duration, location, and
+    reminder changes.
+  - Command preview uses the existing Quick Add screen and DotCal card surfaces with selectable
+    candidates; title search is global and date/time references use expanded six-month agenda data.
+  - “it” persists the last selected event ID in DataStore and reloads it for future Quick Add sessions.
+  - Move and prep commands reuse existing conflict checks, recurrence-scope handling, undo snackbar,
+    and Pro gating; delete reuses the existing series-aware confirmation dialog. Other field edits
+    reuse the existing provider-aware event save path.
+  - No Room schema, backend, or cloud NLP dependency added. Unit tests cover parser and matcher paths.
+  - English is the active command-language focus. Existing base-parser Roman-Hindi date tokens are
+    retained for backward compatibility but are not expanded or surfaced as the product focus.
+  - Remaining scope: richer durable conversation history; the shipped prep command creates a
+    separate editable prep event rather than changing the meeting itself.
 - Nothing Glyph Matrix integration updated:
   - Existing device-gated Glyph Toy keeps live countdown behavior on supported Nothing devices.
   - App-to-toy bridge updates state immediately when a reminder is snoozed, opened, completed, or
@@ -267,6 +304,15 @@ After next debug install, prioritize:
 - Repeated sync does not create duplicate detached occurrences.
 - Swipe Week and Day views repeatedly on the clipping-prone device.
 - Create/sync a Google all-day event spanning multiple days; Month/Day/Week show every visible date.
+- Smart Quick Add 3.0 English command pass:
+  - `move my 2pm to tomorrow` shows a matching event and reuses the existing move/conflict flow.
+  - `rename gym to strength training`, `set gym duration to 90 minutes`, and
+    `set location of gym to Studio 2` apply through the existing event save path.
+  - `add reminder for gym 15 minutes before` and `delete reminder from gym` update reminder controls.
+  - `delete tomorrow's gym` opens the existing delete confirmation flow.
+  - `add 30 min prep before it` opens a prefilled editable prep event.
+  - Expected: no-match commands show a clear message; command UI uses existing DotCal Quick Add
+    surfaces and English examples only.
 - Sync Google events with custom calendar colors; DotCal should not fall back to red when provider
   event color is missing.
 - Restore purchase on an account with old lifetime purchase.
@@ -327,7 +373,7 @@ Lower priority unless user demand appears:
 - Year / Month / Week / Day / Agenda views.
 - Events, tasks, recurrence, reminders, holidays, birthdays.
 - Search, Templates, Calendar Sets.
-- Smart Quick Add v2.
+- Smart Quick Add 3.0 command foundation.
 - Countdowns / D-Day.
 - Bulk Edit / Multi-Select.
 - Drag-and-drop reschedule and resize.
@@ -403,10 +449,10 @@ below are absorbed into these phases.
 
 ### Phase 3 — Flagship Differentiators
 
-8. Smart Quick Add 3.0 MERGED with Conversational Edit Commands (NEW): extend the local parser from
-   create-only to edit/move/delete/query ("move my 2pm to kal", "add 30 min prep before it",
-   "delete tomorrow's gym"). Hinglish support is a differentiator no global competitor offers.
-   Marketing hero feature.
+8. Smart Quick Add 3.0 MERGED with Conversational Edit Commands (NEW): English-first local
+   create/edit/move/delete/query commands shipped with global title resolution, expanded date/time
+   matching, and themed confirmation. Continue with richer durable multi-turn context before
+   marketing it as a fully conversational assistant.
 9. SMS-to-Event Parser (NEW): on-device regex reads booking/train/movie/appointment SMS and creates
    Ghost Event drafts with one-tap pencil-in. Fully offline, Hinglish SMS aware, zero cloud.
    Requires explicit user opt-in (notification/SMS access) given privacy posture — discuss tiering

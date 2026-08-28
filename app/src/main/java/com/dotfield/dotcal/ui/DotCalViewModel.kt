@@ -22,6 +22,7 @@ import com.dotfield.dotcal.data.provider.ProviderMeetingMetadata
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.scheduling.AvailabilityTextFormatter
+import com.dotfield.dotcal.data.scheduling.DayAvailability
 import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
@@ -33,6 +34,8 @@ import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.holiday.HolidayCountry
 import com.dotfield.dotcal.data.holiday.HolidayDataSource
 import com.dotfield.dotcal.data.insights.OnThisDayMemory
+import com.dotfield.dotcal.data.nlp.SmartQuickAddCommand
+import com.dotfield.dotcal.data.nlp.SmartQuickAddMatcher
 import com.dotfield.dotcal.data.punchcard.PunchCardStreak
 import com.dotfield.dotcal.sync.CalendarSyncResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -52,6 +55,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.Instant
 
 data class HolidayCountryUiItem(
     val code: String,
@@ -75,6 +79,7 @@ data class PunchCardUiState(
 data class AvailabilityUiState(
     val isLoading: Boolean = false,
     val text: String = "",
+    val days: List<DayAvailability> = emptyList(),
     val error: String? = null,
 )
 
@@ -362,9 +367,9 @@ class DotCalViewModel(
         availabilityJob = viewModelScope.launch {
             runCatching {
                 val days = repository.computeAvailability(request)
-                AvailabilityTextFormatter.format(days, use24HourFormat)
-            }.onSuccess { text ->
-                _availabilityState.value = AvailabilityUiState(text = text)
+                days to AvailabilityTextFormatter.format(days, use24HourFormat)
+            }.onSuccess { (days, text) ->
+                _availabilityState.value = AvailabilityUiState(days = days, text = text)
             }.onFailure {
                 _availabilityState.value = AvailabilityUiState(error = "Couldn't calculate availability")
             }
@@ -581,10 +586,107 @@ class DotCalViewModel(
     // ----- Global Search (FREE) -----
     private val _searchResults = MutableStateFlow<List<CalendarEvent>>(emptyList())
     val searchResults: StateFlow<List<CalendarEvent>> = _searchResults
+    private var smartQuickAddResolveJob: Job? = null
 
     fun search(query: String) {
         viewModelScope.launch {
             _searchResults.value = repository.searchItems(query)
+        }
+    }
+
+    fun resolveSmartQuickAddCandidates(
+        command: SmartQuickAddCommand?,
+        contextEventId: String?,
+        onResolved: (List<CalendarEvent>) -> Unit,
+    ) {
+        smartQuickAddResolveJob?.cancel()
+        if (command == null) {
+            onResolved(emptyList())
+            return
+        }
+        smartQuickAddResolveJob = viewModelScope.launch {
+            val now = LocalDateTime.now()
+            val date = (command as? SmartQuickAddCommand.Query)?.date
+            val rangeStart = date ?: now.toLocalDate()
+            val rangeEnd = date ?: rangeStart.plusMonths(6)
+            val query = when (command) {
+                is SmartQuickAddCommand.Move -> command.eventQuery
+                is SmartQuickAddCommand.Delete -> command.eventQuery
+                is SmartQuickAddCommand.AddPrep -> command.eventQuery
+                is SmartQuickAddCommand.Rename -> command.eventQuery
+                is SmartQuickAddCommand.SetDuration -> command.eventQuery
+                is SmartQuickAddCommand.SetLocation -> command.eventQuery
+                is SmartQuickAddCommand.SetReminder -> command.eventQuery
+                is SmartQuickAddCommand.Query -> ""
+            }
+            val context = contextEventId?.let { repository.getEvent(it) }
+            val source = repository.findSmartQuickAddCandidates(query, rangeStart, rangeEnd) + listOfNotNull(context)
+            onResolved(SmartQuickAddMatcher.findCandidates(command, source, now, context))
+        }
+    }
+
+    fun applySmartQuickAddEdit(
+        event: CalendarEvent,
+        command: SmartQuickAddCommand,
+        onDone: (Boolean) -> Unit,
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                val current = repository.getEvent(event.baseEventId()) ?: event
+                require(current.isTask == 0 && current.source != "BIRTHDAY") { "EVENT CANNOT BE EDITED" }
+                require(
+                    command is SmartQuickAddCommand.Rename ||
+                        command is SmartQuickAddCommand.SetDuration ||
+                        command is SmartQuickAddCommand.SetLocation ||
+                        command is SmartQuickAddCommand.SetReminder,
+                ) { "UNSUPPORTED QUICK EDIT" }
+                val zone = runCatching { ZoneId.of(current.timeZone) }.getOrDefault(ZoneId.systemDefault())
+                val start = Instant.ofEpochMilli(current.startTimeMs).atZone(zone).toLocalDateTime()
+                val currentEnd = Instant.ofEpochMilli(current.endTimeMs).atZone(zone).toLocalDateTime()
+                val reminders = repository.getRemindersForEvent(current.baseEventId()).map { it.minutesBefore }
+                val edit = when (command) {
+                    is SmartQuickAddCommand.Rename -> current.title to command.newTitle.trim()
+                    is SmartQuickAddCommand.SetLocation -> current.location to command.location.trim()
+                    else -> current.title to current.title
+                }
+                val targetEnd = when (command) {
+                    is SmartQuickAddCommand.SetDuration -> start.plusMinutes(command.minutes.also {
+                        require(current.isAllDay == 0) { "ALL-DAY EVENT HAS NO DURATION" }
+                        require(it in 1..(7L * 24L * 60L)) { "DURATION OUT OF RANGE" }
+                    })
+                    else -> currentEnd
+                }
+                val targetReminders = when (command) {
+                    is SmartQuickAddCommand.SetReminder -> command.minutesBefore?.let(::listOf).orEmpty()
+                    else -> reminders
+                }.distinct().sorted()
+                repository.saveLocalEvent(
+                    existing = current,
+                    data = EventEditorData(
+                        eventId = current.baseEventId(),
+                        accountId = current.accountId,
+                        title = edit.second.ifBlank { current.title },
+                        description = current.description,
+                        location = if (command is SmartQuickAddCommand.SetLocation) edit.second else current.location,
+                        date = start.toLocalDate(),
+                        endDate = if (current.isAllDay == 1) {
+                            currentEnd.toLocalDate().minusDays(1)
+                        } else {
+                            targetEnd.toLocalDate()
+                        },
+                        startTime = start.toLocalTime(),
+                        endTime = targetEnd.toLocalTime(),
+                        isAllDay = current.isAllDay == 1,
+                        reminderMinutes = targetReminders.firstOrNull(),
+                        reminderMinutesList = targetReminders.takeIf { it.size > 1 },
+                        rrule = current.rrule,
+                        imageUris = current.imageUris,
+                        voiceNotePath = current.voiceNotePath,
+                        colorHex = current.colorHex,
+                        isGhost = current.isGhost,
+                    ),
+                )
+            }.onSuccess { onDone(true) }.onFailure { onDone(false) }
         }
     }
 

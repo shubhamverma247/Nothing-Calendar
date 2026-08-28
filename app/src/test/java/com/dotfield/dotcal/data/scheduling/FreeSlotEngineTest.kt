@@ -108,6 +108,30 @@ class FreeSlotEngineTest {
     }
 
     @Test
+    fun autoBuffersPadBusyEventsBeforeFindingFreeSlots() {
+        val result = FreeSlotEngine.compute(
+            request(bufferBeforeMinutes = 30, bufferAfterMinutes = 45),
+            listOf(busy("2026-07-13T10:00", "2026-07-13T12:00")),
+        ).single()
+
+        assertEquals(
+            listOf(slot("09:00", "09:30"), slot("12:45", "21:00")),
+            result.freeSlots,
+        )
+    }
+
+    @Test
+    fun autoBuffersCanCrossWorkingDayBoundary() {
+        val result = FreeSlotEngine.compute(
+            request(bufferBeforeMinutes = 60, bufferAfterMinutes = 60, rangeEnd = monday.plusDays(1)),
+            listOf(busy("2026-07-13T20:30", "2026-07-14T09:30")),
+        )
+
+        assertEquals(listOf(slot("09:00", "19:30", monday)), result[0].freeSlots)
+        assertEquals(listOf(slot("10:30", "21:00", monday.plusDays(1))), result[1].freeSlots)
+    }
+
+    @Test
     fun textFormatterCoversCompactRulesAndBusyDays() {
         val request = request(rangeEnd = monday.plusDays(3))
         val days = FreeSlotEngine.compute(
@@ -155,12 +179,16 @@ class FreeSlotEngineTest {
         minimumMinutes: Int = 30,
         blockAllDay: Boolean = true,
         treatGhostsAsBusy: Boolean = true,
+        bufferBeforeMinutes: Int = 0,
+        bufferAfterMinutes: Int = 0,
     ) = FreeSlotRequest(
         rangeStart = monday,
         rangeEnd = rangeEnd,
         minimumSlotMinutes = minimumMinutes,
         blockAllDayEvents = blockAllDay,
         treatGhostsAsBusy = treatGhostsAsBusy,
+        bufferBeforeMinutes = bufferBeforeMinutes,
+        bufferAfterMinutes = bufferAfterMinutes,
     )
 
     private fun busy(start: String, end: String, isGhost: Boolean = false) = BusyPeriod(

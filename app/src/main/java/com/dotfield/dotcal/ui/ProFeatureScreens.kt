@@ -229,6 +229,9 @@ import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.nlp.QuickAddParser
 import com.dotfield.dotcal.data.nlp.QuickAddResult
+import com.dotfield.dotcal.data.nlp.SmartQuickAddCommand
+import com.dotfield.dotcal.data.nlp.SmartQuickAddMatcher
+import com.dotfield.dotcal.data.nlp.SmartQuickAddParser
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.recurrence.ByDay
 import com.dotfield.dotcal.data.recurrence.RecurrenceFreq
@@ -1089,6 +1092,11 @@ internal fun QuickAddScreen(
     palette: DotCalPalette,
     onBack: () -> Unit,
     onContinue: (QuickAddResult) -> Unit,
+    eventCandidates: List<CalendarEvent> = emptyList(),
+    resolvedCommandCandidates: List<CalendarEvent>? = null,
+    commandContextEvent: CalendarEvent? = null,
+    onCommandDetected: (SmartQuickAddCommand?) -> Unit = {},
+    onCommand: (SmartQuickAddCommand, CalendarEvent?) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     var text by remember { mutableStateOf("") }
@@ -1108,9 +1116,29 @@ internal fun QuickAddScreen(
     val trimmed = text.trim()
     // Re-parsed on every keystroke; pure and cheap.
     val parsed = remember(trimmed) { if (trimmed.isEmpty()) null else QuickAddParser.parse(trimmed) }
+    val command = remember(trimmed) { if (trimmed.isEmpty()) null else SmartQuickAddParser.parse(trimmed) }
+    LaunchedEffect(command, commandContextEvent?.id) { onCommandDetected(command) }
+    val commandCandidates = resolvedCommandCandidates ?: remember(command, eventCandidates, commandContextEvent) {
+        command?.let { SmartQuickAddMatcher.findCandidates(it, eventCandidates, contextEvent = commandContextEvent) }.orEmpty()
+    }
+    var selectedCommandEventId by remember(command) { mutableStateOf<String?>(null) }
+    LaunchedEffect(commandCandidates) {
+        if (selectedCommandEventId == null || commandCandidates.none { it.id == selectedCommandEventId }) {
+            selectedCommandEventId = commandCandidates.firstOrNull()?.id
+        }
+    }
+    val selectedCommandEvent = commandCandidates.firstOrNull { it.id == selectedCommandEventId }
     val focusRequester = remember { FocusRequester() }
     val examples = remember {
-        listOf("Gym every mon 7am", "Lunch tomorrow noon", "Pay rent on 1st", "Standup daily 9:30am")
+        listOf(
+            "Gym every mon 7am",
+            "Lunch tomorrow noon",
+            "Move my 2pm to tomorrow",
+            "Delete tomorrow's gym",
+            "Add 30 min prep before it",
+            "Rename gym to strength training",
+            "Set gym duration to 90 minutes",
+        )
     }
 
     fun submit() {
@@ -1203,7 +1231,18 @@ internal fun QuickAddScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            if (parsed != null) {
+            if (command != null) {
+                CalcSectionLabel(stringResource(R.string.quick_add_command), palette)
+                Spacer(modifier = Modifier.height(10.dp))
+                QuickAddCommandPreview(
+                    command = command,
+                    candidates = commandCandidates,
+                    selectedEventId = selectedCommandEventId,
+                    palette = palette,
+                    onSelect = { selectedCommandEventId = it },
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+            } else if (parsed != null) {
                 CalcSectionLabel(stringResource(R.string.quick_add_preview), palette)
                 Spacer(modifier = Modifier.height(10.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1267,18 +1306,20 @@ internal fun QuickAddScreen(
             }
 
             Spacer(modifier = Modifier.height(30.dp))
-            val enabled = parsed != null
+            val enabled = command != null && selectedCommandEvent != null || command == null && parsed != null
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(if (enabled) palette.accent else palette.disabledText.copy(alpha = 0.25f))
-                    .noRippleClickable(enabled = enabled) { submit() },
+                    .noRippleClickable(enabled = enabled) {
+                        if (command != null) onCommand(command, selectedCommandEvent) else submit()
+                    },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    stringResource(R.string.quick_add_continue),
+                    stringResource(if (command != null) R.string.quick_add_apply_command else R.string.quick_add_continue),
                     color = if (enabled) NWhite else palette.disabledText,
                     fontFamily = mono,
                     fontWeight = FontWeight.Bold,
@@ -2246,6 +2287,64 @@ internal fun ShiftPatternsScreen(
                 deletePattern = null
             },
         )
+    }
+}
+
+@Composable
+private fun QuickAddCommandPreview(
+    command: SmartQuickAddCommand,
+    candidates: List<CalendarEvent>,
+    selectedEventId: String?,
+    palette: DotCalPalette,
+    onSelect: (String) -> Unit,
+) {
+    val summary = when (command) {
+        is SmartQuickAddCommand.Move -> stringResource(R.string.quick_add_command_move, command.targetDate.format(editorDateFormatter))
+        is SmartQuickAddCommand.Delete -> stringResource(R.string.quick_add_command_delete)
+        is SmartQuickAddCommand.Query -> stringResource(R.string.quick_add_command_query)
+        is SmartQuickAddCommand.Rename -> stringResource(R.string.quick_add_command_rename, command.newTitle)
+        is SmartQuickAddCommand.SetDuration -> stringResource(R.string.quick_add_command_duration, command.minutes)
+        is SmartQuickAddCommand.SetLocation -> stringResource(R.string.quick_add_command_location, command.location)
+        is SmartQuickAddCommand.SetReminder -> if (command.minutesBefore == null) {
+            stringResource(R.string.quick_add_command_reminder_remove)
+        } else {
+            stringResource(R.string.quick_add_command_reminder, command.minutesBefore)
+        }
+        is SmartQuickAddCommand.AddPrep -> stringResource(
+            if (command.before) R.string.quick_add_command_prep_before else R.string.quick_add_command_prep_after,
+            command.minutes,
+        )
+    }
+    Text(summary, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    Spacer(modifier = Modifier.height(10.dp))
+    if (candidates.isEmpty()) {
+        Text(stringResource(R.string.quick_add_no_match), color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp)
+    } else {
+        candidates.take(4).forEach { event ->
+            val selected = event.id == selectedEventId
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selected) palette.accent.copy(alpha = 0.14f) else palette.eventCardSurface)
+                    .noRippleClickable { onSelect(event.id) }
+                    .padding(horizontal = 12.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    event.title.ifBlank { stringResource(R.string.quick_add_untitled) },
+                    color = palette.primaryText,
+                    fontFamily = mono,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    fontSize = 14.sp,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(event.localDate().format(editorDateFormatter), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+        }
     }
 }
 

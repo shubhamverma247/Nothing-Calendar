@@ -3,9 +3,11 @@ package com.dotfield.dotcal.reminders
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import com.dotfield.dotcal.DotCalApplication
+import com.dotfield.dotcal.MainActivity
 import com.dotfield.dotcal.glyph.DotCalGlyphBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -85,6 +87,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     }
                     ACTION_SNOOZE_REMINDER -> {
                         scheduler.cancelLiveProgress(alarmRequestCode)
+                        scheduler.cancelRepeat(alarmRequestCode)
                         NotificationManagerCompat.from(context).cancel(alarmRequestCode)
                         val snoozeAtMs = System.currentTimeMillis() + ReminderNotificationActions.snoozeDelayMs(snoozeMinutes)
                         val reminder = repository.getReminderByRequestCode(alarmRequestCode)
@@ -103,6 +106,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     }
                     ACTION_COMPLETE_TASK_REMINDER -> {
                         scheduler.cancelLiveProgress(alarmRequestCode)
+                        scheduler.cancelRepeat(alarmRequestCode)
                         NotificationManagerCompat.from(context).cancel(alarmRequestCode)
                         val targetEventId = eventId ?: repository.getReminderByRequestCode(alarmRequestCode)?.eventId ?: return@runCatching
                         val task = repository.getEvent(targetEventId)
@@ -112,6 +116,22 @@ class ReminderReceiver : BroadcastReceiver() {
                         } else {
                             Log.w(TAG, "Complete task ignored: missing task for requestCode=$alarmRequestCode")
                         }
+                    }
+                    ACTION_DISMISS_REMINDER -> {
+                        scheduler.cancelLiveProgress(alarmRequestCode)
+                        scheduler.cancelRepeat(alarmRequestCode)
+                        NotificationManagerCompat.from(context).cancel(alarmRequestCode)
+                    }
+                    ACTION_OPEN_REMINDER -> {
+                        scheduler.cancelLiveProgress(alarmRequestCode)
+                        scheduler.cancelRepeat(alarmRequestCode)
+                        NotificationManagerCompat.from(context).cancel(alarmRequestCode)
+                        val openIntent = Intent(context, MainActivity::class.java).apply {
+                            action = Intent.ACTION_VIEW
+                            data = Uri.parse(if (fallbackIsTask) "dotcal://task/$eventId" else "dotcal://event/$eventId")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        }
+                        context.startActivity(openIntent)
                     }
                 }
             }.onFailure { throwable ->
@@ -127,6 +147,8 @@ class ReminderReceiver : BroadcastReceiver() {
         const val ACTION_UPDATE_LIVE_PROGRESS = "com.dotfield.dotcal.action.UPDATE_LIVE_PROGRESS"
         const val ACTION_SNOOZE_REMINDER = "com.dotfield.dotcal.action.SNOOZE_REMINDER"
         const val ACTION_COMPLETE_TASK_REMINDER = "com.dotfield.dotcal.action.COMPLETE_TASK_REMINDER"
+        const val ACTION_DISMISS_REMINDER = "com.dotfield.dotcal.action.DISMISS_REMINDER"
+        const val ACTION_OPEN_REMINDER = "com.dotfield.dotcal.action.OPEN_REMINDER"
         const val EXTRA_EVENT_ID = "extra_event_id"
         const val EXTRA_ALARM_REQUEST_CODE = "extra_alarm_request_code"
         const val EXTRA_EVENT_TITLE = "extra_event_title"

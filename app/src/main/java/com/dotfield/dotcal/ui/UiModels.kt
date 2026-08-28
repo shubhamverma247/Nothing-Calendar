@@ -44,6 +44,7 @@ internal val reminderOptions = listOf(null, 5, 10, 30, 60, 1440)
 internal val eventReminderPresets = listOf(1440, 60, 30, 10)
 internal val taskReminderOptions = listOf(null, 5, 10, 30, 1440)
 internal val defaultEventDurationOptions = listOf(15, 30, 60, 90, 120)
+internal val autoBufferOptions = listOf(0, 5, 10, 15, 30, 45, 60)
 
 /**
  * [rrule] is the persisted RRULE code and must stay stable; [labelRes] is the display text. Same

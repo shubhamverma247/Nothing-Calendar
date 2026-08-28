@@ -597,8 +597,15 @@ class DotCalRepository(
 
     suspend fun computeAvailability(request: FreeSlotRequest): List<DayAvailability> {
         val busyPeriods = loadBusyPeriods(request.rangeStart, request.rangeEnd)
+        val preferences = context.calendarPreferencesDataStore.data.first()
+        val bufferedRequest = request.copy(
+            bufferBeforeMinutes = (preferences[CalendarPreferences.KEY_AUTO_BUFFER_BEFORE_MINUTES] ?: 0)
+                .coerceIn(0, 240),
+            bufferAfterMinutes = (preferences[CalendarPreferences.KEY_AUTO_BUFFER_AFTER_MINUTES] ?: 0)
+                .coerceIn(0, 240),
+        )
         return withContext(Dispatchers.Default) {
-            FreeSlotEngine.compute(request, busyPeriods)
+            FreeSlotEngine.compute(bufferedRequest, busyPeriods)
         }
     }
 
@@ -719,8 +726,13 @@ class DotCalRepository(
         excludedEventId: String?,
     ): List<CalendarEvent> {
         val zoneId = ZoneId.systemDefault()
-        val startMs = startDate.atTime(startTime).atZone(zoneId).toInstant().toEpochMilli()
-        val endMs = endDate.atTime(endTime).atZone(zoneId).toInstant().toEpochMilli()
+        val preferences = context.calendarPreferencesDataStore.data.first()
+        val bufferBeforeMs = (preferences[CalendarPreferences.KEY_AUTO_BUFFER_BEFORE_MINUTES] ?: 0)
+            .coerceIn(0, 240) * 60_000L
+        val bufferAfterMs = (preferences[CalendarPreferences.KEY_AUTO_BUFFER_AFTER_MINUTES] ?: 0)
+            .coerceIn(0, 240) * 60_000L
+        val startMs = startDate.atTime(startTime).atZone(zoneId).toInstant().toEpochMilli() - bufferBeforeMs
+        val endMs = endDate.atTime(endTime).atZone(zoneId).toInstant().toEpochMilli() + bufferAfterMs
         if (endMs <= startMs) return emptyList()
         val queryStartDate = startDate.minusDays(1)
         val queryEndDate = endDate.plusDays(2)
@@ -734,7 +746,10 @@ class DotCalRepository(
                     .asSequence()
                     .filter { event -> excludedEventId == null || event.baseEventId() != excludedEventId }
                     .filter { event -> event.isAllDay == 0 && event.isCompleted == 0 && event.source != "BIRTHDAY" }
-                    .filter { event -> event.startTimeMs < endMs && event.conflictEndTimeMs() > startMs }
+                    .filter { event ->
+                        event.startTimeMs - bufferBeforeMs < endMs &&
+                            event.conflictEndTimeMs() + bufferAfterMs > startMs
+                    }
                     .sortedBy { event -> event.startTimeMs }
                     .toList()
             }.withGhostFlags()
@@ -758,6 +773,22 @@ class DotCalRepository(
         if (q.isBlank()) return@withContext emptyList()
         val privateIds = privacyManager.observePrivateVaultIds().first()
         dao.searchUserEvents(q).filterOutPrivate(privateIds)
+    }
+
+    /**
+     * Candidate source for local conversational commands. Title/location search is global; the
+     * date window adds expanded occurrences so time-only references such as "my 2pm" also work.
+     */
+    suspend fun findSmartQuickAddCandidates(
+        query: String,
+        rangeStart: LocalDate,
+        rangeEnd: LocalDate,
+    ): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        val expanded = observeAgendaEvents(rangeStart, rangeEnd.plusDays(1)).first()
+        val searched: List<CalendarEvent> = if (query.trim().isBlank()) emptyList() else searchItems(query)
+        (expanded + searched)
+            .distinctBy { it.baseEventId() }
+            .take(200)
     }
 
     fun observeTodayTasks(day: LocalDate): Flow<List<CalendarEvent>> {
@@ -809,6 +840,8 @@ class DotCalRepository(
     suspend fun getEvent(eventId: String): CalendarEvent? = dao.getEvent(eventId)?.withGhostFlag()
 
     suspend fun getReminderByRequestCode(alarmRequestCode: Int): EventReminder? = dao.getReminderByRequestCode(alarmRequestCode)
+
+    suspend fun getRemindersForEvent(eventId: String): List<EventReminder> = dao.getRemindersForEvent(eventId)
 
     suspend fun markReminderDelivered(alarmRequestCode: Int) {
         dao.markReminderDelivered(alarmRequestCode)

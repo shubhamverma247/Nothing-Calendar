@@ -158,6 +158,23 @@
     <string name="settings_birthday_calendar">Birthday calendar</string>
     <string name="settings_birthday_calendar_subtitle">Import contacts\' birthdays</string>
     <string name="settings_global_holidays">Global Holidays</string>
+    <string name="settings_auto_buffers">Auto-buffers</string>
+    <string name="settings_auto_buffers_subtitle">Protect time before and after meetings</string>
+    <string name="settings_auto_buffer_before">Before meetings</string>
+    <string name="settings_auto_buffer_after">After meetings</string>
+    <string name="settings_auto_buffer_off">Off</string>
+    <string name="settings_auto_buffer_minutes">%1$d min</string>
+    <string name="settings_reminder_sound">Reminder sound</string>
+    <string name="settings_reminder_sound_default">System default</string>
+    <string name="settings_reminder_sound_custom">Custom</string>
+    <string name="settings_reminder_repeat">Repeat until dismissed</string>
+    <string name="settings_reminder_repeat_subtitle">Alert again if reminder stays open</string>
+    <string name="settings_reminder_repeat_interval">Repeat interval</string>
+    <string name="settings_reminder_vibration">Vibration pattern</string>
+    <string name="settings_reminder_vibration_subtitle">Use a stronger reminder vibration</string>
+    <string name="settings_reminder_full_screen">Strong alert</string>
+    <string name="settings_reminder_full_screen_subtitle">Open DotCal over other apps at reminder time</string>
+    <string name="settings_reminder_minutes">%1$d min</string>
     <string name="settings_default_view">Default view</string>
     <string name="settings_calendar_menu">Calendar menu</string>
     <string name="settings_calendar_menu_visible_count">%1$d/%2$d visible</string>
@@ -892,6 +909,7 @@
     <string name="shortcut_quick_add_short">Quick add</string>
     <string name="shortcut_quick_add_long">Create with Quick Add</string>
     <string name="quick_add_continue">Continue</string>
+    <string name="quick_add_apply_command">Apply command</string>
     <string name="templates_title">Templates</string>
     <string name="calendar_sets_title">Calendar Sets</string>
     <string name="calc_title">Date Calculator</string>
@@ -929,6 +947,21 @@
     <string name="quick_add_repeat_custom">Custom</string>
     <!-- Shown via CalcSectionLabel, which no longer uppercases: written in display case. -->
     <string name="quick_add_describe_event">DESCRIBE YOUR EVENT</string>
+    <string name="quick_add_command">COMMAND</string>
+    <string name="quick_add_command_move">Move to %1$s</string>
+    <string name="quick_add_command_delete">Delete this event</string>
+    <string name="quick_add_command_query">Show matching events</string>
+    <string name="quick_add_command_rename">Rename to %1$s</string>
+    <string name="quick_add_command_duration">Set duration to %1$d min</string>
+    <string name="quick_add_command_location">Set location to %1$s</string>
+    <string name="quick_add_command_reminder">Set reminder to %1$d min before</string>
+    <string name="quick_add_command_reminder_remove">Remove reminder</string>
+    <string name="quick_add_command_prep_before">Add %1$d min prep before</string>
+    <string name="quick_add_command_prep_after">Add %1$d min buffer after</string>
+    <string name="quick_add_no_match">No matching event in the current calendar window.</string>
+    <string name="quick_add_command_applied">Command applied</string>
+    <string name="quick_add_command_failed">Could not apply command</string>
+    <string name="quick_add_prep_title">Prep · %1$s</string>
 
     <string name="recurrence_every_n_units">Every %1$d %2$s</string>
     <string name="recurrence_label_on_days">" on %1$s"</string>
@@ -1129,6 +1162,9 @@
     <string name="availability_preset_this_week">This week</string>
     <string name="availability_preset_next_week">Next week</string>
     <string name="availability_preview">Preview</string>
+    <string name="availability_find_a_time">Find a time</string>
+    <string name="availability_use_slot">Use slot</string>
+    <string name="availability_no_slots">No matching free slots</string>
     <!-- Status pill above the generated text. Stored ALL CAPS: it renders in caps as a
          visual style and is never passed through uppercase(). -->
     <string name="availability_status_updating">UPDATING</string>

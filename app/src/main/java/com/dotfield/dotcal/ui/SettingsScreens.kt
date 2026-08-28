@@ -11,6 +11,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -283,6 +284,13 @@ internal fun SettingsPreview(
     birthdayEnabled: Boolean,
     defaultReminderMinutes: Int?,
     defaultEventDurationMinutes: Int,
+    autoBufferBeforeMinutes: Int,
+    autoBufferAfterMinutes: Int,
+    reminderSoundUri: String,
+    reminderRepeatEnabled: Boolean,
+    reminderRepeatMinutes: Int,
+    reminderVibrationEnabled: Boolean,
+    reminderFullScreenEnabled: Boolean,
     defaultCalendarTab: CalendarTab,
     hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
@@ -302,6 +310,13 @@ internal fun SettingsPreview(
     onSyncIntervalSelected: (Int) -> Unit,
     onDefaultReminderSelected: (Int?) -> Unit,
     onDefaultEventDurationSelected: (Int) -> Unit,
+    onAutoBufferBeforeSelected: (Int) -> Unit,
+    onAutoBufferAfterSelected: (Int) -> Unit,
+    onReminderSoundSelected: (String) -> Unit,
+    onReminderRepeatEnabledChange: (Boolean) -> Unit,
+    onReminderRepeatMinutesSelected: (Int) -> Unit,
+    onReminderVibrationEnabledChange: (Boolean) -> Unit,
+    onReminderFullScreenEnabledChange: (Boolean) -> Unit,
     onDefaultViewSelected: (CalendarTab) -> Unit,
     onCalendarMenuActionVisibleChange: (CalendarOverflowAction, Boolean) -> Unit,
     onResetCalendarMenuActions: () -> Unit,
@@ -488,11 +503,26 @@ internal fun SettingsPreview(
             ReminderDefaultsSettings(
                 defaultReminderMinutes = defaultReminderMinutes,
                 defaultEventDurationMinutes = defaultEventDurationMinutes,
+                autoBufferBeforeMinutes = autoBufferBeforeMinutes,
+                autoBufferAfterMinutes = autoBufferAfterMinutes,
+                reminderSoundUri = reminderSoundUri,
+                reminderRepeatEnabled = reminderRepeatEnabled,
+                reminderRepeatMinutes = reminderRepeatMinutes,
+                reminderVibrationEnabled = reminderVibrationEnabled,
+                reminderFullScreenEnabled = reminderFullScreenEnabled,
+                isPro = isPro,
                 defaultAllDayReminderTime = defaultAllDayReminderTime,
                 palette = palette,
                 onBack = { onScreenChange(SettingsScreen.Root) },
                 onDefaultReminderSelected = onDefaultReminderSelected,
                 onDefaultEventDurationSelected = onDefaultEventDurationSelected,
+                onAutoBufferBeforeSelected = onAutoBufferBeforeSelected,
+                onAutoBufferAfterSelected = onAutoBufferAfterSelected,
+                onReminderSoundSelected = onReminderSoundSelected,
+                onReminderRepeatEnabledChange = onReminderRepeatEnabledChange,
+                onReminderRepeatMinutesSelected = onReminderRepeatMinutesSelected,
+                onReminderVibrationEnabledChange = onReminderVibrationEnabledChange,
+                onReminderFullScreenEnabledChange = onReminderFullScreenEnabledChange,
                 onDefaultAllDayReminderTimeSelected = onDefaultAllDayReminderTimeSelected,
             )
         }
@@ -920,11 +950,26 @@ private fun CalendarPreferencesSettings(
 private fun ReminderDefaultsSettings(
     defaultReminderMinutes: Int?,
     defaultEventDurationMinutes: Int,
+    autoBufferBeforeMinutes: Int,
+    autoBufferAfterMinutes: Int,
+    reminderSoundUri: String,
+    reminderRepeatEnabled: Boolean,
+    reminderRepeatMinutes: Int,
+    reminderVibrationEnabled: Boolean,
+    reminderFullScreenEnabled: Boolean,
+    isPro: Boolean,
     defaultAllDayReminderTime: LocalTime,
     palette: DotCalPalette,
     onBack: () -> Unit,
     onDefaultReminderSelected: (Int?) -> Unit,
     onDefaultEventDurationSelected: (Int) -> Unit,
+    onAutoBufferBeforeSelected: (Int) -> Unit,
+    onAutoBufferAfterSelected: (Int) -> Unit,
+    onReminderSoundSelected: (String) -> Unit,
+    onReminderRepeatEnabledChange: (Boolean) -> Unit,
+    onReminderRepeatMinutesSelected: (Int) -> Unit,
+    onReminderVibrationEnabledChange: (Boolean) -> Unit,
+    onReminderFullScreenEnabledChange: (Boolean) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
 ) {
     LazyColumn(
@@ -953,6 +998,62 @@ private fun ReminderDefaultsSettings(
                     selectedTime = defaultAllDayReminderTime,
                     palette = palette,
                     onTimeSelected = onDefaultAllDayReminderTimeSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsAutoBufferRow(
+                    title = stringResource(R.string.settings_auto_buffer_before),
+                    selectedMinutes = autoBufferBeforeMinutes,
+                    palette = palette,
+                    onSelected = onAutoBufferBeforeSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsAutoBufferRow(
+                    title = stringResource(R.string.settings_auto_buffer_after),
+                    selectedMinutes = autoBufferAfterMinutes,
+                    palette = palette,
+                    onSelected = onAutoBufferAfterSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsReminderSoundRow(
+                    soundUri = reminderSoundUri,
+                    isPro = isPro,
+                    palette = palette,
+                    onSelected = onReminderSoundSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsWidgetToggleRow(
+                    title = stringResource(R.string.settings_reminder_repeat),
+                    subtitle = stringResource(R.string.settings_reminder_repeat_subtitle),
+                    checked = reminderRepeatEnabled,
+                    isPro = isPro,
+                    palette = palette,
+                    onCheckedChange = onReminderRepeatEnabledChange,
+                )
+                SettingsContentDivider(palette)
+                SettingsReminderRepeatRow(
+                    selectedMinutes = reminderRepeatMinutes,
+                    enabled = reminderRepeatEnabled,
+                    isPro = isPro,
+                    palette = palette,
+                    onSelected = onReminderRepeatMinutesSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsWidgetToggleRow(
+                    title = stringResource(R.string.settings_reminder_vibration),
+                    subtitle = stringResource(R.string.settings_reminder_vibration_subtitle),
+                    checked = reminderVibrationEnabled,
+                    isPro = isPro,
+                    palette = palette,
+                    onCheckedChange = onReminderVibrationEnabledChange,
+                )
+                SettingsContentDivider(palette)
+                SettingsWidgetToggleRow(
+                    title = stringResource(R.string.settings_reminder_full_screen),
+                    subtitle = stringResource(R.string.settings_reminder_full_screen_subtitle),
+                    checked = reminderFullScreenEnabled,
+                    isPro = isPro,
+                    palette = palette,
+                    onCheckedChange = onReminderFullScreenEnabledChange,
                 )
             }
         }
@@ -2281,6 +2382,162 @@ private fun SettingsDefaultReminderRow(
             onDismiss = { showSheet = false },
             onSelected = {
                 onReminderSelected(it)
+                showSheet = false
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsReminderSoundRow(
+    soundUri: String,
+    isPro: Boolean,
+    palette: DotCalPalette,
+    onSelected: (String) -> Unit,
+) {
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val picked = result.data?.let { data ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    data.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+                }
+            }
+            onSelected(picked?.toString().orEmpty())
+        }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable {
+                if (isPro) {
+                    launcher.launch(Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "DotCal reminder sound")
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                        if (soundUri.isNotBlank()) putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(soundUri))
+                    })
+                }
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.settings_reminder_sound), color = palette.primaryText, fontFamily = mono, fontSize = 16.sp)
+            if (!isPro) {
+                Spacer(modifier = Modifier.width(8.dp))
+                ProFeatureTag(palette)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(if (soundUri.isBlank()) R.string.settings_reminder_sound_default else R.string.settings_reminder_sound_custom),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 14.sp,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            SettingsTrailingIcon(isPro = isPro, palette = palette)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsReminderRepeatRow(
+    selectedMinutes: Int,
+    enabled: Boolean,
+    isPro: Boolean,
+    palette: DotCalPalette,
+    onSelected: (Int) -> Unit,
+) {
+    var showSheet by remember { mutableStateOf(false) }
+    val options = listOf(5, 10, 15, 30, 60)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable(enabled = isPro && enabled) { showSheet = true },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.settings_reminder_repeat_interval), color = if (enabled) palette.primaryText else palette.secondaryText, fontFamily = mono, fontSize = 16.sp)
+            if (!isPro) {
+                Spacer(modifier = Modifier.width(8.dp))
+                ProFeatureTag(palette)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.settings_reminder_minutes, selectedMinutes), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            UpDownChevron(tint = palette.secondaryText)
+        }
+    }
+    if (showSheet) {
+        SettingsOptionSheet(
+            title = stringResource(R.string.settings_reminder_repeat_interval),
+            options = options,
+            selected = selectedMinutes,
+            palette = palette,
+            label = { stringResource(R.string.settings_reminder_minutes, it) },
+            onDismiss = { showSheet = false },
+            onSelected = {
+                onSelected(it)
+                showSheet = false
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsAutoBufferRow(
+    title: String,
+    selectedMinutes: Int,
+    palette: DotCalPalette,
+    onSelected: (Int) -> Unit,
+) {
+    var showSheet by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable { showSheet = true },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (selectedMinutes == 0) stringResource(R.string.settings_auto_buffer_off)
+                else stringResource(R.string.settings_auto_buffer_minutes, selectedMinutes),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 14.sp,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            UpDownChevron(tint = palette.secondaryText)
+        }
+    }
+    if (showSheet) {
+        SettingsOptionSheet(
+            title = title,
+            options = autoBufferOptions,
+            selected = selectedMinutes,
+            palette = palette,
+            label = { minutes ->
+                if (minutes == 0) stringResource(R.string.settings_auto_buffer_off)
+                else stringResource(R.string.settings_auto_buffer_minutes, minutes)
+            },
+            onDismiss = { showSheet = false },
+            onSelected = {
+                onSelected(it)
                 showSheet = false
             },
         )
