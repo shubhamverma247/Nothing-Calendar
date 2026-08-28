@@ -586,6 +586,38 @@ Worth later if demand repeats:
 - Time-zone planner.
 - More complete shift pack, without turning DotCal into a shift-only app.
 
+## 28 August 2026 Audit Record
+
+The post-22-August audit was completed commit-by-commit through `9fc8b55` on `main`.
+Confirmed defects fixed without adding features:
+
+- Provider recurring reminders now roll to the next valid occurrence, including recurrence
+  exceptions and provider RDATE data.
+- Widget task data respects the selected account; existing placed widgets are re-registered;
+  free-tier widget configurations are sanitized on render and load; failed config persistence no
+  longer reports success.
+- Pro reminder settings are enforced after downgrade, and the Silent ringtone choice is preserved.
+- Reminder open actions now resolve the persisted event before building the deep link, and repeat
+  reminders use an AlarmClock fallback when exact-alarm access is unavailable.
+- Smart Quick Add 3.0 remains English-focused; newly added Hindi/Hinglish command tokens are
+  rejected and covered by regression tests.
+- The Quick Settings Tile's guarded pre-API-34 activity collapse call is lint-safe.
+- Recent feature strings are translated in the configured Arabic, German, English/Indonesia,
+  Spanish, French, Portuguese, Russian, and Turkish resource sets; formatting placeholders are
+  kept consistent with the base resources, including dynamic notification timing text.
+- Widget maintenance broadcasts now validate their action before scheduling a refresh.
+- Provider sync now batch-loads reminder and attendee rows in bounded provider queries instead of
+  issuing one reminder/attendee query per event.
+- All-day provider boundaries are converted by calendar date between provider UTC and the event
+  timezone; recurring reminder Glyph lifecycle messages now use occurrence IDs.
+
+Verification: `:app:testDebugUnitTest :app:assembleDebug`, `:app:lintDebug`, and `git diff --check`
+pass after the localization and receiver fixes.
+The report still contains non-blocking pre-existing warnings and hints (including hardcoded text,
+unused resources, typography, and formatting guidance). The required unit-test/assemble run and
+manual provider, widget, notification, Glyph, tile, shortcut, voice, and visual export QA remain
+device-dependent.
+
 ## Existing Known Gaps
 
 - Full UI string extraction and translation: language picker exists, but most visible text remains

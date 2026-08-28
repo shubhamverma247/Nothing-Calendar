@@ -168,16 +168,19 @@ class WidgetConfigActivity : ComponentActivity() {
                     preferences[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG] = config.encode()
                 }
             }.onFailure { Log.e(TAG, "Failed to persist config for widget $appWidgetId", it) }.isSuccess
-            if (saved) {
-                val receiverClass = AppWidgetManager.getInstance(this@WidgetConfigActivity)
-                    .getAppWidgetInfo(appWidgetId)
-                    ?.provider
-                    ?.className
-                    ?.substringAfterLast('.')
-                    .orEmpty()
-                runCatching { registerConfiguredWidget(this@WidgetConfigActivity, receiverClass, appWidgetId) }
-                    .onFailure { Log.e(TAG, "Failed to register widget $appWidgetId", it) }
+            if (!saved) {
+                setResult(Activity.RESULT_CANCELED)
+                finish()
+                return@launch
             }
+            val receiverClass = AppWidgetManager.getInstance(this@WidgetConfigActivity)
+                .getAppWidgetInfo(appWidgetId)
+                ?.provider
+                ?.className
+                ?.substringAfterLast('.')
+                .orEmpty()
+            runCatching { registerConfiguredWidget(this@WidgetConfigActivity, receiverClass, appWidgetId) }
+                .onFailure { Log.e(TAG, "Failed to register widget $appWidgetId", it) }
             WidgetUpdateWorker.updateNow(this@WidgetConfigActivity)
             val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             setResult(Activity.RESULT_OK, result)
@@ -369,12 +372,12 @@ private fun WidgetConfigScreen(
             if (profile.ranges.isNotEmpty() && loadedConfig.timeRange !in profile.ranges) {
                 loadedConfig = loadedConfig.copy(
                     timeRange = profile.ranges.minByOrNull { abs(it.days - loadedConfig.timeRange.days) }
-                        ?: loadedConfig.timeRange,
+                    ?: loadedConfig.timeRange,
                 )
             }
-            config = loadedConfig
             val prefs = context.calendarPreferencesDataStore.data.first()
             isPro = prefs[CalendarPreferences.KEY_IS_PRO] ?: false
+            config = if (isPro) loadedConfig else sanitizeForFree(loadedConfig)
             isDark = resolveIsDark(context, prefs[CalendarPreferences.KEY_THEME_MODE])
             accounts = withContext(Dispatchers.IO) {
                 DotCalDatabase.create(context).calendarDao().getAccountsForWidgetConfig()

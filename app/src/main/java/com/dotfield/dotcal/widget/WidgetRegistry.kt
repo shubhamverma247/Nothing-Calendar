@@ -8,6 +8,18 @@ import kotlinx.coroutines.flow.first
 
 private fun widgetEntry(receiverClass: String, appWidgetId: Int) = "$receiverClass:$appWidgetId"
 
+internal fun receiverClassNameForWidgetKind(kind: LegacyWidgetKind): String = when (kind) {
+    LegacyWidgetKind.DateOnly -> "DateOnlyDotCalWidgetReceiver"
+    LegacyWidgetKind.MonthCompact -> "CompactMonthDotCalWidgetReceiver"
+    LegacyWidgetKind.ShiftWide -> "ShiftWideWidgetReceiver"
+    LegacyWidgetKind.Small -> "SmallDotCalWidgetReceiver"
+    LegacyWidgetKind.Medium -> "MediumDotCalWidgetReceiver"
+    LegacyWidgetKind.Large -> "LargeDotCalWidgetReceiver"
+    LegacyWidgetKind.Countdown -> "EventCountdownWidgetReceiver"
+    LegacyWidgetKind.Agenda -> "AgendaListWidgetReceiver"
+    LegacyWidgetKind.MonthGrid -> "MonthGridWidgetReceiver"
+}
+
 internal suspend fun registerConfiguredWidget(context: Context, receiverClass: String, appWidgetId: Int) {
     val entry = widgetEntry(receiverClass, appWidgetId)
     context.applicationContext.calendarPreferencesDataStore.edit { preferences ->

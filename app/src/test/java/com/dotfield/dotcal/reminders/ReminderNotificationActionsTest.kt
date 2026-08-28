@@ -44,6 +44,13 @@ class ReminderNotificationActionsTest {
     }
 
     @Test
+    fun alarmClockFallbackCoversTasksAndMissingExactAlarmAccess() {
+        assertEquals(true, shouldUseAlarmClock(isTask = true, canScheduleExactAlarms = true))
+        assertEquals(true, shouldUseAlarmClock(isTask = false, canScheduleExactAlarms = false))
+        assertEquals(false, shouldUseAlarmClock(isTask = false, canScheduleExactAlarms = true))
+    }
+
+    @Test
     fun snoozePickerProvidesUsefulPresets() {
         assertEquals(listOf(5, 10, 15, 30, 60), ReminderNotificationActions.SnoozePickerMinutes)
     }

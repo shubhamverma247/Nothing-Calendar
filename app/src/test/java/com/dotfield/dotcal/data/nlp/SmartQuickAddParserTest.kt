@@ -84,6 +84,13 @@ class SmartQuickAddParserTest {
     }
 
     @Test
+    fun doesNotAddHindiOrHinglishSmartCommands() {
+        assertEquals(null, SmartQuickAddParser.parse("delete kal gym", now))
+        assertEquals(null, SmartQuickAddParser.parse("make gym 2 ghante long", now))
+        assertEquals(null, SmartQuickAddParser.parse("what do I have agli friday", now))
+    }
+
+    @Test
     fun matchesEventByTimeQuery() {
         val event = event("Gym", LocalDateTime.of(2026, 3, 10, 14, 0))
         val command = SmartQuickAddParser.parse("move my 2pm to tomorrow", now)!!

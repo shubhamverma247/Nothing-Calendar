@@ -24,6 +24,11 @@
     <string name="notification_action_snooze_minutes">Snooze %1$d min</string>
     <string name="notification_action_snooze">Snooze</string>
     <string name="notification_snoozed_until">Snoozed until %1$s</string>
+    <string name="notification_starting_now">Starting now</string>
+    <string name="notification_starts_in_minute">Starts in 1 minute</string>
+    <string name="notification_starts_in_hour">Starts in 1 hour</string>
+    <string name="notification_starts_in_day">Starts in 1 day</string>
+    <string name="notification_starts_in_minutes">Starts in %1$d minutes</string>
     <string name="notification_action_complete_task">Complete Task</string>
     <string name="snooze_picker_title">Snooze reminder</string>
     <string name="snooze_picker_for">Snooze for</string>
@@ -167,6 +172,7 @@
     <string name="settings_reminder_sound">Reminder sound</string>
     <string name="settings_reminder_sound_default">System default</string>
     <string name="settings_reminder_sound_custom">Custom</string>
+    <string name="settings_reminder_sound_silent">Silent</string>
     <string name="settings_reminder_repeat">Repeat until dismissed</string>
     <string name="settings_reminder_repeat_subtitle">Alert again if reminder stays open</string>
     <string name="settings_reminder_repeat_interval">Repeat interval</string>

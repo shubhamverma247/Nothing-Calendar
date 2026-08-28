@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.quickadd
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.app.PendingIntent
@@ -21,6 +22,7 @@ class QuickAddTileService : TileService() {
         }
     }
 
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     override fun onClick() {
         super.onClick()
         val intent = quickAddIntent(this)

@@ -57,6 +57,7 @@ suspend fun syncDotCalWidgetState(
     legacyKind: LegacyWidgetKind = LegacyWidgetKind.Medium,
 ): DotCalWidgetSettings {
     val settings = readDotCalWidgetSettings(context)
+    val isPro = context.calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_IS_PRO] ?: false
     var accountId: String? = null
     var monthOffset = 0
     var instanceConfig = WidgetInstanceConfig.legacyDefault(legacyKind)
@@ -68,11 +69,10 @@ suspend fun syncDotCalWidgetState(
             preferences[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG],
             fallback,
         )
+        if (!isPro) instanceConfig = sanitizeForFree(instanceConfig)
         mutablePreferencesOf().apply {
             plusAssign(preferences)
-            if (preferences[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG].isNullOrBlank()) {
-                this[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG] = instanceConfig.encode()
-            }
+            this[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG] = instanceConfig.encode()
             this[CalendarPreferences.KEY_THEME_MODE] = settings.themeMode
             settings.accentColor?.let { this[CalendarPreferences.KEY_ACCENT_COLOR] = it }
                 ?: remove(CalendarPreferences.KEY_ACCENT_COLOR)

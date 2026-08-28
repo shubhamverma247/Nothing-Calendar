@@ -43,14 +43,16 @@ sealed interface SmartQuickAddCommand {
 }
 
 object SmartQuickAddParser {
+    private val UNSUPPORTED_NON_ENGLISH = Regex("""(?i)\b(?:kal|parso|agle|agli|ghanta|ghante)\b""")
     private val DATE_WORDS = Regex("""(?i)today|tomorrow|tmrw|tmr|tom""")
     private val WEEKDAY_WORDS = Regex(
-        """(?i)(?:(?:next|agle|agli)\s+)?(?:mon(?:day)?s?|tue(?:sday)?s?|wed(?:nesday)?s?|thu(?:rsday)?s?|fri(?:day)?s?|sat(?:urday)?s?|sun(?:day)?s?)""",
+        """(?i)(?:next\s+)?(?:mon(?:day)?s?|tue(?:sday)?s?|wed(?:nesday)?s?|thu(?:rsday)?s?|fri(?:day)?s?|sat(?:urday)?s?|sun(?:day)?s?)""",
     )
 
     fun parse(input: String, now: LocalDateTime = LocalDateTime.now()): SmartQuickAddCommand? {
         val value = input.trim()
         if (value.isBlank()) return null
+        if (UNSUPPORTED_NON_ENGLISH.containsMatchIn(value)) return null
 
         val move = Regex(
             """(?i)^(?:please\s+)?(?:move|reschedule|shift)\s+(?:my\s+)?(.+?)\s+(?:to|on)\s+(.+)$""",
@@ -81,10 +83,10 @@ object SmartQuickAddParser {
         }
 
         val setDuration = Regex(
-            """(?i)^(?:please\s+)?set\s+(?:the\s+)?(.+?)\s+duration\s+to\s+(\d+)\s*(hours?|hrs?|hr|minutes?|mins?|min|ghante|ghanta)\s*(?:long)?$""",
+            """(?i)^(?:please\s+)?set\s+(?:the\s+)?(.+?)\s+duration\s+to\s+(\d+)\s*(hours?|hrs?|hr|minutes?|mins?|min)\s*(?:long)?$""",
         ).matchEntire(value)
         val makeDuration = Regex(
-            """(?i)^(?:please\s+)?make\s+(?:my\s+)?(.+?)\s+(\d+)\s*(hours?|hrs?|hr|minutes?|mins?|min|ghante|ghanta)\s*(?:long)?$""",
+            """(?i)^(?:please\s+)?make\s+(?:my\s+)?(.+?)\s+(\d+)\s*(hours?|hrs?|hr|minutes?|mins?|min)\s*(?:long)?$""",
         ).matchEntire(value)
         val duration = setDuration ?: makeDuration
         if (duration != null) {
@@ -128,7 +130,7 @@ object SmartQuickAddParser {
         }
 
         val delete = Regex(
-            """(?i)^(?:please\s+)?(?:delete|remove|cancel)\s+(?:my\s+)?(.+?)(?:\s+((?:today|tomorrow|tmrw|tmr|tom|kal|parso)))?$""",
+            """(?i)^(?:please\s+)?(?:delete|remove|cancel)\s+(?:my\s+)?(.+?)(?:\s+((?:today|tomorrow|tmrw|tmr|tom)))?$""",
         ).matchEntire(value)
         if (delete != null) {
             val dateText = delete.groupValues[2]

@@ -1,6 +1,7 @@
 package com.dotfield.dotcal.reminders
 
 internal object ReminderNotificationActions {
+    const val SILENT_SOUND_VALUE = "__silent__"
     val SnoozeMinutes = listOf(5, 15, 30)
     val SnoozePickerMinutes = listOf(5, 10, 15, 30, 60)
 

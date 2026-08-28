@@ -52,6 +52,15 @@ class WidgetInstanceConfigTest {
     }
 
     @Test
+    fun widgetKindsMapToTheirReceiversForRegistryMigration() {
+        assertEquals("DateOnlyDotCalWidgetReceiver", receiverClassNameForWidgetKind(LegacyWidgetKind.DateOnly))
+        assertEquals("CompactMonthDotCalWidgetReceiver", receiverClassNameForWidgetKind(LegacyWidgetKind.MonthCompact))
+        assertEquals("ShiftWideWidgetReceiver", receiverClassNameForWidgetKind(LegacyWidgetKind.ShiftWide))
+        assertEquals("MediumDotCalWidgetReceiver", receiverClassNameForWidgetKind(LegacyWidgetKind.Medium))
+        assertEquals("MonthGridWidgetReceiver", receiverClassNameForWidgetKind(LegacyWidgetKind.MonthGrid))
+    }
+
+    @Test
     fun countdownLegacyUsesFourteenDayRange() {
         assertEquals(WidgetTimeRange.Next14Days, WidgetInstanceConfig.legacyDefault(LegacyWidgetKind.Countdown).timeRange)
     }

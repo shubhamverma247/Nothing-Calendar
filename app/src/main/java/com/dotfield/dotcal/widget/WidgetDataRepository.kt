@@ -98,7 +98,7 @@ class WidgetDataRepository(
             emptyList()
         }
         val tasks = if (config.content.showTasks || config.category == WidgetCategory.Tasks) {
-            dao.getOpenTasksForWidget(rangeEnd.atStartMs(zoneId))
+            dao.getOpenTasksForWidget(rangeEnd.atStartMs(zoneId), accountId)
                 .filterNot { it.id.substringBefore(RECURRENCE_SEPARATOR) in privateIds }
                 .asWidgetItems(zoneId, use24Hour, nowMs)
                 .take(maxItems)

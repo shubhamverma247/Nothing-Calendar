@@ -21,6 +21,7 @@ import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.CalendarEvent
 import com.nothing.ketchum.Common
 import com.dotfield.dotcal.data.EventReminder
+import com.dotfield.dotcal.data.recurrence.planNextReminder
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import kotlinx.coroutines.runBlocking
@@ -32,8 +33,16 @@ class ReminderScheduler(private val context: Context) {
     private val appContext = context.applicationContext
     private val alarmManager = appContext.getSystemService(AlarmManager::class.java)
 
-    fun scheduleReminder(reminder: EventReminder, event: CalendarEvent) {
-        if (reminder.triggerAtMs <= System.currentTimeMillis()) return
+    fun scheduleReminder(
+        reminder: EventReminder,
+        event: CalendarEvent,
+        occurrenceStartTimeMs: Long = event.startTimeMs,
+    ) {
+        val nowMs = System.currentTimeMillis()
+        val plan = planNextReminder(event, reminder.minutesBefore, nowMs)
+        val triggerAtMs = plan?.triggerAtMs ?: reminder.triggerAtMs
+        val effectiveOccurrenceStartMs = plan?.occurrenceStartMs ?: occurrenceStartTimeMs
+        if (triggerAtMs <= nowMs) return
         val pendingIntent = reminderPendingIntent(
             requestCode = reminder.alarmRequestCode,
             payload = ReminderAlarmPayload(
@@ -42,17 +51,17 @@ class ReminderScheduler(private val context: Context) {
                 eventTitle = event.title,
                 minutesBefore = reminder.minutesBefore,
                 isTask = event.isTask == 1,
-                eventStartTimeMs = event.startTimeMs,
+                eventStartTimeMs = effectiveOccurrenceStartMs,
             ),
         )
-        if (event.isTask == 1 || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms())) {
+        if (shouldUseAlarmClock(event.isTask == 1, canScheduleExactAlarms())) {
             alarmManager.setAlarmClock(
-                AlarmManager.AlarmClockInfo(reminder.triggerAtMs, viewReminderPendingIntent(event.id, isTask = event.isTask == 1)),
+                AlarmManager.AlarmClockInfo(triggerAtMs, viewReminderPendingIntent(event.id, isTask = event.isTask == 1)),
                 pendingIntent,
             )
             return
         }
-        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, reminder.triggerAtMs, pendingIntent)
+        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
     }
 
     fun scheduleSnooze(eventId: String, eventTitle: String, alarmRequestCode: Int, triggerAtMs: Long, snoozeMinutes: Int, isTask: Boolean = false) {
@@ -69,7 +78,7 @@ class ReminderScheduler(private val context: Context) {
                 snoozedUntilMs = triggerAtMs,
             ),
         )
-        if (isTask || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms())) {
+        if (shouldUseAlarmClock(isTask, canScheduleExactAlarms())) {
             alarmManager.setAlarmClock(
                 AlarmManager.AlarmClockInfo(triggerAtMs, viewReminderPendingIntent(eventId, isTask)),
                 pendingIntent,
@@ -283,7 +292,7 @@ class ReminderScheduler(private val context: Context) {
 
     private fun notificationSettings(): ReminderNotificationSettings = runBlocking {
         val preferences = appContext.calendarPreferencesDataStore.data.first()
-        ReminderNotificationSettings.from(preferences)
+        ReminderNotificationSettings.from(preferences, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
     }
 
     private fun scheduleRepeat(
@@ -307,12 +316,19 @@ class ReminderScheduler(private val context: Context) {
                 eventStartTimeMs = eventStartTimeMs,
             ),
         )
-        alarmManager.setExactAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            System.currentTimeMillis() + repeatMinutes * 60_000L,
-            pendingIntent,
-        )
+        val triggerAtMs = System.currentTimeMillis() + repeatMinutes * 60_000L
+        if (shouldUseAlarmClock(isTask, canScheduleExactAlarms())) {
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerAtMs, viewReminderPendingIntent(eventId, isTask)),
+                pendingIntent,
+            )
+        } else {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
+        }
     }
+
+    private fun canScheduleExactAlarms(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
 
     fun cancelRepeat(alarmRequestCode: Int) {
         val requestCode = ReminderNotificationActions.repeatAlarmRequestCode(alarmRequestCode)
@@ -439,11 +455,11 @@ class ReminderScheduler(private val context: Context) {
         return appContext.getString(R.string.notification_snoozed_until, formattedTime)
         }
         return when (minutesBefore) {
-            0 -> "Starting now"
-            1 -> "Starts in 1 minute"
-            60 -> "Starts in 1 hour"
-            1440 -> "Starts in 1 day"
-            else -> "Starts in $minutesBefore minutes"
+            0 -> appContext.getString(R.string.notification_starting_now)
+            1 -> appContext.getString(R.string.notification_starts_in_minute)
+            60 -> appContext.getString(R.string.notification_starts_in_hour)
+            1440 -> appContext.getString(R.string.notification_starts_in_day)
+            else -> appContext.getString(R.string.notification_starts_in_minutes, minutesBefore)
         }
     }
 
@@ -457,7 +473,10 @@ class ReminderScheduler(private val context: Context) {
     }
 }
 
-private data class ReminderNotificationSettings(
+internal fun shouldUseAlarmClock(isTask: Boolean, canScheduleExactAlarms: Boolean): Boolean =
+    isTask || !canScheduleExactAlarms
+
+internal data class ReminderNotificationSettings(
     val soundUri: Uri?,
     val repeatEnabled: Boolean,
     val repeatMinutes: Int,
@@ -468,16 +487,24 @@ private data class ReminderNotificationSettings(
         get() = "dotcal_reminders_${listOf(soundUri?.toString().orEmpty(), vibrationEnabled).hashCode()}"
 
     companion object {
-        fun from(preferences: androidx.datastore.preferences.core.Preferences): ReminderNotificationSettings {
-            val sound = preferences[CalendarPreferences.KEY_REMINDER_SOUND_URI]
-                ?.takeIf(String::isNotBlank)
-                ?.let(Uri::parse)
+        internal fun from(
+            preferences: androidx.datastore.preferences.core.Preferences,
+            defaultSoundUri: Uri? = null,
+        ): ReminderNotificationSettings {
+            val isPro = preferences[CalendarPreferences.KEY_IS_PRO] ?: false
+            val storedSound = preferences[CalendarPreferences.KEY_REMINDER_SOUND_URI]
+            val sound = when {
+                !isPro -> defaultSoundUri
+                storedSound == ReminderNotificationActions.SILENT_SOUND_VALUE -> null
+                storedSound.isNullOrBlank() -> defaultSoundUri
+                else -> Uri.parse(storedSound)
+            }
             return ReminderNotificationSettings(
-                soundUri = sound ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
-                repeatEnabled = preferences[CalendarPreferences.KEY_REMINDER_REPEAT_ENABLED] ?: false,
+                soundUri = sound,
+                repeatEnabled = isPro && (preferences[CalendarPreferences.KEY_REMINDER_REPEAT_ENABLED] ?: false),
                 repeatMinutes = (preferences[CalendarPreferences.KEY_REMINDER_REPEAT_MINUTES] ?: 5).coerceIn(5, 60),
-                vibrationEnabled = preferences[CalendarPreferences.KEY_REMINDER_VIBRATION_ENABLED] ?: true,
-                fullScreenEnabled = preferences[CalendarPreferences.KEY_REMINDER_FULL_SCREEN_ENABLED] ?: false,
+                vibrationEnabled = if (isPro) preferences[CalendarPreferences.KEY_REMINDER_VIBRATION_ENABLED] ?: true else true,
+                fullScreenEnabled = isPro && (preferences[CalendarPreferences.KEY_REMINDER_FULL_SCREEN_ENABLED] ?: false),
             )
         }
     }

@@ -33,6 +33,7 @@ import com.dotfield.dotcal.data.provider.providerRdateStartTimes
 import com.dotfield.dotcal.data.provider.providerReminderAlarmRequestCode
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource.Companion.BIRTHDAY_BASE_YEAR
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
+import com.dotfield.dotcal.data.recurrence.planNextReminder
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.profiles.FocusProfileStore
 import com.dotfield.dotcal.data.scheduling.BusyPeriod
@@ -848,11 +849,37 @@ class DotCalRepository(
     }
 
     suspend fun rescheduleFutureReminders() {
-        dao.getFutureUndeliveredReminders(System.currentTimeMillis()).forEach { reminder ->
+        val nowMs = System.currentTimeMillis()
+        val providerRdates = sideStore.readNamespace(EventSideStoreNamespaces.ProviderRdates)
+        dao.getUndeliveredReminders().forEach { reminder ->
             dao.getEvent(reminder.eventId)?.let { event ->
-                reminderScheduler.scheduleReminder(reminder, event)
+                event.providerRdate = providerRdates[event.baseEventId()]
+                val plan = planNextReminder(event, reminder.minutesBefore, nowMs)
+                if (plan == null) {
+                    dao.markReminderDelivered(reminder.alarmRequestCode)
+                } else {
+                    val updated = reminder.copy(triggerAtMs = plan.triggerAtMs, isDelivered = 0)
+                    if (updated.triggerAtMs != reminder.triggerAtMs) {
+                        dao.rescheduleReminder(reminder.id, updated.triggerAtMs)
+                    }
+                    reminderScheduler.scheduleReminder(updated, event, plan.occurrenceStartMs)
+                }
             }
         }
+    }
+
+    suspend fun rescheduleRecurringReminder(
+        reminder: EventReminder,
+        event: CalendarEvent,
+        currentOccurrenceStartMs: Long,
+    ): Boolean {
+        event.providerRdate = sideStore.read(EventSideStoreNamespaces.ProviderRdates, event.baseEventId())
+        if (event.rrule.isNullOrBlank() && event.providerRdate.isNullOrBlank()) return false
+        val plan = planNextReminder(event, reminder.minutesBefore, maxOf(System.currentTimeMillis(), currentOccurrenceStartMs))
+            ?: return false
+        dao.rescheduleReminder(reminder.id, plan.triggerAtMs)
+        reminderScheduler.scheduleReminder(reminder.copy(triggerAtMs = plan.triggerAtMs), event, plan.occurrenceStartMs)
+        return true
     }
 
     suspend fun ensureLocalAccount() {
@@ -2158,7 +2185,11 @@ class DotCalRepository(
     }
 
     private suspend fun CalendarEvent.withGhostFlag(): CalendarEvent {
-        return also { it.isGhost = sideStore.read(GHOST_FLAGS_NAMESPACE, baseEventId()) == "1" }
+        return also {
+            val baseId = baseEventId()
+            it.isGhost = sideStore.read(GHOST_FLAGS_NAMESPACE, baseId) == "1"
+            it.providerRdate = sideStore.read(EventSideStoreNamespaces.ProviderRdates, baseId)
+        }
     }
 
     private suspend fun List<CalendarEvent>.withGhostFlags(): List<CalendarEvent> {

@@ -61,7 +61,13 @@ class WidgetUpdateWorker(
             widgetClass: Class<out GlanceAppWidget>,
             legacyKind: LegacyWidgetKind,
         ) {
-            GlanceAppWidgetManager(context).getGlanceIds(widgetClass).forEach { glanceId ->
+            val manager = GlanceAppWidgetManager(context)
+            manager.getGlanceIds(widgetClass).forEach { glanceId ->
+                registerConfiguredWidget(
+                    context,
+                    receiverClassNameForWidgetKind(legacyKind),
+                    manager.getAppWidgetId(glanceId),
+                )
                 syncDotCalWidgetState(context, glanceId, legacyKind)
                 widget.update(context, glanceId)
             }

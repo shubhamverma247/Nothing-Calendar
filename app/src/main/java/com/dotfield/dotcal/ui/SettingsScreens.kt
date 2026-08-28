@@ -12,6 +12,7 @@ import android.graphics.Typeface
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.media.RingtoneManager
+import com.dotfield.dotcal.reminders.ReminderNotificationActions
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -2406,7 +2407,7 @@ private fun SettingsReminderSoundRow(
                     data.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
                 }
             }
-            onSelected(picked?.toString().orEmpty())
+            onSelected(picked?.toString() ?: ReminderNotificationActions.SILENT_SOUND_VALUE)
         }
     }
     Row(
@@ -2420,7 +2421,9 @@ private fun SettingsReminderSoundRow(
                         putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "DotCal reminder sound")
                         putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
                         putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
-                        if (soundUri.isNotBlank()) putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(soundUri))
+                        if (soundUri.isNotBlank() && soundUri != ReminderNotificationActions.SILENT_SOUND_VALUE) {
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(soundUri))
+                        }
                     })
                 }
             },
@@ -2436,7 +2439,14 @@ private fun SettingsReminderSoundRow(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                stringResource(if (soundUri.isBlank()) R.string.settings_reminder_sound_default else R.string.settings_reminder_sound_custom),
+                stringResource(
+                    when {
+                        !isPro -> R.string.settings_reminder_sound_default
+                        soundUri == ReminderNotificationActions.SILENT_SOUND_VALUE -> R.string.settings_reminder_sound_silent
+                        soundUri.isBlank() -> R.string.settings_reminder_sound_default
+                        else -> R.string.settings_reminder_sound_custom
+                    },
+                ),
                 color = palette.secondaryText,
                 fontFamily = mono,
                 fontSize = 14.sp,

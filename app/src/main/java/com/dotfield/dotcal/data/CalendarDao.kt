@@ -141,6 +141,12 @@ interface CalendarDao {
     )
     suspend fun getFutureUndeliveredReminders(nowMs: Long): List<EventReminder>
 
+    @Query("SELECT * FROM event_reminders WHERE isDelivered = 0 ORDER BY triggerAtMs ASC")
+    suspend fun getUndeliveredReminders(): List<EventReminder>
+
+    @Query("UPDATE event_reminders SET triggerAtMs = :triggerAtMs, isDelivered = 0 WHERE id = :reminderId")
+    suspend fun rescheduleReminder(reminderId: Long, triggerAtMs: Long)
+
     @Query(
         """
         SELECT calendar_events.* FROM calendar_events
@@ -162,12 +168,13 @@ interface CalendarDao {
         SELECT * FROM calendar_events
         WHERE isTask = 1
         AND isCompleted = 0
+        AND (:accountId IS NULL OR accountId = :accountId)
         AND startTimeMs > 0
         AND startTimeMs < :rangeEndMs
         ORDER BY startTimeMs ASC
         """,
     )
-    suspend fun getOpenTasksForWidget(rangeEndMs: Long): List<CalendarEvent>
+    suspend fun getOpenTasksForWidget(rangeEndMs: Long, accountId: String?): List<CalendarEvent>
 
     @Query(
         """

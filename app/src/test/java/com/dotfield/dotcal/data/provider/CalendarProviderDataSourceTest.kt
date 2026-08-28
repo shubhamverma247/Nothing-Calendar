@@ -135,6 +135,21 @@ class CalendarProviderDataSourceTest {
     }
 
     @Test
+    fun allDayBoundaryConversionPreservesCalendarDateAcrossTimezones() {
+        val utcBoundary = LocalDate.of(2026, 8, 22).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val localBoundary = convertAllDayBoundary(utcBoundary, ZoneOffset.UTC, ZoneId.of("America/Los_Angeles"))
+
+        assertEquals(
+            LocalDate.of(2026, 8, 22).atStartOfDay(ZoneId.of("America/Los_Angeles")).toInstant().toEpochMilli(),
+            localBoundary,
+        )
+        assertEquals(
+            utcBoundary,
+            convertAllDayBoundary(localBoundary, ZoneId.of("America/Los_Angeles"), ZoneOffset.UTC),
+        )
+    }
+
+    @Test
     fun providerReminderAlarmRequestCodeIsStableForEventAndMinutes() {
         assertEquals(
             providerReminderAlarmRequestCode("event-1", 15),

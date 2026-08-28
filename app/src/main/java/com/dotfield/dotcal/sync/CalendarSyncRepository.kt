@@ -7,6 +7,7 @@ import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.data.provider.providerAvailabilityIsNonBlocking
 import com.dotfield.dotcal.data.provider.providerReminderAlarmRequestCode
+import com.dotfield.dotcal.data.recurrence.planNextReminder
 import com.dotfield.dotcal.data.provider.providerStatusIsCancelled
 import com.dotfield.dotcal.data.sidestore.EventSideStoreNamespaces
 import com.dotfield.dotcal.data.sidestore.SharedSideStore
@@ -139,11 +140,13 @@ class CalendarSyncRepository(
     }
 
     private fun List<Int>.toEventReminders(event: CalendarEvent): List<EventReminder> {
+        val nowMs = System.currentTimeMillis()
         return distinct().filter { it >= 0 }.sorted().map { minutes ->
+            val plan = planNextReminder(event, minutes, nowMs)
             EventReminder(
                 eventId = event.id,
                 minutesBefore = minutes,
-                triggerAtMs = event.startTimeMs - minutes * 60_000L,
+                triggerAtMs = plan?.triggerAtMs ?: event.startTimeMs - minutes * 60_000L,
                 alarmRequestCode = providerReminderAlarmRequestCode(event.id, minutes),
             )
         }

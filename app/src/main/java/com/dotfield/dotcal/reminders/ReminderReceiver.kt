@@ -8,6 +8,9 @@ import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import com.dotfield.dotcal.DotCalApplication
 import com.dotfield.dotcal.MainActivity
+import com.dotfield.dotcal.data.CalendarEvent
+import com.dotfield.dotcal.data.baseEventId
+import com.dotfield.dotcal.data.recurrenceOccurrenceId
 import com.dotfield.dotcal.glyph.DotCalGlyphBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,21 +59,46 @@ class ReminderReceiver : BroadcastReceiver() {
                 when (intent.action) {
                     ACTION_UPDATE_LIVE_PROGRESS -> scheduler.updateLiveProgress(intent)
                     ACTION_SHOW_REMINDER -> {
-                        eventId?.let { DotCalGlyphBridge.reminderExpired(context, it) }
                         if (showedFromPayload) {
-                            repository.markReminderDelivered(alarmRequestCode)
+                            val reminder = repository.getReminderByRequestCode(alarmRequestCode)
+                            val event = eventId?.let { repository.getEvent(it) }
+                            eventId?.let {
+                                DotCalGlyphBridge.reminderExpired(
+                                    context,
+                                    reminderGlyphEventId(event, it, eventStartTimeMs),
+                                )
+                            }
+                            val rescheduled = if (reminder != null && event != null) {
+                                repository.rescheduleRecurringReminder(reminder, event, eventStartTimeMs)
+                            } else {
+                                false
+                            }
+                            if (!rescheduled) repository.markReminderDelivered(alarmRequestCode)
                             return@runCatching
                         }
                         val reminder = repository.getReminderByRequestCode(alarmRequestCode)
                         val targetEventId = eventId ?: reminder?.eventId
                         val event = targetEventId?.let { repository.getEvent(it) }
                         if (event != null && reminder != null) {
+                            DotCalGlyphBridge.reminderExpired(
+                                context,
+                                reminderGlyphEventId(
+                                    event,
+                                    targetEventId,
+                                    reminder.triggerAtMs + reminder.minutesBefore * 60_000L,
+                                ),
+                            )
                             scheduler.showReminderNotification(event, reminder)
-                            repository.markReminderDelivered(alarmRequestCode)
+                            val rescheduled = repository.rescheduleRecurringReminder(reminder, event, reminder.triggerAtMs + reminder.minutesBefore * 60_000L)
+                            if (!rescheduled) repository.markReminderDelivered(alarmRequestCode)
                             return@runCatching
                         }
                         if (targetEventId != null && !fallbackTitle.isNullOrBlank() && fallbackMinutes != Int.MIN_VALUE) {
                             Log.w(TAG, "Reminder using alarm payload fallback for requestCode=$alarmRequestCode")
+                            DotCalGlyphBridge.reminderExpired(
+                                context,
+                                reminderGlyphEventId(event, targetEventId, eventStartTimeMs),
+                            )
                             scheduler.showReminderNotification(
                                 eventId = targetEventId,
                                 eventTitle = fallbackTitle,
@@ -102,7 +130,17 @@ class ReminderReceiver : BroadcastReceiver() {
                             snoozeMinutes = snoozeMinutes,
                             isTask = event?.isTask == 1 || fallbackIsTask,
                         )
-                        DotCalGlyphBridge.eventSnoozed(context, targetEventId, snoozeAtMs)
+                        DotCalGlyphBridge.eventSnoozed(
+                            context,
+                            reminderGlyphEventId(
+                                event,
+                                targetEventId,
+                                eventStartTimeMs.takeIf { it > 0L }
+                                    ?: reminder?.let { it.triggerAtMs + it.minutesBefore * 60_000L }
+                                    ?: 0L,
+                            ),
+                            snoozeAtMs,
+                        )
                     }
                     ACTION_COMPLETE_TASK_REMINDER -> {
                         scheduler.cancelLiveProgress(alarmRequestCode)
@@ -112,7 +150,18 @@ class ReminderReceiver : BroadcastReceiver() {
                         val task = repository.getEvent(targetEventId)
                         if (task?.isTask == 1) {
                             repository.setTaskCompleted(task, completed = true)
-                            DotCalGlyphBridge.taskCompleted(context, targetEventId)
+                            DotCalGlyphBridge.taskCompleted(
+                                context,
+                                reminderGlyphEventId(
+                                    task,
+                                    targetEventId,
+                                    eventStartTimeMs.takeIf { it > 0L }
+                                        ?: repository.getReminderByRequestCode(alarmRequestCode)?.let {
+                                            it.triggerAtMs + it.minutesBefore * 60_000L
+                                        }
+                                        ?: 0L,
+                                ),
+                            )
                         } else {
                             Log.w(TAG, "Complete task ignored: missing task for requestCode=$alarmRequestCode")
                         }
@@ -126,9 +175,17 @@ class ReminderReceiver : BroadcastReceiver() {
                         scheduler.cancelLiveProgress(alarmRequestCode)
                         scheduler.cancelRepeat(alarmRequestCode)
                         NotificationManagerCompat.from(context).cancel(alarmRequestCode)
+                        val reminder = repository.getReminderByRequestCode(alarmRequestCode)
+                        val targetEventId = eventId ?: reminder?.eventId
+                        if (targetEventId.isNullOrBlank()) {
+                            Log.w(TAG, "Open reminder ignored: missing event for requestCode=$alarmRequestCode")
+                            return@runCatching
+                        }
+                        val event = repository.getEvent(targetEventId)
+                        val targetIsTask = event?.isTask == 1 || (event == null && fallbackIsTask)
                         val openIntent = Intent(context, MainActivity::class.java).apply {
                             action = Intent.ACTION_VIEW
-                            data = Uri.parse(if (fallbackIsTask) "dotcal://task/$eventId" else "dotcal://event/$eventId")
+                            data = Uri.parse(if (targetIsTask) "dotcal://task/$targetEventId" else "dotcal://event/$targetEventId")
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                         }
                         context.startActivity(openIntent)
@@ -159,4 +216,10 @@ class ReminderReceiver : BroadcastReceiver() {
         const val EXTRA_SNOOZED_UNTIL_MS = "extra_snoozed_until_ms"
         private const val DEFAULT_SNOOZE_MINUTES = 15
     }
+}
+
+internal fun reminderGlyphEventId(event: CalendarEvent?, fallbackEventId: String, occurrenceStartMs: Long): String {
+    if (event == null || occurrenceStartMs <= 0L) return fallbackEventId
+    val isRecurring = !event.rrule.isNullOrBlank() || !event.providerRdate.isNullOrBlank()
+    return if (isRecurring) recurrenceOccurrenceId(event.baseEventId(), occurrenceStartMs) else fallbackEventId
 }
