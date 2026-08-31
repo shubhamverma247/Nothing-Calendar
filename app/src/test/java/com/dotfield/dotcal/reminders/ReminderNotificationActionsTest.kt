@@ -1,11 +1,21 @@
 package com.dotfield.dotcal.reminders
 
+import android.content.Intent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertArrayEquals
 import org.junit.Test
 
 class ReminderNotificationActionsTest {
+    @Test
+    fun fullScreenReminderUsesActivityTaskLaunchFlags() {
+        val flags = ReminderNotificationActions.fullScreenIntentFlags()
+
+        assertEquals(Intent.FLAG_ACTIVITY_NEW_TASK, flags and Intent.FLAG_ACTIVITY_NEW_TASK)
+        assertEquals(Intent.FLAG_ACTIVITY_CLEAR_TOP, flags and Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        assertEquals(Intent.FLAG_ACTIVITY_SINGLE_TOP, flags and Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    }
+
     @Test
     fun eventNotificationsUseOneSnoozePickerAction() {
         assertEquals(

@@ -469,6 +469,8 @@ class ReminderScheduler(private val context: Context) {
         val intent = Intent(appContext, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             data = Uri.parse(ReminderNotificationActions.reminderDeepLink(eventId, isTask))
+            flags = ReminderNotificationActions.fullScreenIntentFlags()
+            putExtra(ReminderNotificationActions.EXTRA_FULL_SCREEN_REMINDER, true)
         }
         return PendingIntent.getActivity(
             appContext,

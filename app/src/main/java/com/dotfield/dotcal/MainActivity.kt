@@ -20,6 +20,7 @@ import com.dotfield.dotcal.prefs.AppLanguage
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.reminders.ReminderReceiver
+import com.dotfield.dotcal.reminders.ReminderNotificationActions
 import com.dotfield.dotcal.ui.DotCalApp
 import com.dotfield.dotcal.ui.DotCalViewModel
 import com.dotfield.dotcal.ui.theme.DotCalTheme
@@ -102,6 +103,7 @@ class MainActivity : ComponentActivity() {
             },
         )
         super.onCreate(savedInstanceState)
+        configureReminderWindow(intent)
         clearOpenedReminder(intent)
         deepLinkTarget.value = intent.dotCalDeepLinkTarget()
         lifecycleScope.launch {
@@ -136,8 +138,15 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        configureReminderWindow(intent)
         clearOpenedReminder(intent)
         deepLinkTarget.value = intent.dotCalDeepLinkTarget()
+    }
+
+    private fun configureReminderWindow(intent: android.content.Intent) {
+        if (!intent.getBooleanExtra(ReminderNotificationActions.EXTRA_FULL_SCREEN_REMINDER, false)) return
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
     }
 
     private fun clearOpenedReminder(intent: android.content.Intent) {

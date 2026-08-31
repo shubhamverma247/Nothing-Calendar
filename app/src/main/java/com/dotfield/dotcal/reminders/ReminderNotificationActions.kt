@@ -1,9 +1,15 @@
 package com.dotfield.dotcal.reminders
 
+import android.content.Intent
+
 internal object ReminderNotificationActions {
     const val SILENT_SOUND_VALUE = "__silent__"
+    const val EXTRA_FULL_SCREEN_REMINDER = "com.dotfield.dotcal.extra.FULL_SCREEN_REMINDER"
     val SnoozeMinutes = listOf(5, 15, 30)
     val SnoozePickerMinutes = listOf(5, 10, 15, 30, 60)
+
+    fun fullScreenIntentFlags(): Int =
+        Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
 
     fun snoozeDelayMs(minutes: Int): Long = minutes * 60_000L
 

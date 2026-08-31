@@ -15,9 +15,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   progress. Continue one manual test at a time and wait for feedback before diagnosing or changing
   anything else.
 - Snooze Picker overlap fix verified manually on device in commit `2ff91cb`.
-- Latest pushed feature commit: `a42cb2b fix(widget): render full resized month agenda`.
-  This handoff update is the follow-up documentation change. Protected screenshots and `.claude/`
-  remain untracked and untouched.
+- Latest pushed commit: see latest git history; keep remote synchronized after approved commits.
+  Protected screenshots and `.claude/` remain untracked and untouched.
 - Latest pushed commit before current local widget work: `2b61b79 feat(widgets): start unified widget configuration`.
 - Local release target: `versionCode 36`, `versionName 1.4.0`.
 - Latest debug APK was installed successfully on device `000153573000720` (Nothing Phone (3),
@@ -283,6 +282,12 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - Snooze Picker now keeps a fixed 480dp options pane while switching `For` / `Until` tabs, so
     the dialog does not resize as tab content changes.
   - Matrix Glyph Toy remains optional fallback for supported Nothing devices.
+- Full-screen reminder alert fix completed:
+  - Full-screen reminder PendingIntents carry an explicit marker and stable activity launch flags.
+  - `MainActivity` applies `setShowWhenLocked(true)` and `setTurnScreenOn(true)` only for reminder
+    launches, preserving normal calendar launches.
+  - Regression coverage added for full-screen activity launch flags.
+  - Unit tests, debug assemble, lint, APK install, and locked-device retest passed.
 
 ## Verification Baseline
 
@@ -315,7 +320,14 @@ After next debug install, prioritize:
 - Reminder vibration: PASS after enabling device notification vibration. Fixed double-pulse pattern
   works on fresh reminder delivery.
 - Reminder sound: PASS. `Custom` row shown; selected tone played; vibration behavior unchanged.
-- Next single manual test: enable `Repeat until dismissed`, set `Repeat interval` to `5 min`, then
+- Full-screen reminder alert: PASS on device `000153573000720` after the lock-screen activity fix.
+  Event detail opens full-screen while phone is locked; notification and full-screen intent
+  permissions are granted. Snooze from lock screen may still request unlock by Android security.
+- Next single manual test: turn full-screen alert OFF, create a disposable event starting about
+  3 minutes from now with a `1 min before` reminder, then expand its standard notification.
+  Expected: one notification; title and reminder text fully visible; no clipping/overlap; reminder
+  action layout readable. Wait for feedback before testing another path.
+- Previous repeat test: enable `Repeat until dismissed`, set `Repeat interval` to `5 min`, then
   create a disposable event starting 7 minutes from now with its reminder set to `5 min before`.
   Expected: first reminder arrives about 2 minutes from now; untouched notification repeats about
   5 minutes later; dismissing it prevents another repeat. Wait for feedback before testing
