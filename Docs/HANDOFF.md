@@ -14,9 +14,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Current user-reported QA focus is reminder notification behavior and Nothing Phone (3) Glyph
   progress. Continue one manual test at a time and wait for feedback before diagnosing or changing
   anything else.
-- Local QA fix pending manual retest: Snooze Picker options are now vertically contained inside the
-  fixed pane instead of overlapping at one position when `For` / `Until` content renders.
-- Current pushed commit: `231f2af fix(reminders): stabilize notification and snooze flows`; remote
+- Snooze Picker overlap fix verified manually on device in commit `2ff91cb`.
+- Current pushed commit: `2ff91cb fix(reminders): prevent snooze option overlap`; remote
   `origin/main` is synchronized. Protected screenshots and `.claude/` remain untracked and untouched.
 - Latest pushed commit before current local widget work: `2b61b79 feat(widgets): start unified widget configuration`.
 - Local release target: `versionCode 36`, `versionName 1.4.0`.
@@ -301,11 +300,12 @@ local app data.
 After next debug install, prioritize:
 
 - Glyph Progress retest: PASS on device `000153573000720`.
-- Next single manual test: open Snooze from a fresh reminder and switch `For` / `Until` tabs.
-  Local fix is installed after the confirmed overlap report. Expected: each tab shows only its own
-  options vertically; content changes but dialog height and position remain stable. Wait for
-  feedback before testing Reminder Defaults scrolling, vibration, custom sound, repeat, full-screen
-  behavior, or notification layout.
+- Snooze Picker `For` / `Until` retest: PASS. Options show vertically; dialog height and position
+  remain stable.
+- Next single manual test: open `Settings > Reminder Defaults` and scroll the page from top to
+  bottom and back. Expected: all reminder controls remain reachable, no header/content overlap or
+  clipping occurs, and DotCal theme remains unchanged. Wait for feedback before testing vibration,
+  custom sound, repeat, full-screen behavior, or notification layout.
 
 - Open phone widget picker.
   - Expected: 7 entries visible: `DC 1x1 Date`, `DC 2x2 Event`, `DC 4x2 Agenda`,
