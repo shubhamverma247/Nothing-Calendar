@@ -15,8 +15,9 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   progress. Continue one manual test at a time and wait for feedback before diagnosing or changing
   anything else.
 - Snooze Picker overlap fix verified manually on device in commit `2ff91cb`.
-- Current pushed commit: `6f1572d docs: update reminder QA handoff`; remote
-  `origin/main` is synchronized. Protected screenshots and `.claude/` remain untracked and untouched.
+- Latest pushed feature commit: `a42cb2b fix(widget): render full resized month agenda`.
+  This handoff update is the follow-up documentation change. Protected screenshots and `.claude/`
+  remain untracked and untouched.
 - Latest pushed commit before current local widget work: `2b61b79 feat(widgets): start unified widget configuration`.
 - Local release target: `versionCode 36`, `versionName 1.4.0`.
 - Latest debug APK was installed successfully on device `000153573000720` (Nothing Phone (3),
@@ -65,8 +66,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - 3. Track the whole-day one-day-early report as the next sync/timezone bug to reproduce with device and timezone details.
 - 4. Add a faster edit action in the event detail flow if it fits the current UI pattern.
 - 5. Play Console shows an R8 / optimized resource shrinking warning. Keep it on the release hygiene list for the AGP upgrade path.
-- 6. After manual QA, review customer request for responsive widget agenda density: use available
-  resized widget height instead of leaving unused lower space. No implementation committed yet.
+- 6. Continue reminder notification QA one manual test at a time; wait for feedback before the next
+  test or any further change.
 
 ## Billing Products
 
@@ -179,6 +180,12 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Month-grid `4x4` calendar agenda keeps its grid readable, loads up to 20 agenda events, then
   uses available resized height for additional agenda rows; large month providers use exact
   Glance sizing and show `+X MORE` for overflow.
+  - Root cause of the prior repeated truncation: Glance limits a `Column` to 10 direct children;
+    17 agenda rows were being truncated by the Glance RemoteViews translator.
+  - Fixed by grouping agenda rows into nested columns of at most 9 rows, preserving room for all
+    loaded rows and the overflow indicator without violating the Glance child limit.
+  - Regression tests cover 17/20-row grouping and resized visible-row calculations.
+  - Manually verified after debug APK install on device `000153573000720`.
   - Added Quick Actions deep links and config options for Quick Add, Add Task, and Search:
     - `dotcal://quick-add`
     - `dotcal://task/new`
@@ -210,10 +217,10 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug`
     passed.
   - Latest widget verification:
-    `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest --tests com.dotfield.dotcal.widget.WidgetInstanceConfigTest :app:assembleDebug`
+    `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest --tests com.dotfield.dotcal.widget.WidgetResponsiveSizeTest --tests com.dotfield.dotcal.widget.WidgetInstanceConfigTest :app:assembleDebug`
     passed.
     `git diff --check` passed with CRLF warnings only.
-  - Latest local install succeeded on device `4ab0d020`:
+  - Latest local install succeeded on device `000153573000720`:
     `C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk`.
 - Auto-Buffers foundation completed:
   - Global before/after meeting buffers persist in DataStore; no Room schema change.
@@ -327,8 +334,10 @@ After next debug install, prioritize:
   - Expected: date badge at left; first event dominant; up to two compact rows; no clipping.
 - Add `4x4` Schedule widget with `Next 14 Days`.
   - Expected: `SCHEDULE / NEXT 14 DAYS` header; up to four rows; `+X MORE` when needed.
-- Add `4x4` Calendar widget.
-  - Expected: month grid readable; short agenda only; no overflow below grid.
+- Add `4x4` Calendar widget and resize it vertically.
+  - PASS on device `000153573000720`.
+  - Expected: month grid remains readable; agenda uses available height; 17 events render without
+    Glance truncation; `+X MORE` appears only when the resized height cannot fit all events.
 - Configure Quick Actions for Quick Add, Add Task, and Search.
   - Expected: each tap opens the matching app screen, not a fallback calendar screen.
 - DotCal reminder -> Google reminder.
