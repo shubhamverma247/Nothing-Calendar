@@ -15,7 +15,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   progress. Continue one manual test at a time and wait for feedback before diagnosing or changing
   anything else.
 - Snooze Picker overlap fix verified manually on device in commit `2ff91cb`.
-- Current pushed commit: `2ff91cb fix(reminders): prevent snooze option overlap`; remote
+- Current pushed commit: `6f1572d docs: update reminder QA handoff`; remote
   `origin/main` is synchronized. Protected screenshots and `.claude/` remain untracked and untouched.
 - Latest pushed commit before current local widget work: `2b61b79 feat(widgets): start unified widget configuration`.
 - Local release target: `versionCode 36`, `versionName 1.4.0`.
@@ -302,10 +302,13 @@ After next debug install, prioritize:
 - Glyph Progress retest: PASS on device `000153573000720`.
 - Snooze Picker `For` / `Until` retest: PASS. Options show vertically; dialog height and position
   remain stable.
-- Next single manual test: open `Settings > Reminder Defaults` and scroll the page from top to
-  bottom and back. Expected: all reminder controls remain reachable, no header/content overlap or
-  clipping occurs, and DotCal theme remains unchanged. Wait for feedback before testing vibration,
-  custom sound, repeat, full-screen behavior, or notification layout.
+- Reminder Defaults scrolling: PASS. Controls remain reachable; no header/content clipping.
+- Reminder vibration: PASS after enabling device notification vibration. Fixed double-pulse pattern
+  works on fresh reminder delivery.
+- Next single manual test: open `Settings > Reminder Defaults > Reminder sound`, choose a distinct
+  notification tone, then create a fresh reminder. Expected: row shows `Custom` and reminder plays
+  the selected tone; vibration behavior remains unchanged. Wait for feedback before testing repeat,
+  full-screen behavior, or notification layout.
 
 - Open phone widget picker.
   - Expected: 7 entries visible: `DC 1x1 Date`, `DC 2x2 Event`, `DC 4x2 Agenda`,
