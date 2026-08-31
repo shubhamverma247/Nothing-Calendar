@@ -14,8 +14,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Current user-reported QA focus is reminder notification behavior and Nothing Phone (3) Glyph
   progress. Continue one manual test at a time and wait for feedback before diagnosing or changing
   anything else.
-- User-provided baseline: branch `main`, HEAD `c23fd08`, remote synchronized. The current worktree
-  contains uncommitted reminder/settings fixes; preserve them and do not reset unrelated changes.
+- Current pushed commit: `231f2af fix(reminders): stabilize notification and snooze flows`; remote
+  `origin/main` is synchronized. Protected screenshots and `.claude/` remain untracked and untouched.
 - Latest pushed commit before current local widget work: `2b61b79 feat(widgets): start unified widget configuration`.
 - Local release target: `versionCode 36`, `versionName 1.4.0`.
 - Latest debug APK was installed successfully on device `000153573000720` (Nothing Phone (3),
@@ -298,13 +298,11 @@ local app data.
 
 After next debug install, prioritize:
 
-- Reminder/Glyph retest on device `000153573000720` (one test at a time): create a fresh event 5–8
-  minutes in the future with a reminder. When the notification appears, expect one DotCal
-  notification, forward non-flickering rear Glyph progress, and a tap opening Event Detail. Record
-  any remaining backward movement or speed difference versus BC2 before making another change.
-- After the Glyph result is recorded, separately test Reminder Defaults scrolling, vibration, custom
-  sound, snooze/custom snooze sheet placement, repeat, full-screen behavior, and notification action
-  layout. Do not combine these manual tests or infer an issue without feedback.
+- Glyph Progress retest: PASS on device `000153573000720`.
+- Next single manual test: open Snooze from a fresh reminder and switch `For` / `Until` tabs.
+  Expected: content changes but dialog height and position remain stable. Wait for feedback before
+  testing Reminder Defaults scrolling, vibration, custom sound, repeat, full-screen behavior, or
+  notification layout.
 
 - Open phone widget picker.
   - Expected: 7 entries visible: `DC 1x1 Date`, `DC 2x2 Event`, `DC 4x2 Agenda`,
