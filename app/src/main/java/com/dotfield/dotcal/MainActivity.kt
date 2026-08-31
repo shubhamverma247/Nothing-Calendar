@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import com.dotfield.dotcal.prefs.AppLanguage
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import com.dotfield.dotcal.reminders.ReminderReceiver
 import com.dotfield.dotcal.ui.DotCalApp
 import com.dotfield.dotcal.ui.DotCalViewModel
 import com.dotfield.dotcal.ui.theme.DotCalTheme
@@ -101,6 +102,7 @@ class MainActivity : ComponentActivity() {
             },
         )
         super.onCreate(savedInstanceState)
+        clearOpenedReminder(intent)
         deepLinkTarget.value = intent.dotCalDeepLinkTarget()
         lifecycleScope.launch {
             val storedTheme = runCatching { calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_THEME_MODE] }.getOrNull()
@@ -134,7 +136,18 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        clearOpenedReminder(intent)
         deepLinkTarget.value = intent.dotCalDeepLinkTarget()
+    }
+
+    private fun clearOpenedReminder(intent: android.content.Intent) {
+        if (!intent.getBooleanExtra(ReminderReceiver.EXTRA_CLEAR_REMINDER_ON_OPEN, false)) return
+        val alarmRequestCode = intent.getIntExtra(ReminderReceiver.EXTRA_ALARM_REQUEST_CODE, Int.MIN_VALUE)
+        if (alarmRequestCode == Int.MIN_VALUE) return
+        sendBroadcast(android.content.Intent(this, ReminderReceiver::class.java).apply {
+            action = ReminderReceiver.ACTION_DISMISS_REMINDER
+            putExtra(ReminderReceiver.EXTRA_ALARM_REQUEST_CODE, alarmRequestCode)
+        })
     }
 
     /**

@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-08-28
+Updated: 2026-08-31
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 `Docs/HANDOFF.original.md`. Do not touch `Docs/HANDOFF - Copy.md` or user-owned
@@ -11,8 +11,15 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Branch: `main`.
 - All work happens on `main`. Do not create or switch branches.
 - Do not commit or push unless the user explicitly asks.
+- Current user-reported QA focus is reminder notification behavior and Nothing Phone (3) Glyph
+  progress. Continue one manual test at a time and wait for feedback before diagnosing or changing
+  anything else.
+- User-provided baseline: branch `main`, HEAD `c23fd08`, remote synchronized. The current worktree
+  contains uncommitted reminder/settings fixes; preserve them and do not reset unrelated changes.
 - Latest pushed commit before current local widget work: `2b61b79 feat(widgets): start unified widget configuration`.
 - Local release target: `versionCode 36`, `versionName 1.4.0`.
+- Latest debug APK was installed successfully on device `000153573000720` (Nothing Phone (3),
+  Android 16/API 36) with `adb install -r`; app package is `com.dotfield.dotcal`.
 - Expected untracked user file: `Docs/FEEDBACK.md`; leave it untouched.
 
 ## Hard Rules
@@ -249,12 +256,22 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - Unsupported devices remain inert; no Room schema change.
   - Debug unit tests and APK assembly passed after integration.
 - Nothing Phone (3) Glyph Progress path added:
-  - BC2-style path uses a device-gated ongoing custom `RemoteViews` notification; no direct Glyph
-    SDK or Glyph enable step is required on NP3.
-  - `POST_PROMOTED_NOTIFICATIONS` is not needed and is not declared; normal `POST_NOTIFICATIONS`
-    remains required for reminder notifications.
-  - The custom notification updates its progress state every 60 seconds, matching BC2's observed
-    `AlarmManager` cadence; it does not show a notification chronometer timer.
+  - Investigation against the installed Nothing GlyphNotification APK and Business Calendar 2
+    showed that BC2's visible app notification is a single `BigTextStyle` notification. Its rear
+    Glyph progress is driven by Nothing's privileged CalendarProvider observer/native calendar
+    controller, not by two app notifications or a notification progress bar.
+  - DotCal local Room events do not create CalendarProvider rows, so exact BC2-native rear Glyph
+    animation/speed cannot be reproduced for those events through the public notification API.
+    Mirroring local events into CalendarProvider is intentionally not implemented: it could create
+    duplicates and would expand scope beyond the requested fix.
+  - DotCal's supported NP3 fallback uses one native Android `Notification.ProgressStyle`
+    notification, updated by a device-gated exact-alarm loop every 5 seconds. It keeps the normal
+    Snooze/Open/Complete actions and does not require Glyph Toy or a direct Glyph SDK.
+  - Current fixes cancel both current and legacy progress alarms, keep one notification id, prevent
+    repeat alarms from being rescheduled on every progress refresh, use a fresh notification channel
+    for sound/vibration settings, and add the centered compact Reminder Defaults header.
+  - Snooze Picker now keeps a fixed 480dp options pane while switching `For` / `Until` tabs, so
+    the dialog does not resize as tab content changes.
   - Matrix Glyph Toy remains optional fallback for supported Nothing devices.
 
 ## Verification Baseline
@@ -280,6 +297,14 @@ local app data.
 ## Manual QA Focus
 
 After next debug install, prioritize:
+
+- Reminder/Glyph retest on device `000153573000720` (one test at a time): create a fresh event 5–8
+  minutes in the future with a reminder. When the notification appears, expect one DotCal
+  notification, forward non-flickering rear Glyph progress, and a tap opening Event Detail. Record
+  any remaining backward movement or speed difference versus BC2 before making another change.
+- After the Glyph result is recorded, separately test Reminder Defaults scrolling, vibration, custom
+  sound, snooze/custom snooze sheet placement, repeat, full-screen behavior, and notification action
+  layout. Do not combine these manual tests or infer an issue without feedback.
 
 - Open phone widget picker.
   - Expected: 7 entries visible: `DC 1x1 Date`, `DC 2x2 Event`, `DC 4x2 Agenda`,

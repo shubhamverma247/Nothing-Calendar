@@ -13,6 +13,26 @@ internal object ReminderNotificationActions {
 
     fun canScheduleAt(triggerAtMs: Long, nowMs: Long): Boolean = triggerAtMs > nowMs
 
+    fun reminderDeepLink(eventId: String, isTask: Boolean): String =
+        "dotcal://${if (isTask) "task" else "event"}/$eventId"
+
+    fun vibrationPattern(): LongArray = longArrayOf(0, 250, 100, 250)
+
+    fun notificationId(alarmRequestCode: Int): Int = alarmRequestCode
+
+    fun liveProgressRequestCodes(alarmRequestCode: Int): List<Int> {
+        return listOf(
+            alarmRequestCode,
+            alarmRequestCode xor 0x6D6D6D6D,
+        ).distinct()
+    }
+
+    fun progressPercent(originMs: Long, targetMs: Long, nowMs: Long): Int {
+        if (targetMs <= originMs) return 100
+        val elapsed = (nowMs - originMs).coerceAtLeast(0L)
+        return ((elapsed * 100L) / (targetMs - originMs)).toInt().coerceIn(0, 100)
+    }
+
     fun snoozeRequestCode(alarmRequestCode: Int, minutes: Int): Int {
         return alarmRequestCode xor (0x5A5A0000 or minutes)
     }

@@ -135,6 +135,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -178,6 +179,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -2816,6 +2818,7 @@ internal fun DateTimeChoiceSheet(
     palette: DotCalPalette,
     onDismiss: () -> Unit,
     onSelected: (LocalDate, LocalTime) -> Unit,
+    dialogPresentation: Boolean = false,
 ) {
     val initialDate = maxOf(selectedDate, minDate ?: selectedDate)
     val dates = remember(initialDate, minDate) {
@@ -2829,13 +2832,7 @@ internal fun DateTimeChoiceSheet(
     var pickedMinute by remember { mutableStateOf(selectedTime.minute) }
     val dialogBackground = palette.dialogSurface
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = dialogBackground,
-        contentColor = palette.primaryText,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = { BottomSheetDragHandle(palette) },
-    ) {
+    val content: @Composable () -> Unit = {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2917,6 +2914,28 @@ internal fun DateTimeChoiceSheet(
                     Text(stringResource(R.string.action_ok), fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
+        }
+    }
+    if (dialogPresentation) {
+        Dialog(onDismissRequest = onDismiss) {
+            Surface(
+                modifier = Modifier.padding(horizontal = 16.dp).widthIn(max = 430.dp),
+                shape = RoundedCornerShape(28.dp),
+                color = dialogBackground,
+                contentColor = palette.primaryText,
+            ) {
+                content()
+            }
+        }
+    } else {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            containerColor = dialogBackground,
+            contentColor = palette.primaryText,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            dragHandle = { BottomSheetDragHandle(palette) },
+        ) {
+            content()
         }
     }
 }
@@ -3098,21 +3117,21 @@ internal fun ReminderChoiceSheet(
                 .background(palette.dialogSurface)
                 .padding(horizontal = 20.dp),
         ) {
+            Text(
+                stringResource(R.string.event_reminder),
+                color = palette.primaryText,
+                fontFamily = LocalHeadingFont.current,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 18.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 12.dp),
+            )
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 state = reminderListState,
             ) {
-                item {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        stringResource(R.string.event_reminder),
-                        color = palette.primaryText,
-                        fontFamily = LocalHeadingFont.current,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
                 if (selectedMinutes.isEmpty()) {
                     item {
                         Text(

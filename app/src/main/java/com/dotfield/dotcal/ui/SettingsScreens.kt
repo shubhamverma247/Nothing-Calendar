@@ -973,16 +973,20 @@ private fun ReminderDefaultsSettings(
     onReminderFullScreenEnabledChange: (Boolean) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
-        contentPadding = PaddingValues(bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        item {
-            SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_reminder_defaults))
-        }
-        item {
-            SettingsPanel(title = stringResource(R.string.settings_panel_defaults), palette = palette, framed = false) {
+    val listState = rememberLazyListState()
+    val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
+    Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(bottom = 120.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            item {
+                SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_reminder_defaults))
+            }
+            item {
+                SettingsPanel(title = stringResource(R.string.settings_panel_defaults), palette = palette, framed = false) {
                 SettingsDefaultReminderRow(
                     selectedMinutes = defaultReminderMinutes,
                     palette = palette,
@@ -1056,7 +1060,11 @@ private fun ReminderDefaultsSettings(
                     palette = palette,
                     onCheckedChange = onReminderFullScreenEnabledChange,
                 )
+                }
             }
+        }
+        if (showCompactHeader) {
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_reminder_defaults))
         }
     }
 }

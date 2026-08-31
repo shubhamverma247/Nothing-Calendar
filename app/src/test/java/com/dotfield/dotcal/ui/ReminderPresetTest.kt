@@ -8,7 +8,13 @@ import java.time.LocalDateTime
 class ReminderPresetTest {
     @Test
     fun eventReminderPresetsMatchCreationOptions() {
-        assertEquals(listOf(1440, 60, 30, 10), eventReminderPresets)
+        assertEquals(listOf(1440, 120, 60, 30, 15, 10, 5), eventReminderPresets)
+    }
+
+    @Test
+    fun defaultReminderOptionsIncludeCommonShortAndLongOffsets() {
+        assertEquals(listOf(null, 5, 10, 15, 30, 60, 120, 1440), reminderOptions)
+        assertEquals(listOf(null, 5, 10, 15, 30, 60, 120, 1440), taskReminderOptions)
     }
 
     @Test

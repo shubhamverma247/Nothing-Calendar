@@ -51,6 +51,21 @@ class ReminderReceiver : BroadcastReceiver() {
             }
         }
 
+        if (intent.action == ACTION_OPEN_REMINDER) {
+            val targetEventId = eventId
+            if (targetEventId.isNullOrBlank()) {
+                Log.w(TAG, "Open reminder ignored: missing event for requestCode=$alarmRequestCode")
+                return
+            }
+            context.startActivity(Intent(context, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                data = Uri.parse(ReminderNotificationActions.reminderDeepLink(targetEventId, fallbackIsTask))
+                // Reusing a singleTop activity can leave the already-composed calendar route
+                // visible on some Nothing OS builds even after onNewIntent updates the URI.
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            })
+        }
+
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
@@ -181,14 +196,6 @@ class ReminderReceiver : BroadcastReceiver() {
                             Log.w(TAG, "Open reminder ignored: missing event for requestCode=$alarmRequestCode")
                             return@runCatching
                         }
-                        val event = repository.getEvent(targetEventId)
-                        val targetIsTask = event?.isTask == 1 || (event == null && fallbackIsTask)
-                        val openIntent = Intent(context, MainActivity::class.java).apply {
-                            action = Intent.ACTION_VIEW
-                            data = Uri.parse(if (targetIsTask) "dotcal://task/$targetEventId" else "dotcal://event/$targetEventId")
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                        }
-                        context.startActivity(openIntent)
                     }
                 }
             }.onFailure { throwable ->
@@ -214,6 +221,7 @@ class ReminderReceiver : BroadcastReceiver() {
         const val EXTRA_IS_TASK = "extra_is_task"
         const val EXTRA_EVENT_START_TIME_MS = "extra_event_start_time_ms"
         const val EXTRA_SNOOZED_UNTIL_MS = "extra_snoozed_until_ms"
+        const val EXTRA_CLEAR_REMINDER_ON_OPEN = "extra_clear_reminder_on_open"
         private const val DEFAULT_SNOOZE_MINUTES = 15
     }
 }

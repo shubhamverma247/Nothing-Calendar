@@ -2,6 +2,7 @@ package com.dotfield.dotcal.reminders
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Test
 
 class ReminderNotificationActionsTest {
@@ -95,5 +96,41 @@ class ReminderNotificationActionsTest {
         assertEquals(first.size, first.toSet().size)
         assertEquals(second.size, second.toSet().size)
         assertEquals(emptySet<Int>(), first.toSet().intersect(second.toSet()))
+    }
+
+    @Test
+    fun reminderDeepLinksTargetEventOrTaskDetail() {
+        assertEquals("dotcal://event/event-1", ReminderNotificationActions.reminderDeepLink("event-1", isTask = false))
+        assertEquals("dotcal://task/task-1", ReminderNotificationActions.reminderDeepLink("task-1", isTask = true))
+    }
+
+    @Test
+    fun reminderVibrationPatternUsesTwoAlertPulses() {
+        assertArrayEquals(longArrayOf(0, 250, 100, 250), ReminderNotificationActions.vibrationPattern())
+    }
+
+    @Test
+    fun reminderAndGlyphProgressShareOneNotificationId() {
+        val alarmRequestCode = 1234
+
+        assertEquals(alarmRequestCode, ReminderNotificationActions.notificationId(alarmRequestCode))
+    }
+
+    @Test
+    fun liveProgressCancellationCoversCurrentAndLegacyRequestCodes() {
+        val alarmRequestCode = 1234
+
+        assertEquals(
+            listOf(alarmRequestCode, alarmRequestCode xor 0x6D6D6D6D),
+            ReminderNotificationActions.liveProgressRequestCodes(alarmRequestCode),
+        )
+    }
+
+    @Test
+    fun progressPercentIsClampedToTargetWindow() {
+        assertEquals(0, ReminderNotificationActions.progressPercent(1_000L, 2_000L, 500L))
+        assertEquals(50, ReminderNotificationActions.progressPercent(1_000L, 2_000L, 1_500L))
+        assertEquals(100, ReminderNotificationActions.progressPercent(1_000L, 2_000L, 2_500L))
+        assertEquals(100, ReminderNotificationActions.progressPercent(2_000L, 2_000L, 2_000L))
     }
 }

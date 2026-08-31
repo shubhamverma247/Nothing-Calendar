@@ -2,6 +2,7 @@ package com.dotfield.dotcal.reminders
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -12,18 +13,17 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.util.Log
-import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.dotfield.dotcal.MainActivity
 import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.CalendarEvent
-import com.nothing.ketchum.Common
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.recurrence.planNextReminder
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import com.nothing.ketchum.Common
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import java.text.DateFormat
@@ -115,6 +115,7 @@ class ReminderScheduler(private val context: Context) {
         eventStartTimeMs: Long = 0L,
         snoozedUntilMs: Long = 0L,
         progressOriginMs: Long = System.currentTimeMillis(),
+        scheduleRepeatAlarm: Boolean = true,
     ) {
         val settings = notificationSettings()
         ensureChannel(settings)
@@ -124,37 +125,9 @@ class ReminderScheduler(private val context: Context) {
             Log.w(TAG, "Reminder notification blocked: POST_NOTIFICATIONS not granted")
             return
         }
-        val builder = NotificationCompat.Builder(appContext, settings.channelId)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(eventTitle)
-            .setContentText(reminderText(minutesBefore, snoozedUntilMs))
-            .setContentIntent(openReminderPendingIntent(eventId, isTask, alarmRequestCode))
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setDeleteIntent(dismissPendingIntent(alarmRequestCode))
-            .setVibrate(if (settings.vibrationEnabled) longArrayOf(0, 250, 100, 250) else longArrayOf(0))
-            .setSound(settings.soundUri)
-        if (settings.fullScreenEnabled) {
-            builder.setFullScreenIntent(viewReminderPendingIntent(eventId, isTask), true)
-        }
-        if (useNothingLiveProgress()) {
-            val progressAtMs = if (snoozedUntilMs > 0L) snoozedUntilMs else eventStartTimeMs
-            val progress = progressPercent(progressOriginMs, progressAtMs)
-            val views = RemoteViews(appContext.packageName, R.layout.notification_ongoing).apply {
-                setTextViewText(R.id.notification_event_title, eventTitle)
-                setTextViewText(R.id.notification_event_time, reminderText(minutesBefore, snoozedUntilMs))
-                setProgressBar(R.id.notification_progress, 100, progress, false)
-            }
-            builder
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .setOnlyAlertOnce(true)
-                .setShowWhen(false)
-                .setCustomContentView(views)
-                .setCustomBigContentView(views)
-        }
-        if (settings.repeatEnabled) {
+        val useLiveProgress = useNothingLiveProgress()
+        val targetTimeMs = if (snoozedUntilMs > 0L) snoozedUntilMs else eventStartTimeMs
+        if (scheduleRepeatAlarm && settings.repeatEnabled) {
             scheduleRepeat(
                 eventId = eventId,
                 eventTitle = eventTitle,
@@ -164,6 +137,124 @@ class ReminderScheduler(private val context: Context) {
                 minutesBefore = minutesBefore,
                 repeatMinutes = settings.repeatMinutes,
             )
+        }
+        val notification = if (useLiveProgress && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            buildNothingProgressNotification(
+                settings = settings,
+                eventId = eventId,
+                eventTitle = eventTitle,
+                minutesBefore = minutesBefore,
+                alarmRequestCode = alarmRequestCode,
+                isTask = isTask,
+                eventStartTimeMs = eventStartTimeMs,
+                snoozedUntilMs = snoozedUntilMs,
+                progressOriginMs = progressOriginMs,
+                targetTimeMs = targetTimeMs,
+            )
+        } else {
+            buildStandardNotification(
+                settings = settings,
+                eventId = eventId,
+                eventTitle = eventTitle,
+                minutesBefore = minutesBefore,
+                alarmRequestCode = alarmRequestCode,
+                isTask = isTask,
+                eventStartTimeMs = eventStartTimeMs,
+                snoozedUntilMs = snoozedUntilMs,
+            )
+        }
+        NotificationManagerCompat.from(appContext).notify(ReminderNotificationActions.notificationId(alarmRequestCode), notification)
+        if (useLiveProgress) {
+            // Cancel alarms created by both the current and the pre-ProgressStyle
+            // implementations before scheduling the single active updater.
+            cancelLiveProgress(alarmRequestCode)
+            scheduleLiveProgress(
+                eventId = eventId,
+                eventTitle = eventTitle,
+                alarmRequestCode = alarmRequestCode,
+                isTask = isTask,
+                minutesBefore = minutesBefore,
+                eventStartTimeMs = eventStartTimeMs,
+                snoozedUntilMs = snoozedUntilMs,
+                targetTimeMs = targetTimeMs,
+                progressOriginMs = progressOriginMs,
+            )
+        }
+    }
+
+    private fun buildStandardNotification(
+        settings: ReminderNotificationSettings,
+        eventId: String,
+        eventTitle: String,
+        minutesBefore: Int,
+        alarmRequestCode: Int,
+        isTask: Boolean,
+        eventStartTimeMs: Long,
+        snoozedUntilMs: Long,
+    ): Notification {
+        val builder = NotificationCompat.Builder(appContext, settings.channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(eventTitle)
+            .setContentText(reminderText(minutesBefore, snoozedUntilMs))
+            .setContentIntent(openReminderPendingIntent(eventId, isTask, alarmRequestCode))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_EVENT)
+            .setDeleteIntent(dismissPendingIntent(alarmRequestCode))
+            .setVibrate(if (settings.vibrationEnabled) ReminderNotificationActions.vibrationPattern() else longArrayOf(0))
+            .setSound(settings.soundUri)
+        if (settings.fullScreenEnabled) {
+            builder.setFullScreenIntent(viewReminderPendingIntent(eventId, isTask), true)
+        }
+        addNotificationActions(
+            builder = builder,
+            eventId = eventId,
+            eventTitle = eventTitle,
+            alarmRequestCode = alarmRequestCode,
+            isTask = isTask,
+            eventStartTimeMs = eventStartTimeMs,
+        )
+        return builder.build()
+    }
+
+    @android.annotation.TargetApi(Build.VERSION_CODES.BAKLAVA)
+    private fun buildNothingProgressNotification(
+        settings: ReminderNotificationSettings,
+        eventId: String,
+        eventTitle: String,
+        minutesBefore: Int,
+        alarmRequestCode: Int,
+        isTask: Boolean,
+        eventStartTimeMs: Long,
+        snoozedUntilMs: Long,
+        progressOriginMs: Long,
+        targetTimeMs: Long,
+    ): Notification {
+        val progress = ReminderNotificationActions.progressPercent(
+            originMs = progressOriginMs,
+            targetMs = targetTimeMs,
+            nowMs = System.currentTimeMillis(),
+        )
+        val builder = Notification.Builder(appContext, settings.channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(eventTitle)
+            .setContentText(reminderText(minutesBefore, snoozedUntilMs))
+            .setContentIntent(openReminderPendingIntent(eventId, isTask, alarmRequestCode))
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setPriority(Notification.PRIORITY_HIGH)
+            .setCategory(Notification.CATEGORY_EVENT)
+            .setDeleteIntent(dismissPendingIntent(alarmRequestCode))
+            .setVibrate(if (settings.vibrationEnabled) ReminderNotificationActions.vibrationPattern() else longArrayOf(0))
+            .setSound(settings.soundUri)
+            .setStyle(
+                Notification.ProgressStyle()
+                    .setStyledByProgress(true)
+                    .setProgress(progress),
+            )
+        if (settings.fullScreenEnabled) {
+            builder.setFullScreenIntent(viewReminderPendingIntent(eventId, isTask), true)
         }
         ReminderNotificationActions.notificationActionTypes(isTask).forEach { action ->
             when (action) {
@@ -179,38 +270,60 @@ class ReminderScheduler(private val context: Context) {
                 )
             }
         }
-        val notification = builder.build()
-        NotificationManagerCompat.from(appContext).notify(alarmRequestCode, notification)
-        if (useNothingLiveProgress()) {
-            scheduleLiveProgress(
-                eventId = eventId,
-                eventTitle = eventTitle,
-                alarmRequestCode = alarmRequestCode,
-                isTask = isTask,
-                minutesBefore = minutesBefore,
-                eventStartTimeMs = eventStartTimeMs,
-                snoozedUntilMs = snoozedUntilMs,
-                targetTimeMs = if (snoozedUntilMs > 0L) snoozedUntilMs else eventStartTimeMs,
-                progressOriginMs = progressOriginMs,
-            )
+        return builder.build()
+    }
+
+    private fun addNotificationActions(
+        builder: NotificationCompat.Builder,
+        eventId: String,
+        eventTitle: String,
+        alarmRequestCode: Int,
+        isTask: Boolean,
+        eventStartTimeMs: Long,
+    ) {
+        ReminderNotificationActions.notificationActionTypes(isTask).forEach { action ->
+            when (action) {
+                ReminderNotificationActionType.Snooze -> builder.addAction(
+                    R.drawable.ic_notification,
+                    appContext.getString(R.string.notification_action_snooze),
+                    snoozePickerPendingIntent(eventId, eventTitle, alarmRequestCode, isTask, eventStartTimeMs),
+                )
+                ReminderNotificationActionType.CompleteTask -> builder.addAction(
+                    R.drawable.ic_notification,
+                    appContext.getString(R.string.notification_action_complete_task),
+                    completeTaskPendingIntent(eventId, alarmRequestCode),
+                )
+            }
         }
     }
 
     fun updateLiveProgress(intent: Intent) {
+        val eventId = intent.getStringExtra(ReminderReceiver.EXTRA_EVENT_ID) ?: return
+        val alarmRequestCode = intent.getIntExtra(ReminderReceiver.EXTRA_ALARM_REQUEST_CODE, Int.MIN_VALUE)
+        if (alarmRequestCode == Int.MIN_VALUE) return
+        val eventTitle = intent.getStringExtra(ReminderReceiver.EXTRA_EVENT_TITLE) ?: return
+        val minutesBefore = intent.getIntExtra(ReminderReceiver.EXTRA_MINUTES_BEFORE, 0)
+        val isTask = intent.getBooleanExtra(ReminderReceiver.EXTRA_IS_TASK, false)
+        val eventStartTimeMs = intent.getLongExtra(ReminderReceiver.EXTRA_EVENT_START_TIME_MS, 0L)
+        val snoozedUntilMs = intent.getLongExtra(ReminderReceiver.EXTRA_SNOOZED_UNTIL_MS, 0L)
+        val progressOriginMs = intent.getLongExtra(EXTRA_PROGRESS_ORIGIN_MS, System.currentTimeMillis())
         showReminderNotification(
-            eventId = intent.getStringExtra(ReminderReceiver.EXTRA_EVENT_ID) ?: return,
-            eventTitle = intent.getStringExtra(ReminderReceiver.EXTRA_EVENT_TITLE) ?: return,
-            minutesBefore = intent.getIntExtra(ReminderReceiver.EXTRA_MINUTES_BEFORE, 0),
-            alarmRequestCode = intent.getIntExtra(ReminderReceiver.EXTRA_ALARM_REQUEST_CODE, Int.MIN_VALUE),
-            isTask = intent.getBooleanExtra(ReminderReceiver.EXTRA_IS_TASK, false),
-            eventStartTimeMs = intent.getLongExtra(ReminderReceiver.EXTRA_EVENT_START_TIME_MS, 0L),
-            snoozedUntilMs = intent.getLongExtra(ReminderReceiver.EXTRA_SNOOZED_UNTIL_MS, 0L),
-            progressOriginMs = intent.getLongExtra(EXTRA_PROGRESS_ORIGIN_MS, System.currentTimeMillis()),
+            eventId = eventId,
+            eventTitle = eventTitle,
+            minutesBefore = minutesBefore,
+            alarmRequestCode = alarmRequestCode,
+            isTask = isTask,
+            eventStartTimeMs = eventStartTimeMs,
+            snoozedUntilMs = snoozedUntilMs,
+            progressOriginMs = progressOriginMs,
+            scheduleRepeatAlarm = false,
         )
     }
 
     fun cancelLiveProgress(alarmRequestCode: Int) {
-        alarmManager.cancel(liveProgressPendingIntent(alarmRequestCode, ReminderAlarmPayload.EMPTY))
+        ReminderNotificationActions.liveProgressRequestCodes(alarmRequestCode).forEach { requestCode ->
+            alarmManager.cancel(liveProgressPendingIntent(requestCode, ReminderAlarmPayload.EMPTY))
+        }
     }
 
     private fun scheduleLiveProgress(
@@ -253,7 +366,7 @@ class ReminderScheduler(private val context: Context) {
         }
         return PendingIntent.getBroadcast(
             appContext,
-            liveProgressRequestCode(payload.alarmRequestCode),
+            ReminderNotificationActions.notificationId(payload.alarmRequestCode),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -261,12 +374,6 @@ class ReminderScheduler(private val context: Context) {
 
     private fun liveProgressPendingIntent(requestCode: Int, payload: ReminderAlarmPayload): PendingIntent =
         liveProgressIntent(payload.copy(alarmRequestCode = requestCode), 0L)
-
-    private fun progressPercent(originMs: Long, targetMs: Long): Int {
-        if (targetMs <= originMs) return 100
-        val elapsed = (System.currentTimeMillis() - originMs).coerceAtLeast(0L)
-        return ((elapsed * 100L) / (targetMs - originMs)).toInt().coerceIn(0, 100)
-    }
 
     private fun useNothingLiveProgress(): Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
@@ -282,10 +389,10 @@ class ReminderScheduler(private val context: Context) {
         ).apply {
             description = "Event reminder alerts"
             setSound(settings.soundUri, android.media.AudioAttributes.Builder()
-                .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT)
                 .build())
             enableVibration(settings.vibrationEnabled)
-            if (settings.vibrationEnabled) vibrationPattern = longArrayOf(0, 250, 100, 250)
+            if (settings.vibrationEnabled) vibrationPattern = ReminderNotificationActions.vibrationPattern()
         }
         appContext.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
@@ -361,7 +468,7 @@ class ReminderScheduler(private val context: Context) {
     private fun viewReminderPendingIntent(eventId: String, isTask: Boolean): PendingIntent {
         val intent = Intent(appContext, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
-            data = Uri.parse(if (isTask) "dotcal://task/$eventId" else "dotcal://event/$eventId")
+            data = Uri.parse(ReminderNotificationActions.reminderDeepLink(eventId, isTask))
         }
         return PendingIntent.getActivity(
             appContext,
@@ -372,13 +479,16 @@ class ReminderScheduler(private val context: Context) {
     }
 
     private fun openReminderPendingIntent(eventId: String, isTask: Boolean, alarmRequestCode: Int): PendingIntent {
-        val intent = Intent(appContext, ReminderReceiver::class.java).apply {
-            action = ReminderReceiver.ACTION_OPEN_REMINDER
+        val intent = Intent(appContext, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            data = Uri.parse(ReminderNotificationActions.reminderDeepLink(eventId, isTask))
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra(ReminderReceiver.EXTRA_EVENT_ID, eventId)
             putExtra(ReminderReceiver.EXTRA_ALARM_REQUEST_CODE, alarmRequestCode)
             putExtra(ReminderReceiver.EXTRA_IS_TASK, isTask)
+            putExtra(ReminderReceiver.EXTRA_CLEAR_REMINDER_ON_OPEN, true)
         }
-        return PendingIntent.getBroadcast(
+        return PendingIntent.getActivity(
             appContext,
             alarmRequestCode xor 0x1E1E1E1E,
             intent,
@@ -466,8 +576,7 @@ class ReminderScheduler(private val context: Context) {
     companion object {
         private const val TAG = "ReminderScheduler"
         private const val EXTRA_PROGRESS_ORIGIN_MS = "extra_progress_origin_ms"
-        private const val LIVE_PROGRESS_INTERVAL_MS = 60_000L
-        private fun liveProgressRequestCode(alarmRequestCode: Int): Int = alarmRequestCode xor 0x6D6D6D6D
+        private const val LIVE_PROGRESS_INTERVAL_MS = 5_000L
         const val CHANNEL_ID = "dotcal_reminders"
         private fun completeTaskRequestCode(alarmRequestCode: Int): Int = alarmRequestCode xor 0x7C7C7C7C
     }
@@ -484,7 +593,7 @@ internal data class ReminderNotificationSettings(
     val fullScreenEnabled: Boolean,
 ) {
     val channelId: String
-        get() = "dotcal_reminders_${listOf(soundUri?.toString().orEmpty(), vibrationEnabled).hashCode()}"
+        get() = "dotcal_reminders_v2_${listOf(soundUri?.toString().orEmpty(), vibrationEnabled).hashCode()}"
 
     companion object {
         internal fun from(

@@ -68,6 +68,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Calendar
 
+internal const val SNOOZE_PICKER_OPTIONS_PANE_HEIGHT_DP = 480
+
 class SnoozePickerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -175,47 +177,54 @@ private fun SnoozePickerScreen(
                     Tab(selected = tab == 1, onClick = { tab = 1; invalidTime = false }, text = { Text(stringResource(R.string.snooze_picker_until), color = if (tab == 1) palette.primaryText else palette.secondaryText) })
                 }
                 Spacer(Modifier.height(12.dp))
-                if (tab == 0) {
-                    ReminderNotificationActions.SnoozePickerMinutes.forEach { minutes ->
-                        val label = if (minutes < 60) context.getString(R.string.snooze_picker_minutes, minutes) else context.getString(R.string.snooze_picker_one_hour)
-                        SnoozeRadioRow(label, context.getString(R.string.snooze_picker_after_this_time), Icons.Default.AccessTime, selectedForMinutes == minutes, palette) { selectedForMinutes = minutes; customDurationMinutes = null }
-                    }
-                    SnoozeRadioRow(
-                        title = if (customDurationMinutes == null) stringResource(R.string.snooze_picker_custom) else stringResource(R.string.snooze_picker_custom_minutes, customDurationMinutes!!),
-                        subtitle = stringResource(R.string.snooze_picker_custom_duration_subtitle),
-                        icon = Icons.Default.AccessTime,
-                        selected = customDurationMinutes != null,
-                        palette = palette,
-                        onClick = {
-                            showCustomDuration = true
-                        },
-                    )
-                    if (invalidTime) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(stringResource(R.string.snooze_picker_invalid_time), color = palette.accent, fontSize = 13.sp)
-                    }
-                } else {
-                    SnoozeRadioRow(
-                        stringResource(R.string.snooze_picker_event_start),
-                        if (eventStartAvailable) stringResource(R.string.snooze_picker_event_start_subtitle) else stringResource(R.string.snooze_picker_invalid_time),
-                        Icons.Default.CalendarMonth,
-                        untilMode == 0,
-                        palette,
-                        enabled = eventStartAvailable,
-                    ) { untilMode = 0; invalidTime = false }
-                    SnoozeRadioRow(
-                        stringResource(R.string.snooze_picker_custom),
-                        if (customChosen) DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(customTime.time) else stringResource(R.string.snooze_picker_custom_subtitle),
-                        Icons.Default.AccessTime,
-                        untilMode == 1,
-                        palette,
-                    ) {
-                        untilMode = 1
-                        showCustomDateTime = true
-                    }
-                    if (invalidTime) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(stringResource(R.string.snooze_picker_invalid_time), color = palette.accent, fontSize = 13.sp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(SNOOZE_PICKER_OPTIONS_PANE_HEIGHT_DP.dp),
+                    contentAlignment = Alignment.TopStart,
+                ) {
+                    if (tab == 0) {
+                        ReminderNotificationActions.SnoozePickerMinutes.forEach { minutes ->
+                            val label = if (minutes < 60) context.getString(R.string.snooze_picker_minutes, minutes) else context.getString(R.string.snooze_picker_one_hour)
+                            SnoozeRadioRow(label, context.getString(R.string.snooze_picker_after_this_time), Icons.Default.AccessTime, selectedForMinutes == minutes, palette) { selectedForMinutes = minutes; customDurationMinutes = null }
+                        }
+                        SnoozeRadioRow(
+                            title = if (customDurationMinutes == null) stringResource(R.string.snooze_picker_custom) else stringResource(R.string.snooze_picker_custom_minutes, customDurationMinutes!!),
+                            subtitle = stringResource(R.string.snooze_picker_custom_duration_subtitle),
+                            icon = Icons.Default.AccessTime,
+                            selected = customDurationMinutes != null,
+                            palette = palette,
+                            onClick = {
+                                showCustomDuration = true
+                            },
+                        )
+                        if (invalidTime) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(stringResource(R.string.snooze_picker_invalid_time), color = palette.accent, fontSize = 13.sp)
+                        }
+                    } else {
+                        SnoozeRadioRow(
+                            stringResource(R.string.snooze_picker_event_start),
+                            if (eventStartAvailable) stringResource(R.string.snooze_picker_event_start_subtitle) else stringResource(R.string.snooze_picker_invalid_time),
+                            Icons.Default.CalendarMonth,
+                            untilMode == 0,
+                            palette,
+                            enabled = eventStartAvailable,
+                        ) { untilMode = 0; invalidTime = false }
+                        SnoozeRadioRow(
+                            stringResource(R.string.snooze_picker_custom),
+                            if (customChosen) DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(customTime.time) else stringResource(R.string.snooze_picker_custom_subtitle),
+                            Icons.Default.AccessTime,
+                            untilMode == 1,
+                            palette,
+                        ) {
+                            untilMode = 1
+                            showCustomDateTime = true
+                        }
+                        if (invalidTime) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(stringResource(R.string.snooze_picker_invalid_time), color = palette.accent, fontSize = 13.sp)
+                        }
                     }
                 }
             }
@@ -254,6 +263,7 @@ private fun SnoozePickerScreen(
             includeTime = true,
             palette = palette,
             onDismiss = { showCustomDateTime = false },
+            dialogPresentation = true,
             onSelected = { date, time ->
                 customTime = Calendar.getInstance().apply {
                     set(date.year, date.monthValue - 1, date.dayOfMonth, time.hour, time.minute, 0)
@@ -277,6 +287,7 @@ private fun SnoozePickerScreen(
             includeTime = true,
             palette = palette,
             onDismiss = { showCustomDuration = false },
+            dialogPresentation = true,
             onSelected = { date, time ->
                 customDurationTime = Calendar.getInstance().apply {
                     set(date.year, date.monthValue - 1, date.dayOfMonth, time.hour, time.minute, 0)
