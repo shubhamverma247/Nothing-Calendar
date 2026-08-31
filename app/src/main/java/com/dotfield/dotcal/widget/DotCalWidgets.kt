@@ -8,6 +8,8 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.net.Uri
+import android.appwidget.AppWidgetManager
+import android.os.Bundle
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -87,18 +89,19 @@ class ShiftWideDotCalWidget : DotCalWidget(
     setOf(DpSize(110.dp, 110.dp), DpSize(250.dp, 56.dp), DpSize(250.dp, 140.dp)),
 )
 class MediumDotCalWidget : DotCalWidget(LegacyWidgetKind.Medium, DotCalWidgetSize.Medium, DpSize(250.dp, 140.dp))
-class LargeDotCalWidget : DotCalWidget(LegacyWidgetKind.Large, DotCalWidgetSize.Large, DpSize(250.dp, 250.dp))
+class LargeDotCalWidget : DotCalWidget(LegacyWidgetKind.Large, DotCalWidgetSize.Large, DpSize(250.dp, 250.dp), useExactSize = true)
 class EventCountdownDotCalWidget : DotCalWidget(LegacyWidgetKind.Countdown, DotCalWidgetSize.Countdown, DpSize(110.dp, 110.dp))
 class AgendaListDotCalWidget : DotCalWidget(LegacyWidgetKind.Agenda, DotCalWidgetSize.Medium, DpSize(250.dp, 140.dp))
-class MonthGridDotCalWidget : DotCalWidget(LegacyWidgetKind.MonthGrid, DotCalWidgetSize.Large, DpSize(250.dp, 250.dp))
+class MonthGridDotCalWidget : DotCalWidget(LegacyWidgetKind.MonthGrid, DotCalWidgetSize.Large, DpSize(250.dp, 250.dp), useExactSize = true)
 
 abstract class DotCalWidget(
     private val legacyKind: LegacyWidgetKind,
     private val widgetSize: DotCalWidgetSize,
     private val minSize: DpSize,
     private val supportedSizes: Set<DpSize> = setOf(minSize),
+    private val useExactSize: Boolean = false,
 ) : GlanceAppWidget() {
-    override val sizeMode: SizeMode = SizeMode.Responsive(supportedSizes)
+    override val sizeMode: SizeMode = if (useExactSize) SizeMode.Exact else SizeMode.Responsive(supportedSizes)
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -170,6 +173,16 @@ private fun ConfiguredWidget(
 }
 
 abstract class DotCalWidgetReceiver : GlanceAppWidgetReceiver() {
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle,
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        WidgetUpdateWorker.enqueue(context)
+    }
+
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
         runBlocking { unregisterConfiguredWidgets(context, appWidgetIds) }
@@ -658,6 +671,12 @@ private fun MediumWidget(
 @Composable
 private fun LargeWidget(context: Context, config: WidgetInstanceConfig, data: WidgetCalendarData, palette: DotCalWidgetPalette) {
     val eventCount = data.events.size + data.moreItemCount
+    val widgetHeight = LocalSize.current.height.value.toInt()
+    val visibleRowCount = monthAgendaVisibleRowCount(eventCount, widgetHeight, config.content.showLocation)
+    val agendaItems = data.events.take(
+        visibleRowCount,
+    )
+    val remainingItemCount = (eventCount - agendaItems.size).coerceAtLeast(0)
     WidgetSurfaceBox(palette) {
         Column(
             modifier = GlanceModifier
@@ -689,10 +708,16 @@ private fun LargeWidget(context: Context, config: WidgetInstanceConfig, data: Wi
                     CompactAddPrompt("NO EVENTS - TAP TO ADD", 26, palette)
                 }
             } else {
-                data.events.forEach { item -> AgendaRow(context, item, config, palette) }
-                if (data.moreItemCount > 0) {
+                agendaItems
+                    .chunked(MONTH_AGENDA_COLUMN_GROUP_SIZE)
+                    .forEach { group ->
+                        Column(modifier = GlanceModifier.fillMaxWidth()) {
+                            group.forEach { item -> AgendaRow(context, item, config, palette) }
+                        }
+                    }
+                if (remainingItemCount > 0) {
                     Text(
-                        "+${data.moreItemCount} MORE",
+                        "+$remainingItemCount MORE",
                         modifier = GlanceModifier
                             .padding(start = 68.dp)
                             .clickable(actionStartActivity(openCalendarMonthIntent(context))),

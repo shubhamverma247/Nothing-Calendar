@@ -86,12 +86,12 @@ class WidgetInstanceConfigTest {
     }
 
     @Test
-    fun calendarWidgetKeepsMonthGridAgendaShort() {
+    fun calendarWidgetLoadsAgendaForDynamicSizing() {
         val config = WidgetInstanceConfig.legacyDefault(LegacyWidgetKind.Large).copy(
             layoutMode = WidgetLayoutMode.Detailed,
             density = WidgetContentDensity.High,
         )
 
-        assertEquals(2, config.maxVisibleItems(DotCalWidgetSize.Large.maxItems))
+        assertEquals(20, config.maxVisibleItems(DotCalWidgetSize.Large.maxItems))
     }
 }

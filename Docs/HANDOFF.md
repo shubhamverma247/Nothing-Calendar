@@ -176,7 +176,9 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     - `4x2` now uses one dominant event plus compact upcoming rows.
     - `4x4` Schedule has a dedicated `SCHEDULE / NEXT 14 DAYS` agenda renderer with capped rows
       and `+X MORE`.
-  - Month-grid `4x4` calendar agenda is capped short so the calendar grid remains readable.
+- Month-grid `4x4` calendar agenda keeps its grid readable, loads up to 20 agenda events, then
+  uses available resized height for additional agenda rows; large month providers use exact
+  Glance sizing and show `+X MORE` for overflow.
   - Added Quick Actions deep links and config options for Quick Add, Add Task, and Search:
     - `dotcal://quick-add`
     - `dotcal://task/new`
@@ -305,10 +307,12 @@ After next debug install, prioritize:
 - Reminder Defaults scrolling: PASS. Controls remain reachable; no header/content clipping.
 - Reminder vibration: PASS after enabling device notification vibration. Fixed double-pulse pattern
   works on fresh reminder delivery.
-- Next single manual test: open `Settings > Reminder Defaults > Reminder sound`, choose a distinct
-  notification tone, then create a fresh reminder. Expected: row shows `Custom` and reminder plays
-  the selected tone; vibration behavior remains unchanged. Wait for feedback before testing repeat,
-  full-screen behavior, or notification layout.
+- Reminder sound: PASS. `Custom` row shown; selected tone played; vibration behavior unchanged.
+- Next single manual test: enable `Repeat until dismissed`, set `Repeat interval` to `5 min`, then
+  create a disposable event starting 7 minutes from now with its reminder set to `5 min before`.
+  Expected: first reminder arrives about 2 minutes from now; untouched notification repeats about
+  5 minutes later; dismissing it prevents another repeat. Wait for feedback before testing
+  full-screen behavior or notification layout.
 
 - Open phone widget picker.
   - Expected: 7 entries visible: `DC 1x1 Date`, `DC 2x2 Event`, `DC 4x2 Agenda`,

@@ -217,6 +217,9 @@ data class WidgetInstanceConfig(
 }
 
 internal fun WidgetInstanceConfig.maxVisibleItems(defaultMax: Int): Int {
+    if (category == WidgetCategory.Calendar && viewType == WidgetViewType.Month && defaultMax == DotCalWidgetSize.Large.maxItems) {
+        return MONTH_AGENDA_MAX_ITEMS
+    }
     val densityMax = when (density) {
         WidgetContentDensity.Low -> 1
         WidgetContentDensity.Medium -> defaultMax
@@ -229,7 +232,6 @@ internal fun WidgetInstanceConfig.maxVisibleItems(defaultMax: Int): Int {
     }.let { max ->
         when {
             defaultMax <= 1 -> 1
-            category == WidgetCategory.Calendar -> max.coerceAtMost(2)
             category == WidgetCategory.Shift -> max.coerceAtMost(2)
             else -> max
         }

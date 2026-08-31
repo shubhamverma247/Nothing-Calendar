@@ -15,9 +15,9 @@
     <string name="widget_countdown_label">DC Count</string>
     <string name="widget_countdown_description">Countdown</string>
     <string name="widget_agenda_label">DC Agenda</string>
-    <string name="widget_agenda_description">Legacy list</string>
+    <string name="widget_agenda_description">Agenda list</string>
     <string name="widget_month_grid_label">DC Month</string>
-    <string name="widget_month_grid_description">Legacy grid</string>
+    <string name="widget_month_grid_description">Month grid</string>
     <string name="glyph_toy_name">DotCal</string>
     <string name="glyph_toy_summary">Shows a live countdown to your next DotCal event.</string>
     <string name="notification_action_open">Open</string>
