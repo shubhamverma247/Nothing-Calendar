@@ -70,6 +70,14 @@ import java.util.Calendar
 
 internal const val SNOOZE_PICKER_OPTIONS_PANE_HEIGHT_DP = 480
 
+internal enum class SnoozePickerTab {
+    FOR,
+    UNTIL,
+}
+
+internal fun snoozePickerTab(index: Int): SnoozePickerTab =
+    if (index == 0) SnoozePickerTab.FOR else SnoozePickerTab.UNTIL
+
 class SnoozePickerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -126,10 +134,14 @@ private fun SnoozePickerScreen(
     var showCustomDateTime by remember { mutableStateOf(false) }
     var invalidTime by remember { mutableStateOf(false) }
     val eventStartAvailable = ReminderNotificationActions.canScheduleAt(eventStartTimeMs, System.currentTimeMillis())
-    val canSave = if (tab == 0) selectedForMinutes != null || customDurationMinutes != null else untilMode == 0 && eventStartAvailable || untilMode == 1 && customChosen
+    val canSave = if (snoozePickerTab(tab) == SnoozePickerTab.FOR) {
+        selectedForMinutes != null || customDurationMinutes != null
+    } else {
+        untilMode == 0 && eventStartAvailable || untilMode == 1 && customChosen
+    }
 
     fun save() {
-        val triggerAtMs = if (tab == 0) {
+        val triggerAtMs = if (snoozePickerTab(tab) == SnoozePickerTab.FOR) {
             selectedForMinutes?.let { System.currentTimeMillis() + ReminderNotificationActions.snoozeDelayMs(it) }
                 ?: customDurationTime.timeInMillis.takeIf { customDurationMinutes != null }
                 ?: return
@@ -183,7 +195,8 @@ private fun SnoozePickerScreen(
                         .height(SNOOZE_PICKER_OPTIONS_PANE_HEIGHT_DP.dp),
                     contentAlignment = Alignment.TopStart,
                 ) {
-                    if (tab == 0) {
+                    Column(Modifier.fillMaxWidth()) {
+                    if (snoozePickerTab(tab) == SnoozePickerTab.FOR) {
                         ReminderNotificationActions.SnoozePickerMinutes.forEach { minutes ->
                             val label = if (minutes < 60) context.getString(R.string.snooze_picker_minutes, minutes) else context.getString(R.string.snooze_picker_one_hour)
                             SnoozeRadioRow(label, context.getString(R.string.snooze_picker_after_this_time), Icons.Default.AccessTime, selectedForMinutes == minutes, palette) { selectedForMinutes = minutes; customDurationMinutes = null }
@@ -225,6 +238,7 @@ private fun SnoozePickerScreen(
                             Spacer(Modifier.height(8.dp))
                             Text(stringResource(R.string.snooze_picker_invalid_time), color = palette.accent, fontSize = 13.sp)
                         }
+                    }
                     }
                 }
             }
