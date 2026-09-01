@@ -1282,6 +1282,10 @@
     <string name="template_summary_separator">, </string>
     <string name="shortcut_quick_add_long">Crear con Añadir rápido</string>
     <string name="shortcut_quick_add_short">Añadir rápido</string>
+    <string name="shortcut_create_event_short">Crear evento</string>
+    <string name="shortcut_create_event_long">Crear evento</string>
+    <string name="shortcut_create_task_short">Crear tarea</string>
+    <string name="shortcut_create_task_long">Crear tarea</string>
     <string name="quick_add_apply_command">Aplicar comando</string>
     <string name="quick_add_command">Comando de Añadir rápido</string>
     <string name="quick_add_command_applied">Comando aplicado</string>

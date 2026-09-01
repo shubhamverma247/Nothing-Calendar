@@ -1133,6 +1133,10 @@
     <string name="template_summary_separator">, </string>
     <string name="shortcut_quick_add_long">Buat dengan Tambah cepat</string>
     <string name="shortcut_quick_add_short">Tambah cepat</string>
+    <string name="shortcut_create_event_short">Buat acara</string>
+    <string name="shortcut_create_event_long">Buat acara</string>
+    <string name="shortcut_create_task_short">Buat tugas</string>
+    <string name="shortcut_create_task_long">Buat tugas</string>
     <string name="quick_add_apply_command">Terapkan perintah</string>
     <string name="quick_add_command">Perintah tambah cepat</string>
     <string name="quick_add_command_applied">Perintah diterapkan</string>

@@ -1201,6 +1201,10 @@
     <string name="template_summary_separator">, </string>
     <string name="shortcut_quick_add_long">Создать с помощью быстрой записи</string>
     <string name="shortcut_quick_add_short">Быстрая запись</string>
+    <string name="shortcut_create_event_short">Создать событие</string>
+    <string name="shortcut_create_event_long">Создать событие</string>
+    <string name="shortcut_create_task_short">Создать задачу</string>
+    <string name="shortcut_create_task_long">Создать задачу</string>
     <string name="quick_add_apply_command">Применить команду</string>
     <string name="quick_add_command">Команда быстрой записи</string>
     <string name="quick_add_command_applied">Команда применена</string>

@@ -14,6 +14,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Current user-reported QA focus is reminder notification behavior and Nothing Phone (3) Glyph
   progress. Continue one manual test at a time and wait for feedback before diagnosing or changing
   anything else.
+- Manual QA scope is post-22-August/newly added features only; skip older backlog/regression items
+  such as purchase restore or legacy Glyph Toy unless the user explicitly pulls them back in.
 - Manual QA now passed on latest installed debug APK:
   - Widget config opens/saves normally; widget removal does not freeze or crash.
   - Reminder notification behavior and Nothing Phone (3) Glyph progress passed.
@@ -116,6 +118,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - Voice dictation debug/state/error logs were removed from release-capable code. Manual QA passed:
     typed text plus dictated speech stays merged in the Quick Add draft.
   - Quick Settings Tile and launcher long-press Quick Add shortcut reuse `dotcal://quick-add`.
+  - Launcher long-press now also includes Create Event and Create Task shortcuts.
   - Month, Week, and Agenda export branded PNG cards through existing FileProvider sharing. Cards
     use view-specific layouts and event time zones; basic export remains Free.
   - Added unit coverage for voice error states and export layout selection.
@@ -160,6 +163,27 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - Manual DotCal edit one recurring occurrence -> Google QA passed. User found stale detail title
     immediately after save; fixed by returning saved event id from repository save and reopening
     that id after editor closes; retest passed.
+  - Manual Google edit/move one recurring occurrence -> DotCal QA passed; edited occurrence imports
+    as a standalone event and the original occurrence stays hidden.
+  - Manual repeated-sync detached occurrence QA passed; repeated sync does not duplicate detached
+    recurring occurrence rows.
+  - Manual Week/Day repeated swipe QA passed on clipping-prone device; no clipping/overlap/stuck
+    gesture state reported.
+  - Manual Smart Quick Add 3.0 English command pass worked fine with seeded event.
+  - Manual Google multi-day all-day sync retest passed; Month/Week/Day show every intended date
+    with no one-day-early or missing final-day behavior.
+  - Manual Google/provider custom calendar color sync retest passed; non-red provider colors do not
+    fall back to DotCal red.
+  - Restore purchase QA is out of current manual scope.
+  - Manual Quick Settings Tile + launcher long-press Quick Add shortcut QA passed; both open the
+    Quick Add flow without wrong-screen behavior or crash.
+  - Launcher long-press shortcuts now expose `Quick add`, `Create event`, and `Create task`.
+    Create Event uses `dotcal://event/new`; Create Task uses `dotcal://task/new`; shortcut labels
+    were added to all existing locale resource sets. Root cause of default-only launcher menu was
+    `android.app.shortcuts` metadata being declared at application level; it now lives on
+    `MainActivity` as required by Android static shortcuts.
+  - Launcher shortcuts use distinct light gray stroke-only transparent glyph icons now: quick-add
+    lightning/plus, create-event plus-only, and create-task checkmark.
 - Added transient provider exception metadata on `CalendarEvent` using `@Ignore`.
 - Added provider reminder/EXDATE helper tests.
 - Calendar overflow menu customization is implemented:
@@ -455,10 +479,10 @@ After next debug install, prioritize:
 - DotCal delete one recurring occurrence -> Google hides that occurrence.
 - Google delete one recurring occurrence -> DotCal hides that occurrence.
 - DotCal edit one recurring occurrence -> Google shows original excluded plus standalone edited event.
-- Google edit/move one recurring occurrence -> DotCal imports standalone edited occurrence and hides original.
-- Repeated sync does not create duplicate detached occurrences.
-- Swipe Week and Day views repeatedly on the clipping-prone device.
-- Create/sync a Google all-day event spanning multiple days; Month/Day/Week show every visible date.
+- Google edit/move one recurring occurrence -> DotCal imports standalone edited occurrence and hides original. PASS.
+- Repeated sync does not create duplicate detached occurrences. PASS.
+- Swipe Week and Day views repeatedly on the clipping-prone device. PASS.
+- Create/sync a Google all-day event spanning multiple days; Month/Day/Week show every visible date. PASS.
 - Smart Quick Add 3.0 English command pass:
   - `move my 2pm to tomorrow` shows a matching event and reuses the existing move/conflict flow.
   - `rename gym to strength training`, `set gym duration to 90 minutes`, and
@@ -468,9 +492,10 @@ After next debug install, prioritize:
   - `add 30 min prep before it` opens a prefilled editable prep event.
   - Expected: no-match commands show a clear message; command UI uses existing DotCal Quick Add
     surfaces and English examples only.
+  - PASS.
 - Sync Google events with custom calendar colors; DotCal should not fall back to red when provider
-  event color is missing.
-- Restore purchase on an account with old lifetime purchase.
+  event color is missing. PASS.
+- Restore purchase on an account with old lifetime purchase. OUT OF SCOPE.
 - On supported Nothing Glyph device, select DotCal Glyph Toy and create a future reminder.
   - Expected: Glyph shows countdown; snooze updates countdown immediately; opening/completing item
     clears it and advances to next item; reminder delivery advances/clears expired item.

@@ -1269,6 +1269,10 @@
     <string name="template_summary_separator">، </string>
     <string name="shortcut_quick_add_long">إنشاء باستخدام الإضافة السريعة</string>
     <string name="shortcut_quick_add_short">إضافة سريعة</string>
+    <string name="shortcut_create_event_short">إنشاء حدث</string>
+    <string name="shortcut_create_event_long">إنشاء حدث</string>
+    <string name="shortcut_create_task_short">إنشاء مهمة</string>
+    <string name="shortcut_create_task_long">إنشاء مهمة</string>
     <string name="quick_add_apply_command">تطبيق الأمر</string>
     <string name="quick_add_command">أمر سريع</string>
     <string name="quick_add_command_applied">تم تطبيق الأمر</string>

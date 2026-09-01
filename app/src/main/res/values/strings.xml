@@ -914,6 +914,10 @@
     <string name="quick_add_title">Quick Add</string>
     <string name="shortcut_quick_add_short">Quick add</string>
     <string name="shortcut_quick_add_long">Create with Quick Add</string>
+    <string name="shortcut_create_event_short">Create event</string>
+    <string name="shortcut_create_event_long">Create event</string>
+    <string name="shortcut_create_task_short">Create task</string>
+    <string name="shortcut_create_task_long">Create task</string>
     <string name="quick_add_continue">Continue</string>
     <string name="quick_add_apply_command">Apply command</string>
     <string name="templates_title">Templates</string>

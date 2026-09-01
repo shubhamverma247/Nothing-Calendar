@@ -1133,6 +1133,10 @@
     <string name="template_summary_separator">, </string>
     <string name="shortcut_quick_add_long">Hızlı Ekle ile oluştur</string>
     <string name="shortcut_quick_add_short">Hızlı Ekle</string>
+    <string name="shortcut_create_event_short">Etkinlik oluştur</string>
+    <string name="shortcut_create_event_long">Etkinlik oluştur</string>
+    <string name="shortcut_create_task_short">Görev oluştur</string>
+    <string name="shortcut_create_task_long">Görev oluştur</string>
     <string name="quick_add_apply_command">Komutu uygula</string>
     <string name="quick_add_command">Hızlı ekleme komutu</string>
     <string name="quick_add_command_applied">Komut uygulandı</string>

@@ -3,7 +3,7 @@
     <shortcut
         android:shortcutId="quick_add"
         android:enabled="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_shortcut_quick_add"
         android:shortcutLongLabel="@string/shortcut_quick_add_long"
         android:shortcutShortLabel="@string/shortcut_quick_add_short">
         <intent
@@ -11,5 +11,29 @@
             android:targetPackage="com.dotfield.dotcal"
             android:targetClass="com.dotfield.dotcal.MainActivity"
             android:data="dotcal://quick-add" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="create_event"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_create_event"
+        android:shortcutLongLabel="@string/shortcut_create_event_long"
+        android:shortcutShortLabel="@string/shortcut_create_event_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.dotfield.dotcal"
+            android:targetClass="com.dotfield.dotcal.MainActivity"
+            android:data="dotcal://event/new" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="create_task"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_create_task"
+        android:shortcutLongLabel="@string/shortcut_create_task_long"
+        android:shortcutShortLabel="@string/shortcut_create_task_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.dotfield.dotcal"
+            android:targetClass="com.dotfield.dotcal.MainActivity"
+            android:data="dotcal://task/new" />
     </shortcut>
 </shortcuts>

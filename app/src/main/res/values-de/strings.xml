@@ -1133,6 +1133,10 @@
     <string name="template_summary_separator">, </string>
     <string name="shortcut_quick_add_long">Mit Schnelleingabe erstellen</string>
     <string name="shortcut_quick_add_short">Schnelleingabe</string>
+    <string name="shortcut_create_event_short">Termin erstellen</string>
+    <string name="shortcut_create_event_long">Termin erstellen</string>
+    <string name="shortcut_create_task_short">Aufgabe erstellen</string>
+    <string name="shortcut_create_task_long">Aufgabe erstellen</string>
     <string name="quick_add_apply_command">Befehl anwenden</string>
     <string name="quick_add_command">Schnelleingabebefehl</string>
     <string name="quick_add_command_applied">Befehl angewendet</string>
