@@ -19,6 +19,22 @@ class WidgetUpdateWorker(
     workerParameters: WorkerParameters,
 ) : CoroutineWorker(appContext, workerParameters) {
     override suspend fun doWork(): Result {
+        when (inputData.getString(WORK_ACTION)) {
+            ACTION_UNREGISTER_WIDGETS -> {
+                unregisterConfiguredWidgets(
+                    applicationContext,
+                    inputData.getIntArray(APP_WIDGET_IDS) ?: IntArray(0),
+                )
+                return Result.success()
+            }
+            ACTION_CLEAR_RECEIVER -> {
+                val receiverClass = inputData.getString(RECEIVER_CLASS).orEmpty()
+                if (receiverClass.isNotBlank()) {
+                    clearConfiguredWidgetsForReceiver(applicationContext, receiverClass)
+                }
+                return Result.success()
+            }
+        }
         val configuredId = inputData.getInt(APP_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
         if (configuredId != AppWidgetManager.INVALID_APPWIDGET_ID) {
             if (AppWidgetManager.getInstance(applicationContext).getAppWidgetInfo(configuredId) == null) {
@@ -38,7 +54,13 @@ class WidgetUpdateWorker(
     companion object {
         private const val UNIQUE_WORK = "dotcal_widget_update"
         private const val CONFIGURED_WIDGET_WORK_PREFIX = "dotcal_widget_configured_"
+        private const val WIDGET_CLEANUP_WORK_PREFIX = "dotcal_widget_cleanup_"
+        private const val WORK_ACTION = "work_action"
+        private const val ACTION_UNREGISTER_WIDGETS = "unregister_widgets"
+        private const val ACTION_CLEAR_RECEIVER = "clear_receiver"
         private const val APP_WIDGET_ID = "app_widget_id"
+        private const val APP_WIDGET_IDS = "app_widget_ids"
+        private const val RECEIVER_CLASS = "receiver_class"
         private const val CONFIGURED_WIDGET_ATTEMPT_COUNT = 3
         private val CONFIGURED_WIDGET_ATTEMPT_DELAYS = longArrayOf(750L, 3_000L, 10_000L)
 
@@ -66,6 +88,40 @@ class WidgetUpdateWorker(
                     request,
                 )
             }
+        }
+
+        fun enqueueDeletedWidgets(context: Context, appWidgetIds: IntArray) {
+            if (appWidgetIds.isEmpty()) return
+            val request = OneTimeWorkRequestBuilder<WidgetUpdateWorker>()
+                .setInputData(
+                    workDataOf(
+                        WORK_ACTION to ACTION_UNREGISTER_WIDGETS,
+                        APP_WIDGET_IDS to appWidgetIds,
+                    ),
+                )
+                .build()
+            WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
+                "$WIDGET_CLEANUP_WORK_PREFIX${appWidgetIds.joinToString("-")}",
+                ExistingWorkPolicy.REPLACE,
+                request,
+            )
+        }
+
+        fun enqueueClearReceiver(context: Context, receiverClass: String) {
+            if (receiverClass.isBlank()) return
+            val request = OneTimeWorkRequestBuilder<WidgetUpdateWorker>()
+                .setInputData(
+                    workDataOf(
+                        WORK_ACTION to ACTION_CLEAR_RECEIVER,
+                        RECEIVER_CLASS to receiverClass,
+                    ),
+                )
+                .build()
+            WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
+                "$WIDGET_CLEANUP_WORK_PREFIX$receiverClass",
+                ExistingWorkPolicy.REPLACE,
+                request,
+            )
         }
 
         suspend fun updateNow(context: Context) {

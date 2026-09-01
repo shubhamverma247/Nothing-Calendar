@@ -64,7 +64,6 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlinx.coroutines.runBlocking
 
 enum class DotCalWidgetSize(val maxItems: Int) {
     DateOnly(maxItems = 0),
@@ -205,12 +204,12 @@ abstract class DotCalWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
-        runBlocking { unregisterConfiguredWidgets(context, appWidgetIds) }
+        WidgetUpdateWorker.enqueueDeletedWidgets(context, appWidgetIds)
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        runBlocking { clearConfiguredWidgetsForReceiver(context, javaClass.simpleName) }
+        WidgetUpdateWorker.enqueueClearReceiver(context, javaClass.simpleName)
     }
 }
 

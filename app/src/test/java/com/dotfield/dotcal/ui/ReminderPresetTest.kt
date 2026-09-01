@@ -8,7 +8,7 @@ import java.time.LocalDateTime
 class ReminderPresetTest {
     @Test
     fun eventReminderPresetsMatchCreationOptions() {
-        assertEquals(listOf(1440, 120, 60, 30, 15, 10, 5), eventReminderPresets)
+        assertEquals(listOf(5, 10, 15, 30, 60, 120, 1440), eventReminderPresets)
     }
 
     @Test
@@ -36,6 +36,7 @@ class ReminderPresetTest {
     @Test
     fun reminderOffsetDisplayUsesMinutesOnlyBelowOneHour() {
         assertEquals(ReminderOffsetDisplay("15", ReminderOffsetUnit.Minute), reminderOffsetDisplay(15))
+        assertEquals(ReminderOffsetDisplay("7", ReminderOffsetUnit.Hour), reminderOffsetDisplay(420))
         assertEquals(ReminderOffsetDisplay("1.5", ReminderOffsetUnit.Hour), reminderOffsetDisplay(90))
         assertEquals(ReminderOffsetDisplay("2", ReminderOffsetUnit.Day), reminderOffsetDisplay(2_880))
         assertEquals(ReminderOffsetDisplay("2", ReminderOffsetUnit.Week), reminderOffsetDisplay(20_160))

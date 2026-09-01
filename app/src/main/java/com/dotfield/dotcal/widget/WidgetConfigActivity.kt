@@ -120,7 +120,7 @@ class WidgetConfigActivity : ComponentActivity() {
             AppWidgetManager.EXTRA_APPWIDGET_ID,
             AppWidgetManager.INVALID_APPWIDGET_ID,
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
-        if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+        if (!isOwnedAppWidget(appWidgetId)) {
             finish()
             return
         }
@@ -154,7 +154,21 @@ class WidgetConfigActivity : ComponentActivity() {
         return AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)?.loadLabel(packageManager).orEmpty()
     }
 
+    private fun isOwnedAppWidget(candidateId: Int): Boolean {
+        if (candidateId == AppWidgetManager.INVALID_APPWIDGET_ID) return false
+        val provider = AppWidgetManager.getInstance(this)
+            .getAppWidgetInfo(candidateId)
+            ?.provider
+            ?: return false
+        return provider.packageName == packageName
+    }
+
     private fun saveConfig(config: WidgetInstanceConfig) {
+        if (!isOwnedAppWidget(appWidgetId)) {
+            setResult(Activity.RESULT_CANCELED)
+            finish()
+            return
+        }
         lifecycleScope.launch {
             val saved = runCatching {
                 val glanceId = GlanceAppWidgetManager(this@WidgetConfigActivity).getGlanceIdBy(appWidgetId)

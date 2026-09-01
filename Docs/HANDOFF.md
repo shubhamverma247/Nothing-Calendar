@@ -14,6 +14,30 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Current user-reported QA focus is reminder notification behavior and Nothing Phone (3) Glyph
   progress. Continue one manual test at a time and wait for feedback before diagnosing or changing
   anything else.
+- Manual QA now passed on latest installed debug APK:
+  - Widget config opens/saves normally; widget removal does not freeze or crash.
+  - Reminder notification behavior and Nothing Phone (3) Glyph progress passed.
+  - Week/Day event tap opens the correct detail and back navigation returns cleanly.
+  - Google all-day imported reminder detail label shows human units such as `7 hours before`
+    instead of raw minute counts like `420 minutes before`.
+  - Event reminder picker presets now show in ascending time order: minutes first, then hours, then
+    day.
+  - Provider-backed custom event colors display correctly and do not fall back to DotCal red unless
+    the provider color is actually red.
+  - Multi-day all-day Google events display on each intended day with no one-day-early or missing
+    final-day behavior.
+  - DotCal reminder -> Google reminder sync passed; Google shows the same reminder offset with no
+    duplicate reminder rows.
+  - Google reminder -> DotCal reminder sync passed; DotCal imports the reminder offset without
+    duplicate reminder rows.
+  - DotCal delete one recurring occurrence -> Google hides only that occurrence; repeated sync does
+    not bring it back.
+  - Google delete one recurring occurrence -> DotCal hides only that occurrence; repeated sync does
+    not recreate it.
+  - Editing a recurring occurrence in DotCal and returning to detail now reopens the actual saved
+    event id, so the detail title updates immediately instead of requiring month-view reopen.
+  - DotCal edit one recurring occurrence -> Google passed after detail-refresh fix; edited title
+    appears immediately on return to detail.
 - Snooze Picker overlap fix verified manually on device in commit `2ff91cb`.
 - Latest pushed commit: see latest git history; keep remote synchronized after approved commits.
   Protected screenshots and `.claude/` remain untracked and untouched.
@@ -89,10 +113,21 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     permission, unavailable, cancellation, empty-result, and failure handling.
   - Quick Add preserves typed text while dictation runs; spoken text merges into the draft instead of
     replacing the typed prefix.
+  - Voice dictation debug/state/error logs were removed from release-capable code. Manual QA passed:
+    typed text plus dictated speech stays merged in the Quick Add draft.
   - Quick Settings Tile and launcher long-press Quick Add shortcut reuse `dotcal://quick-add`.
   - Month, Week, and Agenda export branded PNG cards through existing FileProvider sharing. Cards
     use view-specific layouts and event time zones; basic export remains Free.
   - Added unit coverage for voice error states and export layout selection.
+
+- Widget hardening after audit:
+  - Widget receiver delete/disable cleanup no longer uses `runBlocking` in broadcast callbacks.
+    Cleanup is handed off to `WidgetUpdateWorker`.
+  - Exported `WidgetConfigActivity` now validates that the incoming app widget id belongs to this
+    app's provider package before showing or saving config.
+  - Verification passed:
+    `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug` and
+    `.\gradlew.bat --no-daemon --console=plain :app:lintDebug`.
 
 - All-day Google/provider sync follow-up:
   - Existing calendar-date boundary conversion fix remains in place.
@@ -100,6 +135,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     event timezone into CalendarProvider.
   - Recurring all-day provider duration now writes day durations like `P2D`; timed recurring events
     keep second durations like `PT5400S`.
+  - Manual multi-day all-day Google event QA passed.
   - Focused provider unit test passed:
     `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest --tests com.dotfield.dotcal.data.provider.CalendarProviderDataSourceTest`.
 
@@ -107,6 +143,11 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - DotCal -> Google writes `CalendarContract.Reminders`.
   - Google -> DotCal imports provider reminder minutes.
   - Old local alarms are cancelled and future imported reminders are scheduled.
+  - Event detail reminder labels now format imported long offsets as human units. Example: Google
+    all-day reminder `420` minutes renders as `7 hours before`, not raw `420 minutes before`.
+    Manual QA passed.
+  - Manual DotCal -> Google reminder sync QA passed.
+  - Manual Google -> DotCal reminder sync QA passed.
 - Calendar sync handles recurrence exceptions:
   - Google `EXDATE` imports into DotCal `exceptionDates`.
   - DotCal deleted provider-backed single occurrences use Android's recurring exception row with
@@ -114,6 +155,11 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - DotCal edited single occurrence excludes original and creates a standalone provider event.
   - Google modified recurring occurrences import using `ORIGINAL_ID` / `ORIGINAL_INSTANCE_TIME`.
   - Modified Google occurrence rows import as standalone non-recurring DotCal rows.
+  - Manual DotCal delete one recurring occurrence -> Google QA passed.
+  - Manual Google delete one recurring occurrence -> DotCal QA passed.
+  - Manual DotCal edit one recurring occurrence -> Google QA passed. User found stale detail title
+    immediately after save; fixed by returning saved event id from repository save and reopening
+    that id after editor closes; retest passed.
 - Added transient provider exception metadata on `CalendarEvent` using `@Ignore`.
 - Added provider reminder/EXDATE helper tests.
 - Calendar overflow menu customization is implemented:
@@ -739,6 +785,14 @@ device-dependent.
 
 - Full UI string extraction and translation: language picker exists, but most visible text remains
   hardcoded English.
+- Lint cleanup debt is deferred:
+  - `HardcodedText` is mostly widget picker preview XML sample text; extract to strings or suppress
+    preview-only cases later.
+  - `UnusedResources` needs careful one-by-one pruning because some resources may be preview,
+    notification, or indirectly used.
+  - `Typos` is mostly Portuguese/Turkish/German translation spelling/accent cleanup.
+  - `UseKtx` is low-risk Kotlin style cleanup such as `toUri()`, `toColorInt()`, and
+    `createBitmap()`.
 - App Lock PIN hardening: current PIN storage needs a backward-compatible migration to a slow hash
   such as PBKDF2 plus failed-attempt backoff/lockout UI.
 - `DotCalApp.kt` remains large and should eventually be split into smaller route/state coordinators.

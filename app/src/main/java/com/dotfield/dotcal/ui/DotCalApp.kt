@@ -2999,8 +2999,7 @@ fun DotCalApp(
                 },
                 onSave = { data, scope ->
                     val shouldReturnToDetail = detailEvent != null && editingEvent != null
-                    val savedEventId = data.eventId ?: editingEvent?.baseEventId()
-                    viewModel.saveEvent(editingEvent, data, scope) {
+                    viewModel.saveEvent(editingEvent, data, scope) { savedEventId ->
                         viewModel.selectDate(data.date)
                         editingEvent = null
                         addEditorDateOverride = null

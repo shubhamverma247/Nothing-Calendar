@@ -990,17 +990,15 @@ class DotCalRepository(
         existing: CalendarEvent?,
         data: EventEditorData,
         recurringEditScope: RecurringEditScope = RecurringEditScope.WholeSeries,
-    ) {
+    ): CalendarEvent? {
         require(data.title.isNotBlank()) { "TITLE REQUIRED" }
         ensureLocalAccount()
         val zoneId = ZoneId.systemDefault()
         if (existing?.isRecurrenceOccurrence() == true && recurringEditScope == RecurringEditScope.ThisEvent) {
-            saveDetachedOccurrence(existing, data, zoneId)
-            return
+            return saveDetachedOccurrence(existing, data, zoneId)
         }
         if (existing?.isRecurrenceOccurrence() == true && recurringEditScope == RecurringEditScope.ThisAndFollowing) {
-            saveThisAndFollowingOccurrence(existing, data, zoneId)
-            return
+            return saveThisAndFollowingOccurrence(existing, data, zoneId)
         }
         val eventId = existing?.baseEventId() ?: data.eventId ?: UUID.randomUUID().toString()
         val existingMaster = if (existing?.isRecurrenceOccurrence() == true) {
@@ -1097,6 +1095,7 @@ class DotCalRepository(
             reminderScheduler.scheduleReminder(reminder, event)
         }
         updateWidgets()
+        return event
     }
 
     suspend fun deleteLocalEvent(
@@ -1947,8 +1946,8 @@ class DotCalRepository(
         return endTimeMs.coerceAtLeast(startTimeMs + 15 * 60 * 1000L)
     }
 
-    private suspend fun saveDetachedOccurrence(existing: CalendarEvent, data: EventEditorData, zoneId: ZoneId) {
-        val master = excludeOccurrence(existing) ?: return
+    private suspend fun saveDetachedOccurrence(existing: CalendarEvent, data: EventEditorData, zoneId: ZoneId): CalendarEvent? {
+        val master = excludeOccurrence(existing) ?: return null
         val start = if (data.isAllDay) {
             data.date.atStartOfDay(zoneId).toInstant().toEpochMilli()
         } else {
@@ -2003,6 +2002,7 @@ class DotCalRepository(
             reminderScheduler.scheduleReminder(reminder, syncedDetachedEvent)
         }
         updateWidgets()
+        return syncedDetachedEvent
     }
 
     private suspend fun excludeOccurrence(event: CalendarEvent, syncProvider: Boolean = true): CalendarEvent? {
@@ -2025,18 +2025,16 @@ class DotCalRepository(
         return syncedMaster
     }
 
-    private suspend fun saveThisAndFollowingOccurrence(existing: CalendarEvent, data: EventEditorData, zoneId: ZoneId) {
-        val occurrenceStartMs = existing.occurrenceStartMs() ?: return
+    private suspend fun saveThisAndFollowingOccurrence(existing: CalendarEvent, data: EventEditorData, zoneId: ZoneId): CalendarEvent? {
+        val occurrenceStartMs = existing.occurrenceStartMs() ?: return null
         val masterId = existing.baseEventId()
         val master = dao.getEvent(masterId) ?: existing.copy(id = masterId)
         if (master.rrule.isNullOrBlank()) {
-            saveLocalEvent(master, data, RecurringEditScope.WholeSeries)
-            return
+            return saveLocalEvent(master, data, RecurringEditScope.WholeSeries)
         }
         val splitDate = Instant.ofEpochMilli(occurrenceStartMs).atZone(safeZoneId(master.timeZone)).toLocalDate()
         if (splitDate <= master.startDate()) {
-            saveLocalEvent(master, data, RecurringEditScope.WholeSeries)
-            return
+            return saveLocalEvent(master, data, RecurringEditScope.WholeSeries)
         }
         val oldReminders = dao.getRemindersForEvent(master.id)
         val oldReminderMinutes = oldReminders.map { it.minutesBefore }.distinct().sorted()
@@ -2104,6 +2102,7 @@ class DotCalRepository(
             reminderScheduler.scheduleReminder(reminder, syncedNewEvent)
         }
         updateWidgets()
+        return syncedNewEvent
     }
 
     private suspend fun truncateSeriesBeforeOccurrence(event: CalendarEvent): CalendarEvent? {

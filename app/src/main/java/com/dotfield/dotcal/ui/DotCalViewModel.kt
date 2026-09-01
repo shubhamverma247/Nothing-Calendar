@@ -403,10 +403,10 @@ class DotCalViewModel(
         existing: CalendarEvent?,
         data: EventEditorData,
         recurringEditScope: RecurringEditScope = RecurringEditScope.WholeSeries,
-        onSaved: () -> Unit = {},
+        onSaved: (String?) -> Unit = {},
     ) {
         viewModelScope.launch {
-            repository.saveLocalEvent(
+            val savedEvent = repository.saveLocalEvent(
                 existing = existing,
                 data = data,
                 recurringEditScope = recurringEditScope,
@@ -414,8 +414,8 @@ class DotCalViewModel(
             if (existing == null) {
                 _lastSelectedEventAccountId.value = data.accountId
             }
-            (existing?.baseEventId() ?: data.eventId)?.let { refreshEventFileAttachments(it) }
-            onSaved()
+            (savedEvent?.baseEventId() ?: existing?.baseEventId() ?: data.eventId)?.let { refreshEventFileAttachments(it) }
+            onSaved(savedEvent?.id ?: savedEvent?.baseEventId())
         }
     }
 

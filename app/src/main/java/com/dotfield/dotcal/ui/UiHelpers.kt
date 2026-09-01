@@ -482,11 +482,30 @@ internal fun CalendarEvent.recurrenceDetailLabel(): String? {
  * sentence-cased at every call site, so the resources now carry the displayed casing directly.
  */
 @Composable
-internal fun EventReminder.detailLabel(): String = when (minutesBefore) {
-    1 -> stringResource(R.string.reminder_detail_1_minute_before)
-    60 -> stringResource(R.string.reminder_detail_1_hour_before)
-    1440 -> stringResource(R.string.reminder_detail_1_day_before)
-    else -> pluralStringResource(R.plurals.reminder_detail_minutes_before, minutesBefore, minutesBefore)
+internal fun EventReminder.detailLabel(): String {
+    val display = reminderOffsetDisplay(minutesBefore)
+    return when (display.unit) {
+        ReminderOffsetUnit.Minute -> pluralStringResource(
+            R.plurals.reminder_detail_minutes_before,
+            minutesBefore,
+            minutesBefore,
+        )
+        ReminderOffsetUnit.Hour -> if (display.value == "1") {
+            stringResource(R.string.reminder_detail_1_hour_before)
+        } else {
+            stringResource(R.string.reminder_hours_before, display.value)
+        }
+        ReminderOffsetUnit.Day -> if (display.value == "1") {
+            stringResource(R.string.reminder_detail_1_day_before)
+        } else {
+            stringResource(R.string.reminder_days_before, display.value)
+        }
+        ReminderOffsetUnit.Week -> if (display.value == "1") {
+            stringResource(R.string.reminder_1_week_before)
+        } else {
+            stringResource(R.string.reminder_weeks_before, display.value)
+        }
+    }
 }
 
 /**
