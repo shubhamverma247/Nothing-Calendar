@@ -180,7 +180,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
@@ -1099,6 +1098,7 @@ internal fun QuickAddScreen(
     onCommand: (SmartQuickAddCommand, CalendarEvent?) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var text by remember { mutableStateOf("") }
     var voiceState by remember { mutableStateOf(VoiceDictationState.Ready) }
     val voiceController = remember(context) { VoiceDictationController(context, { voiceState = it }, { text = it }) }
@@ -1207,6 +1207,7 @@ internal fun QuickAddScreen(
                     },
                 )
                 IconButton(onClick = {
+                    keyboardController?.hide()
                     if (voiceState == VoiceDictationState.Listening) voiceController.cancel()
                     else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) voiceController.start()
                     else microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
