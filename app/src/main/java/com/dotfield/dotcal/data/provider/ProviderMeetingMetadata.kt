@@ -21,9 +21,12 @@ data class ProviderMeetingMetadata(
 )
 
 internal fun ProviderMeetingMetadata.hasMeaningfulMeetingDetails(): Boolean {
-    return attendees.isNotEmpty() ||
-        accessLevel?.let { it != CalendarContract.Events.ACCESS_DEFAULT } == true ||
-        availability?.let { it != CalendarContract.Events.AVAILABILITY_BUSY } == true
+    return attendees.any { it.isGuestAttendee() }
+}
+
+internal fun ProviderAttendee.isGuestAttendee(): Boolean {
+    return relationship != CalendarContract.Attendees.RELATIONSHIP_ORGANIZER &&
+        (name?.isNotBlank() == true || email?.isNotBlank() == true)
 }
 
 internal fun encodeProviderMeetingMetadata(metadata: ProviderMeetingMetadata): String? {

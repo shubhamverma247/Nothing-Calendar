@@ -1099,9 +1099,15 @@ internal fun QuickAddScreen(
 ) {
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    var text by remember { mutableStateOf("") }
+    var manualText by remember { mutableStateOf("") }
+    var spokenText by remember { mutableStateOf("") }
     var voiceState by remember { mutableStateOf(VoiceDictationState.Ready) }
-    val voiceController = remember(context) { VoiceDictationController(context, { voiceState = it }, { text = it }) }
+    val text = remember(manualText, spokenText) { mergeVoiceDictationText(manualText, spokenText) }
+    val voiceController = remember(context) {
+        VoiceDictationController(context, { voiceState = it }, { transcript ->
+            spokenText = transcript
+        })
+    }
     val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) voiceController.start() else voiceState = VoiceDictationState.PermissionDenied
     }
@@ -1177,7 +1183,10 @@ internal fun QuickAddScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                 BasicTextField(
                     value = text,
-                    onValueChange = { text = it.replace("\n", "") },
+                    onValueChange = {
+                        manualText = it.replace("\n", "")
+                        spokenText = ""
+                    },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { submit() }),
@@ -1297,7 +1306,10 @@ internal fun QuickAddScreen(
                                         style = Stroke(width = 1.dp.toPx()),
                                     )
                                 }
-                                .noRippleClickable { text = example }
+                                .noRippleClickable {
+                                    manualText = example
+                                    spokenText = ""
+                                }
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                         ) {
                             Text(example, color = palette.secondaryText, fontFamily = mono, fontSize = 13.sp)

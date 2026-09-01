@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-08-31
+Updated: 2026-09-01
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 `Docs/HANDOFF.original.md`. Do not touch `Docs/HANDOFF - Copy.md` or user-owned
@@ -21,6 +21,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Local release target: `versionCode 36`, `versionName 1.4.0`.
 - Latest debug APK was installed successfully on device `000153573000720` (Nothing Phone (3),
   Android 16/API 36) with `adb install -r`; app package is `com.dotfield.dotcal`.
+- Connected reference phone also has Business Calendar 2 installed as `com.appgenix.bizcal`.
 - Expected untracked user file: `Docs/FEEDBACK.md`; leave it untouched.
 
 ## Hard Rules
@@ -62,7 +63,9 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 
 - 1. Fix provider-backed custom event colors so new CalDav/Google events do not fall back to red.
 - 2. Verify Week/Day event tap behavior on device; detail open should work consistently outside Agenda.
-- 3. Track the whole-day one-day-early report as the next sync/timezone bug to reproduce with device and timezone details.
+- 3. Whole-day one-day-early report is assumed fixed for now because it no longer reproduces on the
+  user's phone. Code-level follow-up also forced all-day provider writes to use UTC provider timezone
+  and day-based recurring durations.
 - 4. Add a faster edit action in the event detail flow if it fits the current UI pattern.
 - 5. Play Console shows an R8 / optimized resource shrinking warning. Keep it on the release hygiene list for the AGP upgrade path.
 - 6. Continue reminder notification QA one manual test at a time; wait for feedback before the next
@@ -84,10 +87,21 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Phase 1 quick wins completed locally:
   - Smart Quick Add voice dictation uses Android on-device SpeechRecognizer when supported, with
     permission, unavailable, cancellation, empty-result, and failure handling.
+  - Quick Add preserves typed text while dictation runs; spoken text merges into the draft instead of
+    replacing the typed prefix.
   - Quick Settings Tile and launcher long-press Quick Add shortcut reuse `dotcal://quick-add`.
   - Month, Week, and Agenda export branded PNG cards through existing FileProvider sharing. Cards
     use view-specific layouts and event time zones; basic export remains Free.
   - Added unit coverage for voice error states and export layout selection.
+
+- All-day Google/provider sync follow-up:
+  - Existing calendar-date boundary conversion fix remains in place.
+  - Provider writes now use `EVENT_TIMEZONE = "UTC"` for all-day rows instead of carrying local
+    event timezone into CalendarProvider.
+  - Recurring all-day provider duration now writes day durations like `P2D`; timed recurring events
+    keep second durations like `PT5400S`.
+  - Focused provider unit test passed:
+    `.\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest --tests com.dotfield.dotcal.data.provider.CalendarProviderDataSourceTest`.
 
 - Calendar sync handles reminders both ways:
   - DotCal -> Google writes `CalendarContract.Reminders`.
@@ -153,6 +167,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     organizer, access/private-public visibility, availability/transparency, guest permissions,
     attendee name/email/status/type/relationship, and RSVP-ish attendee status are preserved under
     `ProviderMeetingMetadata`.
+  - Meeting section rendering is attendee-only now. Organizer/self-only provider rows are filtered
+    out so normal Google events no longer show a meeting block in detail.
   - Provider-cancelled recurring instances now become parent exceptions only; they no longer import
     as standalone visible events.
   - Calendar-move duplicate guard deletes stale local provider rows with the same `googleEventId`
@@ -221,6 +237,14 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     `git diff --check` passed with CRLF warnings only.
   - Latest local install succeeded on device `000153573000720`:
     `C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk`.
+  - Fresh widget config refresh hardening:
+    - Root cause of stale first paint was launcher/widget-host attach lag after save, not bad widget config persistence.
+    - Fixed by scheduling multiple exact-instance refresh retries after save instead of a single 750 ms follow-up.
+    - Current retry cadence: 750 ms, 3 s, and 10 s.
+  - Widget config editor support gating:
+    - Tap action now shows only for widget types that actually use tap actions, so the editor no longer offers misleading unsupported choices.
+    - Switching away from `Quick Actions` resets unsupported tap actions back to `OpenCalendar`.
+    - `Countdown` / D-Day widget remains countdown-only; its tap still opens the event or add-event flow, not task creation.
 - Auto-Buffers foundation completed:
   - Global before/after meeting buffers persist in DataStore; no Room schema change.
   - Free-slot calculations pad busy periods, including recurrence-expanded and overnight events.
@@ -323,35 +347,63 @@ After next debug install, prioritize:
 - Full-screen reminder alert: PASS on device `000153573000720` after the lock-screen activity fix.
   Event detail opens full-screen while phone is locked; notification and full-screen intent
   permissions are granted. Snooze from lock screen may still request unlock by Android security.
-- Next single manual test: turn full-screen alert OFF, create a disposable event starting about
-  3 minutes from now with a `1 min before` reminder, then expand its standard notification.
-  Expected: one notification; title and reminder text fully visible; no clipping/overlap; reminder
-  action layout readable. Wait for feedback before testing another path.
-- Previous repeat test: enable `Repeat until dismissed`, set `Repeat interval` to `5 min`, then
-  create a disposable event starting 7 minutes from now with its reminder set to `5 min before`.
-  Expected: first reminder arrives about 2 minutes from now; untouched notification repeats about
-  5 minutes later; dismissing it prevents another repeat. Wait for feedback before testing
-  full-screen behavior or notification layout.
+- Repeat until dismissed: PASS. Five-minute repeat arrived; dismissing the reminder prevented
+  another repeat.
+- Standard notification layout: PASS with full-screen alert OFF. Expanded notification showed one
+  readable reminder with no clipping or overlap.
 
-- Open phone widget picker.
-  - Expected: 7 entries visible: `DC 1x1 Date`, `DC 2x2 Event`, `DC 4x2 Agenda`,
-    `DC 4x4 Month`, `DC Count`, `DC Agenda`, and `DC Month`.
-- Add `DC 1x1 Date`.
-  - Expected: compact date tile; no generic configurable label.
-- Add any configurable widget.
-  - Expected: `WidgetConfigActivity` opens, saves configuration, then places/updates the widget.
-- Add `2x2` Schedule widget.
-  - Expected: one strongest upcoming event only; no cramped list.
-- Add `4x2` Schedule widget with `Next 14 Days`.
-  - Expected: date badge at left; first event dominant; up to two compact rows; no clipping.
-- Add `4x4` Schedule widget with `Next 14 Days`.
-  - Expected: `SCHEDULE / NEXT 14 DAYS` header; up to four rows; `+X MORE` when needed.
+- Widget picker: PASS. All 7 entries visible: `DC 1x1 Date`, `DC 2x2 Event`, `DC 4x2 Agenda`,
+  `DC 4x4 Month`, `DC Count`, `DC Agenda`, and `DC Month`.
+- `DC 1x1 Date` widget: PASS. Compact date tile rendered with correct current date and no generic
+  configurable label.
+- Configurable widget setup: PASS. `WidgetConfigActivity` opened; save placed the widget correctly.
+- `2x2` Schedule widget: PASS. One strongest upcoming event rendered without cramped rows.
+- `4x2` Schedule widget with `Next 14 Days`: PASS. Date badge, dominant first event, compact rows,
+  and no clipping rendered correctly.
+- `4x4` Schedule widget with `Next 14 Days`: PASS. Header, capped rows, and overflow behavior
+  rendered correctly.
 - Add `4x4` Calendar widget and resize it vertically.
   - PASS on device `000153573000720`.
   - Expected: month grid remains readable; agenda uses available height; 17 events render without
     Glance truncation; `+X MORE` appears only when the resized height cannot fit all events.
-- Configure Quick Actions for Quick Add, Add Task, and Search.
-  - Expected: each tap opens the matching app screen, not a fallback calendar screen.
+- Fresh 2x2 Event widget configuration matrix: PASS on device `000153573000720`.
+  - Quick Actions showed only supported tap-action choices.
+  - Countdown hid tap-action controls and stayed countdown-only.
+  - Other widget types hid unsupported tap actions.
+  - Save updated first paint immediately; no stale `CONFIGURE` placeholder and no extra app open
+    was needed.
+  - Re-editing one widget through Quick Actions -> Countdown -> other types did not leak stale
+    config across widget types.
+  - Multiple placed widget instances stayed isolated; changing one did not overwrite another.
+  - Resize behavior passed across 2x2, 4x2, and 4x4; saved config stayed intact with no crop or
+    overlap.
+  - Rotation/unlock and cold-start refresh paths passed; widget content remained stable.
+  - No Glance/widget refresh errors were reported during the manual save checks.
+- Quick Actions first-save refresh hardened (pending device retest): root cause was the default
+  Small widget event branch emitting 11 direct children in one Glance `Column`, exceeding the
+  10-child RemoteViews limit and aborting later config renders. Event details are now nested;
+  the config screen also refreshes the exact app-widget instance and schedules a short
+  post-launcher hand-off retry. Multiple placed widgets remain independent; a newly added second
+  widget still starts with its default Schedule config until explicitly configured.
+  - Next manual QA should move off widgets and cover the other post-22-August features:
+  - Quick capture: Smart Quick Add text, invalid-command safety, voice dictation, Quick Settings
+    Tile, and launcher shortcut.
+    - Expected flow: valid command shows preview first, then opens Add Event with prefills for
+      final confirmation.
+    - Voice QA note: spoken `Dentist tomorrow at 5 PM` was parsed with wrong title/time in preview
+      (`dentist at pm`, `5 AM-6 AM`). Treat as voice parsing / AM-PM normalization bug until fixed.
+    - Fixed: QuickAddParser now normalizes spaced and dotted meridiem forms like `p m`, `a m`,
+      `p.m.`, and `a.m.` before parsing; regression test added for voice-style `Dentist tomorrow at
+      5 p m`.
+  - Smart planning: Auto-Buffers plus Find-a-Time slot suggestions and Use Slot prefill.
+  - Sharing/files: Month/Week/Agenda image export, event ICS/PDF/QR export, availability text, and
+    shift-plan export.
+  - Privacy/power tools: Search, Templates, Calendar Sets, Bulk Edit, App Lock, Private Vault, and
+    Backup/Restore.
+  - Reminders/Glyph: snooze presets, complete/open actions, repeat-until-dismissed, full-screen
+    lock-screen alert, vibration/sound behavior, and Glyph lifecycle.
+  - Sync/recurrence: provider meeting metadata, single-occurrence edit/delete, EXDATE/RDATE, all-day
+    timezone boundaries, reminders, and attendees.
 - DotCal reminder -> Google reminder.
 - Google reminder -> DotCal reminder.
 - DotCal delete one recurring occurrence -> Google hides that occurrence.

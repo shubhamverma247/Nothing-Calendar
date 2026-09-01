@@ -150,6 +150,39 @@ class CalendarProviderDataSourceTest {
     }
 
     @Test
+    fun providerEventTimeZoneUsesUtcForAllDayEvents() {
+        assertEquals("UTC", providerEventTimeZone(1, "Asia/Kolkata"))
+        assertEquals("Asia/Kolkata", providerEventTimeZone(0, "Asia/Kolkata"))
+    }
+
+    @Test
+    fun providerDurationFormatsAllDayRecurringEventsAsDays() {
+        val zone = ZoneId.of("Asia/Kolkata")
+        val start = LocalDate.of(2026, 8, 22).atStartOfDay(zone).toInstant().toEpochMilli()
+        val event = providerDurationEvent(
+            startTimeMs = start,
+            endTimeMs = start + 2L * 24L * 60L * 60L * 1000L,
+            isAllDay = 1,
+            timeZone = zone.id,
+        )
+
+        assertEquals("P2D", event.providerDuration())
+    }
+
+    @Test
+    fun providerDurationFormatsTimedRecurringEventsAsSeconds() {
+        val start = LocalDateTime.of(2026, 8, 22, 9, 30).toInstant(ZoneOffset.UTC).toEpochMilli()
+        val event = providerDurationEvent(
+            startTimeMs = start,
+            endTimeMs = start + 90L * 60L * 1000L,
+            isAllDay = 0,
+            timeZone = "UTC",
+        )
+
+        assertEquals("PT5400S", event.providerDuration())
+    }
+
+    @Test
     fun providerReminderAlarmRequestCodeIsStableForEventAndMinutes() {
         assertEquals(
             providerReminderAlarmRequestCode("event-1", 15),
@@ -208,4 +241,30 @@ class CalendarProviderDataSourceTest {
         assertEquals("P1D", providerCanceledOccurrenceDuration(localStart, localStart + 24 * 60 * 60 * 1000L, 1))
         assertEquals(utcStart, providerCanceledOccurrenceTime(localStart, 1, zone.id))
     }
+
+    private fun providerDurationEvent(
+        startTimeMs: Long,
+        endTimeMs: Long,
+        isAllDay: Int,
+        timeZone: String,
+    ) = com.dotfield.dotcal.data.CalendarEvent(
+        id = "duration-event",
+        accountId = "provider-calendar-1",
+        title = "Duration",
+        startTimeMs = startTimeMs,
+        endTimeMs = endTimeMs,
+        timeZone = timeZone,
+        isAllDay = isAllDay,
+        colorHex = null,
+        rrule = "FREQ=DAILY;COUNT=2",
+        source = "GOOGLE",
+        googleEventId = "1",
+        googleCalendarId = "1",
+        isTask = 0,
+        isCompleted = 0,
+        completedAtMs = null,
+        voiceNotePath = null,
+        createdAtMs = startTimeMs,
+        updatedAtMs = startTimeMs,
+    )
 }

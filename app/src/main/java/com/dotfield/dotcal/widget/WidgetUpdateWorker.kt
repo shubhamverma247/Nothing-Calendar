@@ -9,20 +9,38 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import java.util.concurrent.TimeUnit
 
 class WidgetUpdateWorker(
     appContext: Context,
     workerParameters: WorkerParameters,
 ) : CoroutineWorker(appContext, workerParameters) {
     override suspend fun doWork(): Result {
-            updateNow(applicationContext)
-            return Result.success()
+        val configuredId = inputData.getInt(APP_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (configuredId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            if (AppWidgetManager.getInstance(applicationContext).getAppWidgetInfo(configuredId) == null) {
+                return Result.success()
+            }
+            return runCatching {
+                updateConfiguredWidgetNow(applicationContext, configuredId)
+            }.fold(
+                onSuccess = { Result.success() },
+                onFailure = { if (runAttemptCount < 3) Result.retry() else Result.failure() },
+            )
+        }
+        updateNow(applicationContext)
+        return Result.success()
     }
 
     companion object {
         private const val UNIQUE_WORK = "dotcal_widget_update"
+        private const val CONFIGURED_WIDGET_WORK_PREFIX = "dotcal_widget_configured_"
+        private const val APP_WIDGET_ID = "app_widget_id"
+        private const val CONFIGURED_WIDGET_ATTEMPT_COUNT = 3
+        private val CONFIGURED_WIDGET_ATTEMPT_DELAYS = longArrayOf(750L, 3_000L, 10_000L)
 
         fun enqueue(context: Context) {
             // KEEP (not REPLACE): several receivers enqueue on the same trigger; REPLACE would
@@ -33,6 +51,21 @@ class WidgetUpdateWorker(
                 ExistingWorkPolicy.KEEP,
                 request,
             )
+        }
+
+        fun enqueueConfiguredWidgetUpdate(context: Context, appWidgetId: Int) {
+            val workManager = WorkManager.getInstance(context.applicationContext)
+            repeat(CONFIGURED_WIDGET_ATTEMPT_COUNT) { attempt ->
+                val request = OneTimeWorkRequestBuilder<WidgetUpdateWorker>()
+                    .setInitialDelay(CONFIGURED_WIDGET_ATTEMPT_DELAYS[attempt], TimeUnit.MILLISECONDS)
+                    .setInputData(workDataOf(APP_WIDGET_ID to appWidgetId))
+                    .build()
+                workManager.enqueueUniqueWork(
+                    "$CONFIGURED_WIDGET_WORK_PREFIX$appWidgetId-$attempt",
+                    ExistingWorkPolicy.REPLACE,
+                    request,
+                )
+            }
         }
 
         suspend fun updateNow(context: Context) {
@@ -55,6 +88,27 @@ class WidgetUpdateWorker(
             notifyWidgetHost(appContext, CompactMonthDotCalWidgetReceiver::class.java)
         }
 
+        /**
+         * Refresh the widget that was just configured instead of waiting for a provider-wide
+         * enumeration. During the launcher configure flow the new app-widget id can be visible
+         * to the host before it appears in getGlanceIds(), which otherwise leaves the saved
+         * config rendered only after the next host refresh.
+         */
+        suspend fun updateConfiguredWidgetNow(context: Context, appWidgetId: Int) {
+            val appContext = context.applicationContext
+            val kind = legacyKindForAppWidget(appWidgetId, appContext)
+            val widget = widgetForKind(kind)
+            val glanceId = GlanceAppWidgetManager(appContext).getGlanceIdBy(appWidgetId)
+            registerConfiguredWidget(
+                appContext,
+                receiverClassNameForWidgetKind(kind),
+                appWidgetId,
+            )
+            syncDotCalWidgetState(appContext, glanceId, kind)
+            widget.update(appContext, glanceId)
+            notifyWidgetHost(appContext, receiverClassForWidgetKind(kind))
+        }
+
         private suspend fun updateWidget(
             context: Context,
             widget: GlanceAppWidget,
@@ -71,6 +125,30 @@ class WidgetUpdateWorker(
                 syncDotCalWidgetState(context, glanceId, legacyKind)
                 widget.update(context, glanceId)
             }
+        }
+
+        private fun widgetForKind(kind: LegacyWidgetKind): GlanceAppWidget = when (kind) {
+            LegacyWidgetKind.DateOnly -> DateOnlyDotCalWidget()
+            LegacyWidgetKind.MonthCompact -> CompactMonthDotCalWidget()
+            LegacyWidgetKind.ShiftWide -> ShiftWideDotCalWidget()
+            LegacyWidgetKind.Small -> SmallDotCalWidget()
+            LegacyWidgetKind.Medium -> MediumDotCalWidget()
+            LegacyWidgetKind.Large -> LargeDotCalWidget()
+            LegacyWidgetKind.Countdown -> EventCountdownDotCalWidget()
+            LegacyWidgetKind.Agenda -> AgendaListDotCalWidget()
+            LegacyWidgetKind.MonthGrid -> MonthGridDotCalWidget()
+        }
+
+        private fun receiverClassForWidgetKind(kind: LegacyWidgetKind): Class<*> = when (kind) {
+            LegacyWidgetKind.DateOnly -> DateOnlyDotCalWidgetReceiver::class.java
+            LegacyWidgetKind.MonthCompact -> CompactMonthDotCalWidgetReceiver::class.java
+            LegacyWidgetKind.ShiftWide -> ShiftWideWidgetReceiver::class.java
+            LegacyWidgetKind.Small -> SmallDotCalWidgetReceiver::class.java
+            LegacyWidgetKind.Medium -> MediumDotCalWidgetReceiver::class.java
+            LegacyWidgetKind.Large -> LargeDotCalWidgetReceiver::class.java
+            LegacyWidgetKind.Countdown -> EventCountdownWidgetReceiver::class.java
+            LegacyWidgetKind.Agenda -> AgendaListWidgetReceiver::class.java
+            LegacyWidgetKind.MonthGrid -> MonthGridWidgetReceiver::class.java
         }
 
         private fun notifyWidgetHosts(context: Context) {

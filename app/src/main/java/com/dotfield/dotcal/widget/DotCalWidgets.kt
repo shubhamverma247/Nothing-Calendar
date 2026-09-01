@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.Preferences
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.GlanceId
@@ -38,6 +39,7 @@ import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.state.GlanceStateDefinition
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.background
+import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -113,9 +115,27 @@ abstract class DotCalWidget(
             monthOffset = if (widgetSize == DotCalWidgetSize.MonthCompact) settings.monthOffset else 0,
         )
         provideContent {
-            val palette = dotCalWidgetPalette(context, currentDotCalWidgetSettings())
+            val widgetState = currentState<Preferences>()
+            val liveSettings = currentDotCalWidgetSettings()
+            val liveConfig = liveSettings.instanceConfig
+            val palette = dotCalWidgetPalette(context, liveSettings)
             DotCalGlanceTheme {
-                ConfiguredWidget(context, config, widgetSize, data, palette)
+                if (
+                    widgetState[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG] == null &&
+                    widgetSize != DotCalWidgetSize.DateOnly &&
+                    widgetSize != DotCalWidgetSize.MonthCompact
+                ) {
+                    WidgetSurfaceBox(palette) {
+                        Box(
+                            modifier = GlanceModifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CompactAddPrompt("CONFIGURE", 26, palette)
+                        }
+                    }
+                } else {
+                    ConfiguredWidget(context, liveConfig, widgetSize, data, palette)
+                }
             }
         }
     }
@@ -349,12 +369,17 @@ private fun SmallWidget(
                     CompactAddPrompt("ADD EVENT", 22, palette)
                 }
             } else {
-                Text(countdownLabel(item), maxLines = 1, style = monoStyle(palette.accent, 18, FontWeight.Bold))
-                Spacer(GlanceModifier.height(2.dp))
-                Text(item.displayTitle(config), maxLines = 1, style = primaryStyle(palette, 14, FontWeight.Bold))
-                if (config.content.showTime || config.content.showLocation) {
-                    Spacer(GlanceModifier.height(3.dp))
-                    Text(item.detailLine(config), maxLines = 1, style = monoStyle(palette.secondary, 9, FontWeight.Normal))
+                // Keep the outer Column below Glance's 10 direct-child limit. The event
+                // details are one logical block, so nesting them also prevents the default
+                // Small widget from aborting later Quick Actions refreshes.
+                Column {
+                    Text(countdownLabel(item), maxLines = 1, style = monoStyle(palette.accent, 18, FontWeight.Bold))
+                    Spacer(GlanceModifier.height(2.dp))
+                    Text(item.displayTitle(config), maxLines = 1, style = primaryStyle(palette, 14, FontWeight.Bold))
+                    if (config.content.showTime || config.content.showLocation) {
+                        Spacer(GlanceModifier.height(3.dp))
+                        Text(item.detailLine(config), maxLines = 1, style = monoStyle(palette.secondary, 9, FontWeight.Normal))
+                    }
                 }
             }
         }

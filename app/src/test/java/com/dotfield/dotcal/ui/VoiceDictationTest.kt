@@ -18,6 +18,12 @@ class VoiceDictationTest {
         assertEquals(com.dotfield.dotcal.R.string.quick_add_voice_empty, VoiceDictationState.Empty.stringRes())
     }
 
+    @Test fun mergesTypedAndSpokenTextWithoutDroppingPrefix() {
+        assertEquals("Dentist tomorrow at 5 p m", mergeVoiceDictationText("Dentist", "tomorrow at 5 p m"))
+        assertEquals("next monday", mergeVoiceDictationText("", "next monday"))
+        assertEquals("Dentist", mergeVoiceDictationText("Dentist", ""))
+    }
+
     @Test fun calendarExportSelectsRequestedLayout() {
         assertEquals("month", CardImageExporter.calendarViewLayout("Month"))
         assertEquals("week", CardImageExporter.calendarViewLayout("WEEK"))

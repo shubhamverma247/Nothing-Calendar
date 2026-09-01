@@ -1,9 +1,9 @@
 package com.dotfield.dotcal.data.provider
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 import android.provider.CalendarContract
 
@@ -52,8 +52,8 @@ class ProviderMeetingMetadataTest {
     fun defaultProviderFieldsDoNotCountAsMeetingDetails() {
         val metadata = ProviderMeetingMetadata(
             organizer = "account@example.com",
-            accessLevel = CalendarContract.Events.ACCESS_DEFAULT,
-            availability = CalendarContract.Events.AVAILABILITY_BUSY,
+            accessLevel = 1,
+            availability = 1,
             guestsCanModify = true,
             guestsCanInviteOthers = true,
             guestsCanSeeGuests = true,
@@ -62,16 +62,23 @@ class ProviderMeetingMetadataTest {
         assertFalse(metadata.hasMeaningfulMeetingDetails())
     }
 
-    @Test
-    fun attendeesOrNonDefaultProviderFieldsCountAsMeetingDetails() {
+    @Test fun attendeesCountAsMeetingDetails() {
         assertTrue(
             ProviderMeetingMetadata(
                 attendees = listOf(ProviderAttendee(email = "guest@example.com")),
             ).hasMeaningfulMeetingDetails(),
         )
-        assertTrue(
+    }
+
+    @Test fun organizerOnlyAttendeeDoesNotCountAsMeetingDetails() {
+        assertFalse(
             ProviderMeetingMetadata(
-                availability = CalendarContract.Events.AVAILABILITY_TENTATIVE,
+                attendees = listOf(
+                    ProviderAttendee(
+                        email = "owner@example.com",
+                        relationship = CalendarContract.Attendees.RELATIONSHIP_ORGANIZER,
+                    ),
+                ),
             ).hasMeaningfulMeetingDetails(),
         )
     }

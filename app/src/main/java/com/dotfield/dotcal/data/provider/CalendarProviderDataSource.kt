@@ -136,7 +136,7 @@ class CalendarProviderDataSource(private val context: Context) {
             providerEventId,
         )
         val providerStartMs = providerCanceledOccurrenceTime(occurrenceStartMs, isAllDay, timeZone)
-        val providerTimeZone = if (isAllDay == 1) ZoneOffset.UTC.id else timeZone
+        val providerTimeZone = providerEventTimeZone(isAllDay, timeZone)
         val values = ContentValues().apply {
             put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, providerStartMs)
             put(CalendarContract.Events.DTSTART, providerStartMs)
@@ -295,7 +295,7 @@ class CalendarProviderDataSource(private val context: Context) {
                 event.startTimeMs
             }
             put(CalendarContract.Events.DTSTART, providerStartMs)
-            put(CalendarContract.Events.EVENT_TIMEZONE, event.timeZone)
+            put(CalendarContract.Events.EVENT_TIMEZONE, providerEventTimeZone(event.isAllDay, event.timeZone))
             put(CalendarContract.Events.ALL_DAY, event.isAllDay)
             if (event.rrule.isNullOrBlank()) {
                 val providerEndMs = if (event.isAllDay == 1) {
@@ -442,15 +442,14 @@ class CalendarProviderDataSource(private val context: Context) {
         return cursor.use { attendees ->
             buildList {
                 while (attendees.moveToNext()) {
-                    add(
-                        ProviderAttendee(
-                            name = attendees.getStringOrNull(ATTENDEE_NAME_INDEX),
-                            email = attendees.getStringOrNull(ATTENDEE_EMAIL_INDEX),
-                            status = attendees.getIntOrNull(ATTENDEE_STATUS_INDEX),
-                            type = attendees.getIntOrNull(ATTENDEE_TYPE_INDEX),
-                            relationship = attendees.getIntOrNull(ATTENDEE_RELATIONSHIP_INDEX),
-                        ),
+                    val attendee = ProviderAttendee(
+                        name = attendees.getStringOrNull(ATTENDEE_NAME_INDEX),
+                        email = attendees.getStringOrNull(ATTENDEE_EMAIL_INDEX),
+                        status = attendees.getIntOrNull(ATTENDEE_STATUS_INDEX),
+                        type = attendees.getIntOrNull(ATTENDEE_TYPE_INDEX),
+                        relationship = attendees.getIntOrNull(ATTENDEE_RELATIONSHIP_INDEX),
                     )
+                    if (attendee.isGuestAttendee()) add(attendee)
                 }
             }
         }
@@ -480,15 +479,16 @@ class CalendarProviderDataSource(private val context: Context) {
             cursor.use { attendees ->
                 while (attendees.moveToNext()) {
                     val eventId = attendees.getLong(0).toString()
-                    result.getOrPut(eventId) { mutableListOf() }.add(
-                        ProviderAttendee(
-                            name = attendees.getStringOrNull(1),
-                            email = attendees.getStringOrNull(2),
-                            status = attendees.getIntOrNull(3),
-                            type = attendees.getIntOrNull(4),
-                            relationship = attendees.getIntOrNull(5),
-                        ),
+                    val attendee = ProviderAttendee(
+                        name = attendees.getStringOrNull(1),
+                        email = attendees.getStringOrNull(2),
+                        status = attendees.getIntOrNull(3),
+                        type = attendees.getIntOrNull(4),
+                        relationship = attendees.getIntOrNull(5),
                     )
+                    if (attendee.isGuestAttendee()) {
+                        result.getOrPut(eventId) { mutableListOf() }.add(attendee)
+                    }
                 }
             }
         }
@@ -600,6 +600,7 @@ fun providerCalendarId(accountId: String): Long? = accountId.substringAfter("pro
 fun providerEventRoomId(calendarId: Long, eventId: String): String = "provider-calendar-$calendarId-event-$eventId"
 
 private const val DEFAULT_PROVIDER_COLOR = "#FF3B30"
+private const val PROVIDER_UTC_TIMEZONE = "UTC"
 
 private fun colorIntToHex(color: Int): String = "#%06X".format(0xFFFFFF and color)
 
@@ -608,9 +609,15 @@ private fun String.toProviderColor(): Int? {
     return hex.toLongOrNull(16)?.toInt()
 }
 
-private fun CalendarEvent.providerDuration(): String {
-    val seconds = ((endTimeMs - startTimeMs).coerceAtLeast(60_000L)) / 1000L
-    return "PT${seconds}S"
+internal fun CalendarEvent.providerDuration(): String {
+    return if (isAllDay == 1) {
+        val dayMs = 24L * 60L * 60L * 1000L
+        val days = ((endTimeMs - startTimeMs).coerceAtLeast(dayMs) + dayMs - 1L) / dayMs
+        "P${days}D"
+    } else {
+        val seconds = ((endTimeMs - startTimeMs).coerceAtLeast(60_000L)) / 1000L
+        "PT${seconds}S"
+    }
 }
 
 internal fun List<Int>.normalizedProviderReminderMinutes(): List<Int> {
@@ -753,6 +760,10 @@ private fun parseProviderDateToken(token: String, isAllDay: Int, zone: ZoneId): 
 
 private fun safeProviderZone(id: String): ZoneId {
     return runCatching { ZoneId.of(id) }.getOrDefault(ZoneId.systemDefault())
+}
+
+internal fun providerEventTimeZone(isAllDay: Int, timeZone: String): String {
+    return if (isAllDay == 1) PROVIDER_UTC_TIMEZONE else timeZone
 }
 
 /** Converts an all-day boundary by calendar date, never by elapsed milliseconds. */

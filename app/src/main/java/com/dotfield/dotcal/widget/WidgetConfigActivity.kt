@@ -181,7 +181,14 @@ class WidgetConfigActivity : ComponentActivity() {
                 .orEmpty()
             runCatching { registerConfiguredWidget(this@WidgetConfigActivity, receiverClass, appWidgetId) }
                 .onFailure { Log.e(TAG, "Failed to register widget $appWidgetId", it) }
-            WidgetUpdateWorker.updateNow(this@WidgetConfigActivity)
+            runCatching {
+                WidgetUpdateWorker.updateConfiguredWidgetNow(this@WidgetConfigActivity, appWidgetId)
+            }.onFailure {
+                Log.e(TAG, "Failed to refresh configured widget $appWidgetId", it)
+            }
+            // The launcher attaches a newly configured widget after this activity returns.
+            // Refresh the exact instance again after that hand-off.
+            WidgetUpdateWorker.enqueueConfiguredWidgetUpdate(this@WidgetConfigActivity, appWidgetId)
             val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             setResult(Activity.RESULT_OK, result)
             finish()
@@ -390,7 +397,7 @@ private fun WidgetConfigScreen(
         }
     }
 
-    val profile = profileForKind(kind)
+    val profile = profileForKind(kind).copy(showTapAction = supportsTapAction(config.category))
     val hasContentRows = profile.showTimeRange || profile.showCalendar || profile.showDisplay || profile.showDensity
 
     fun accountDisplayName(id: String): String =
@@ -1081,6 +1088,8 @@ private fun WidgetPreviewCard(ui: EditorPalette, config: WidgetInstanceConfig, a
     }
 }
 
+private fun supportsTapAction(category: WidgetCategory): Boolean = category == WidgetCategory.QuickActions
+
 private fun accentOptions(): List<Pair<String?, Int>> = listOf(
     null to R.string.widget_accent_follow,
     "RED" to R.string.widget_accent_red,
@@ -1209,7 +1218,12 @@ private fun withCategory(config: WidgetInstanceConfig, category: WidgetCategory)
         WidgetCategory.Shift -> WidgetViewType.ShiftList
         WidgetCategory.QuickActions -> WidgetViewType.QuickAction
     }
-    return config.copy(category = category, viewType = viewType)
+    val interaction = if (supportsTapAction(category)) {
+        config.interaction
+    } else {
+        config.interaction.copy(tapAction = WidgetTapAction.OpenCalendar)
+    }
+    return config.copy(category = category, viewType = viewType, interaction = interaction)
 }
 
 internal fun legacyKindForAppWidget(

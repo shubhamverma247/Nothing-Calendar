@@ -47,6 +47,7 @@ class QuickAddParserTest {
         assertTimes("call 13:00", LocalTime.of(13, 0), LocalTime.of(14, 0))
         assertTimes("dentist sham 5 baje", LocalTime.of(17, 0), LocalTime.of(18, 0))
         assertTimes("pooja subah 9", LocalTime.of(9, 0), LocalTime.of(10, 0))
+        assertTimes("Dentist tomorrow at 5 p m", LocalDateTime.of(2026, 3, 11, 10, 0), LocalTime.of(17, 0), LocalTime.of(18, 0))
         assertTimes("chai 9 baje", LocalTime.of(9, 0), LocalTime.of(10, 0), LocalDateTime.of(2026, 3, 10, 8, 0))
         assertTimes("work block 2-4pm", LocalTime.of(14, 0), LocalTime.of(16, 0))
         assertTimes("study 2pm to 4pm", LocalTime.of(14, 0), LocalTime.of(16, 0))
@@ -75,6 +76,7 @@ class QuickAddParserTest {
     fun preservesTitleAfterConsumingTokens() {
         assertEquals("Lunch with Rahul", QuickAddParser.parse("Lunch with Rahul kal 1pm", now).title)
         assertEquals("dentist", QuickAddParser.parse("kal sham 5 baje dentist", now).title)
+        assertEquals("Dentist", QuickAddParser.parse("Dentist tomorrow at 5 p.m.", now).title)
         assertEquals("gym", QuickAddParser.parse("har somvar gym 7am", now).title)
         assertEquals("mummy ka birthday", QuickAddParser.parse("mummy ka birthday 14 march", now).title)
     }
@@ -113,6 +115,17 @@ class QuickAddParserTest {
         start: LocalTime,
         end: LocalTime,
         clock: LocalDateTime = now,
+    ) {
+        val result = QuickAddParser.parse(text, clock)
+        assertEquals(start, result.startTime)
+        assertEquals(end, result.endTime)
+    }
+
+    private fun assertTimes(
+        text: String,
+        clock: LocalDateTime,
+        start: LocalTime,
+        end: LocalTime,
     ) {
         val result = QuickAddParser.parse(text, clock)
         assertEquals(start, result.startTime)

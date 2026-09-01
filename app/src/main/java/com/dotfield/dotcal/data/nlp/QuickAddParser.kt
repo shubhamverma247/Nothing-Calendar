@@ -58,8 +58,9 @@ object QuickAddParser {
     )
 
     fun parse(input: String, now: LocalDateTime = LocalDateTime.now()): QuickAddResult {
+        val normalizedInput = normalizeMeridiems(input)
         val today = now.toLocalDate()
-        val scanner = Scanner(input)
+        val scanner = Scanner(normalizedInput)
 
         val recurrence = parseRecurrence(scanner)
         val allDayKeyword = scanner.take(Regex("""\ball[-\s]?day\b""", RegexOption.IGNORE_CASE)) != null
@@ -354,12 +355,18 @@ object QuickAddParser {
 
     private fun cleanTitle(raw: String): String {
         val tokens = raw.split(Regex("""\s+"""))
+            .map { it.trim(',', '.', '-', ' ') }
             .filter { it.isNotBlank() }
             .toMutableList()
-        while (tokens.isNotEmpty() && tokens.first().lowercase(Locale.US).trim(',', '.') in FILLER) tokens.removeAt(0)
-        while (tokens.isNotEmpty() && tokens.last().lowercase(Locale.US).trim(',', '.') in FILLER) tokens.removeAt(tokens.size - 1)
+        while (tokens.isNotEmpty() && tokens.first().lowercase(Locale.US) in FILLER) tokens.removeAt(0)
+        while (tokens.isNotEmpty() && tokens.last().lowercase(Locale.US) in FILLER) tokens.removeAt(tokens.size - 1)
         return tokens.joinToString(" ").trim().trim(',', '-', ' ')
     }
+
+    private fun normalizeMeridiems(text: String): String =
+        Regex("""(?i)\b([ap])\s*\.?\s*m\.?\b""").replace(text) { match ->
+            match.groupValues[1].lowercase(Locale.US) + "m"
+        }
 
     private fun weekdaysIn(text: String): List<DayOfWeek> =
         WEEKDAYS.mapNotNull { token ->

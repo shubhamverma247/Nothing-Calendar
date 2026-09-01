@@ -32,6 +32,12 @@ internal fun voiceDictationStateForError(error: Int): VoiceDictationState = when
     else -> VoiceDictationState.Failed
 }
 
+internal fun mergeVoiceDictationText(manualText: String, spokenText: String): String {
+    return listOf(manualText.trim(), spokenText.trim())
+        .filter { it.isNotBlank() }
+        .joinToString(" ")
+}
+
 internal class VoiceDictationController(
     context: Context,
     private val onState: (VoiceDictationState) -> Unit,
