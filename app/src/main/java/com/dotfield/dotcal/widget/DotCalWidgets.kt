@@ -219,7 +219,7 @@ class DateOnlyDotCalWidgetReceiver : DotCalWidgetReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
-            WidgetUpdateWorker.enqueue(context)
+            WidgetUpdateWorker.enqueueConfigurationRefresh(context)
         }
     }
 }
@@ -230,7 +230,7 @@ class CompactMonthDotCalWidgetReceiver : DotCalWidgetReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
-            WidgetUpdateWorker.enqueue(context)
+            WidgetUpdateWorker.enqueueConfigurationRefresh(context)
         }
     }
 }
@@ -241,7 +241,7 @@ class SmallDotCalWidgetReceiver : DotCalWidgetReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
-            WidgetUpdateWorker.enqueue(context)
+            WidgetUpdateWorker.enqueueConfigurationRefresh(context)
         }
     }
 }
@@ -252,7 +252,7 @@ class MediumDotCalWidgetReceiver : DotCalWidgetReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
-            WidgetUpdateWorker.enqueue(context)
+            WidgetUpdateWorker.enqueueConfigurationRefresh(context)
         }
     }
 }
@@ -263,7 +263,7 @@ class LargeDotCalWidgetReceiver : DotCalWidgetReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
-            WidgetUpdateWorker.enqueue(context)
+            WidgetUpdateWorker.enqueueConfigurationRefresh(context)
         }
     }
 }
@@ -274,7 +274,7 @@ class ShiftWideWidgetReceiver : DotCalWidgetReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
-            WidgetUpdateWorker.enqueue(context)
+            WidgetUpdateWorker.enqueueConfigurationRefresh(context)
         }
     }
 }
@@ -836,7 +836,7 @@ class EventCountdownWidgetReceiver : DotCalWidgetReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
-            WidgetUpdateWorker.enqueue(context)
+            WidgetUpdateWorker.enqueueConfigurationRefresh(context)
         }
     }
 }
@@ -847,7 +847,7 @@ class AgendaListWidgetReceiver : DotCalWidgetReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
-            WidgetUpdateWorker.enqueue(context)
+            WidgetUpdateWorker.enqueueConfigurationRefresh(context)
         }
     }
 }
@@ -858,7 +858,7 @@ class MonthGridWidgetReceiver : DotCalWidgetReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
-            WidgetUpdateWorker.enqueue(context)
+            WidgetUpdateWorker.enqueueConfigurationRefresh(context)
         }
     }
 }

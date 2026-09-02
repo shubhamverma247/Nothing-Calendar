@@ -37,6 +37,7 @@ data class DotCalWidgetSettings(
     val transparent: Boolean = false,
     val opacityPercent: Int = 35,
     val showDotTexture: Boolean = true,
+    val systemDark: Boolean = false,
     val accountId: String? = null,
     val monthOffset: Int = 0,
     val instanceConfig: WidgetInstanceConfig = WidgetInstanceConfig.legacyDefault(LegacyWidgetKind.Medium),
@@ -58,6 +59,7 @@ suspend fun syncDotCalWidgetState(
 ): DotCalWidgetSettings {
     val settings = readDotCalWidgetSettings(context)
     val isPro = context.calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_IS_PRO] ?: false
+    val systemDark = context.isSystemDark()
     var accountId: String? = null
     var monthOffset = 0
     var instanceConfig = WidgetInstanceConfig.legacyDefault(legacyKind)
@@ -79,9 +81,15 @@ suspend fun syncDotCalWidgetState(
             this[CalendarPreferences.KEY_WIDGET_TRANSPARENT] = settings.transparent
             this[CalendarPreferences.KEY_WIDGET_OPACITY_PERCENT] = settings.opacityPercent
             this[CalendarPreferences.KEY_WIDGET_DOT_TEXTURE] = settings.showDotTexture
+            this[CalendarPreferences.KEY_WIDGET_SYSTEM_DARK] = systemDark
         }
     }
-    return settings.copy(accountId = accountId, monthOffset = monthOffset, instanceConfig = instanceConfig)
+    return settings.copy(
+        systemDark = systemDark,
+        accountId = accountId,
+        monthOffset = monthOffset,
+        instanceConfig = instanceConfig,
+    )
 }
 
 @Composable
@@ -95,7 +103,7 @@ fun dotCalWidgetPalette(context: Context, settings: DotCalWidgetSettings): DotCa
     val transparent = settings.instanceConfig.appearance.transparent ?: settings.transparent
     val opacity = (settings.instanceConfig.appearance.opacityPercent ?: settings.opacityPercent).coerceIn(0, 100) / 100f
     val showDotTexture = settings.instanceConfig.appearance.showDotTexture ?: settings.showDotTexture
-    val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    val systemDark = settings.systemDark
     if (mode == "System") {
         val solidColor = if (systemDark) Color(0xFF1A1A1A) else Color(0xFFFFFFFF)
         val surfaceColor = if (transparent) solidColor.copy(alpha = opacity) else solidColor
@@ -174,6 +182,7 @@ private fun Preferences.toDotCalWidgetSettings(): DotCalWidgetSettings {
         transparent = transparent,
         opacityPercent = (this[CalendarPreferences.KEY_WIDGET_OPACITY_PERCENT] ?: if (transparent) 0 else 35).coerceIn(0, 100),
         showDotTexture = this[CalendarPreferences.KEY_WIDGET_DOT_TEXTURE] ?: true,
+        systemDark = this[CalendarPreferences.KEY_WIDGET_SYSTEM_DARK] ?: false,
         accountId = accountId,
         monthOffset = this[CalendarPreferences.KEY_WIDGET_MONTH_OFFSET] ?: 0,
         instanceConfig = WidgetInstanceConfig.decodeOrDefault(
@@ -181,6 +190,10 @@ private fun Preferences.toDotCalWidgetSettings(): DotCalWidgetSettings {
             fallback,
         ),
     )
+}
+
+private fun Context.isSystemDark(): Boolean {
+    return (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 }
 
 private val DEFAULT_ACCENT = Color(0xFFFF3B30)

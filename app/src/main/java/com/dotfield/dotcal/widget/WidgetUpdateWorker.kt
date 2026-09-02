@@ -53,6 +53,7 @@ class WidgetUpdateWorker(
 
     companion object {
         private const val UNIQUE_WORK = "dotcal_widget_update"
+        private const val UNIQUE_CONFIGURATION_WORK = "dotcal_widget_configuration_update"
         private const val CONFIGURED_WIDGET_WORK_PREFIX = "dotcal_widget_configured_"
         private const val WIDGET_CLEANUP_WORK_PREFIX = "dotcal_widget_cleanup_"
         private const val WORK_ACTION = "work_action"
@@ -102,6 +103,15 @@ class WidgetUpdateWorker(
                 .build()
             WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
                 "$WIDGET_CLEANUP_WORK_PREFIX${appWidgetIds.joinToString("-")}",
+                ExistingWorkPolicy.REPLACE,
+                request,
+            )
+        }
+
+        fun enqueueConfigurationRefresh(context: Context) {
+            val request = OneTimeWorkRequestBuilder<WidgetUpdateWorker>().build()
+            WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
+                UNIQUE_CONFIGURATION_WORK,
                 ExistingWorkPolicy.REPLACE,
                 request,
             )

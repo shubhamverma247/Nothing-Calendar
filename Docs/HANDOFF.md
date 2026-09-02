@@ -11,12 +11,14 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Branch: `main`.
 - All work happens on `main`. Do not create or switch branches.
 - Do not commit or push unless the user explicitly asks.
-- Current user-reported QA focus is reminder notification behavior and Nothing Phone (3) Glyph
-  progress. Continue one manual test at a time and wait for feedback before diagnosing or changing
-  anything else.
+- Current user-reported QA focus is widget System theme refresh from phone settings. Continue one
+  manual test at a time and wait for feedback before diagnosing or changing anything else.
 - Manual QA scope is post-22-August/newly added features only; skip older backlog/regression items
   such as purchase restore or legacy Glyph Toy unless the user explicitly pulls them back in.
 - Manual QA now passed on latest installed debug APK:
+  - Widget System theme refresh from phone settings passed on Nothing Phone (3). ADB smoke
+    `cmd uimode night no` and `cmd uimode night yes` both triggered DotCal widget updates for app
+    widget id `48` with no DotCal crash/error lines in logcat; user manual QA worked fine.
   - Widget theme-toggle persistence passed on MIUI reference device `4ab0d020`; widget follows
     Light/Dark app theme without freeze, blank state, resize jump, or stale old theme after wait.
   - Provider `AVAILABILITY_FREE` import passed; free provider events remain visible but do not block
