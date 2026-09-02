@@ -84,7 +84,8 @@ object CardImageExporter {
         weekStart: DayOfWeek,
     ): Bitmap {
         val width = 1080
-        val height = 1350
+        val layout = calendarViewLayout(viewName)
+        val height = calendarViewCardHeight(layout, events.size)
         val background = if (darkTheme) Color.rgb(11, 11, 13) else Color.rgb(250, 250, 250)
         val text = if (darkTheme) Color.WHITE else Color.rgb(17, 17, 17)
         val secondary = if (darkTheme) Color.rgb(156, 163, 175) else Color.rgb(107, 114, 128)
@@ -100,7 +101,7 @@ object CardImageExporter {
         paint.color = secondary
         paint.textSize = 30f
         canvas.drawText(brandLabel, 72f, 242f, paint)
-        when (calendarViewLayout(viewName)) {
+        when (layout) {
             "month" -> drawMonthView(canvas, viewDate, weekStart, events, accentColor, text, secondary, untitledLabel)
             "week" -> drawWeekView(canvas, viewDate, weekStart, events, accentColor, text, secondary, untitledLabel)
             else -> drawAgendaView(canvas, events, accentColor, text, secondary, untitledLabel)
@@ -110,17 +111,31 @@ object CardImageExporter {
             paint.textSize = 32f
             canvas.drawText(emptyLabel, 72f, 390f, paint)
         }
+        paint.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        paint.color = accentColor
+        val footerY = height - 75f
+        canvas.drawCircle(width / 2f - 92f, footerY - 11f, 5f, paint)
+        canvas.drawCircle(width / 2f + 92f, footerY - 11f, 5f, paint)
         paint.color = text
         paint.textSize = 34f
-        canvas.drawText("DotCal", 72f, 1275f, paint)
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText("DotCal", width / 2f, footerY, paint)
+        paint.textAlign = Paint.Align.LEFT
         return bitmap
+    }
+
+    private fun calendarViewCardHeight(layout: String, eventCount: Int): Int {
+        if (layout == "week") return 2400
+        if (layout != "agenda") return 1350
+        val visibleRows = eventCount.coerceIn(1, 12)
+        return maxOf(1350, 350 + visibleRows * 112 + 170)
     }
 
     private fun drawAgendaView(canvas: Canvas, events: List<CalendarEvent>, accentColor: Int, text: Int, secondary: Int, untitledLabel: String) {
         var y = 350f
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD) }
         events.take(12).forEach { event ->
-            paint.color = accentColor; canvas.drawCircle(92f, y - 10f, 12f, paint)
+            paint.color = event.shareCardColor(accentColor); canvas.drawCircle(92f, y - 10f, 12f, paint)
             paint.color = text; paint.textSize = 36f
             canvas.drawText(event.title.ifBlank { untitledLabel }.take(30), 132f, y, paint)
             paint.color = secondary; paint.textSize = 25f
@@ -155,21 +170,83 @@ object CardImageExporter {
 
     private fun drawWeekView(canvas: Canvas, viewDate: LocalDate, weekStart: DayOfWeek, events: List<CalendarEvent>, accentColor: Int, text: Int, secondary: Int, untitledLabel: String) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.color = secondary; paint.textSize = 22f; paint.typeface = Typeface.DEFAULT_BOLD
+        val grid = Color.argb(70, Color.red(secondary), Color.green(secondary), Color.blue(secondary))
         val start = viewDate.minusDays((viewDate.dayOfWeek.value - weekStart.value + 7L) % 7L)
+        val weekEvents = events.filter { event ->
+            val eventDay = eventDate(event)
+            val column = (eventDay.toEpochDay() - start.toEpochDay()).toInt()
+            column in 0..6
+        }
+        val startHour = 0
+        val endHour = 24
+        val gridLeft = 128f
+        val allDayTop = 382f
+        val allDayBottom = 444f
+        val gridTop = 470f
+        val gridRight = 1008f
+        val gridBottom = gridTop + (endHour - startHour) * 72f
+        val dayWidth = (gridRight - gridLeft) / 7f
+        val hourHeight = (gridBottom - gridTop) / (endHour - startHour)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2f
+        paint.color = grid
+        canvas.drawRoundRect(RectF(gridLeft, gridTop, gridRight, gridBottom), 18f, 18f, paint)
+        (1..6).forEach { day ->
+            val x = gridLeft + day * dayWidth
+            canvas.drawLine(x, gridTop, x, gridBottom, paint)
+        }
+        (startHour..endHour).forEach { hour ->
+            val y = gridTop + (hour - startHour) * hourHeight
+            canvas.drawLine(gridLeft, y, gridRight, y, paint)
+            paint.style = Paint.Style.FILL
+            paint.color = secondary
+            paint.textSize = 18f
+            paint.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            paint.textAlign = Paint.Align.RIGHT
+            canvas.drawText("${hour.toString().padStart(2, '0')}:00", gridLeft - 14f, y + 7f, paint)
+            paint.style = Paint.Style.STROKE
+            paint.color = grid
+            paint.textAlign = Paint.Align.LEFT
+        }
+        paint.style = Paint.Style.FILL
+        paint.color = secondary
+        paint.textSize = 22f
+        paint.typeface = Typeface.DEFAULT_BOLD
+        paint.textAlign = Paint.Align.CENTER
         (0..6).forEach { day ->
             val date = start.plusDays(day.toLong())
-            canvas.drawText("${date.dayOfWeek.name.take(3)} ${date.dayOfMonth}", 70f + day * 140f, 350f, paint)
+            canvas.drawText("${date.dayOfWeek.name.take(3)} ${date.dayOfMonth}", gridLeft + day * dayWidth + dayWidth / 2f, 350f, paint)
         }
-        events.forEach { event ->
+        paint.textAlign = Paint.Align.LEFT
+        weekEvents.forEach { event ->
             val eventDateTime = eventDateTime(event)
             val column = (eventDateTime.toLocalDate().toEpochDay() - start.toEpochDay()).toInt()
             if (column !in 0..6) return@forEach
-            val minutes = eventDateTime.hour * 60 + eventDateTime.minute
-            val row = ((minutes - 7 * 60).coerceIn(0, 9 * 60) / 60)
-            paint.color = accentColor; canvas.drawRoundRect(62f + column * 140f, 390f + row * 90f, 192f + column * 140f, 465f + row * 90f, 12f, 12f, paint)
-            paint.color = text; paint.textSize = 18f
-            canvas.drawText(event.title.ifBlank { untitledLabel }.take(12), 70f + column * 140f, 438f + row * 90f, paint)
+            val blockLeft = gridLeft + column * dayWidth + 6f
+            val blockRight = gridLeft + (column + 1) * dayWidth - 6f
+            if (event.isAllDay == 1) {
+                paint.color = event.shareCardColor(accentColor)
+                paint.style = Paint.Style.FILL
+                canvas.drawRoundRect(RectF(blockLeft, allDayTop + 10f, blockRight, allDayBottom - 10f), 12f, 12f, paint)
+                paint.color = Color.WHITE
+                paint.textSize = 16f
+                paint.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                canvas.drawText(event.title.ifBlank { untitledLabel }.take(10), blockLeft + 8f, allDayTop + 40f, paint)
+                return@forEach
+            }
+            val startMinutes = eventDateTime.hour * 60 + eventDateTime.minute
+            val endDateTime = eventEndDateTime(event)
+            val endMinutes = (endDateTime.hour * 60 + endDateTime.minute).coerceAtLeast(startMinutes + 30)
+            val eventTop = gridTop + ((startMinutes - startHour * 60).coerceIn(0, (endHour - startHour) * 60) / 60f) * hourHeight
+            val eventBottom = gridTop + ((endMinutes - startHour * 60).coerceIn(0, (endHour - startHour) * 60) / 60f) * hourHeight
+            val blockBottom = maxOf(eventBottom, eventTop + 38f)
+            paint.color = event.shareCardColor(accentColor)
+            paint.style = Paint.Style.FILL
+            canvas.drawRoundRect(RectF(blockLeft, eventTop + 4f, blockRight, blockBottom - 4f), 12f, 12f, paint)
+            paint.color = Color.WHITE
+            paint.textSize = 17f
+            paint.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            canvas.drawText(event.title.ifBlank { untitledLabel }.take(10), blockLeft + 8f, eventTop + 30f, paint)
         }
     }
 
@@ -178,6 +255,14 @@ object CardImageExporter {
     private fun eventDateTime(event: CalendarEvent) = java.time.Instant.ofEpochMilli(event.startTimeMs).atZone(
         runCatching { java.time.ZoneId.of(event.timeZone) }.getOrDefault(java.time.ZoneId.systemDefault()),
     )
+
+    private fun eventEndDateTime(event: CalendarEvent) = java.time.Instant.ofEpochMilli(event.endTimeMs).atZone(
+        runCatching { java.time.ZoneId.of(event.timeZone) }.getOrDefault(java.time.ZoneId.systemDefault()),
+    )
+
+    private fun CalendarEvent.shareCardColor(fallback: Int): Int {
+        return runCatching { Color.parseColor(colorHex ?: "") }.getOrDefault(fallback)
+    }
 
     private fun CalendarEvent.shareCardDateLabel(): String {
         val zone = runCatching { java.time.ZoneId.of(timeZone) }.getOrDefault(java.time.ZoneId.systemDefault())

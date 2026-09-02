@@ -177,6 +177,26 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - Restore purchase QA is out of current manual scope.
   - Manual Quick Settings Tile + launcher long-press Quick Add shortcut QA passed; both open the
     Quick Add flow without wrong-screen behavior or crash.
+  - Manual launcher long-press Create event shortcut QA passed; it opens the new event flow.
+  - Manual launcher long-press Create task shortcut QA passed; all three shortcuts (`Quick add`,
+    `Create event`, `Create task`) open the intended flows.
+  - Manual launcher shortcut label/icon visual QA passed for all three shortcuts; no default app
+    icon fallback reported.
+  - Manual Month image export QA passed. Follow-up polish centered the bottom `DotCal` footer mark
+    while preserving the existing header/title and dot-card content; retest passed.
+  - Manual Week image export QA passed after polish. Initial QA found the card too bare: day/event
+    labels rendered without a visible time frame. Follow-up polish added a bordered week grid, hour
+    labels, column separators, horizontal time lines, time-sized event blocks, full 00:00-24:00
+    coverage, per-event colors from `colorHex`, and kept the centered footer. A second polish pass
+    increased Week export height so each hour cell keeps readable height instead of compressing the
+    full day into the old short image. A third pass labels every hour row and adds a separate
+    all-day event area above `00:00` so all-day events no longer render inside the midnight time
+    row. Per user feedback, the explicit `ALL DAY` label and all-day border box were removed so the
+    export stays closer to the in-app Week UI.
+  - Manual Agenda image export QA passed after polish. Initial QA found bottom content cut off.
+    Follow-up made agenda export height
+    grow with visible content, anchored the footer to the dynamic bottom, and uses per-event colors
+    for agenda bullets.
   - Launcher long-press shortcuts now expose `Quick add`, `Create event`, and `Create task`.
     Create Event uses `dotcal://event/new`; Create Task uses `dotcal://task/new`; shortcut labels
     were added to all existing locale resource sets. Root cause of default-only launcher menu was
@@ -465,6 +485,7 @@ After next debug install, prioritize:
     - Fixed: QuickAddParser now normalizes spaced and dotted meridiem forms like `p m`, `a m`,
       `p.m.`, and `a.m.` before parsing; regression test added for voice-style `Dentist tomorrow at
       5 p m`.
+    - Voice Quick Add retest with `Dentist tomorrow at 5 PM`: PASS.
   - Smart planning: Auto-Buffers plus Find-a-Time slot suggestions and Use Slot prefill.
   - Sharing/files: Month/Week/Agenda image export, event ICS/PDF/QR export, availability text, and
     shift-plan export.
