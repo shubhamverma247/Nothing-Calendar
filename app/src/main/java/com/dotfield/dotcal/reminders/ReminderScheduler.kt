@@ -66,6 +66,10 @@ class ReminderScheduler(private val context: Context) {
     }
 
     fun scheduleSnooze(eventId: String, eventTitle: String, alarmRequestCode: Int, triggerAtMs: Long, snoozeMinutes: Int, isTask: Boolean = false) {
+        cancelLiveProgress(alarmRequestCode)
+        cancelRepeat(alarmRequestCode)
+        NotificationManagerCompat.from(appContext)
+            .cancel(ReminderNotificationActions.notificationId(alarmRequestCode))
         cancelSnoozeAlarms(alarmRequestCode)
         val requestCode = ReminderNotificationActions.snoozeAlarmRequestCode(alarmRequestCode)
         val pendingIntent = reminderPendingIntent(

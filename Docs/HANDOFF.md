@@ -20,9 +20,20 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   directly when access is already allowed, and open the system permission screen instead of silently
   enabling when denied; reminder payload notifications are built after `BroadcastReceiver.goAsync()`
   on the IO path; notification setting DataStore reads now run on `Dispatchers.IO`.
+- Local uncommitted reminder QA fix after `f3bfc41`: snooze scheduled from `SnoozePickerActivity`
+  now cancels live-progress updater/repeat alarm/current notification inside `ReminderScheduler`
+  before scheduling the snooze alarm. This prevents an immediate repost after selecting 5-minute
+  snooze on Nothing Phone (3). Verified with focused reminder unit test and `:app:assembleDebug`;
+  fixed debug APK installed on device `000153573000720`. User retest passed. Commit/push next, then
+  user plans to release this version for Play internal testing today.
 - Manual QA scope is post-22-August/newly added features only; skip older backlog/regression items
   such as purchase restore or legacy Glyph Toy unless the user explicitly pulls them back in.
 - Manual QA now passed on latest installed debug APK:
+  - Android 14+/Nothing Phone (3) full-screen alert permission already allowed path passed: toggling
+    Strong alert ON saved inside DotCal and did not open Android full-screen alert settings.
+  - Strong alert ON + permission allowed full-screen reminder alert passed before snooze follow-up:
+    alert opened and core actions worked; 5-minute snooze exposed an immediate-repost bug, then
+    passed after local scheduler fix.
   - Widget System theme refresh from phone settings passed on Nothing Phone (3). ADB smoke
     `cmd uimode night no` and `cmd uimode night yes` both triggered DotCal widget updates for app
     widget id `48` with no DotCal crash/error lines in logcat; user manual QA worked fine.
