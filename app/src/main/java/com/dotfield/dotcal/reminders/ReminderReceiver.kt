@@ -35,22 +35,6 @@ class ReminderReceiver : BroadcastReceiver() {
             eventId != null &&
             !fallbackTitle.isNullOrBlank() &&
             fallbackMinutes != Int.MIN_VALUE
-        if (showedFromPayload) {
-            runCatching {
-                scheduler.showReminderNotification(
-                    eventId = eventId,
-                    eventTitle = fallbackTitle,
-                    minutesBefore = fallbackMinutes,
-                    alarmRequestCode = alarmRequestCode,
-                    isTask = fallbackIsTask,
-                    eventStartTimeMs = eventStartTimeMs,
-                    snoozedUntilMs = snoozedUntilMs,
-                )
-            }.onFailure { throwable ->
-                Log.e(TAG, "Reminder payload notification failed for requestCode=$alarmRequestCode", throwable)
-            }
-        }
-
         if (intent.action == ACTION_OPEN_REMINDER) {
             val targetEventId = eventId
             if (targetEventId.isNullOrBlank()) {
@@ -75,6 +59,15 @@ class ReminderReceiver : BroadcastReceiver() {
                     ACTION_UPDATE_LIVE_PROGRESS -> scheduler.updateLiveProgress(intent)
                     ACTION_SHOW_REMINDER -> {
                         if (showedFromPayload) {
+                            scheduler.showReminderNotification(
+                                eventId = eventId,
+                                eventTitle = fallbackTitle,
+                                minutesBefore = fallbackMinutes,
+                                alarmRequestCode = alarmRequestCode,
+                                isTask = fallbackIsTask,
+                                eventStartTimeMs = eventStartTimeMs,
+                                snoozedUntilMs = snoozedUntilMs,
+                            )
                             val reminder = repository.getReminderByRequestCode(alarmRequestCode)
                             val event = eventId?.let { repository.getEvent(it) }
                             eventId?.let {

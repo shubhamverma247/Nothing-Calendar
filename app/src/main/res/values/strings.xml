@@ -1093,6 +1093,7 @@
     <string name="toast_countdown_share_failed">Could not share countdown</string>
     <string name="toast_event_share_failed">Could not share event</string>
     <string name="toast_qr_share_failed">Could not share QR image</string>
+    <string name="toast_permission_needed" translatable="false">Allow permission in Android settings</string>
     <string name="toast_file_attachment_failed">Could not attach PDF</string>
     <string name="toast_file_attachment_missing">File is missing</string>
     <string name="toast_file_attachment_no_app">No app can open this file</string>

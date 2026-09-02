@@ -40,4 +40,21 @@ class ReminderNotificationSettingsTest {
         assertTrue(settings.fullScreenEnabled)
         assertTrue(settings.soundUri == null)
     }
+
+    @Test
+    fun fullScreenReminderRequiresProPreferenceAndSystemAccess() {
+        assertFalse(shouldUseFullScreenReminder(isProEnabled = false, preferenceEnabled = true, canUseFullScreenIntent = true))
+        assertFalse(shouldUseFullScreenReminder(isProEnabled = true, preferenceEnabled = false, canUseFullScreenIntent = true))
+        assertFalse(shouldUseFullScreenReminder(isProEnabled = true, preferenceEnabled = true, canUseFullScreenIntent = false))
+        assertTrue(shouldUseFullScreenReminder(isProEnabled = true, preferenceEnabled = true, canUseFullScreenIntent = true))
+    }
+
+    @Test
+    fun strongAlertSettingsOpenOnlyWhenAndroid14PlusPermissionIsDenied() {
+        assertFalse(shouldOpenFullScreenReminderSettings(isEnabling = false, sdkInt = 34, canUseFullScreenIntent = false))
+        assertFalse(shouldOpenFullScreenReminderSettings(isEnabling = true, sdkInt = 33, canUseFullScreenIntent = false))
+        assertFalse(shouldOpenFullScreenReminderSettings(isEnabling = true, sdkInt = 34, canUseFullScreenIntent = true))
+        assertTrue(shouldOpenFullScreenReminderSettings(isEnabling = true, sdkInt = 34, canUseFullScreenIntent = false))
+        assertTrue(shouldOpenFullScreenReminderSettings(isEnabling = true, sdkInt = 36, canUseFullScreenIntent = false))
+    }
 }

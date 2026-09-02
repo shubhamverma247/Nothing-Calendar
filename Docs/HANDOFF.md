@@ -14,6 +14,12 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Current user-reported QA focus is post-22-August/new-feature QA. Calendar-move duplicate guard
   is now passed. Continue one manual test at a time and wait for feedback before diagnosing or
   changing anything else.
+- Production-audit HIGH/MEDIUM fixes are committed and verified:
+  `SCHEDULE_EXACT_ALARM` is capped to API 32 while `USE_EXACT_ALARM` remains for API 33+ calendar
+  reminders; Pro full-screen reminder alerts now check Android 14+ full-screen intent access, save
+  directly when access is already allowed, and open the system permission screen instead of silently
+  enabling when denied; reminder payload notifications are built after `BroadcastReceiver.goAsync()`
+  on the IO path; notification setting DataStore reads now run on `Dispatchers.IO`.
 - Manual QA scope is post-22-August/newly added features only; skip older backlog/regression items
   such as purchase restore or legacy Glyph Toy unless the user explicitly pulls them back in.
 - Manual QA now passed on latest installed debug APK:

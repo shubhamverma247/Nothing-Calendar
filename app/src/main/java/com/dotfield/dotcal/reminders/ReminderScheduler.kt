@@ -24,6 +24,7 @@ import com.dotfield.dotcal.data.recurrence.planNextReminder
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.nothing.ketchum.Common
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import java.text.DateFormat
@@ -203,7 +204,7 @@ class ReminderScheduler(private val context: Context) {
             .setDeleteIntent(dismissPendingIntent(alarmRequestCode))
             .setVibrate(if (settings.vibrationEnabled) ReminderNotificationActions.vibrationPattern() else longArrayOf(0))
             .setSound(settings.soundUri)
-        if (settings.fullScreenEnabled) {
+        if (settings.fullScreenEnabled && appContext.canUseFullScreenReminderIntent()) {
             builder.setFullScreenIntent(viewReminderPendingIntent(eventId, isTask), true)
         }
         addNotificationActions(
@@ -253,7 +254,7 @@ class ReminderScheduler(private val context: Context) {
                     .setStyledByProgress(true)
                     .setProgress(progress),
             )
-        if (settings.fullScreenEnabled) {
+        if (settings.fullScreenEnabled && appContext.canUseFullScreenReminderIntent()) {
             builder.setFullScreenIntent(viewReminderPendingIntent(eventId, isTask), true)
         }
         ReminderNotificationActions.notificationActionTypes(isTask).forEach { action ->
@@ -397,7 +398,7 @@ class ReminderScheduler(private val context: Context) {
         appContext.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    private fun notificationSettings(): ReminderNotificationSettings = runBlocking {
+    private fun notificationSettings(): ReminderNotificationSettings = runBlocking(Dispatchers.IO) {
         val preferences = appContext.calendarPreferencesDataStore.data.first()
         ReminderNotificationSettings.from(preferences, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
     }
@@ -587,6 +588,23 @@ class ReminderScheduler(private val context: Context) {
 internal fun shouldUseAlarmClock(isTask: Boolean, canScheduleExactAlarms: Boolean): Boolean =
     isTask || !canScheduleExactAlarms
 
+internal fun shouldUseFullScreenReminder(
+    isProEnabled: Boolean,
+    preferenceEnabled: Boolean,
+    canUseFullScreenIntent: Boolean,
+): Boolean = isProEnabled && preferenceEnabled && canUseFullScreenIntent
+
+internal fun shouldOpenFullScreenReminderSettings(
+    isEnabling: Boolean,
+    sdkInt: Int,
+    canUseFullScreenIntent: Boolean,
+): Boolean = isEnabling && sdkInt >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && !canUseFullScreenIntent
+
+internal fun Context.canUseFullScreenReminderIntent(): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return true
+    return getSystemService(NotificationManager::class.java)?.canUseFullScreenIntent() == true
+}
+
 internal data class ReminderNotificationSettings(
     val soundUri: Uri?,
     val repeatEnabled: Boolean,
@@ -615,7 +633,11 @@ internal data class ReminderNotificationSettings(
                 repeatEnabled = isPro && (preferences[CalendarPreferences.KEY_REMINDER_REPEAT_ENABLED] ?: false),
                 repeatMinutes = (preferences[CalendarPreferences.KEY_REMINDER_REPEAT_MINUTES] ?: 5).coerceIn(5, 60),
                 vibrationEnabled = if (isPro) preferences[CalendarPreferences.KEY_REMINDER_VIBRATION_ENABLED] ?: true else true,
-                fullScreenEnabled = isPro && (preferences[CalendarPreferences.KEY_REMINDER_FULL_SCREEN_ENABLED] ?: false),
+                fullScreenEnabled = shouldUseFullScreenReminder(
+                    isProEnabled = isPro,
+                    preferenceEnabled = preferences[CalendarPreferences.KEY_REMINDER_FULL_SCREEN_ENABLED] ?: false,
+                    canUseFullScreenIntent = true,
+                ),
             )
         }
     }

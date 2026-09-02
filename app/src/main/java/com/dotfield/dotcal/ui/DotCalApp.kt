@@ -3,6 +3,7 @@ package com.dotfield.dotcal.ui
 import android.Manifest
 import android.accounts.AccountManager
 import android.app.Activity
+import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -255,6 +256,7 @@ import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.BOOT_LANGUAGE_KEY
 import com.dotfield.dotcal.applyAppLanguage
+import com.dotfield.dotcal.reminders.shouldOpenFullScreenReminderSettings
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
 import com.dotfield.dotcal.share.CardImageExporter
 import com.dotfield.dotcal.share.QrEventImageExporter
@@ -2068,6 +2070,26 @@ fun DotCalApp(
                 },
                 onReminderFullScreenEnabledChange = { enabled ->
                     if (!isPro) showPaywall = true else scope.launch {
+                        val notificationManager = context.getSystemService(NotificationManager::class.java)
+                        val canUseFullScreenIntent = Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE ||
+                            notificationManager?.canUseFullScreenIntent() == true
+                        if (shouldOpenFullScreenReminderSettings(
+                                isEnabling = enabled,
+                                sdkInt = Build.VERSION.SDK_INT,
+                                canUseFullScreenIntent = canUseFullScreenIntent,
+                            )
+                        ) {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    },
+                                )
+                            }.onFailure {
+                                showDotCalToast(context, bootPalette, R.string.toast_permission_needed)
+                            }
+                            return@launch
+                        }
                         context.calendarPreferencesDataStore.edit { preferences ->
                             preferences[CalendarPreferences.KEY_REMINDER_FULL_SCREEN_ENABLED] = enabled
                         }
