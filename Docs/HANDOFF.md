@@ -11,8 +11,9 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Branch: `main`.
 - All work happens on `main`. Do not create or switch branches.
 - Do not commit or push unless the user explicitly asks.
-- Current user-reported QA focus is widget System theme refresh from phone settings. Continue one
-  manual test at a time and wait for feedback before diagnosing or changing anything else.
+- Current user-reported QA focus is post-22-August/new-feature QA. Calendar-move duplicate guard
+  is now passed. Continue one manual test at a time and wait for feedback before diagnosing or
+  changing anything else.
 - Manual QA scope is post-22-August/newly added features only; skip older backlog/regression items
   such as purchase restore or legacy Glyph Toy unless the user explicitly pulls them back in.
 - Manual QA now passed on latest installed debug APK:
@@ -27,6 +28,11 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     sync does not create duplicates.
   - Provider meeting metadata import passed; real attendee events show meeting details, while plain
     provider events do not show noisy default/organizer-only meeting blocks.
+  - Calendar-move duplicate guard passed; moving a provider event between calendars does not leave a
+    duplicate stale local row after sync.
+  - Shift pattern action icon overlap and shift-plan export card polish passed after debug APK
+    install; pattern card actions no longer have overlapping circular backgrounds, and share cards
+    match the Month/Week/Agenda export visual language.
   - Auto-buffers plus Find-a-Time slot suggestions and Use Slot prefill passed.
   - Widget config opens/saves normally; widget removal does not freeze or crash.
   - Reminder notification behavior and Nothing Phone (3) Glyph progress passed.
@@ -233,6 +239,11 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - Quick Shift Add from Calendar surfaces is built and Pro-gated.
   - Shift plan sharing supports image, PDF, ICS, and DotCal QR for compact ranges.
   - QR sharing capped at 14 shifts for reliability.
+  - Shift pattern card action icons no longer use filled circular backgrounds, preventing
+    generate/share/delete icon background overlap.
+  - Shift plan image/PDF/QR export cards now use the same DotCal share-card visual language as the
+    Month/Week/Agenda exports: top red rule, `DOTCAL / SHIFT PLAN` header, themed rows, bordered
+    surfaces, and centered footer mark.
 - Widget/month polish completed:
   - Medium agenda widget date clarity fixed.
   - Transparent widget opacity slider added.
@@ -541,6 +552,8 @@ After next debug install, prioritize:
   - PASS.
 - Sync Google events with custom calendar colors; DotCal should not fall back to red when provider
   event color is missing. PASS.
+- Move a provider event between calendars and sync; DotCal should show only the moved event under
+  its new calendar, with no duplicate stale event from the old calendar. PASS.
 - Restore purchase on an account with old lifetime purchase. OUT OF SCOPE.
 - On supported Nothing Glyph device, select DotCal Glyph Toy and create a future reminder.
   - Expected: Glyph shows countdown; snooze updates countdown immediately; opening/completing item

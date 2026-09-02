@@ -2758,7 +2758,10 @@ private fun ShiftPatternCard(
             Text(shiftPatternSummary(pattern, typeMap), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             ShiftMiniActionButton(icon = Icons.Default.CalendarMonth, contentDescription = "Generate shifts", tint = palette.accent, palette = palette, onClick = onGenerate)
             ShiftMiniActionButton(icon = Icons.Default.Share, contentDescription = stringResource(R.string.shift_share_plan), tint = palette.secondaryText, palette = palette, onClick = onShare)
             ShiftMiniActionButton(icon = Icons.Default.DeleteOutline, contentDescription = "Delete shift pattern", tint = palette.secondaryText, palette = palette, onClick = onDelete)
@@ -2776,10 +2779,7 @@ private fun ShiftMiniActionButton(
 ) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier
-            .size(38.dp)
-            .clip(CircleShape)
-            .background(palette.cell.copy(alpha = 0.55f)),
+        modifier = Modifier.size(44.dp),
     ) {
         Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(19.dp))
     }

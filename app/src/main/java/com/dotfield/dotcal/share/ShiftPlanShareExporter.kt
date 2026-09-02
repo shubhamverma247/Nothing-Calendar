@@ -92,8 +92,8 @@ object ShiftPlanShareExporter {
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         canvas.drawColor(colors.background)
-        drawHeader(canvas, paint, planTitle, events, accentColor, colors, 96f, 118f, 888f)
-        var y = 306f
+        drawHeader(canvas, paint, planTitle, events, accentColor, colors, 72f, 92f, 936f)
+        var y = 330f
         events.take(rowCount).forEach { event ->
             drawEventRow(canvas, paint, event, colors, accentColor, 96f, y, 888f)
             y += rowHeight
@@ -104,7 +104,7 @@ object ShiftPlanShareExporter {
             paint.color = colors.secondary
             drawFittedText(canvas, "+${events.size - rowCount} more shifts", 126f, y + 38f, paint, 828f)
         }
-        drawFooter(canvas, paint, colors, width / 2f, height - 70f, 1f)
+        drawFooter(canvas, paint, colors, accentColor, width / 2f, height - 70f, 1f)
         return bitmap
     }
 
@@ -122,7 +122,7 @@ object ShiftPlanShareExporter {
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         canvas.drawColor(colors.background)
-        drawHeader(canvas, paint, planTitle, events, accentColor, colors, 96f, 120f, 888f)
+        drawHeader(canvas, paint, planTitle, events, accentColor, colors, 72f, 94f, 936f)
         val qr = QrEventImageExporter.createQrBitmap(payload, size = 760)
         paint.color = colors.surface
         canvas.drawRoundRect(RectF(96f, 326f, 984f, 1282f), 56f, 56f, paint)
@@ -137,7 +137,7 @@ object ShiftPlanShareExporter {
         paint.color = Color.WHITE
         canvas.drawRoundRect(RectF(140f, 454f, 940f, 1254f), 44f, 44f, paint)
         canvas.drawBitmap(qr, 160f, 474f, paint)
-        drawFooter(canvas, paint, colors, width / 2f, 1350f, 1f)
+        drawFooter(canvas, paint, colors, accentColor, width / 2f, 1350f, 1f)
         return bitmap
     }
 
@@ -155,13 +155,13 @@ object ShiftPlanShareExporter {
             val canvas = page.canvas
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
             canvas.drawColor(colors.background)
-            drawHeader(canvas, paint, planTitle, events, accentColor, colors, 48f, 72f, 499f)
+            drawHeader(canvas, paint, planTitle, events, accentColor, colors, 36f, 54f, 523f)
             var y = 224f
             pageEvents.forEach { event ->
                 drawEventRow(canvas, paint, event, colors, accentColor, 48f, y, 499f)
                 y += 58f
             }
-            drawFooter(canvas, paint, colors, 297.5f, 794f, 0.64f)
+            drawFooter(canvas, paint, colors, accentColor, 297.5f, 794f, 0.64f)
             document.finishPage(page)
         }
         return document
@@ -179,18 +179,19 @@ object ShiftPlanShareExporter {
         width: Float,
     ) {
         val scale = (width / 888f).coerceIn(0.55f, 1f)
-        paint.color = colors.surface
-        canvas.drawRoundRect(RectF(left, top, left + width, top + 132f), 36f, 36f, paint)
+        paint.style = Paint.Style.FILL
         paint.color = accentColor
-        canvas.drawCircle(left + 40f * scale, top + 42f, 12f * scale, paint)
-        paint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-        paint.textSize = 38f * scale
+        canvas.drawRect(left, top, left + width, top + 10f * scale, paint)
+        paint.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        paint.textSize = 54f * scale
         paint.color = colors.text
-        drawFittedText(canvas, planTitle, left + 70f * scale, top + 56f, paint, width - 90f * scale)
+        drawFittedText(canvas, "DOTCAL / SHIFT PLAN", left, top + 96f * scale, paint, width)
+        paint.textSize = 29f * scale
+        paint.color = colors.secondary
+        drawFittedText(canvas, planTitle, left, top + 144f * scale, paint, width)
         paint.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
         paint.textSize = 24f * scale
-        paint.color = colors.secondary
-        drawFittedText(canvas, shareRangeLine(events), left + 70f * scale, top + 96f, paint, width - 90f * scale)
+        drawFittedText(canvas, shareRangeLine(events), left, top + 184f * scale, paint, width)
     }
 
     private fun drawEventRow(
@@ -204,8 +205,14 @@ object ShiftPlanShareExporter {
         width: Float,
     ) {
         val scale = (width / 888f).coerceIn(0.56f, 1f)
+        paint.style = Paint.Style.FILL
         paint.color = colors.surface
         canvas.drawRoundRect(RectF(left, top, left + width, top + 52f), 18f * scale, 18f * scale, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1.4f * scale
+        paint.color = colors.border
+        canvas.drawRoundRect(RectF(left, top, left + width, top + 52f), 18f * scale, 18f * scale, paint)
+        paint.style = Paint.Style.FILL
         paint.color = runCatching { Color.parseColor(event.colorHex ?: "") }.getOrDefault(accentColor)
         canvas.drawRoundRect(
             RectF(left + 16f * scale, top + 14f, left + 28f * scale, top + 38f),
@@ -237,18 +244,17 @@ object ShiftPlanShareExporter {
         canvas: Canvas,
         paint: Paint,
         colors: ShareColors,
+        accentColor: Int,
         centerX: Float,
         y: Float,
         scale: Float,
     ) {
-        val width = 136f * scale
-        val height = 46f * scale
-        val left = centerX - width / 2f
-        val top = y - height + 10f * scale
-        paint.color = colors.surface
-        canvas.drawRoundRect(RectF(left, top, left + width, top + height), 22f * scale, 22f * scale, paint)
+        paint.style = Paint.Style.FILL
+        paint.color = accentColor
+        canvas.drawCircle(centerX - 92f * scale, y - 11f * scale, 5f * scale, paint)
+        canvas.drawCircle(centerX + 92f * scale, y - 11f * scale, 5f * scale, paint)
         paint.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        paint.textSize = 24f * scale
+        paint.textSize = 34f * scale
         paint.color = colors.text
         paint.textAlign = Paint.Align.CENTER
         canvas.drawText("DotCal", centerX, y, paint)
@@ -322,6 +328,7 @@ object ShiftPlanShareExporter {
             surface = Color.rgb(18, 18, 22),
             text = Color.WHITE,
             secondary = Color.rgb(156, 163, 175),
+            border = Color.argb(50, 255, 255, 255),
         )
     } else {
         ShareColors(
@@ -329,6 +336,7 @@ object ShiftPlanShareExporter {
             surface = Color.WHITE,
             text = Color.rgb(17, 17, 17),
             secondary = Color.rgb(107, 114, 128),
+            border = Color.rgb(229, 231, 235),
         )
     }
 
@@ -337,5 +345,6 @@ object ShiftPlanShareExporter {
         val surface: Int,
         val text: Int,
         val secondary: Int,
+        val border: Int,
     )
 }
