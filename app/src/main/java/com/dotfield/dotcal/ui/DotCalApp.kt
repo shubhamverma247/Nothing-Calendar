@@ -188,7 +188,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
@@ -329,6 +328,7 @@ fun DotCalApp(
     initialPaywall: Boolean = false,
     initialTasksTab: Boolean = false,
     initialRouteToken: Long? = null,
+    systemDark: Boolean = false,
 ) {
     val month by viewModel.month.collectAsStateWithLifecycle()
     val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
@@ -735,7 +735,6 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_ONBOARDING_DONE] ?: false
         }
     }.collectAsStateWithLifecycle<Boolean?>(initialValue = null)
-    val systemDark = isSystemInDarkTheme()
     val resolvedThemeMode = themeMode
     val resolvedAccentColor = accentColor
     val palette = remember(resolvedThemeMode, resolvedAccentColor, systemDark) {

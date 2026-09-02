@@ -73,8 +73,12 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
+private fun Configuration.isNightMode(): Boolean =
+    (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+
 class MainActivity : ComponentActivity() {
     private val deepLinkTarget = mutableStateOf<DotCalDeepLinkTarget?>(null)
+    private val systemDarkState = mutableStateOf(false)
     private var deepLinkSequence = 0L
     private val viewModel: DotCalViewModel by viewModels {
         val app = application as DotCalApplication
@@ -103,6 +107,7 @@ class MainActivity : ComponentActivity() {
             },
         )
         super.onCreate(savedInstanceState)
+        systemDarkState.value = resources.configuration.isNightMode()
         configureReminderWindow(intent)
         clearOpenedReminder(intent)
         deepLinkTarget.value = intent.dotCalDeepLinkTarget()
@@ -130,9 +135,20 @@ class MainActivity : ComponentActivity() {
                     initialPaywall = target?.paywall == true,
                     initialTasksTab = target?.tasksTab == true,
                     initialRouteToken = target?.routeToken,
+                    systemDark = systemDarkState.value,
                 )
             }
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        systemDarkState.value = newConfig.isNightMode()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        systemDarkState.value = applicationContext.resources.configuration.isNightMode()
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

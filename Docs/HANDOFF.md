@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-09-01
+Updated: 2026-09-02
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 `Docs/HANDOFF.original.md`. Do not touch `Docs/HANDOFF - Copy.md` or user-owned
@@ -17,6 +17,14 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Manual QA scope is post-22-August/newly added features only; skip older backlog/regression items
   such as purchase restore or legacy Glyph Toy unless the user explicitly pulls them back in.
 - Manual QA now passed on latest installed debug APK:
+  - Widget theme-toggle persistence passed on MIUI reference device `4ab0d020`; widget follows
+    Light/Dark app theme without freeze, blank state, resize jump, or stale old theme after wait.
+  - Provider `AVAILABILITY_FREE` import passed; free provider events remain visible but do not block
+    Find-a-Time slot suggestions.
+  - Provider `RDATE` import passed; extra recurrence dates appear on intended dates and repeated
+    sync does not create duplicates.
+  - Provider meeting metadata import passed; real attendee events show meeting details, while plain
+    provider events do not show noisy default/organizer-only meeting blocks.
   - Auto-buffers plus Find-a-Time slot suggestions and Use Slot prefill passed.
   - Widget config opens/saves normally; widget removal does not freeze or crash.
   - Reminder notification behavior and Nothing Phone (3) Glyph progress passed.
@@ -262,6 +270,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     `ProviderMeetingMetadata`.
   - Meeting section rendering is attendee-only now. Organizer/self-only provider rows are filtered
     out so normal Google events no longer show a meeting block in detail.
+  - Manual provider meeting metadata QA passed; real attendee events show meeting details and plain
+    provider events suppress default metadata noise.
   - Provider-cancelled recurring instances now become parent exceptions only; they no longer import
     as standalone visible events.
   - Calendar-move duplicate guard deletes stale local provider rows with the same `googleEventId`
@@ -405,6 +415,16 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
     launches, preserving normal calendar launches.
   - Regression coverage added for full-screen activity launch flags.
   - Unit tests, debug assemble, lint, APK install, and locked-device retest passed.
+- System theme live-change fix completed:
+  - `MainActivity` now owns the current night-mode state from `onConfigurationChanged()` and
+    `onResume()`, then passes it into Compose.
+  - `DotCalApp` uses that Activity-owned night-mode state for System theme, so foreground
+    notification-shade theme changes and background/resume theme changes refresh the app palette.
+  - Debug assemble passed with:
+    `.\gradlew.bat --no-daemon --console=plain :app:assembleDebug`.
+  - Latest debug APK was installed successfully on device `000153573000720`.
+  - Manual QA passed: System theme updates immediately while DotCal is foregrounded, and updates on
+    reopen after the phone theme changes while DotCal is backgrounded.
 
 ## Verification Baseline
 
@@ -543,6 +563,7 @@ Worth adding:
     Free Time logic.
   - Exported DotCal ghost/Pencil-In provider-backed events as `AVAILABILITY_FREE`; normal events as
     `AVAILABILITY_BUSY`.
+  - Manual provider Free/Busy QA passed; Google/provider Free events do not block Find-a-Time.
 - Recurrence "this and following" edits. DONE for event edit/delete scope.
   - Implement clean series split: old parent ends before selected occurrence; new parent starts at
     selected occurrence.
@@ -550,6 +571,8 @@ Worth adding:
 - RDATE support. DONE for provider-backed expansion/preservation.
   - Import/export provider RDATE string through side-store for provider-backed edits.
   - Local RDATE creation UI remains out of scope unless specifically requested.
+  - Manual provider RDATE QA passed; extra recurrence dates render on intended dates without
+    duplicate rows after repeated sync.
 - Provider event status. DONE for preservation.
   - Preserve confirmed/tentative/cancelled status through side-store/provider writes.
   - Tentative remains separate from DotCal Pencil-In/Ghost.
@@ -623,8 +646,8 @@ below are absorbed into these phases.
 
 ### Phase 0 — Finish Current Work
 
-- Unified Configurable Widget System completion + pending theme-toggle manual QA (MIUI Autostart +
-  battery no-restrictions verify on device `4ab0d020`).
+- Unified Configurable Widget System completion; theme-toggle manual QA passed on MIUI reference
+  device `4ab0d020`.
 
 ### Phase 1 — Free Quick Wins (one small release each; retention/acquisition)
 
