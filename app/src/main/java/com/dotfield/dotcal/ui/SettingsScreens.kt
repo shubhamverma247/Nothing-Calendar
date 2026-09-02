@@ -262,6 +262,7 @@ import kotlinx.coroutines.withContext
 
 
 private const val DISCORD_INVITE_URL = "https://discord.gg/sTAKcAG8R"
+private const val FEATURES_GUIDE_URL = "https://dotcal-website.netlify.app/guide"
 private const val PRIVACY_POLICY_URL = "https://dotcal-website.netlify.app/privacy"
 
 @Composable
@@ -836,6 +837,10 @@ internal fun SettingsRoot(
                     SettingsIconMenuRow(title = stringResource(R.string.settings_check_updates), value = "", icon = Icons.Default.AutoAwesome, palette = palette, onClick = onCheckForUpdates)
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(title = stringResource(R.string.settings_privacy_policy), value = "", icon = Icons.Default.Description, palette = palette, onClick = onPrivacyPolicy)
+                    SettingsContentDivider(palette)
+                    SettingsIconMenuRow(title = stringResource(R.string.settings_features_guide), value = "", icon = Icons.AutoMirrored.Filled.Article, palette = palette, onClick = {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(FEATURES_GUIDE_URL))) }
+                    })
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(title = stringResource(R.string.settings_rate), value = "", icon = Icons.Default.Star, palette = palette, onClick = onRateDotCal)
                     SettingsContentDivider(palette)

@@ -17,6 +17,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Manual QA scope is post-22-August/newly added features only; skip older backlog/regression items
   such as purchase restore or legacy Glyph Toy unless the user explicitly pulls them back in.
 - Manual QA now passed on latest installed debug APK:
+  - Auto-buffers plus Find-a-Time slot suggestions and Use Slot prefill passed.
   - Widget config opens/saves normally; widget removal does not freeze or crash.
   - Reminder notification behavior and Nothing Phone (3) Glyph progress passed.
   - Week/Day event tap opens the correct detail and back navigation returns cleanly.
@@ -111,6 +112,8 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 ## Recently Completed
 
 - Phase 1 quick wins completed locally:
+  - Added `Settings > About > Features & Guide`, which opens
+    `https://dotcal-website.netlify.app/guide` in the browser. Manual QA passed after debug install.
   - Smart Quick Add voice dictation uses Android on-device SpeechRecognizer when supported, with
     permission, unavailable, cancellation, empty-result, and failure handling.
   - Quick Add preserves typed text while dictation runs; spoken text merges into the draft instead of
@@ -486,9 +489,9 @@ After next debug install, prioritize:
       `p.m.`, and `a.m.` before parsing; regression test added for voice-style `Dentist tomorrow at
       5 p m`.
     - Voice Quick Add retest with `Dentist tomorrow at 5 PM`: PASS.
-  - Smart planning: Auto-Buffers plus Find-a-Time slot suggestions and Use Slot prefill.
+  - Smart planning: Auto-Buffers plus Find-a-Time slot suggestions and Use Slot prefill. PASS.
   - Sharing/files: Month/Week/Agenda image export, event ICS/PDF/QR export, availability text, and
-    shift-plan export.
+    shift-plan export. Event `.ics` share PASS. Event QR share PASS. Availability text share/copy PASS.
   - Privacy/power tools: Search, Templates, Calendar Sets, Bulk Edit, App Lock, Private Vault, and
     Backup/Restore.
   - Reminders/Glyph: snooze presets, complete/open actions, repeat-until-dismissed, full-screen
