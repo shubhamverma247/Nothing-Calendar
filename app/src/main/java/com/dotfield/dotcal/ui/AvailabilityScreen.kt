@@ -68,6 +68,9 @@ private enum class AvailabilityPreset(@StringRes val labelRes: Int) {
         @Composable get() = stringResource(labelRes)
 }
 
+internal fun shouldRenderAvailabilitySuggestions(isLoading: Boolean, error: String?): Boolean =
+    error == null
+
 internal data class AvailabilityScrollbarThumb(
     val height: Dp,
     val offset: Dp,
@@ -294,7 +297,7 @@ internal fun AvailabilityScreen(
                 }
             }
             val suggestedSlots = state.days.flatMap { it.freeSlots }.take(6)
-            if (!state.isLoading && state.error == null) {
+            if (shouldRenderAvailabilitySuggestions(state.isLoading, state.error)) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
