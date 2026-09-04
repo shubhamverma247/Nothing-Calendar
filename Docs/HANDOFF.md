@@ -8,8 +8,14 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 
 ## Current Worktree
 
-- Branch: `main`.
-- All work happens on `main`. Do not create or switch branches.
+- Branch: `feature-and-fixes`.
+- All current resume work happens on `feature-and-fixes`. Do not create or switch branches.
+- Resume-session implementation is currently being developed on `feature-and-fixes` per active
+  user instruction; do not switch branches. Local changes add directional Week/Day/ThreeDay
+  period transitions and Play In-App Review usage gating. No commit/push.
+- Verification for this local work: focused direction/review-policy tests, full
+  `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:lintDebug`, and `git diff --check` pass.
+  Install attempt on 2026-09-04 was blocked because SDK `adb devices` returned no attached devices.
 - Do not commit or push unless the user explicitly asks.
 - Current user-reported QA focus is post-22-August/new-feature QA. Calendar-move duplicate guard
   is now passed. Continue one manual test at a time and wait for feedback before diagnosing or

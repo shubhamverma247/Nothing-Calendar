@@ -129,6 +129,23 @@ private enum class EventDragMode {
     ResizeEnd,
 }
 
+internal fun monthTransitionDirection(initialMonth: LocalDate, targetMonth: LocalDate): Int {
+    return periodTransitionDirection(initialMonth, targetMonth)
+}
+
+internal fun periodTransitionDirection(initialPeriod: LocalDate, targetPeriod: LocalDate): Int {
+    return when {
+        targetPeriod.isAfter(initialPeriod) -> 1
+        targetPeriod.isBefore(initialPeriod) -> -1
+        else -> 0
+    }
+}
+
+internal fun weekTransitionKey(date: LocalDate, weekStart: DayOfWeek): LocalDate {
+    val delta = (7 + date.dayOfWeek.value - weekStart.value) % 7
+    return date.minusDays(delta.toLong())
+}
+
 @Composable
 internal fun MonthView(
     month: LocalDate,
@@ -2241,8 +2258,7 @@ private fun monthGrid(month: LocalDate, weekStart: DayOfWeek): List<LocalDate> {
 }
 
 private fun weekDays(date: LocalDate, weekStart: DayOfWeek): List<LocalDate> {
-    val delta = (7 + date.dayOfWeek.value - weekStart.value) % 7
-    val start = date.minusDays(delta.toLong())
+    val start = weekTransitionKey(date, weekStart)
     return List(7) { start.plusDays(it.toLong()) }
 }
 

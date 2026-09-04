@@ -7,6 +7,16 @@ import org.junit.Test
 
 class CalendarSyncRepositoryTest {
     @Test
+    fun calendarSyncWindowIncludesThirtyDaysPastAndOneYearFuture() {
+        val nowMs = 1_000_000_000L
+
+        val window = calendarSyncWindow(nowMs)
+
+        assertEquals(nowMs - 30L * 24L * 60L * 60L * 1_000L, window.startMs)
+        assertEquals(nowMs + 365L * 24L * 60L * 60L * 1_000L, window.endMs)
+    }
+
+    @Test
     fun applyProviderRecurringExceptionMetadataKeepsModifiedOccurrencesAsStandalone() {
         val parent = providerEvent("10", rrule = "FREQ=WEEKLY")
         val modifiedStart = 1_000L

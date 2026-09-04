@@ -14,6 +14,21 @@ import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import com.dotfield.dotcal.reminders.ReminderScheduler
 import java.util.concurrent.TimeUnit
 
+private const val SYNC_PAST_DAYS = 30L
+private const val SYNC_FUTURE_DAYS = 365L
+
+internal data class CalendarSyncWindow(
+    val startMs: Long,
+    val endMs: Long,
+)
+
+internal fun calendarSyncWindow(nowMs: Long): CalendarSyncWindow {
+    return CalendarSyncWindow(
+        startMs = nowMs - TimeUnit.DAYS.toMillis(SYNC_PAST_DAYS),
+        endMs = nowMs + TimeUnit.DAYS.toMillis(SYNC_FUTURE_DAYS),
+    )
+}
+
 data class CalendarSyncResult(
     val permissionDenied: Boolean = false,
     val calendarsSynced: Int = 0,
@@ -33,7 +48,7 @@ class CalendarSyncRepository(
             return CalendarSyncResult(permissionDenied = true)
         }
         val now = System.currentTimeMillis()
-        val rangeEndMs = now + TimeUnit.DAYS.toMillis(SYNC_RANGE_DAYS)
+        val syncWindow = calendarSyncWindow(now)
         val tombstoneCutoffMs = now - TimeUnit.DAYS.toMillis(TOMBSTONE_RETENTION_DAYS)
         var inserted = 0
         var updated = 0
@@ -45,9 +60,9 @@ class CalendarSyncRepository(
             dao.upsertAccountPreservingEvents(account)
             if (account.isVisible == 0) return@forEach
             val calendarId = account.googleCalendarId() ?: return@forEach
-            val providerEvents = providerDataSource.getEventsInRange(calendarId, now, rangeEndMs)
+            val providerEvents = providerDataSource.getEventsInRange(calendarId, syncWindow.startMs, syncWindow.endMs)
             val providerEventsWithExceptions = applyProviderRecurringExceptionMetadata(providerEvents)
-            val localEvents = dao.getGoogleEventsInRange(calendarId.toString(), now, rangeEndMs)
+            val localEvents = dao.getGoogleEventsInRange(calendarId.toString(), syncWindow.startMs, syncWindow.endMs)
             val providerByGoogleId = providerEventsWithExceptions.mapNotNull { event ->
                 event.googleEventId?.let { it to event }
             }.toMap()
@@ -193,7 +208,6 @@ class CalendarSyncRepository(
     }
 
     companion object {
-        private const val SYNC_RANGE_DAYS = 365L
         private const val TOMBSTONE_RETENTION_DAYS = 30L
     }
 }

@@ -229,6 +229,7 @@ import com.dotfield.dotcal.data.BulkEditResult
 import com.dotfield.dotcal.data.ics.IcsExporter
 import com.dotfield.dotcal.data.ics.IcsParser
 import com.dotfield.dotcal.data.ics.ParsedIcsItem
+import com.dotfield.dotcal.data.insights.OnThisDayMemory
 import com.dotfield.dotcal.data.qr.QrEventDecodeResult
 import com.dotfield.dotcal.data.qr.QrEventPayloadCodec
 import com.dotfield.dotcal.data.countdown.CountdownPinResult
@@ -254,6 +255,7 @@ import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.AppLanguage
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import com.dotfield.dotcal.review.ReviewUsageStore
 import com.dotfield.dotcal.BOOT_LANGUAGE_KEY
 import com.dotfield.dotcal.applyAppLanguage
 import com.dotfield.dotcal.reminders.shouldOpenFullScreenReminderSettings
@@ -312,6 +314,12 @@ private data class QrShareSession(
 private data class PendingIcsImport(
     val icsText: String,
     val items: List<ParsedIcsItem>,
+)
+private data class CalendarPeriodViewState(
+    val key: LocalDate,
+    val selectedDate: LocalDate,
+    val eventsByDate: Map<LocalDate, List<CalendarEvent>>,
+    val onThisDayMemories: List<OnThisDayMemory> = emptyList(),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -439,6 +447,23 @@ fun DotCalApp(
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
     }
     val scope = rememberCoroutineScope()
+    val reviewUsageStore = remember(context, scope) { ReviewUsageStore(context.applicationContext, scope) }
+    fun checkReviewEligibility() {
+        context.findActivity()?.let { activity ->
+            scope.launch { reviewUsageStore.maybeRequestReview(activity) }
+        }
+    }
+    fun recordReviewAction(createdItem: Boolean = false) {
+        scope.launch {
+            if (createdItem) reviewUsageStore.recordCreatedItem()
+            reviewUsageStore.recordMeaningfulAction()
+            checkReviewEligibility()
+        }
+    }
+    LaunchedEffect(Unit) {
+        reviewUsageStore.recordSession()
+        checkReviewEligibility()
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     // Hoisted for the non-composable callbacks below (toasts, snackbars, share intents,
     // and the plural-backed bulk-edit results).
@@ -787,7 +812,10 @@ fun DotCalApp(
                     runCatching { future.result }.onSuccess {
                         if (!isSyncing) {
                             isSyncing = true
-                            viewModel.syncNow { isSyncing = false }
+                            viewModel.syncNow { result ->
+                                isSyncing = false
+                                if (result.isSuccess && result.getOrNull()?.permissionDenied != true) recordReviewAction()
+                            }
                         }
                         settingsScreen = SettingsScreen.CalendarAccounts
                     }
@@ -806,7 +834,9 @@ fun DotCalApp(
                 pendingAddAccountAfterPermission = false
                 launchGoogleAddAccount()
             } else {
-                viewModel.syncNow()
+                viewModel.syncNow { result ->
+                    if (result.isSuccess && result.getOrNull()?.permissionDenied != true) recordReviewAction()
+                }
             }
         } else {
             pendingAddAccountAfterPermission = false
@@ -827,7 +857,11 @@ fun DotCalApp(
     val onboardingCalendarPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         hasCalendarPermission = grants[Manifest.permission.READ_CALENDAR] == true ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
-        if (hasCalendarPermission) viewModel.syncNow()
+        if (hasCalendarPermission) {
+            viewModel.syncNow { result ->
+                if (result.isSuccess && result.getOrNull()?.permissionDenied != true) recordReviewAction()
+            }
+        }
         advanceOnboarding()
     }
     val onboardingNotificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -1665,115 +1699,185 @@ fun DotCalApp(
                                 animationSpec = tween(durationMillis = 150),
                                 label = "calendarViewSwitch",
                             ) { calendarTab ->
-                                when (calendarTab) {
-                                    CalendarTab.Month -> MonthView(
-                                        month = month,
+                                val weekViewState = remember(selectedDate, weekStartDay, eventsByDate) {
+                                    val key = weekTransitionKey(selectedDate, weekStartDay)
+                                    val dates = List(7) { key.plusDays(it.toLong()) }
+                                    CalendarPeriodViewState(
+                                        key = key,
                                         selectedDate = selectedDate,
-                                        eventsByDate = eventsByDate,
-                                        shiftEventIds = shiftEventIds,
-                                        palette = palette,
-                                        weekStart = weekStartDay,
-                                        showWeekNumbers = showWeekNumbers,
-                                        onPrevious = viewModel::previousMonth,
-                                        onNext = viewModel::nextMonth,
-                                        highlightDate = jumpHighlightDate,
-                                        selectedBulkDates = selectedBulkDates,
-                                        onBulkSelectionStart = { date ->
-                                            if (!isPro) {
-                                                showPaywall = true
-                                            } else {
-                                                selectedBulkDates = setOf(date)
-                                            }
-                                        },
-                                        onBulkApply = {
-                                            if (isPro) {
-                                                viewModel.refreshTemplates()
-                                                showBulkTemplatePicker = true
-                                            } else {
-                                                showPaywall = true
-                                            }
-                                        },
-                                        onBulkClear = { selectedBulkDates = emptySet() },
-                                        onDateSelected = {
-                                            if (selectedBulkDates.isNotEmpty()) {
-                                                selectedBulkDates = if (it in selectedBulkDates) selectedBulkDates - it else selectedBulkDates + it
-                                            } else {
-                                                viewModel.selectDate(it)
-                                                showSheet = true
-                                            }
-                                        },
+                                        eventsByDate = dates.associateWith { eventsByDate[it].orEmpty() },
                                     )
-                                    CalendarTab.Week -> WeekView(
+                                }
+                                val dayViewState = remember(selectedDate, eventsByDate, onThisDayMemories) {
+                                    CalendarPeriodViewState(
+                                        key = selectedDate,
                                         selectedDate = selectedDate,
-                                        eventsByDate = eventsByDate,
-                                        palette = palette,
-                                        weekStart = weekStartDay,
-                                        showWeekNumbers = showWeekNumbers,
-                                        onPreviousWeek = { viewModel.selectDate(selectedDate.minusWeeks(1)) },
-                                        onNextWeek = { viewModel.selectDate(selectedDate.plusWeeks(1)) },
-                                        onJumpToday = { jumpToDate(LocalDate.now()) },
-                                        onJumpPickerRequest = { showJumpToDatePicker = true },
-                                        highlightDate = jumpHighlightDate,
-                                        onDateSelected = viewModel::selectDate,
-                                        onAddAtDate = { date, time ->
-                                            viewModel.selectDate(date)
-                                            openAddEditor(time)
-                                        },
-                                        onEventClick = viewModel::openEventDetail,
-                                        onEventDrag = ::requestEventDrag,
-                                        onAvailabilityRequest = { date ->
-                                            if (isPro) {
-                                                availabilityInitialDate = date
-                                                availabilityInitialEndDate = date.plusDays(2)
-                                                viewModel.clearAvailability()
-                                                showAvailability = true
-                                            } else {
-                                                showPaywall = true
-                                            }
-                                        },
-                                        use24HourFormat = use24HourFormat,
-                                    )
-                                    CalendarTab.Day -> DayView(
-                                        selectedDate = selectedDate,
-                                        eventsByDate = eventsByDate,
-                                        shiftEventIds = shiftEventIds,
-                                        palette = palette,
-                                        isDayPunched = punchCardState.isPunched(selectedDate),
-                                        punchStreak = punchCardState.streakEndingAt(selectedDate),
+                                        eventsByDate = mapOf(selectedDate to eventsByDate[selectedDate].orEmpty()),
                                         onThisDayMemories = onThisDayMemories,
-                                        onPreviousDay = { viewModel.selectDate(selectedDate.minusDays(1)) },
-                                        onNextDay = { viewModel.selectDate(selectedDate.plusDays(1)) },
-                                        onJumpToday = { jumpToDate(LocalDate.now()) },
-                                        onJumpPickerRequest = { showJumpToDatePicker = true },
-                                        onPunchDay = { viewModel.punchDay(selectedDate) },
-                                        onClearPunchDay = { viewModel.clearDayPunch(selectedDate) },
-                                        onMemoryClick = { viewModel.openMemoryById(it) },
-                                        onMemoryDismiss = { viewModel.dismissOnThisDay(selectedDate) },
-                                        highlightDate = jumpHighlightDate,
-                                        onAddAtDate = { date, time ->
-                                            viewModel.selectDate(date)
-                                            openAddEditor(time)
-                                        },
-                                        onEventClick = viewModel::openEventDetail,
-                                        onEventDrag = ::requestEventDrag,
-                                        use24HourFormat = use24HourFormat,
                                     )
-                                    CalendarTab.ThreeDay -> ThreeDayView(
+                                }
+                                val threeDayViewState = remember(selectedDate, eventsByDate) {
+                                    val dates = List(3) { selectedDate.plusDays(it.toLong()) }
+                                    CalendarPeriodViewState(
+                                        key = selectedDate,
                                         selectedDate = selectedDate,
-                                        eventsByDate = eventsByDate,
-                                        palette = palette,
-                                        onPreviousRange = { viewModel.selectDate(selectedDate.minusDays(3)) },
-                                        onNextRange = { viewModel.selectDate(selectedDate.plusDays(3)) },
-                                        onJumpToday = { jumpToDate(LocalDate.now()) },
-                                        onJumpPickerRequest = { showJumpToDatePicker = true },
-                                        highlightDate = jumpHighlightDate,
-                                        onDateSelected = viewModel::selectDate,
-                                        onAddAtDate = { date, time ->
-                                            viewModel.selectDate(date)
-                                            openAddEditor(time)
-                                        },
-                                        onEventClick = viewModel::openEventDetail,
+                                        eventsByDate = dates.associateWith { eventsByDate[it].orEmpty() },
                                     )
+                                }
+                                when (calendarTab) {
+                                    CalendarTab.Month -> AnimatedContent(
+                                        targetState = month,
+                                        transitionSpec = {
+                                            val direction = monthTransitionDirection(initialState, targetState)
+                                            (slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() * direction } +
+                                                fadeIn(tween(180))) togetherWith
+                                                (slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() * -direction } +
+                                                    fadeOut(tween(150)))
+                                        },
+                                        label = "monthViewSwitch",
+                                    ) { visibleMonth ->
+                                        MonthView(
+                                            month = visibleMonth,
+                                            selectedDate = selectedDate,
+                                            eventsByDate = eventsByDate,
+                                            shiftEventIds = shiftEventIds,
+                                            palette = palette,
+                                            weekStart = weekStartDay,
+                                            showWeekNumbers = showWeekNumbers,
+                                            onPrevious = viewModel::previousMonth,
+                                            onNext = viewModel::nextMonth,
+                                            highlightDate = jumpHighlightDate,
+                                            selectedBulkDates = selectedBulkDates,
+                                            onBulkSelectionStart = { date ->
+                                                if (!isPro) {
+                                                    showPaywall = true
+                                                } else {
+                                                    selectedBulkDates = setOf(date)
+                                                }
+                                            },
+                                            onBulkApply = {
+                                                if (isPro) {
+                                                    viewModel.refreshTemplates()
+                                                    showBulkTemplatePicker = true
+                                                } else {
+                                                    showPaywall = true
+                                                }
+                                            },
+                                            onBulkClear = { selectedBulkDates = emptySet() },
+                                            onDateSelected = {
+                                                if (selectedBulkDates.isNotEmpty()) {
+                                                    selectedBulkDates = if (it in selectedBulkDates) selectedBulkDates - it else selectedBulkDates + it
+                                                } else {
+                                                    viewModel.selectDate(it)
+                                                    showSheet = true
+                                                }
+                                            },
+                                        )
+                                    }
+                                    CalendarTab.Week -> AnimatedContent(
+                                        targetState = weekViewState,
+                                        contentKey = { it.key },
+                                        transitionSpec = {
+                                            val direction = periodTransitionDirection(initialState.key, targetState.key)
+                                            (slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() * direction } + fadeIn(tween(180))) togetherWith
+                                                (slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() * -direction } + fadeOut(tween(150)))
+                                        },
+                                        label = "weekViewSwitch",
+                                    ) { visibleState ->
+                                        WeekView(
+                                            selectedDate = visibleState.selectedDate,
+                                            eventsByDate = visibleState.eventsByDate,
+                                            palette = palette,
+                                            weekStart = weekStartDay,
+                                            showWeekNumbers = showWeekNumbers,
+                                            onPreviousWeek = { viewModel.selectDate(visibleState.selectedDate.minusWeeks(1)) },
+                                            onNextWeek = { viewModel.selectDate(visibleState.selectedDate.plusWeeks(1)) },
+                                            onJumpToday = { jumpToDate(LocalDate.now()) },
+                                            onJumpPickerRequest = { showJumpToDatePicker = true },
+                                            highlightDate = jumpHighlightDate,
+                                            onDateSelected = viewModel::selectDate,
+                                            onAddAtDate = { date, time ->
+                                                viewModel.selectDate(date)
+                                                openAddEditor(time)
+                                            },
+                                            onEventClick = viewModel::openEventDetail,
+                                            onEventDrag = ::requestEventDrag,
+                                            onAvailabilityRequest = { date ->
+                                                if (isPro) {
+                                                    availabilityInitialDate = date
+                                                    availabilityInitialEndDate = date.plusDays(2)
+                                                    viewModel.clearAvailability()
+                                                    showAvailability = true
+                                                } else {
+                                                    showPaywall = true
+                                                }
+                                            },
+                                            use24HourFormat = use24HourFormat,
+                                        )
+                                    }
+                                    CalendarTab.Day -> AnimatedContent(
+                                        targetState = dayViewState,
+                                        contentKey = { it.key },
+                                        transitionSpec = {
+                                            val direction = periodTransitionDirection(initialState.key, targetState.key)
+                                            (slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() * direction } + fadeIn(tween(180))) togetherWith
+                                                (slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() * -direction } + fadeOut(tween(150)))
+                                        },
+                                        label = "dayViewSwitch",
+                                    ) { visibleState ->
+                                        DayView(
+                                            selectedDate = visibleState.selectedDate,
+                                            eventsByDate = visibleState.eventsByDate,
+                                            shiftEventIds = shiftEventIds,
+                                            palette = palette,
+                                            isDayPunched = punchCardState.isPunched(visibleState.selectedDate),
+                                            punchStreak = punchCardState.streakEndingAt(visibleState.selectedDate),
+                                            onThisDayMemories = visibleState.onThisDayMemories,
+                                            onPreviousDay = { viewModel.selectDate(visibleState.selectedDate.minusDays(1)) },
+                                            onNextDay = { viewModel.selectDate(visibleState.selectedDate.plusDays(1)) },
+                                            onJumpToday = { jumpToDate(LocalDate.now()) },
+                                            onJumpPickerRequest = { showJumpToDatePicker = true },
+                                            onPunchDay = { viewModel.punchDay(visibleState.selectedDate) },
+                                            onClearPunchDay = { viewModel.clearDayPunch(visibleState.selectedDate) },
+                                            onMemoryClick = { viewModel.openMemoryById(it) },
+                                            onMemoryDismiss = { viewModel.dismissOnThisDay(visibleState.selectedDate) },
+                                            highlightDate = jumpHighlightDate,
+                                            onAddAtDate = { date, time ->
+                                                viewModel.selectDate(date)
+                                                openAddEditor(time)
+                                            },
+                                            onEventClick = viewModel::openEventDetail,
+                                            onEventDrag = ::requestEventDrag,
+                                            use24HourFormat = use24HourFormat,
+                                        )
+                                    }
+                                    CalendarTab.ThreeDay -> AnimatedContent(
+                                        targetState = threeDayViewState,
+                                        contentKey = { it.key },
+                                        transitionSpec = {
+                                            val direction = periodTransitionDirection(initialState.key, targetState.key)
+                                            (slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() * direction } + fadeIn(tween(180))) togetherWith
+                                                (slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() * -direction } + fadeOut(tween(150)))
+                                        },
+                                        label = "threeDayViewSwitch",
+                                    ) { visibleState ->
+                                        ThreeDayView(
+                                            selectedDate = visibleState.selectedDate,
+                                            eventsByDate = visibleState.eventsByDate,
+                                            palette = palette,
+                                            onPreviousRange = { viewModel.selectDate(visibleState.selectedDate.minusDays(3)) },
+                                            onNextRange = { viewModel.selectDate(visibleState.selectedDate.plusDays(3)) },
+                                            onJumpToday = { jumpToDate(LocalDate.now()) },
+                                            onJumpPickerRequest = { showJumpToDatePicker = true },
+                                            highlightDate = jumpHighlightDate,
+                                            onDateSelected = viewModel::selectDate,
+                                            onAddAtDate = { date, time ->
+                                                viewModel.selectDate(date)
+                                                openAddEditor(time)
+                                            },
+                                            onEventClick = viewModel::openEventDetail,
+                                        )
+                                    }
                                     CalendarTab.Agenda -> AgendaPreview(
                                         selectedDate = selectedDate,
                                         events = agendaEvents,
@@ -2928,7 +3032,7 @@ fun DotCalApp(
                         if (task.isCompleted == 1) {
                             viewModel.reopenTask(task)
                         } else {
-                            viewModel.completeTask(task)
+                            viewModel.completeTask(task) { recordReviewAction() }
                             DotCalGlyphBridge.taskCompleted(context, task.baseEventId())
                         }
                         taskDetail = null
@@ -2954,7 +3058,9 @@ fun DotCalApp(
                     showTaskEditor = false
                 },
                 onSave = { data ->
+                    val isNewTask = editingTask == null
                     viewModel.saveTask(editingTask, data) {
+                        if (isNewTask) recordReviewAction(createdItem = true)
                         editingTask = null
                         taskTemplatePrefill = null
                         showTaskEditor = false
@@ -3020,7 +3126,9 @@ fun DotCalApp(
                 },
                 onSave = { data, scope ->
                     val shouldReturnToDetail = detailEvent != null && editingEvent != null
+                    val isNewEvent = editingEvent == null
                     viewModel.saveEvent(editingEvent, data, scope) { savedEventId ->
+                        if (isNewEvent && savedEventId != null) recordReviewAction(createdItem = true)
                         viewModel.selectDate(data.date)
                         editingEvent = null
                         addEditorDateOverride = null

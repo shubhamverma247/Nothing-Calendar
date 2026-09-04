@@ -68,6 +68,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.play.app.update.ktx)
+    implementation(libs.play.review.ktx)
     implementation(libs.billing.ktx)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
