@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-09-02
+Updated: 2026-09-03
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 `Docs/HANDOFF.original.md`. Do not touch `Docs/HANDOFF - Copy.md` or user-owned
@@ -8,9 +8,14 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 
 ## Current Worktree
 
-- Branch: `main`.
-- All work happens on `main`. Do not create or switch branches.
+- Branch: `agp-r8-optimization` for current AGP/R8 migration work; `main` remains release base.
+- Normal app work happens on `main`; this isolated build-toolchain branch is intentional.
 - Do not commit or push unless the user explicitly asks.
+- AGP/R8 migration currently uncommitted on `agp-r8-optimization`: AGP `9.0.1`, Gradle `9.1.0`,
+  built-in Kotlin `2.2.10`, KSP `2.2.10-2.0.2`, Room `2.8.4`. Release AAB and APK builds pass;
+  debug unit tests and lint pass. `android.disallowKotlinSourceSets=false` remains as a temporary
+  KSP compatibility flag because KSP registers generated sources through the legacy Kotlin source
+  set API. Full release/manual QA still pending before merge.
 - Current user-reported QA focus is post-22-August/new-feature QA. Calendar-move duplicate guard
   is now passed. Continue one manual test at a time and wait for feedback before diagnosing or
   changing anything else.
