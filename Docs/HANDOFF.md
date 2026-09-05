@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-09-03
+Updated: 2026-09-05
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 `Docs/HANDOFF.original.md`. Do not touch `Docs/HANDOFF - Copy.md` or user-owned
@@ -87,10 +87,14 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   - DotCal edit one recurring occurrence -> Google passed after detail-refresh fix; edited title
     appears immediately on return to detail.
 - Snooze Picker overlap fix verified manually on device in commit `2ff91cb`.
+- Latest local commit: `66ad96a merge: integrate AGP R8 optimization and bump version`.
+  Verification passed: `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:lintDebug`, and
+  `git diff --check`. Install attempt on 2026-09-05 was blocked because `adb devices` returned
+  no attached devices.
 - Latest pushed commit: see latest git history; keep remote synchronized after approved commits.
   Protected screenshots and `.claude/` remain untracked and untouched.
 - Latest pushed commit before current local widget work: `2b61b79 feat(widgets): start unified widget configuration`.
-- Local release target: `versionCode 36`, `versionName 1.4.0`.
+- Local release target: `versionCode 37`, `versionName 1.4.1`.
 - Latest debug APK was installed successfully on device `000153573000720` (Nothing Phone (3),
   Android 16/API 36) with `adb install -r`; app package is `com.dotfield.dotcal`.
 - Connected reference phone also has Business Calendar 2 installed as `com.appgenix.bizcal`.
@@ -119,7 +123,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 
 - Android: Kotlin + Compose, `compileSdk 36`, `minSdk 30`, `targetSdk 36`.
 - Billing: `billing-ktx 8.0.0`; do not downgrade below v8.
-- Version: `versionCode 36`, `versionName 1.4.0`.
+- Version: `versionCode 37`, `versionName 1.4.1`.
 - Release build has `isMinifyEnabled=true`, `isShrinkResources=true`, and
   `proguard-android-optimize.txt`.
 - Tabs: Calendar, Tasks, Settings.
