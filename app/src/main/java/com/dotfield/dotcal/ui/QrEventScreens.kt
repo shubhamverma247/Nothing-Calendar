@@ -89,27 +89,34 @@ internal sealed interface QrScanOutcome {
     data class Rejected(val message: String) : QrScanOutcome
 }
 
+internal fun normalizeQrShareText(value: String?, fallback: String): String =
+    value?.takeIf { it.isNotBlank() } ?: fallback
+
 @Composable
 internal fun QrEventShareScreen(
-    eventTitle: String,
-    eventDateTime: String,
-    eventMeta: String,
-    payload: String,
+    eventTitle: String?,
+    eventDateTime: String?,
+    eventMeta: String?,
+    payload: String?,
     sharedWithoutDescription: Boolean,
     palette: DotCalPalette,
     onBack: () -> Unit,
     onShare: (Bitmap) -> Unit,
 ) {
+    val safeEventTitle = normalizeQrShareText(eventTitle, stringResource(R.string.a11y_untitled_event))
+    val safeEventDateTime = eventDateTime.orEmpty()
+    val safeEventMeta = eventMeta.orEmpty()
+    val safePayload = payload.orEmpty()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val exportBitmapResult by produceState<Result<Bitmap>?>(initialValue = null, payload, eventTitle) {
+    val exportBitmapResult by produceState<Result<Bitmap>?>(initialValue = null, safePayload, safeEventTitle) {
         value = withContext(Dispatchers.Default) {
-            runCatching { QrEventImageExporter.createCard(payload, eventTitle, eventDateTime, eventMeta) }
+            runCatching { QrEventImageExporter.createCard(safePayload, safeEventTitle, safeEventDateTime, safeEventMeta) }
         }
     }
-    val qrBitmapResult by produceState<Result<Bitmap>?>(initialValue = null, payload) {
+    val qrBitmapResult by produceState<Result<Bitmap>?>(initialValue = null, safePayload) {
         value = withContext(Dispatchers.Default) {
-            runCatching { QrEventImageExporter.createQrBitmap(payload, size = 920) }
+            runCatching { QrEventImageExporter.createQrBitmap(safePayload, size = 920) }
         }
     }
     var pendingSaveBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -171,7 +178,7 @@ internal fun QrEventShareScreen(
             }
             Spacer(Modifier.height(20.dp))
             Text(
-                eventTitle,
+                safeEventTitle,
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontSize = 20.sp,
@@ -179,10 +186,10 @@ internal fun QrEventShareScreen(
                 textAlign = TextAlign.Center,
                 maxLines = 2,
             )
-            if (eventDateTime.isNotBlank()) {
+            if (safeEventDateTime.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    eventDateTime,
+                    safeEventDateTime,
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 13.sp,
@@ -190,10 +197,10 @@ internal fun QrEventShareScreen(
                     textAlign = TextAlign.Center,
                 )
             }
-            if (eventMeta.isNotBlank()) {
+            if (safeEventMeta.isNotBlank()) {
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    eventMeta,
+                    safeEventMeta,
                     color = palette.secondaryText,
                     fontFamily = mono,
                     fontSize = 12.sp,
@@ -222,7 +229,7 @@ internal fun QrEventShareScreen(
                 onClick = {
                     exportBitmapResult?.getOrNull()?.let { bitmap ->
                         pendingSaveBitmap = bitmap
-                        saveLauncher.launch("${eventTitle.safeQrFilename()}.png")
+                        saveLauncher.launch("${safeEventTitle.safeQrFilename()}.png")
                     }
                 },
                 enabled = exportBitmapResult?.isSuccess == true,

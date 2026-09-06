@@ -23,6 +23,13 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   debug unit tests and lint pass. `android.disallowKotlinSourceSets=false` remains as a temporary
   KSP compatibility flag because KSP registers generated sources through the legacy Kotlin source
   set API. Full release/manual QA still pending before merge.
+- Play release blocker hardening is now coded locally (no commit/push): QR share display inputs are
+  normalized before Compose rendering; release R8 keeps the QR screen file/singletons intact after
+  the pre-launch Java NPE. ML Kit's three manifest-discovered registrar constructors are also
+  explicitly kept after the old release log showed R8 removing them. The release ABI restriction
+  was removed to preserve the 2,151 devices dropped by the temporary 64-bit-only filter. VersionCode
+  is now 39 for the next Play upload. Added `QrEventShareTest` regression coverage. Device and Play
+  pre-launch retest remain pending.
 - Current user-reported QA focus is post-22-August/new-feature QA. Calendar-move duplicate guard
   is now passed. Continue one manual test at a time and wait for feedback before diagnosing or
   changing anything else.
@@ -94,7 +101,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Latest pushed commit: see latest git history; keep remote synchronized after approved commits.
   Protected screenshots and `.claude/` remain untracked and untouched.
 - Latest pushed commit before current local widget work: `2b61b79 feat(widgets): start unified widget configuration`.
-- Local release target: `versionCode 37`, `versionName 1.4.1`.
+- Local release target: `versionCode 39`, `versionName 1.4.1`.
 - Latest debug APK was installed successfully on device `000153573000720` (Nothing Phone (3),
   Android 16/API 36) with `adb install -r`; app package is `com.dotfield.dotcal`.
 - Connected reference phone also has Business Calendar 2 installed as `com.appgenix.bizcal`.
@@ -123,7 +130,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 
 - Android: Kotlin + Compose, `compileSdk 36`, `minSdk 30`, `targetSdk 36`.
 - Billing: `billing-ktx 8.0.0`; do not downgrade below v8.
-- Version: `versionCode 37`, `versionName 1.4.1`.
+- Version: `versionCode 39`, `versionName 1.4.1`.
 - Release build has `isMinifyEnabled=true`, `isShrinkResources=true`, and
   `proguard-android-optimize.txt`.
 - Tabs: Calendar, Tasks, Settings.
