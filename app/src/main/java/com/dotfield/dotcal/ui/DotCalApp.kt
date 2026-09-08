@@ -290,6 +290,13 @@ private const val BOOT_THEME_KEY = "theme_mode"
 private const val BOOT_ACCENT_KEY = "accent_color"
 private const val BOOT_DEFAULT_VIEW_KEY = "default_view"
 private const val BULK_UNDO_SNACKBAR_MILLIS = 4_000L
+
+internal fun shareViewDate(
+    activeCalendarTab: CalendarTab,
+    month: LocalDate,
+    selectedDate: LocalDate,
+): LocalDate = if (activeCalendarTab == CalendarTab.Month) month else selectedDate
+
 private enum class DeleteSource { Editor, Detail }
 private enum class BulkEventSheet { Actions, Shift, Calendar, Color, MoveDate, CopyDate }
 private data class PendingDelete(
@@ -1672,7 +1679,7 @@ fun DotCalApp(
                                                     context = context,
                                                     viewName = activeCalendarTab.name,
                                                     events = if (activeCalendarTab == CalendarTab.Agenda) agendaEvents else events,
-                                                    viewDate = selectedDate,
+                                                    viewDate = shareViewDate(activeCalendarTab, month, selectedDate),
                                                     weekStart = weekStartDay,
                                                     accentColor = palette.accent.toArgb(),
                                                     darkTheme = palette.isDark,

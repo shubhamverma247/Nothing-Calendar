@@ -97,7 +97,13 @@ object CardImageExporter {
         canvas.drawRect(72f, 86f, 1008f, 96f, paint)
         paint.color = text
         paint.textSize = 58f
-        canvas.drawText("DOTCAL / ${viewName.uppercase(Locale.US)}", 72f, 190f, paint)
+        val title = shareHeaderTitle(viewName)
+        canvas.drawText(title, 72f, 190f, paint)
+        sharePeriodLabel(layout, viewDate)?.let { periodLabel ->
+            paint.color = secondary
+            paint.textSize = 30f
+            canvas.drawText(periodLabel, sharePeriodLabelX(paint.measureText(periodLabel)), 190f, paint)
+        }
         paint.color = secondary
         paint.textSize = 30f
         canvas.drawText(brandLabel, 72f, 242f, paint)
@@ -106,10 +112,10 @@ object CardImageExporter {
             "week" -> drawWeekView(canvas, viewDate, weekStart, events, accentColor, text, secondary, untitledLabel)
             else -> drawAgendaView(canvas, events, accentColor, text, secondary, untitledLabel)
         }
-        if (events.isEmpty()) {
+        if (events.isEmpty() && shouldDrawEmptyShareLabel(layout)) {
             paint.color = secondary
             paint.textSize = 32f
-            canvas.drawText(emptyLabel, 72f, 390f, paint)
+            canvas.drawText(emptyLabel, 72f, emptyShareLabelY(layout), paint)
         }
         paint.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
         paint.color = accentColor
@@ -126,9 +132,28 @@ object CardImageExporter {
 
     private fun calendarViewCardHeight(layout: String, eventCount: Int): Int {
         if (layout == "week") return 2400
+        if (layout == "month") return monthShareCardHeight(eventCount)
         if (layout != "agenda") return 1350
         val visibleRows = eventCount.coerceIn(1, 12)
         return maxOf(1350, 350 + visibleRows * 112 + 170)
+    }
+
+    internal fun shouldDrawEmptyShareLabel(layout: String): Boolean = layout != "week"
+
+    internal fun sharePeriodLabel(layout: String, viewDate: LocalDate): String? = when (layout) {
+        "month" -> "${viewDate.year}/${viewDate.monthValue}"
+        else -> null
+    }
+
+    internal fun shareHeaderTitle(viewName: String): String = "DOTCAL/${viewName.uppercase(Locale.US)}"
+
+    internal fun sharePeriodLabelX(labelWidth: Float, right: Float = 1008f): Float = right - labelWidth
+
+    internal fun monthShareCardHeight(eventCount: Int): Int = maxOf(1350, 1190 + eventCount.coerceAtLeast(0) * 58)
+
+    internal fun emptyShareLabelY(layout: String): Float = when (layout) {
+        "month" -> 1035f
+        else -> 390f
     }
 
     private fun drawAgendaView(canvas: Canvas, events: List<CalendarEvent>, accentColor: Int, text: Int, secondary: Int, untitledLabel: String) {
@@ -165,7 +190,18 @@ object CardImageExporter {
         }
         paint.color = secondary; paint.textSize = 22f
         canvas.drawText("${viewDate.month.name.take(3)} ${viewDate.year}  -  ${events.size} EVENTS", 72f, 930f, paint)
-        canvas.drawText(events.take(3).joinToString("  -  ") { it.title.ifBlank { untitledLabel }.take(16) }.take(78), 72f, 970f, paint)
+        events.forEachIndexed { index, event ->
+            val y = 980f + index * 58f
+            paint.color = event.shareCardColor(accentColor)
+            canvas.drawCircle(82f, y - 8f, 6f, paint)
+            paint.color = text
+            canvas.drawText(
+                "${event.shareCardDateLabel()}  ${event.title.ifBlank { untitledLabel }}".take(60),
+                104f,
+                y,
+                paint,
+            )
+        }
     }
 
     private fun drawWeekView(canvas: Canvas, viewDate: LocalDate, weekStart: DayOfWeek, events: List<CalendarEvent>, accentColor: Int, text: Int, secondary: Int, untitledLabel: String) {

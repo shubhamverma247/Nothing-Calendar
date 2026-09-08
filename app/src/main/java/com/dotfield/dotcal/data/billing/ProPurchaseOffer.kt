@@ -114,6 +114,7 @@ private fun ProPurchaseOffer.withComparisonPrice(planOffers: List<ProPurchaseOff
         .maxByOrNull { it.priceAmountMicros ?: Long.MIN_VALUE }
         ?.formattedPrice
         ?.takeUnless { it == formattedPrice }
+        ?: comparisonFormattedPrice
     return copy(comparisonFormattedPrice = comparison)
 }
 

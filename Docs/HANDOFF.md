@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-09-05
+Updated: 2026-09-06
 
 Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 `Docs/HANDOFF.original.md`. Do not touch `Docs/HANDOFF - Copy.md` or user-owned
@@ -33,6 +33,9 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Current user-reported QA focus is post-22-August/new-feature QA. Calendar-move duplicate guard
   is now passed. Continue one manual test at a time and wait for feedback before diagnosing or
   changing anything else.
+- Communication rule: whenever the user reports an issue, first state the exact understanding and
+  proposed fix, then wait for confirmation before changing code; after confirmation, report the
+  verification and install result.
 - Production-audit HIGH/MEDIUM fixes are committed and verified:
   `SCHEDULE_EXACT_ALARM` is capped to API 32 while `USE_EXACT_ALARM` remains for API 33+ calendar
   reminders; Pro full-screen reminder alerts now check Android 14+ full-screen intent access, save
@@ -45,6 +48,14 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
   snooze on Nothing Phone (3). Verified with focused reminder unit test and `:app:assembleDebug`;
   fixed debug APK installed on device `000153573000720`. User retest passed. Commit/push next, then
   user plans to release this version for Play internal testing today.
+- Local uncommitted billing/share fixes: subscription paywall now displays the first paid offer phase
+  (introductory discount) instead of the later renewal price; the yearly discounted offer now also
+  preserves its later renewal price as the crossed-out comparison price. Month share cards use the
+  visible navigated month instead of stale selected-date state, show compact `DOTCAL/MONTH` and
+  upper `YYYY/M` labels, render every Month event in its own row, grow image height with event
+  count, and place the empty-state label below the calendar grid; empty Week share cards omit that
+  label. Added regression tests. Focused tests, `:app:assembleDebug`, and `:app:lintDebug` pass.
+  Install retry on 2026-09-06 was blocked because device `4ab0d020` was disconnected from ADB.
 - Manual QA scope is post-22-August/newly added features only; skip older backlog/regression items
   such as purchase restore or legacy Glyph Toy unless the user explicitly pulls them back in.
 - Manual QA now passed on latest installed debug APK:
@@ -101,9 +112,9 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 - Latest pushed commit: see latest git history; keep remote synchronized after approved commits.
   Protected screenshots and `.claude/` remain untracked and untouched.
 - Latest pushed commit before current local widget work: `2b61b79 feat(widgets): start unified widget configuration`.
-- Local release target: `versionCode 39`, `versionName 1.4.1`.
-- Latest debug APK was installed successfully on device `000153573000720` (Nothing Phone (3),
-  Android 16/API 36) with `adb install -r`; app package is `com.dotfield.dotcal`.
+- Local release target: `versionCode 41`, `versionName 1.4.1`.
+- VersionCode 41 debug APK build passed on 2026-09-06, but install was blocked because device
+  `4ab0d020` was disconnected from ADB; app package is `com.dotfield.dotcal`.
 - Connected reference phone also has Business Calendar 2 installed as `com.appgenix.bizcal`.
 - Expected untracked user file: `Docs/FEEDBACK.md`; leave it untouched.
 
@@ -130,7 +141,7 @@ Source of truth for DotCal (`com.dotfield.dotcal`). Full old history lives in
 
 - Android: Kotlin + Compose, `compileSdk 36`, `minSdk 30`, `targetSdk 36`.
 - Billing: `billing-ktx 8.0.0`; do not downgrade below v8.
-- Version: `versionCode 39`, `versionName 1.4.1`.
+- Version: `versionCode 41`, `versionName 1.4.1`.
 - Release build has `isMinifyEnabled=true`, `isShrinkResources=true`, and
   `proguard-android-optimize.txt`.
 - Tabs: Calendar, Tasks, Settings.
@@ -486,10 +497,18 @@ Use focused checks first, then broad checks when risk warrants it.
 ```powershell
 .\gradlew.bat --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug
 .\gradlew.bat --no-daemon --console=plain :app:lintDebug
+.\gradlew.bat --no-daemon --console=plain :app:bundleRelease
 git diff --check
 ```
 
-Install only when requested or needed:
+If release compilation reports a cascade of unrelated unresolved references, rerun the same
+release bundle command with `--rerun-tasks` to bypass stale incremental Kotlin state:
+
+```powershell
+.\gradlew.bat --no-daemon --console=plain :app:bundleRelease --rerun-tasks
+```
+
+Install the latest verified debug APK whenever a device is attached:
 
 ```powershell
 C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk

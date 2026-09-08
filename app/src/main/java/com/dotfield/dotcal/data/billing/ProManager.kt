@@ -376,6 +376,22 @@ private fun buildProPurchaseOffers(
     return orderedProPurchaseOffers(offers)
 }
 
+internal fun <T> firstPaidPricingPhase(
+    phases: List<T>,
+    priceAmountMicros: (T) -> Long,
+): T? {
+    return phases.firstOrNull { priceAmountMicros(it) > 0 } ?: phases.lastOrNull()
+}
+
+internal fun <T> nextPaidPricingPhase(
+    phases: List<T>,
+    priceAmountMicros: (T) -> Long,
+): T? {
+    val firstPaidIndex = phases.indexOfFirst { priceAmountMicros(it) > 0 }
+    if (firstPaidIndex == -1) return null
+    return phases.drop(firstPaidIndex + 1).firstOrNull { priceAmountMicros(it) > 0 }
+}
+
 private fun ProductDetails.lifetimePurchaseOffers(): List<ProPurchaseOffer> {
     val offers = oneTimePurchaseOfferDetailsList.orEmpty().ifEmpty {
         oneTimePurchaseOfferDetails?.let(::listOf).orEmpty()
@@ -410,10 +426,11 @@ private fun ProductDetails.lifetimePurchaseOffers(): List<ProPurchaseOffer> {
 private fun ProductDetails.subscriptionPurchaseOffers(): List<ProPurchaseOffer> {
     val offers = subscriptionOfferDetails.orEmpty().mapNotNull { offer ->
         val plan = planForBasePlan(offer.basePlanId) ?: return@mapNotNull null
-        val paidPhase = offer.pricingPhases.pricingPhaseList.lastOrNull { it.priceAmountMicros > 0 }
-            ?: offer.pricingPhases.pricingPhaseList.lastOrNull()
+        val pricingPhases = offer.pricingPhases.pricingPhaseList
+        val paidPhase = firstPaidPricingPhase(pricingPhases) { it.priceAmountMicros }
             ?: return@mapNotNull null
-        val trialPhase = offer.pricingPhases.pricingPhaseList.firstOrNull {
+        val renewalPhase = nextPaidPricingPhase(pricingPhases) { it.priceAmountMicros }
+        val trialPhase = pricingPhases.firstOrNull {
             it.priceAmountMicros == 0L && it.billingPeriod == "P7D"
         }
         val hasSevenDayTrial = trialPhase != null ||
@@ -425,6 +442,7 @@ private fun ProductDetails.subscriptionPurchaseOffers(): List<ProPurchaseOffer> 
             productId = productId,
             productType = BillingClient.ProductType.SUBS,
             priceAmountMicros = paidPhase.priceAmountMicros,
+            comparisonFormattedPrice = renewalPhase?.formattedPrice?.takeUnless { it == paidPhase.formattedPrice },
             offerToken = offer.offerToken,
             offerId = offer.offerId,
             basePlanId = offer.basePlanId,
