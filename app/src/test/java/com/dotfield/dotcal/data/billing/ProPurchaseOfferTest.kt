@@ -5,6 +5,11 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ProPurchaseOfferTest {
+    private data class TestPricingPhase(
+        val priceAmountMicros: Long,
+        val formattedPrice: String = "",
+    )
+
     private val lifetimeOffer = ProPurchaseOffer(
         plan = ProPurchasePlan.Lifetime,
         formattedPrice = "$4.99",
@@ -123,5 +128,43 @@ class ProPurchaseOfferTest {
         val ordered = orderedProPurchaseOffers(listOf(discountedYearlyOffer, yearlyTrialOffer))
 
         assertEquals(listOf(yearlyTrialOffer), ordered)
+    }
+
+    @Test
+    fun firstPaidPricingPhaseUsesIntroductoryPriceBeforeRenewalPrice() {
+        val phases = listOf(
+            TestPricingPhase(0),
+            TestPricingPhase(749_250_000),
+            TestPricingPhase(999_000_000),
+        )
+
+        assertEquals(
+            749_250_000L,
+            firstPaidPricingPhase(phases) { it.priceAmountMicros }?.priceAmountMicros,
+        )
+    }
+
+    @Test
+    fun firstPaidPricingPhaseFallsBackToLastPhaseWhenNoPaidPhaseExists() {
+        val phases = listOf(TestPricingPhase(0), TestPricingPhase(0))
+
+        assertEquals(
+            phases.last(),
+            firstPaidPricingPhase(phases) { it.priceAmountMicros },
+        )
+    }
+
+    @Test
+    fun nextPaidPricingPhaseReturnsRenewalPriceAfterDiscountedPhase() {
+        val phases = listOf(
+            TestPricingPhase(0, "Free"),
+            TestPricingPhase(749_250_000, "₹749.25"),
+            TestPricingPhase(999_000_000, "₹999.00"),
+        )
+
+        assertEquals(
+            "₹999.00",
+            nextPaidPricingPhase(phases) { it.priceAmountMicros }?.formattedPrice,
+        )
     }
 }

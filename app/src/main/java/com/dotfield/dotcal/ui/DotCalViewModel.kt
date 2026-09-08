@@ -508,9 +508,10 @@ class DotCalViewModel(
         }
     }
 
-    fun completeTask(task: CalendarEvent) {
+    fun completeTask(task: CalendarEvent, onCompleted: () -> Unit = {}) {
         viewModelScope.launch {
             repository.setTaskCompleted(task, completed = true)
+            onCompleted()
         }
     }
 

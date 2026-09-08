@@ -57,4 +57,8 @@ object CalendarPreferences {
     val KEY_REMINDER_VIBRATION_ENABLED = booleanPreferencesKey("reminder_vibration_enabled")
     val KEY_REMINDER_FULL_SCREEN_ENABLED = booleanPreferencesKey("reminder_full_screen_enabled")
     val KEY_SMART_QUICK_ADD_CONTEXT_EVENT_ID = stringPreferencesKey("smart_quick_add_context_event_id")
+    val KEY_REVIEW_SESSION_COUNT = intPreferencesKey("review_session_count")
+    val KEY_REVIEW_CREATED_ITEM_COUNT = intPreferencesKey("review_created_item_count")
+    val KEY_REVIEW_MEANINGFUL_ACTION_COUNT = intPreferencesKey("review_meaningful_action_count")
+    val KEY_REVIEW_LAST_PROMPT_MS = longPreferencesKey("review_last_prompt_ms")
 }

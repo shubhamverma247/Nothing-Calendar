@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
@@ -13,8 +12,8 @@ android {
         applicationId = "com.dotfield.dotcal"
         minSdk = 30
         targetSdk = 36
-        versionCode = 36
-        versionName = "1.4.0"
+        versionCode = 41
+        versionName = "1.4.1"
     }
 
     buildTypes {
@@ -31,10 +30,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
     }
 
     buildFeatures {
@@ -68,6 +63,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.play.app.update.ktx)
+    implementation(libs.play.review.ktx)
     implementation(libs.billing.ktx)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
