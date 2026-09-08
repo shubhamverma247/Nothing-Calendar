@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabaseLockedException
 import android.database.sqlite.SQLiteException
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Log
 import androidx.datastore.preferences.core.edit
 import com.dotfield.dotcal.data.backup.BackupData
 import com.dotfield.dotcal.data.backup.BackupFileAttachment
@@ -74,7 +75,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.withContext
@@ -321,10 +324,10 @@ class DotCalRepository(
         updateWidgets()
     }
 
-    fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts()
+    fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts().retryOnDatabaseLocked()
 
     fun observeAssignableAccounts(): Flow<List<CalendarAccount>> {
-        return dao.observeAccounts().map { accounts ->
+        return dao.observeAccounts().retryOnDatabaseLocked().map { accounts ->
             accounts
                 .filterNot { it.isReadOnlyGeneratedAccount() }
                 .sortedWith(compareBy<CalendarAccount> { it.sortOrder }.thenBy { it.displayName })
@@ -560,10 +563,10 @@ class DotCalRepository(
         }
     }
 
-    fun observeSelectedHolidayCountries(): Flow<List<String>> = dao.observeHolidayAccountIds()
+    fun observeSelectedHolidayCountries(): Flow<List<String>> = dao.observeHolidayAccountIds().retryOnDatabaseLocked()
         .map { ids -> ids.mapNotNull { it.removePrefix(HOLIDAY_ACCOUNT_PREFIX).takeIf(String::isNotBlank) } }
 
-    fun observeSyncMetadata(): Flow<List<SyncMetadata>> = dao.observeSyncMetadata()
+    fun observeSyncMetadata(): Flow<List<SyncMetadata>> = dao.observeSyncMetadata().retryOnDatabaseLocked()
 
     fun observeEventsForMonth(month: LocalDate): Flow<List<CalendarEvent>> {
         val monthStart = month.withDayOfMonth(1)
@@ -684,7 +687,7 @@ class DotCalRepository(
         val dismissedFlow = context.calendarPreferencesDataStore.data
             .map { it[CalendarPreferences.KEY_ON_THIS_DAY_DISMISSED_DATE] }
         return combine(
-            dao.observeOnThisDayCandidates(targetDayStartMs),
+            dao.observeOnThisDayCandidates(targetDayStartMs).retryOnDatabaseLocked(),
             privacyManager.observePrivateVaultIds(),
             dismissedFlow,
         ) { events, privateIds, dismissedDate ->
@@ -757,7 +760,7 @@ class DotCalRepository(
         }
     }
 
-    fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks()
+    fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks().retryOnDatabaseLocked()
         .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
         .map { tasks ->
             withContext(Dispatchers.Default) { expandRecurringTasks(tasks) }
@@ -794,12 +797,12 @@ class DotCalRepository(
 
     fun observeTodayTasks(day: LocalDate): Flow<List<CalendarEvent>> {
         val start = day.atStartMs()
-        return dao.observeTodayTasks(start, day.plusDays(1).atStartMs() - 1)
+        return dao.observeTodayTasks(start, day.plusDays(1).atStartMs() - 1).retryOnDatabaseLocked()
             .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
     }
 
     fun observeUpcomingTasks(nowMs: Long = System.currentTimeMillis()): Flow<List<CalendarEvent>> =
-        dao.observeUpcomingTasks(nowMs)
+        dao.observeUpcomingTasks(nowMs).retryOnDatabaseLocked()
             .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
 
     /**
@@ -833,10 +836,10 @@ class DotCalRepository(
     }
 
     fun observeCompletedTasks(): Flow<List<CalendarEvent>> =
-        dao.observeCompletedTasks()
+        dao.observeCompletedTasks().retryOnDatabaseLocked()
             .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
 
-    fun observeReminders(): Flow<List<EventReminder>> = dao.observeReminders()
+    fun observeReminders(): Flow<List<EventReminder>> = dao.observeReminders().retryOnDatabaseLocked()
 
     suspend fun getEvent(eventId: String): CalendarEvent? = dao.getEvent(eventId)?.withGhostFlag()
 
@@ -2395,18 +2398,32 @@ private fun CalendarAccount.isReadOnlyGeneratedAccount(): Boolean {
 private const val RECURRENCE_OCCURRENCE_SEPARATOR = "::occurrence::"
 private const val DATABASE_LOCK_RETRY_LIMIT = 4L
 private const val DATABASE_LOCK_RETRY_BASE_DELAY_MS = 120L
+private const val DATABASE_LOCK_TAG = "DotCalRepository"
 
-private fun Flow<List<CalendarEvent>>.retryOnDatabaseLocked(): Flow<List<CalendarEvent>> =
-    retryWhen { cause, attempt ->
-        if (attempt >= DATABASE_LOCK_RETRY_LIMIT || !cause.hasDatabaseLockedCause()) {
-            false
-        } else {
-            delay(DATABASE_LOCK_RETRY_BASE_DELAY_MS * (attempt + 1))
-            true
-        }
+internal fun <T> Flow<List<T>>.retryOnDatabaseLocked(): Flow<List<T>> = flow {
+    var emittedValue = false
+    try {
+        this@retryOnDatabaseLocked
+            .retryWhen { cause, attempt ->
+                if (attempt >= DATABASE_LOCK_RETRY_LIMIT || !cause.hasDatabaseLockedCause()) {
+                    false
+                } else {
+                    delay(DATABASE_LOCK_RETRY_BASE_DELAY_MS * (attempt + 1))
+                    true
+                }
+            }
+            .collect { value ->
+                emittedValue = true
+                emit(value)
+            }
+    } catch (cause: Throwable) {
+        if (!cause.hasDatabaseLockedCause()) throw cause
+        runCatching { Log.w(DATABASE_LOCK_TAG, "Database stayed locked; retaining last list value", cause) }
+        if (!emittedValue) emit(emptyList())
     }
+}
 
-private fun Throwable.hasDatabaseLockedCause(): Boolean {
+internal fun Throwable.hasDatabaseLockedCause(): Boolean {
     var current: Throwable? = this
     while (current != null) {
         if (current is SQLiteDatabaseLockedException) return true

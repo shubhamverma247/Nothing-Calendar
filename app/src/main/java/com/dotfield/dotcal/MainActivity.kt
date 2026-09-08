@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.LocaleManager
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
@@ -16,6 +17,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.lifecycleScope
+import com.dotfield.dotcal.launcher.DynamicLauncherIconManager
 import com.dotfield.dotcal.prefs.AppLanguage
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
@@ -25,6 +27,8 @@ import com.dotfield.dotcal.ui.DotCalApp
 import com.dotfield.dotcal.ui.DotCalViewModel
 import com.dotfield.dotcal.ui.theme.DotCalTheme
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -76,9 +80,22 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 private fun Configuration.isNightMode(): Boolean =
     (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
+internal fun Intent.externalCalendarUri(): String? {
+    return externalCalendarUri(action, type, data?.toString())
+}
+
+internal fun externalCalendarUri(action: String?, mimeType: String?, dataUri: String?): String? {
+    val normalizedType = mimeType?.substringBefore(';')?.trim()?.lowercase() ?: return null
+    if (action != Intent.ACTION_VIEW || normalizedType !in setOf("text/calendar", "text/x-vcalendar", "application/ics")) {
+        return null
+    }
+    return dataUri
+}
+
 class MainActivity : ComponentActivity() {
     private val deepLinkTarget = mutableStateOf<DotCalDeepLinkTarget?>(null)
     private val systemDarkState = mutableStateOf(false)
+    private var launcherIconRefreshJob: Job? = null
     private var deepLinkSequence = 0L
     private val viewModel: DotCalViewModel by viewModels {
         val app = application as DotCalApplication
@@ -134,6 +151,7 @@ class MainActivity : ComponentActivity() {
                     initialSearch = target?.search == true,
                     initialPaywall = target?.paywall == true,
                     initialTasksTab = target?.tasksTab == true,
+                    initialIcsUri = target?.icsUri,
                     initialRouteToken = target?.routeToken,
                     systemDark = systemDarkState.value,
                 )
@@ -149,6 +167,10 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         systemDarkState.value = applicationContext.resources.configuration.isNightMode()
+        launcherIconRefreshJob?.cancel()
+        launcherIconRefreshJob = lifecycleScope.launch(Dispatchers.IO) {
+            DynamicLauncherIconManager(this@MainActivity).updateIconForToday()
+        }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -205,8 +227,13 @@ class MainActivity : ComponentActivity() {
 
     private fun android.content.Intent.dotCalDeepLinkTarget(): DotCalDeepLinkTarget? {
         val uri = data ?: return null
+        val externalIcsUri = externalCalendarUri()
         val token = ++deepLinkSequence
         return when {
+            externalIcsUri != null -> DotCalDeepLinkTarget(
+                icsUri = externalIcsUri,
+                routeToken = token,
+            )
             uri.scheme == "dotcal" && uri.host == "event" && uri.lastPathSegment == "new" -> DotCalDeepLinkTarget(
                 addEvent = true,
                 addEventDate = uri.getQueryParameter("date") ?: LocalDate.now().toString(),
@@ -250,5 +277,6 @@ private data class DotCalDeepLinkTarget(
     val search: Boolean = false,
     val paywall: Boolean = false,
     val tasksTab: Boolean = false,
+    val icsUri: String? = null,
     val routeToken: Long,
 )

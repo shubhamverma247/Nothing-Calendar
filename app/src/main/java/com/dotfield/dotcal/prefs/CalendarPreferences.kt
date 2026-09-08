@@ -1,14 +1,51 @@
 package com.dotfield.dotcal.prefs
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import java.io.FileNotFoundException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.retryWhen
 
-val Context.calendarPreferencesDataStore by preferencesDataStore(name = "calendar_preferences")
+private val Context.rawCalendarPreferencesDataStore by preferencesDataStore(
+    name = "calendar_preferences",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
+
+/**
+ * Preferences can briefly disappear while Android restores or replaces app files. Treat a
+ * missing file as empty state so widgets/startup do not crash; the next edit recreates it.
+ */
+val Context.calendarPreferencesDataStore: DataStore<Preferences>
+    get() = ResilientPreferencesDataStore(rawCalendarPreferencesDataStore)
+
+internal fun Throwable.isMissingDataStoreFile(): Boolean {
+    var current: Throwable? = this
+    while (current != null) {
+        if (current is FileNotFoundException || current.message?.contains("ENOENT", ignoreCase = true) == true) return true
+        current = current.cause
+    }
+    return false
+}
+
+internal class ResilientPreferencesDataStore(
+    private val delegate: DataStore<Preferences>,
+) : DataStore<Preferences> by delegate {
+    override val data: Flow<Preferences> = delegate.data
+        .retryWhen { cause, attempt -> cause.isMissingDataStoreFile() && attempt < 2 }
+        .catch { cause ->
+            if (cause.isMissingDataStoreFile()) emit(emptyPreferences()) else throw cause
+        }
+}
 
 object CalendarPreferences {
     val KEY_DEFAULT_VIEW = stringPreferencesKey("default_view")

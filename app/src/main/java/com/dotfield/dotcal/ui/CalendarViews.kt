@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +31,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -122,6 +125,7 @@ private const val WEEK_ALL_DAY_MAX_ROWS = 3
 private const val WEEK_ALL_DAY_ROW_HEIGHT_DP = 24
 private const val WEEK_ALL_DAY_VERTICAL_PADDING_DP = 4
 private const val WEEK_ALL_DAY_ROW_GAP_DP = 3
+private val BULK_ACTION_BAR_BOTTOM_CLEARANCE = 102.dp
 
 private enum class EventDragMode {
     Move,
@@ -253,7 +257,10 @@ internal fun MonthView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(palette.calendarSurface)
-                    .padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 102.dp),
+                    // Keep the action controls above both system navigation modes and the
+                    // floating in-app navigation pill.
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = BULK_ACTION_BAR_BOTTOM_CLEARANCE),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -731,12 +738,13 @@ internal fun WeekView(
 
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
                 .background(palette.calendarSurface),
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
             ) {
                 Row(modifier = Modifier.fillMaxWidth()) {
@@ -1429,7 +1437,7 @@ internal fun DayView(
         }
 
         Box(modifier = Modifier.weight(1f).background(palette.calendarSurface)) {
-            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     DayTimeColumn(selectedDate = selectedDate, palette = palette)
                     DayTimelineColumn(

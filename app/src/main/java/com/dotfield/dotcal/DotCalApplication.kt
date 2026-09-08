@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import com.dotfield.dotcal.data.DotCalDatabase
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.billing.ProManager
+import com.dotfield.dotcal.launcher.DynamicLauncherIconManager
 import com.dotfield.dotcal.reminders.ReminderScheduler
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
@@ -27,6 +28,7 @@ class DotCalApplication : Application() {
         super.onCreate()
         ReminderScheduler(this).ensureChannel()
         proManager.initialize()
+        runStartupTask { DynamicLauncherIconManager(this@DotCalApplication).updateIconForToday() }
         runStartupTask { repository.rescheduleFutureReminders() }
         runStartupTask {
             if (CalendarSyncWorkScheduler.syncFromPreferences(this@DotCalApplication)) {

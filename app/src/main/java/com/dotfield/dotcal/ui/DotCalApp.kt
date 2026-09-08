@@ -22,6 +22,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.os.SystemClock
 import android.widget.Toast
+import android.util.Log
 import android.util.Size
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -290,6 +291,7 @@ private const val BOOT_THEME_KEY = "theme_mode"
 private const val BOOT_ACCENT_KEY = "accent_color"
 private const val BOOT_DEFAULT_VIEW_KEY = "default_view"
 private const val BULK_UNDO_SNACKBAR_MILLIS = 4_000L
+private const val ICS_IMPORT_TAG = "DotCalIcsImport"
 
 internal fun shareViewDate(
     activeCalendarTab: CalendarTab,
@@ -344,6 +346,7 @@ fun DotCalApp(
     initialSearch: Boolean = false,
     initialPaywall: Boolean = false,
     initialTasksTab: Boolean = false,
+    initialIcsUri: String? = null,
     initialRouteToken: Long? = null,
     systemDark: Boolean = false,
 ) {
@@ -444,7 +447,8 @@ fun DotCalApp(
                         initialSearch ||
                         initialCalendarDate != null ||
                         initialPaywall ||
-                        initialTasksTab
+                        initialTasksTab ||
+                        initialIcsUri != null
                     ),
         )
     }
@@ -892,6 +896,28 @@ fun DotCalApp(
             } else {
                 pendingIcsImport = PendingIcsImport(icsText, items)
             }
+        }
+    }
+
+    LaunchedEffect(initialRouteToken, initialIcsUri) {
+        if (initialRouteToken == null || handledRouteToken == initialRouteToken || initialIcsUri.isNullOrBlank()) return@LaunchedEffect
+        val readResult = withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.openInputStream(Uri.parse(initialIcsUri))
+                    ?.bufferedReader()
+                    ?.use { it.readText() }
+            }
+        }
+        val text = readResult.getOrNull()
+        handledRouteToken = initialRouteToken
+        routePending = false
+        if (text.isNullOrBlank()) {
+            readResult.exceptionOrNull()?.let { error ->
+                Log.w(ICS_IMPORT_TAG, "Unable to read external calendar document", error)
+            } ?: Log.w(ICS_IMPORT_TAG, "External calendar document was empty")
+            showDotCalToast(context, palette, R.string.toast_file_read_failed)
+        } else {
+            openIcsPreview(text, context.getString(R.string.toast_import_invalid_ics))
         }
     }
 
