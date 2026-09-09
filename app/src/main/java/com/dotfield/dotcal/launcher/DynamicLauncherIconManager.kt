@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import java.time.LocalDate
+import java.time.ZonedDateTime
 
 private const val TAG = "DynamicLauncherIcon"
 private const val ALIAS_PACKAGE = "com.dotfield.dotcal.launcher"
@@ -21,6 +22,9 @@ internal fun launcherAliasClassName(day: Int): String? {
 internal fun launcherAliasClassNames(): List<String> = (FIRST_DAY..LAST_DAY).mapNotNull(::launcherAliasClassName)
 
 internal fun localDayOfMonth(date: LocalDate): Int = date.dayOfMonth
+
+internal fun nextLauncherIconRefreshAt(now: ZonedDateTime): ZonedDateTime =
+    now.toLocalDate().plusDays(1).atStartOfDay(now.zone)
 
 class DynamicLauncherIconManager(context: Context) {
     private val appContext = context.applicationContext

@@ -1,6 +1,8 @@
 package com.dotfield.dotcal.launcher
 
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -41,6 +43,16 @@ class DynamicLauncherIconManagerTest {
     fun resolvesLocalDayWithoutMonthOrTimezoneState() {
         assertEquals(8, localDayOfMonth(LocalDate.of(2026, 9, 8)))
         assertEquals(31, localDayOfMonth(LocalDate.of(2026, 12, 31)))
+    }
+
+    @Test
+    fun schedulesNextRefreshAtNextLocalMidnight() {
+        val now = ZonedDateTime.of(2026, 9, 9, 0, 46, 57, 0, ZoneId.of("Asia/Kolkata"))
+
+        assertEquals(
+            ZonedDateTime.of(2026, 9, 10, 0, 0, 0, 0, ZoneId.of("Asia/Kolkata")),
+            nextLauncherIconRefreshAt(now),
+        )
     }
 
 }

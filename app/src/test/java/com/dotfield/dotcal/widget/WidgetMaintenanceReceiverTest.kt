@@ -1,6 +1,7 @@
 package com.dotfield.dotcal.widget
 
 import android.content.Intent
+import com.dotfield.dotcal.launcher.ACTION_DAILY_ICON_REFRESH
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -24,6 +25,14 @@ class WidgetMaintenanceReceiverTest {
         ).forEach { action ->
             assertEquals(WidgetMaintenanceAction.STANDARD, widgetMaintenanceActionFor(action))
         }
+    }
+
+    @Test
+    fun mapsScheduledDailyIconRefreshToAsyncIconRefresh() {
+        assertEquals(
+            WidgetMaintenanceAction.DAILY_ICON,
+            widgetMaintenanceActionFor(ACTION_DAILY_ICON_REFRESH),
+        )
     }
 
     @Test
