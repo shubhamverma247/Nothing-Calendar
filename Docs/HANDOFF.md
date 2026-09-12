@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-09-08
+Updated: 2026-09-12
 
 Active resume document for `com.dotfield.dotcal`. Historical detail is preserved in
 `Docs/HANDOFF.original.md`. Do not edit `Docs/HANDOFF - Copy.md` or user-owned
@@ -9,10 +9,10 @@ Active resume document for `com.dotfield.dotcal`. Historical detail is preserved
 ## Worktree
 
 - Branch: `feature-and-fixes`.
-- Latest local commit: `3118237 fix(billing): preserve intro offer and share dates`.
+- Latest local commit: `eb7fd99 fix(launcher): refresh icon at local midnight`.
 - Current work is uncommitted. Do not commit, push, reset, clean, or switch branches unless explicitly asked.
 - Preserve user-owned untracked files: QA screenshots, icon ZIPs, `.claude`, `Docs/logcat.txt`, and `tools/`.
-- App version: `versionCode 42`, `versionName 1.5.0`.
+- App version: `versionCode 43`, `versionName 1.5.1` (current uncommitted version bump).
 - Package: `com.dotfield.dotcal`. Device: `000153573000720` when connected.
 
 ## Rules
@@ -51,6 +51,17 @@ Active resume document for `com.dotfield.dotcal`. Historical detail is preserved
 - `tools/generate_launcher_icons.ps1` validates deterministic resource counts and adaptive references.
 - Debug two-minute date rotation was removed. Release and debug use the real local date.
 
+### Daily launcher icon feedback and placement constraint
+
+- Feedback received: when the date changes, some launchers make DotCal leave its user-created folder and reappear in a default position.
+- Root cause confirmed in the current implementation: the launcher component identity changes from one `activity-alias` (`LauncherDayNN`) to another at midnight. The launcher can treat this as remove-old-icon plus add-new-icon, so home-screen placement is not preserved.
+- Impact: folder users can need to place DotCal back every day; standalone home-screen users can see the icon move or refresh; app-drawer-only users may notice little or no placement impact.
+- Google Calendar uses launcher-side special handling in supported launchers: the launcher keeps one component identity, invalidates its cached icon on date changes, and selects one of 31 date resources. This is not a general app API that DotCal can enable for every launcher. See Android Launcher `IconProvider`: <https://android.googlesource.com/platform/frameworks/libs/systemui/+/refs/heads/master/iconloaderlib/src/com/android/launcher3/icons/IconProvider.java>.
+- `PackageManager.DONT_KILL_APP` and atomic component-state updates cannot guarantee folder preservation because they do not keep the same launcher identity.
+- Pinned shortcut was reviewed as an alternative but rejected as the default fix: it creates a separate home-screen shortcut, requires first-time launcher/user approval, and does not transparently convert existing app icons.
+- Current decision: do not change code yet. A complete app-only solution preserving automatic date updates, existing placement, and zero user action is not verified with public Android APIs. Keep current dynamic icon behavior until a concrete launcher-supported approach is proven.
+- Any future launcher-icon change must test both standalone and folder placement on Nothing Launcher, with one manual QA test at a time. Do not create another fix solely from this feedback without a reproducible, launcher-specific approach.
+
 ### Import/open behavior
 
 - Existing Settings import uses Android `OpenDocument`, reads ICS on IO, parses it, shows `IcsImportPreviewScreen`, and imports only after confirmation.
@@ -83,6 +94,67 @@ Active resume document for `com.dotfield.dotcal`. Historical detail is preserved
 - Calendar/Week/Agenda share cards, directional Week/Day transitions, Play review gating, and reminder snooze cleanup are implemented locally.
 - Dynamic icon and crash-hardening changes remain local until explicitly approved for commit/push.
 
+## Authoritative active product roadmap
+
+This is the only active roadmap in this handoff. It supersedes the old flat roadmap lists.
+`Docs/DotCal-Feature-Roadmap.md`, `Docs/fable-suggested-feature.md`,
+`Docs/DotCal — FINAL PACKAGE 14 Feature.txt`, and historical roadmap sections in
+`Docs/HANDOFF.original.md` are reference material only; do not select new work from them
+without updating this section first.
+
+The current Play listing and implementation history are the shipped baseline. Do not list
+Quick Add 3.0, voice input, launcher/Quick Settings shortcuts, Auto-Buffers, the base
+Find-a-Time flow, Countdowns, QR Event Share, Availability Text, Dead Time Finder,
+Pencil-In Events, On This Day, drag/resize, bulk edit, widgets, or image/shift-plan sharing
+as new features. The items below are the next active feature proposals and advancements.
+
+| # | Feature | Access | Type | Priority |
+|---|---|---|---|---|
+| 1 | Sync & Widget Health Center | Free | New reliability surface | P0 |
+| 2 | Reminder Center + Reminder Readiness Check | Free basic; Pro batch actions and saved snooze presets | Reminder advancement | P1 |
+| 3 | Saved Smart Views | Free basic filters; Pro saved combinations | Search/filter advancement | P1 |
+| 4 | Evening Task Review | Free manual review; Pro scheduling suggestions | Task-planning advancement | P1 |
+| 5 | Event Readiness Checklist | Free basic checklist; Pro reusable setups and rules | New workflow | P1 |
+| 6 | Find Time for This | Pro advanced matching; preserve current Find-a-Time | Scheduling advancement | P1 |
+| 7 | Repair My Day | Pro | Rescheduling advancement | P1 |
+| 8 | Linked Event Kits | Pro; preserve current templates | Template advancement | P1 |
+| 9 | Advanced Widget Profiles + 14-day view | Free core readability; Pro advanced profiles and filters | Widget advancement | P1 |
+| 10 | Advanced Availability Rules | Pro; preserve current availability sharing | Availability advancement | P1 |
+| 11 | Calendar Health + Usable-Time Insights | Free basic overview; Pro trends and filters | Insights advancement | P1 |
+| 12 | Offline Common-Time QR | Free short two-person comparison; Pro longer ranges and advanced rules | Distinctive offline workflow | P1 |
+| 13 | Shift-aware Usable Time + Routines | Free basic boundaries; Pro shift-relative rules | Shift-planning advancement | P2 |
+| 14 | Pencil-In Plan Comparison | Pro; preserve current Pencil-In Events | Tentative-planning advancement | P2 |
+| 15 | Schedule Change Detector | Pro prototype | New high-risk workflow | P2 |
+
+### Roadmap constraints
+
+- Keep Free as a complete, useful calendar. Pro should unlock automation, deeper planning,
+  reusable power-user controls, and advanced insights—not basic calendar reliability.
+- Preserve offline-first behavior, local processing, no backend/cloud dependency, current Room
+  schema, existing DataStore/side-store patterns, billing IDs, lifetime-Pro entitlement,
+  and existing sync/export behavior.
+- Every scheduling action must be user-confirmed, previewable, undoable where it changes
+  existing events, and must not silently move fixed/shared/provider events.
+- Treat “unique” as a DotCal-specific combination or positioning opportunity, not a worldwide
+  uniqueness claim. Prototype P2 items before committing to implementation.
+- Before implementation, reconcile each item against the current code and add focused tests;
+  this roadmap is not itself an implementation approval.
+
+### Research basis
+
+- BusyCal benchmarks Smart Filters, saved calendar sets, event suggestions, and snooze management:
+  <https://www.busymac.com/docs/busycal/70612-smart-filters/>
+  <https://www.busymac.com/docs/busycal/event-suggestions/>
+- Fantastical benchmarks automatic calendar sets, multiple timezones, and multiple scheduling
+  durations: <https://flexibits.com/fantastical/help/calendar-sets>
+  and <https://flexibits.com/blog/2026/07/new-feature-roundup-you-asked-we-built/>
+- Reclaim benchmarks habits, auto-rescheduling, buffers, and time analytics:
+  <https://reclaim.ai/features/habits>
+- User-feedback themes include sync reliability, widget freshness, reminder reliability,
+  recurrence handling, and automatic schedule shifting:
+  <https://digibites.zendesk.com/hc/en-us/articles/200243176-Widgets-not-updating-task-killer-issue>
+  and <https://apps.apple.com/us/app/structured-daily-planner-todo/id1499198946?see-all=reviews>
+
 ## QA baseline
 
 - Previously passed manual QA includes reminders/full-screen access and snooze, widget theme/config/remove flows, provider availability/RDATE/meeting metadata/colors, calendar-move duplicate protection, shift-pattern export, auto-buffers/Find-a-Time, recurring occurrence sync, and Week/Day detail navigation.
@@ -114,3 +186,21 @@ The latest combined run passed full `:app:testDebugUnitTest` and `:app:assembleD
 2. Run the full debug unit tests, debug APK build, release bundle, and diff check after any further edit.
 3. If the user requests install, state the exact manual test and expected result first, then install the verified APK.
 4. If the user requests release integration, commit/push/merge only the exact requested operation.
+
+## Resume prompt for next feature
+
+Continue DotCal development from `D:\Caveman\caveman\Nothing-Calendar`.
+
+Before work:
+
+- Read `Docs/HANDOFF.md` and all applicable `AGENTS.md` instructions.
+- Inspect git status and recent commits. Preserve all user-owned tracked and untracked work.
+- Do not reset, clean, force-push, switch branches, install, commit, or push unless explicitly requested.
+- Do not change app icon assets or revisit daily launcher icon behavior unless explicitly requested; current folder-placement feedback is documented above and has no verified app-only fix.
+
+For requested feature work:
+
+- Reconcile feature against current code and authoritative roadmap before editing.
+- Use focused tests first, then relevant build checks.
+- Run one manual QA test at a time and state expected behavior before each test.
+- Audit all changes before any explicitly requested commit.

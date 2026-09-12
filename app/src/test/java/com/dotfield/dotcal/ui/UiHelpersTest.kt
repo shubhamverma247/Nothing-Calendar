@@ -1,12 +1,24 @@
 package com.dotfield.dotcal.ui
 
 import com.dotfield.dotcal.data.CalendarEvent
+import com.dotfield.dotcal.data.CalendarAccount
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
 import java.time.ZoneId
 
 class UiHelpersTest {
+    @Test
+    fun selectedCalendarCountExcludesLocalAndHiddenAccounts() {
+        val accounts = listOf(
+            CalendarAccount("local-primary", "", "", "LOCAL", "", 1, 1, 0),
+            CalendarAccount("visible", "", "", "GOOGLE", "", 1, 0, 1),
+            CalendarAccount("hidden", "", "", "GOOGLE", "", 0, 0, 2),
+        )
+
+        assertEquals(1, selectedCalendarAccountCount(accounts))
+    }
+
     @Test
     fun allDayProviderEventUsesItsOwnZoneForDateGrouping() {
         val zone = ZoneId.of("Asia/Kolkata")

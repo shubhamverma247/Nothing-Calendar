@@ -1,5 +1,7 @@
 package com.dotfield.dotcal.ui
 
+import com.dotfield.dotcal.NOTHING_RED_ARGB
+import com.dotfield.dotcal.NOTHING_RED_HEX
 import android.Manifest
 import android.accounts.AccountManager
 import android.app.Activity
@@ -2796,7 +2798,7 @@ private fun ShiftTypeEditorDialog(
     var isOff by remember(existing?.id) { mutableStateOf(existing?.generatesEvent == false) }
     var startHour by remember(existing?.id) { mutableStateOf(((existing?.startMinuteOfDay ?: 7 * 60) / 60).toString()) }
     var durationHours by remember(existing?.id) { mutableStateOf(((existing?.durationMinutes ?: 12 * 60) / 60).coerceAtLeast(1).toString()) }
-    var color by remember(existing?.id) { mutableStateOf(existing?.colorHex ?: "#FF3B30") }
+    var color by remember(existing?.id) { mutableStateOf(existing?.colorHex ?: NOTHING_RED_HEX) }
     var showColorPicker by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2823,7 +2825,7 @@ private fun ShiftTypeEditorDialog(
                         ShiftType(
                             id = existing?.id ?: ShiftType.newId(),
                             name = name.trim(),
-                            colorHex = color.takeIf { it.matches(Regex("#[0-9A-Fa-f]{6}")) } ?: "#FF3B30",
+                            colorHex = color.takeIf { it.matches(Regex("#[0-9A-Fa-f]{6}")) } ?: NOTHING_RED_HEX,
                             startMinuteOfDay = if (isOff) null else hour * 60,
                             durationMinutes = if (isOff) null else duration * 60,
                             isAllDay = false,
@@ -2996,7 +2998,7 @@ private fun ShiftPatternCyclePreview(
                     ShiftPatternCycleChip(
                         index = item.index + 1,
                         label = type?.name ?: item.value,
-                        colorHex = type?.colorHex ?: "#FF3B30",
+                        colorHex = type?.colorHex ?: NOTHING_RED_HEX,
                         palette = palette,
                     )
                 }
@@ -3406,7 +3408,7 @@ private fun SwipeableDeletedRow(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(actionButtonWidth)
-                    .background(Color(0xFFFF3B30))
+                    .background(Color(NOTHING_RED_ARGB))
                     .clickable { onDelete() },
                 contentAlignment = Alignment.Center,
             ) {

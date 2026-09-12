@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.data.provider
 
+import com.dotfield.dotcal.NOTHING_RED_HEX
 import android.Manifest
 import android.content.ContentResolver
 import android.content.Context
@@ -100,7 +101,7 @@ class ContactsProviderDataSource(private val context: Context) {
 
     companion object {
         const val BIRTHDAY_ACCOUNT_ID = "birthday-calendar"
-        const val BIRTHDAY_COLOR = "#FF3B30"
+        const val BIRTHDAY_COLOR = NOTHING_RED_HEX
         // Contact birthdays with no year are stored at this placeholder year; "On This Day"
         // uses it to decide whether an age ("turns 27") can be computed.
         const val BIRTHDAY_BASE_YEAR = 2000

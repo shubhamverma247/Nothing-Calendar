@@ -453,6 +453,7 @@ fun DotCalApp(
         )
     }
     var isSyncing by remember { mutableStateOf(false) }
+    var isRefreshingWidgets by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val hasCameraHardware = remember(context) {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
@@ -641,6 +642,26 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_SYNC_INTERVAL_MINS] ?: CalendarSyncWorkScheduler.DEFAULT_SYNC_INTERVAL_MINS
         }
     }.collectAsStateWithLifecycle(initialValue = CalendarSyncWorkScheduler.DEFAULT_SYNC_INTERVAL_MINS)
+    val lastWidgetRefreshMs by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_LAST_WIDGET_REFRESH_MS]
+        }
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val lastSyncError by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_LAST_SYNC_ERROR]
+        }
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val lastWidgetRefreshError by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_LAST_WIDGET_REFRESH_ERROR]
+        }
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val configuredWidgetCount by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_WIDGET_CONFIGURED_ENTRIES]?.size ?: 0
+        }
+    }.collectAsStateWithLifecycle(initialValue = 0)
     val birthdayEnabled by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] ?: false
@@ -2072,6 +2093,11 @@ fun DotCalApp(
                 syncIntervalMins = syncIntervalMins,
                 syncMetadata = syncMetadata,
                 isSyncing = isSyncing,
+                isRefreshingWidgets = isRefreshingWidgets,
+                configuredWidgetCount = configuredWidgetCount,
+                lastWidgetRefreshMs = lastWidgetRefreshMs,
+                lastSyncError = lastSyncError,
+                lastWidgetRefreshError = lastWidgetRefreshError,
                 birthdayEnabled = birthdayEnabled,
                 defaultReminderMinutes = defaultReminderMinutes,
                 defaultEventDurationMinutes = defaultEventDurationMinutes,
@@ -2096,6 +2122,27 @@ fun DotCalApp(
                 accounts = accounts,
                 hasCalendarPermission = hasCalendarPermission,
                 onSyncNow = { runSyncNow(showToast = true) },
+                onRefreshWidgets = {
+                    if (!isRefreshingWidgets) {
+                        isRefreshingWidgets = true
+                        scope.launch {
+                            val refreshStartedAt = SystemClock.elapsedRealtime()
+                            val refreshResult = runCatching { WidgetUpdateWorker.updateNow(context) }
+                            val elapsed = SystemClock.elapsedRealtime() - refreshStartedAt
+                            if (elapsed < 900L) delay(900L - elapsed)
+                            isRefreshingWidgets = false
+                            showDotCalToast(
+                                context,
+                                palette,
+                                if (refreshResult.isSuccess) {
+                                    R.string.settings_sync_health_widgets_refreshed
+                                } else {
+                                    R.string.settings_sync_health_widget_failed_detail
+                                },
+                            )
+                        }
+                    }
+                },
                 onAccountVisibilityChange = { accountId, visible ->
                     viewModel.setAccountVisible(accountId, visible)
                     runSyncNow(showToast = false)

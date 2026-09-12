@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.data.provider
 
+import com.dotfield.dotcal.NOTHING_RED_HEX
 import android.Manifest
 import android.content.ContentUris
 import android.content.ContentResolver
@@ -341,19 +342,24 @@ class CalendarProviderDataSource(private val context: Context) {
     ): CalendarEvent? {
         val providerEventId = getLong(EVENT_ID_INDEX).toString()
         val rawStart = getLongOrNull(EVENT_DTSTART_INDEX) ?: return null
+        val rrule = getStringOrNull(EVENT_RRULE_INDEX)
+        val rdate = getStringOrNull(EVENT_RDATE_INDEX)
         val rawEnd = providerEventEndTimeMs(
             startTimeMs = rawStart,
             dtEndMs = getLongOrNull(EVENT_DTEND_INDEX),
             duration = getStringOrNull(EVENT_DURATION_INDEX),
             lastDateMs = getLongOrNull(EVENT_LAST_DATE_INDEX),
-            rrule = getStringOrNull(EVENT_RRULE_INDEX),
+            rrule = rrule,
         )
         val timeZone = getStringOrNull(EVENT_TIMEZONE_INDEX).takeUnless { it.isNullOrBlank() } ?: TimeZone.getDefault().id
         val isAllDay = getIntOrDefault(EVENT_ALL_DAY_INDEX, 0)
         val zone = safeProviderZone(timeZone)
         val start = if (isAllDay == 1) convertAllDayBoundary(rawStart, ZoneOffset.UTC, zone) else rawStart
         val end = if (isAllDay == 1) convertAllDayBoundary(rawEnd, ZoneOffset.UTC, zone) else rawEnd
-        if (end < rangeStartMs || start >= rangeEndMs) return null
+        val lastDate = getLongOrNull(EVENT_LAST_DATE_INDEX)?.let { lastDateMs ->
+            if (isAllDay == 1) convertAllDayBoundary(lastDateMs, ZoneOffset.UTC, zone) else lastDateMs
+        }
+        if (!providerEventOverlapsRange(start, end, lastDate, rrule, rdate, rangeStartMs, rangeEndMs)) return null
         val now = System.currentTimeMillis()
         val originalGoogleEventId = getLongOrNull(EVENT_ORIGINAL_ID_INDEX)?.toString()
         val originalInstanceTimeMs = getLongOrNull(EVENT_ORIGINAL_INSTANCE_TIME_INDEX)
@@ -379,7 +385,7 @@ class CalendarProviderDataSource(private val context: Context) {
             timeZone = timeZone,
             isAllDay = isAllDay,
             colorHex = getLongOrNull(EVENT_COLOR_INDEX)?.let { colorIntToHex(it.toInt()) } ?: calendarColor,
-            rrule = getStringOrNull(EVENT_RRULE_INDEX),
+            rrule = rrule,
             exceptionDates = exceptionDatesFromProviderExdate(
                 exdate = getStringOrNull(EVENT_EXDATE_INDEX),
                 isAllDay = getIntOrDefault(EVENT_ALL_DAY_INDEX, 0),
@@ -401,7 +407,7 @@ class CalendarProviderDataSource(private val context: Context) {
             providerOriginalInstanceTimeMs = originalInstanceTimeMs
             providerAvailability = getIntOrDefault(EVENT_AVAILABILITY_INDEX, CalendarContract.Events.AVAILABILITY_BUSY)
             providerStatus = getIntOrDefault(EVENT_STATUS_INDEX, CalendarContract.Events.STATUS_CONFIRMED)
-            providerRdate = normalizedProviderRdate(getStringOrNull(EVENT_RDATE_INDEX))
+            providerRdate = normalizedProviderRdate(rdate)
             providerMeetingMetadataJson = meetingMetadataJson
             isGhost = providerAvailabilityIsNonBlocking(providerAvailability)
         }
@@ -426,7 +432,7 @@ class CalendarProviderDataSource(private val context: Context) {
     private fun Cursor.getIntOrDefault(index: Int, defaultValue: Int): Int = if (isNull(index)) defaultValue else getInt(index)
 
     private fun Cursor.getColorHex(index: Int): String {
-        return getLongOrNull(index)?.let { colorIntToHex(it.toInt()) } ?: "#FF3B30"
+        return getLongOrNull(index)?.let { colorIntToHex(it.toInt()) } ?: NOTHING_RED_HEX
     }
 
     private fun getAttendees(providerEventId: String): List<ProviderAttendee> {
@@ -599,7 +605,7 @@ fun providerCalendarId(accountId: String): Long? = accountId.substringAfter("pro
 
 fun providerEventRoomId(calendarId: Long, eventId: String): String = "provider-calendar-$calendarId-event-$eventId"
 
-private const val DEFAULT_PROVIDER_COLOR = "#FF3B30"
+private const val DEFAULT_PROVIDER_COLOR = NOTHING_RED_HEX
 private const val PROVIDER_UTC_TIMEZONE = "UTC"
 
 private fun colorIntToHex(color: Int): String = "#%06X".format(0xFFFFFF and color)
@@ -714,6 +720,25 @@ internal fun providerEventEndTimeMs(
         lastDateMs?.let { return it }
     }
     return startTimeMs + DEFAULT_PROVIDER_EVENT_DURATION_MS
+}
+
+/**
+ * Checks a provider master row against the requested range without treating a recurring
+ * series' historical DTSTART as its only occurrence.
+ */
+internal fun providerEventOverlapsRange(
+    startTimeMs: Long,
+    endTimeMs: Long,
+    lastDateMs: Long?,
+    rrule: String?,
+    rdate: String?,
+    rangeStartMs: Long,
+    rangeEndMs: Long,
+): Boolean {
+    val hasRecurrence = !rrule.isNullOrBlank() || !rdate.isNullOrBlank()
+    if (!hasRecurrence) return endTimeMs >= rangeStartMs && startTimeMs < rangeEndMs
+    if (startTimeMs >= rangeEndMs) return false
+    return !rdate.isNullOrBlank() || lastDateMs == null || lastDateMs >= rangeStartMs
 }
 
 internal fun providerDurationMillis(duration: String?): Long? {

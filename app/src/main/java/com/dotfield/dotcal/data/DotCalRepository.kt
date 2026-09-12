@@ -907,11 +907,23 @@ class DotCalRepository(
     }
 
     suspend fun syncNow(): CalendarSyncResult = withContext(Dispatchers.IO) {
-        val result = syncRepository.sync()
-        if (!result.permissionDenied) {
+        val result = try {
+            syncRepository.sync()
+        } catch (error: Exception) {
             context.calendarPreferencesDataStore.edit { preferences ->
-                preferences[CalendarPreferences.KEY_LAST_SYNC_MS] = System.currentTimeMillis()
+                preferences[CalendarPreferences.KEY_LAST_SYNC_ERROR] = "SYNC_FAILED"
             }
+            throw error
+        }
+        context.calendarPreferencesDataStore.edit { preferences ->
+            if (result.permissionDenied) {
+                preferences[CalendarPreferences.KEY_LAST_SYNC_ERROR] = "PERMISSION_REQUIRED"
+            } else {
+                preferences[CalendarPreferences.KEY_LAST_SYNC_MS] = System.currentTimeMillis()
+                preferences.remove(CalendarPreferences.KEY_LAST_SYNC_ERROR)
+            }
+        }
+        if (!result.permissionDenied) {
             updateWidgets()
         }
         result

@@ -4,8 +4,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.dotfield.dotcal.NOTHING_RED_ARGB
 
-val NRed = Color(0xFFFF3B30)
+val NRed = Color(NOTHING_RED_ARGB)
 val NBlack = Color(0xFF000000)
 val NWhite = Color(0xFFFFFFFF)
 val NGray = Color(0xFF666666)

@@ -1,7 +1,9 @@
 package com.dotfield.dotcal.data.provider
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -86,6 +88,42 @@ class CalendarProviderDataSourceTest {
                 duration = null,
                 lastDateMs = lastDate,
                 rrule = null,
+            ),
+        )
+    }
+
+    @Test
+    fun recurringProviderEventWithHistoricalStartIsKeptForFutureRange() {
+        val rangeStart = 1_000_000L
+        val rangeEnd = rangeStart + 365L * 24L * 60L * 60L * 1_000L
+
+        assertTrue(
+            providerEventOverlapsRange(
+                startTimeMs = 0L,
+                endTimeMs = 60L * 60L * 1_000L,
+                lastDateMs = null,
+                rrule = "FREQ=YEARLY",
+                rdate = null,
+                rangeStartMs = rangeStart,
+                rangeEndMs = rangeEnd,
+            ),
+        )
+    }
+
+    @Test
+    fun recurringProviderEventWithLastOccurrenceBeforeRangeIsDropped() {
+        val rangeStart = 1_000_000L
+        val rangeEnd = rangeStart + 365L * 24L * 60L * 60L * 1_000L
+
+        assertFalse(
+            providerEventOverlapsRange(
+                startTimeMs = 0L,
+                endTimeMs = 60L * 60L * 1_000L,
+                lastDateMs = rangeStart - 1L,
+                rrule = "FREQ=YEARLY",
+                rdate = null,
+                rangeStartMs = rangeStart,
+                rangeEndMs = rangeEnd,
             ),
         )
     }

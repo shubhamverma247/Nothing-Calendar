@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.data.shifts
 
+import com.dotfield.dotcal.NOTHING_RED_HEX
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
@@ -167,7 +168,7 @@ class ShiftPatternStore(context: Context) {
         return ShiftType(
             id = o.getString("id"),
             name = o.optString("name", "Shift"),
-            colorHex = o.optString("colorHex", "#FF3B30"),
+            colorHex = o.optString("colorHex", NOTHING_RED_HEX),
             startMinuteOfDay = if (o.isNull("startMinuteOfDay")) null else o.optInt("startMinuteOfDay"),
             durationMinutes = if (o.isNull("durationMinutes")) null else o.optInt("durationMinutes"),
             isAllDay = o.optBoolean("isAllDay", false),

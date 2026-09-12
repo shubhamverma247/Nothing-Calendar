@@ -370,6 +370,9 @@ internal fun calendarAccountsLabel(accounts: List<CalendarAccount>, hasCalendarP
     return stringResource(R.string.accounts_selected_ratio, selectedCount, providerCount)
 }
 
+internal fun selectedCalendarAccountCount(accounts: List<CalendarAccount>): Int =
+    accounts.count { it.id != "local-primary" && it.isVisible == 1 }
+
 @Composable
 internal fun selectedHolidayCountriesLabel(countries: List<HolidayCountryUiItem>): String {
     val count = countries.count { it.isSelected }

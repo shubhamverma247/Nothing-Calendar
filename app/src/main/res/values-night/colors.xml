@@ -12,5 +12,5 @@
     <color name="widget_preview_secondary">#7A7A7A</color>
     <color name="widget_preview_dim">#4A4A4A</color>
     <color name="widget_preview_dot">#242424</color>
-    <color name="widget_accent">#FF3B30</color>
+    <item name="widget_accent" type="color">@color/nothing_red</item>
 </resources>

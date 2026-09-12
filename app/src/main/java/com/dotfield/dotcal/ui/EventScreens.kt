@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.ui
 
+import com.dotfield.dotcal.NOTHING_RED_HEX
 import android.Manifest
 import android.accounts.AccountManager
 import android.app.Activity
@@ -2336,7 +2337,7 @@ private fun EventColorChoiceSheet(
         Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value)))
     }
     val currentHex = remember(current) {
-        AccentColor.normalizeHex("#%06X".format(0xFFFFFF and current.toArgb())) ?: "#FF3B30"
+        AccentColor.normalizeHex("#%06X".format(0xFFFFFF and current.toArgb())) ?: NOTHING_RED_HEX
     }
     var hexField by remember { mutableStateOf(currentHex) }
     LaunchedEffect(currentHex) { hexField = currentHex }

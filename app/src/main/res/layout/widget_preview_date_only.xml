@@ -12,7 +12,7 @@
         android:fontFamily="monospace"
         android:gravity="center"
         android:text="25"
-        android:textColor="#FF3B30"
+        android:textColor="@color/nothing_red"
         android:textSize="24sp"
         android:textStyle="bold" />
 </FrameLayout>

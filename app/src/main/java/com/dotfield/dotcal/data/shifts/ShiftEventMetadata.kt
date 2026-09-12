@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.data.shifts
 
+import com.dotfield.dotcal.NOTHING_RED_HEX
 import java.time.LocalDate
 import java.util.Base64
 
@@ -38,7 +39,7 @@ fun parseShiftEventMetadata(text: String): ShiftEventMetadata? = runCatching {
     ShiftEventMetadata(
         shiftTypeId = parts[1].decodedField(),
         shiftTypeName = parts[2].decodedField().ifBlank { "Shift" },
-        colorHex = parts[3].decodedField().ifBlank { "#FF3B30" },
+        colorHex = parts[3].decodedField().ifBlank { NOTHING_RED_HEX },
         date = LocalDate.parse(parts[4]),
         generatedBy = ShiftEventGeneratedBy.fromStorage(parts[5]),
         patternId = parts[6].decodedField().takeIf { it.isNotBlank() },

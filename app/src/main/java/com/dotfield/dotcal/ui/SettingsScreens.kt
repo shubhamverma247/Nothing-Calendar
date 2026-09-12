@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.ui
 
+import com.dotfield.dotcal.NOTHING_RED_HEX
 import android.Manifest
 import android.accounts.AccountManager
 import android.app.Activity
@@ -240,6 +241,9 @@ import com.dotfield.dotcal.prefs.AppLanguage
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
+import com.dotfield.dotcal.sync.SyncWidgetHealthSnapshot
+import com.dotfield.dotcal.sync.SyncWidgetHealthStatus
+import com.dotfield.dotcal.sync.syncWidgetHealth
 import com.dotfield.dotcal.widget.WidgetManagerActivity
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import java.time.DayOfWeek
@@ -262,8 +266,8 @@ import kotlinx.coroutines.withContext
 
 
 private const val DISCORD_INVITE_URL = "https://discord.gg/sTAKcAG8R"
-private const val FEATURES_GUIDE_URL = "https://dotcal-website.netlify.app/guide"
-private const val PRIVACY_POLICY_URL = "https://dotcal-website.netlify.app/privacy"
+private const val FEATURES_GUIDE_URL = "https://dotcal.net/guide"
+private const val PRIVACY_POLICY_URL = "https://dotcal.net/privacy"
 
 @Composable
 internal fun SettingsPreview(
@@ -283,6 +287,11 @@ internal fun SettingsPreview(
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
     isSyncing: Boolean,
+    isRefreshingWidgets: Boolean,
+    configuredWidgetCount: Int,
+    lastWidgetRefreshMs: Long?,
+    lastSyncError: String?,
+    lastWidgetRefreshError: String?,
     birthdayEnabled: Boolean,
     defaultReminderMinutes: Int?,
     defaultEventDurationMinutes: Int,
@@ -307,6 +316,7 @@ internal fun SettingsPreview(
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
+    onRefreshWidgets: () -> Unit,
     onAccountVisibilityChange: (String, Boolean) -> Unit,
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
@@ -573,11 +583,19 @@ internal fun SettingsPreview(
                 syncIntervalMins = syncIntervalMins,
                 syncMetadata = syncMetadata,
                 isSyncing = isSyncing,
+                isRefreshingWidgets = isRefreshingWidgets,
+                accounts = accounts,
+                configuredWidgetCount = configuredWidgetCount,
+                lastWidgetRefreshMs = lastWidgetRefreshMs,
+                lastSyncError = lastSyncError,
+                lastWidgetRefreshError = lastWidgetRefreshError,
+                hasCalendarPermission = hasCalendarPermission,
                 palette = palette,
                 onBack = { onScreenChange(SettingsScreen.Root) },
                 onSyncEnabledChange = onSyncEnabledChange,
                 onSyncIntervalSelected = onSyncIntervalSelected,
                 onSyncNow = onSyncNow,
+                onRefreshWidgets = onRefreshWidgets,
             )
         }
         AnimatedVisibility(
@@ -804,7 +822,7 @@ internal fun SettingsRoot(
                     )
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(
-                        title = stringResource(R.string.settings_sync),
+                        title = stringResource(R.string.settings_sync_health_title),
                         value = if (syncEnabled) {
                             syncIntervalLabel(syncIntervalMins)
                         } else {
@@ -1230,22 +1248,85 @@ private fun SyncSettings(
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
     isSyncing: Boolean,
+    isRefreshingWidgets: Boolean,
+    accounts: List<CalendarAccount>,
+    configuredWidgetCount: Int,
+    lastWidgetRefreshMs: Long?,
+    lastSyncError: String?,
+    lastWidgetRefreshError: String?,
+    hasCalendarPermission: Boolean,
     palette: DotCalPalette,
     onBack: () -> Unit,
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
     onSyncNow: () -> Unit,
+    onRefreshWidgets: () -> Unit,
 ) {
+    val selectedCalendarCount = selectedCalendarAccountCount(accounts)
+    var healthNowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    val listState = rememberLazyListState()
+    val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L)
+            healthNowMs = System.currentTimeMillis()
+        }
+    }
+    val health = syncWidgetHealth(
+        SyncWidgetHealthSnapshot(
+            syncEnabled = syncEnabled,
+            hasCalendarPermission = hasCalendarPermission,
+            lastSyncMs = syncMetadata.maxOfOrNull { it.lastSyncMs }?.takeIf { it > 0L },
+            syncErrorMessage = lastSyncError ?: syncMetadata.firstNotNullOfOrNull { it.errorMessage },
+            widgetCount = configuredWidgetCount,
+            lastWidgetRefreshMs = lastWidgetRefreshMs,
+            widgetErrorMessage = lastWidgetRefreshError,
+            nowMs = healthNowMs,
+        ),
+    )
+    val healthDetail = when {
+        health.status == SyncWidgetHealthStatus.ActionRequired -> stringResource(R.string.settings_sync_health_permission_detail)
+        lastSyncError != null -> stringResource(R.string.settings_sync_health_sync_failed_detail)
+        lastWidgetRefreshError != null -> stringResource(R.string.settings_sync_health_widget_failed_detail)
+        configuredWidgetCount > 0 && lastWidgetRefreshMs == null -> stringResource(R.string.settings_sync_health_widget_never_refreshed_detail)
+        else -> null
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
+        state = listState,
         contentPadding = PaddingValues(bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_sync))
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_sync_health_title))
         }
         item {
             SettingsPanel(title = stringResource(R.string.settings_panel_calendar_sync), palette = palette, framed = false) {
+                Text(
+                    text = when (health.status) {
+                        SyncWidgetHealthStatus.Healthy -> stringResource(R.string.settings_sync_health_healthy)
+                        SyncWidgetHealthStatus.NeedsAttention -> stringResource(R.string.settings_sync_health_attention)
+                        SyncWidgetHealthStatus.ActionRequired -> stringResource(R.string.settings_sync_health_action_required)
+                    },
+                    color = palette.primaryText,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                healthDetail?.let { detail ->
+                    Spacer(Modifier.height(6.dp))
+                    Text(detail, color = palette.secondaryText, fontSize = 14.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(
+                        R.string.settings_sync_health_summary,
+                        selectedCalendarCount,
+                        configuredWidgetCount,
+                    ),
+                    color = palette.secondaryText,
+                    fontSize = 14.sp,
+                )
+                Spacer(Modifier.height(14.dp))
                 SettingsToggleRow(
                     title = stringResource(R.string.settings_sync_enabled),
                     subtitle = stringResource(R.string.settings_sync_enabled_subtitle),
@@ -1266,8 +1347,19 @@ private fun SyncSettings(
                     palette = palette,
                     onClick = onSyncNow,
                 )
+                SettingsContentDivider(palette)
+                SettingsActionRow(
+                    title = stringResource(R.string.settings_sync_health_refresh_widgets),
+                    subtitle = stringResource(R.string.settings_sync_health_refresh_widgets_subtitle),
+                    palette = palette,
+                    isLoading = isRefreshingWidgets,
+                    onClick = onRefreshWidgets,
+                )
             }
         }
+    }
+    if (showCompactHeader) {
+        SettingsCompactHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_sync_health_title))
     }
 }
 
@@ -2819,6 +2911,36 @@ private fun SettingsIconMenuRow(
 }
 
 @Composable
+private fun SettingsActionRow(
+    title: String,
+    subtitle: String,
+    palette: DotCalPalette,
+    isLoading: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 66.dp)
+            .noRippleClickable(enabled = !isLoading, onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        if (isLoading) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = palette.accent, strokeWidth = 2.dp)
+        } else {
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
 private fun SettingsIconCell(icon: ImageVector, palette: DotCalPalette, active: Boolean = false) {
     Box(
         modifier = Modifier
@@ -3956,7 +4078,7 @@ internal fun CustomAccentPickerDialog(
     val current = remember(hue, sat, value) {
         Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value)))
     }
-    val currentHex = remember(current) { AccentColor.normalizeHex("#%06X".format(0xFFFFFF and current.toArgb())) ?: "#FF3B30" }
+    val currentHex = remember(current) { AccentColor.normalizeHex("#%06X".format(0xFFFFFF and current.toArgb())) ?: NOTHING_RED_HEX }
     var hexField by remember { mutableStateOf(currentHex) }
     // Keep the hex text field in sync when the user drags the picker.
     LaunchedEffect(currentHex) { hexField = currentHex }

@@ -8,6 +8,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import com.dotfield.dotcal.NOTHING_RED_HEX
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.R
 import com.dotfield.dotcal.ui.theme.NBlack
@@ -85,7 +87,14 @@ internal val LocalHeadingFont = staticCompositionLocalOf<FontFamily> { FontFamil
 @Composable
 internal fun rememberAppFontFamily(font: AppFont): FontFamily = remember(font) {
     when (font) {
-        AppFont.NDot -> FontFamily(Font(R.font.ndot))
+        // NDot is a single regular asset. Register it for every requested UI weight so Compose
+        // does not synthesize a heavier face when headings ask for Bold or SemiBold.
+        AppFont.NDot -> FontFamily(
+            Font(R.font.ndot, FontWeight.Normal),
+            Font(R.font.ndot, FontWeight.Medium),
+            Font(R.font.ndot, FontWeight.SemiBold),
+            Font(R.font.ndot, FontWeight.Bold),
+        )
         AppFont.NType -> FontFamily(Font(R.font.ntype82))
         AppFont.System -> FontFamily.Default
     }
@@ -111,14 +120,14 @@ internal sealed interface AccentColor {
 
     /** Text/icon color that stays legible on top of [color]. */
     val onColor: Color
-        get() = if (color.luminanceApprox() > 0.5f) Color(0xFF101010) else Color(0xFFFFFFFF)
+        get() = Color.White
 
     /** Value persisted to DataStore + boot prefs. */
     val storageValue: String
 
     enum class Preset(val hex: String, @StringRes val labelRes: Int) : AccentColor {
         // Free presets. Order/names are storage-stable; do not rename.
-        RED("#FF3B30", R.string.accent_red),
+        RED(NOTHING_RED_HEX, R.string.accent_red),
         BLUE("#0A84FF", R.string.accent_blue),
         GREEN("#30D158", R.string.accent_green),
         PURPLE("#BF5AF2", R.string.accent_purple),

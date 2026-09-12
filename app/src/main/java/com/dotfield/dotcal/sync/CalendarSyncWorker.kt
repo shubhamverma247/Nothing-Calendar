@@ -33,16 +33,27 @@ class CalendarSyncWorker(
                 sideStore = SharedSideStore(applicationContext),
             )
             val result = syncRepository.sync()
-            if (!result.permissionDenied) {
-                applicationContext.calendarPreferencesDataStore.edit { preferences ->
+            applicationContext.calendarPreferencesDataStore.edit { preferences ->
+                if (result.permissionDenied) {
+                    preferences[CalendarPreferences.KEY_LAST_SYNC_ERROR] = "PERMISSION_REQUIRED"
+                } else {
                     preferences[CalendarPreferences.KEY_LAST_SYNC_MS] = System.currentTimeMillis()
+                    preferences.remove(CalendarPreferences.KEY_LAST_SYNC_ERROR)
                 }
+            }
+            if (!result.permissionDenied) {
                 WidgetUpdateWorker.enqueue(applicationContext)
             }
             Result.success()
         } catch (_: SecurityException) {
+            applicationContext.calendarPreferencesDataStore.edit { preferences ->
+                preferences[CalendarPreferences.KEY_LAST_SYNC_ERROR] = "PERMISSION_REQUIRED"
+            }
             Result.failure()
         } catch (_: Exception) {
+            applicationContext.calendarPreferencesDataStore.edit { preferences ->
+                preferences[CalendarPreferences.KEY_LAST_SYNC_ERROR] = "SYNC_FAILED"
+            }
             if (runAttemptCount < MAX_RETRY_COUNT) Result.retry() else Result.failure()
         }
     }

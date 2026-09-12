@@ -5,7 +5,7 @@
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">#000000</item>
-        <item name="android:colorAccent">#FF3B30</item>
+        <item name="android:colorAccent">@color/nothing_red</item>
         <item name="android:forceDarkAllowed">false</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
@@ -19,7 +19,7 @@
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">#F7F7F7</item>
-        <item name="android:colorAccent">#FF3B30</item>
+        <item name="android:colorAccent">@color/nothing_red</item>
         <item name="android:forceDarkAllowed">false</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>

@@ -12,6 +12,9 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.datastore.preferences.core.edit
+import com.dotfield.dotcal.prefs.CalendarPreferences
+import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import java.util.concurrent.TimeUnit
 
 class WidgetUpdateWorker(
@@ -136,16 +139,22 @@ class WidgetUpdateWorker(
 
         suspend fun updateNow(context: Context) {
             val appContext = context.applicationContext
-            updateWidget(appContext, DateOnlyDotCalWidget(), DateOnlyDotCalWidget::class.java, LegacyWidgetKind.DateOnly)
-            updateWidget(appContext, CompactMonthDotCalWidget(), CompactMonthDotCalWidget::class.java, LegacyWidgetKind.MonthCompact)
-            updateWidget(appContext, ShiftWideDotCalWidget(), ShiftWideDotCalWidget::class.java, LegacyWidgetKind.ShiftWide)
-            updateWidget(appContext, SmallDotCalWidget(), SmallDotCalWidget::class.java, LegacyWidgetKind.Small)
-            updateWidget(appContext, MediumDotCalWidget(), MediumDotCalWidget::class.java, LegacyWidgetKind.Medium)
-            updateWidget(appContext, LargeDotCalWidget(), LargeDotCalWidget::class.java, LegacyWidgetKind.Large)
-            updateWidget(appContext, EventCountdownDotCalWidget(), EventCountdownDotCalWidget::class.java, LegacyWidgetKind.Countdown)
-            updateWidget(appContext, AgendaListDotCalWidget(), AgendaListDotCalWidget::class.java, LegacyWidgetKind.Agenda)
-            updateWidget(appContext, MonthGridDotCalWidget(), MonthGridDotCalWidget::class.java, LegacyWidgetKind.MonthGrid)
-            notifyWidgetHosts(appContext)
+            try {
+                updateWidget(appContext, DateOnlyDotCalWidget(), DateOnlyDotCalWidget::class.java, LegacyWidgetKind.DateOnly)
+                updateWidget(appContext, CompactMonthDotCalWidget(), CompactMonthDotCalWidget::class.java, LegacyWidgetKind.MonthCompact)
+                updateWidget(appContext, ShiftWideDotCalWidget(), ShiftWideDotCalWidget::class.java, LegacyWidgetKind.ShiftWide)
+                updateWidget(appContext, SmallDotCalWidget(), SmallDotCalWidget::class.java, LegacyWidgetKind.Small)
+                updateWidget(appContext, MediumDotCalWidget(), MediumDotCalWidget::class.java, LegacyWidgetKind.Medium)
+                updateWidget(appContext, LargeDotCalWidget(), LargeDotCalWidget::class.java, LegacyWidgetKind.Large)
+                updateWidget(appContext, EventCountdownDotCalWidget(), EventCountdownDotCalWidget::class.java, LegacyWidgetKind.Countdown)
+                updateWidget(appContext, AgendaListDotCalWidget(), AgendaListDotCalWidget::class.java, LegacyWidgetKind.Agenda)
+                updateWidget(appContext, MonthGridDotCalWidget(), MonthGridDotCalWidget::class.java, LegacyWidgetKind.MonthGrid)
+                notifyWidgetHosts(appContext)
+                recordWidgetRefresh(appContext, null)
+            } catch (error: Exception) {
+                recordWidgetRefresh(appContext, "WIDGET_REFRESH_FAILED")
+                throw error
+            }
         }
 
         suspend fun updateCompactMonthNow(context: Context) {
@@ -162,17 +171,34 @@ class WidgetUpdateWorker(
          */
         suspend fun updateConfiguredWidgetNow(context: Context, appWidgetId: Int) {
             val appContext = context.applicationContext
-            val kind = legacyKindForAppWidget(appWidgetId, appContext)
-            val widget = widgetForKind(kind)
-            val glanceId = GlanceAppWidgetManager(appContext).getGlanceIdBy(appWidgetId)
-            registerConfiguredWidget(
-                appContext,
-                receiverClassNameForWidgetKind(kind),
-                appWidgetId,
-            )
-            syncDotCalWidgetState(appContext, glanceId, kind)
-            widget.update(appContext, glanceId)
-            notifyWidgetHost(appContext, receiverClassForWidgetKind(kind))
+            try {
+                val kind = legacyKindForAppWidget(appWidgetId, appContext)
+                val widget = widgetForKind(kind)
+                val glanceId = GlanceAppWidgetManager(appContext).getGlanceIdBy(appWidgetId)
+                registerConfiguredWidget(
+                    appContext,
+                    receiverClassNameForWidgetKind(kind),
+                    appWidgetId,
+                )
+                syncDotCalWidgetState(appContext, glanceId, kind)
+                widget.update(appContext, glanceId)
+                notifyWidgetHost(appContext, receiverClassForWidgetKind(kind))
+                recordWidgetRefresh(appContext, null)
+            } catch (error: Exception) {
+                recordWidgetRefresh(appContext, "WIDGET_REFRESH_FAILED")
+                throw error
+            }
+        }
+
+        private suspend fun recordWidgetRefresh(context: Context, error: String?) {
+            context.calendarPreferencesDataStore.edit { preferences ->
+                if (error == null) {
+                    preferences[CalendarPreferences.KEY_LAST_WIDGET_REFRESH_MS] = System.currentTimeMillis()
+                    preferences.remove(CalendarPreferences.KEY_LAST_WIDGET_REFRESH_ERROR)
+                } else {
+                    preferences[CalendarPreferences.KEY_LAST_WIDGET_REFRESH_ERROR] = error
+                }
+            }
         }
 
         private suspend fun updateWidget(

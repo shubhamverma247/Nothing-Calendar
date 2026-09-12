@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.widget
 
+import com.dotfield.dotcal.NOTHING_RED_ARGB
 import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
@@ -28,7 +29,7 @@ data class DotCalWidgetPalette(
     val dot: ColorProvider,
     val dotTile: Int,
     val solidSurface: ColorProvider,
-    val accent: ColorProvider = ColorProvider(Color(0xFFFF3B30)),
+    val accent: ColorProvider = ColorProvider(Color(NOTHING_RED_ARGB)),
 )
 
 data class DotCalWidgetSettings(
@@ -196,7 +197,7 @@ private fun Context.isSystemDark(): Boolean {
     return (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 }
 
-private val DEFAULT_ACCENT = Color(0xFFFF3B30)
+private val DEFAULT_ACCENT = Color(NOTHING_RED_ARGB)
 
 /**
  * Resolves the stored accent value into a color. Accepts legacy preset enum names, the Pro extra
