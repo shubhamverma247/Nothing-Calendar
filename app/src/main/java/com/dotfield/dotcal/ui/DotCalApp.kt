@@ -370,6 +370,7 @@ fun DotCalApp(
     val conflictWarnings by viewModel.conflictWarnings.collectAsStateWithLifecycle()
     val holidayCountries by viewModel.holidayCountries.collectAsStateWithLifecycle()
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
+    val reminderCenterItems by viewModel.reminderCenterItems.collectAsStateWithLifecycle()
     val syncMetadata by viewModel.syncMetadata.collectAsStateWithLifecycle()
     val detailEvent by viewModel.detailEvent.collectAsStateWithLifecycle()
     val shiftEventMetadata by viewModel.shiftEventMetadata.collectAsStateWithLifecycle()
@@ -1555,7 +1556,7 @@ fun DotCalApp(
             taskDetail != null -> taskDetail = null
             detailEvent != null -> viewModel.closeEventDetail()
             screenTab == ScreenTab.Settings && settingsScreen != SettingsScreen.Root -> {
-                settingsScreen = SettingsScreen.Root
+                settingsScreen = settingsScreen.parentScreen()
             }
             screenTab == ScreenTab.Settings -> {
                 settingsScreen = SettingsScreen.Root
@@ -2107,6 +2108,7 @@ fun DotCalApp(
                 lastWidgetRefreshError = lastWidgetRefreshError,
                 birthdayEnabled = birthdayEnabled,
                 defaultReminderMinutes = defaultReminderMinutes,
+                reminderCenterItems = reminderCenterItems,
                 defaultEventDurationMinutes = defaultEventDurationMinutes,
                 autoBufferBeforeMinutes = autoBufferBeforeMinutes,
                 autoBufferAfterMinutes = autoBufferAfterMinutes,
@@ -2301,6 +2303,9 @@ fun DotCalApp(
                         }
                     }
                 },
+                onReminderCenterDismiss = viewModel::dismissReminder,
+                onReminderCenterCancel = viewModel::cancelReminder,
+                onReminderCenterSnooze = viewModel::snoozeReminder,
                 onDailyDateIconEnabledChange = { enabled ->
                     scope.launch(Dispatchers.IO) {
                         context.calendarPreferencesDataStore.edit { preferences ->

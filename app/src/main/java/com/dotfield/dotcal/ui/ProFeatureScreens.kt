@@ -1939,6 +1939,8 @@ private fun DeadTimeControls(
                     thumbColor = palette.accent,
                     activeTrackColor = palette.accent,
                     inactiveTrackColor = palette.line,
+                    activeTickColor = Color.Transparent,
+                    inactiveTickColor = Color.Transparent,
                 ),
             )
             Text(stringResource(R.string.availability_next_7_days), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
@@ -1965,7 +1967,7 @@ private fun DeadTimeSlotRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "${slot.date.format(localizedFormatter("EEE, MMM d"))} · ${formatDeadTime(slot.start, use24HourFormat)}-${formatDeadTime(slot.end, use24HourFormat)}",
+                "${slot.date.format(localizedFormatter("EEE, MMM d"))} ${formatDeadTime(slot.start, use24HourFormat)}-${formatDeadTime(slot.end, use24HourFormat)}",
                 color = palette.primaryText,
                 fontFamily = mono,
                 fontWeight = FontWeight.SemiBold,

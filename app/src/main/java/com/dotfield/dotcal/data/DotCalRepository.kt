@@ -152,6 +152,7 @@ class DotCalRepository(
     private val context: Context,
 ) {
     private val reminderScheduler = ReminderScheduler(context)
+    private val reminderCenterActions = ReminderCenterActions(dao, reminderScheduler)
     private val privacyManager = AppPrivacyManager(context.applicationContext)
     private val recentlyDeletedStore = RecentlyDeletedStore(context)
     private val eventTemplateStore = EventTemplateStore(context)
@@ -841,6 +842,9 @@ class DotCalRepository(
 
     fun observeReminders(): Flow<List<EventReminder>> = dao.observeReminders().retryOnDatabaseLocked()
 
+    fun observeReminderCenterItems(): Flow<List<ReminderCenterItem>> =
+        dao.observeReminderCenterItems().retryOnDatabaseLocked()
+
     suspend fun getEvent(eventId: String): CalendarEvent? = dao.getEvent(eventId)?.withGhostFlag()
 
     suspend fun getReminderByRequestCode(alarmRequestCode: Int): EventReminder? = dao.getReminderByRequestCode(alarmRequestCode)
@@ -849,6 +853,18 @@ class DotCalRepository(
 
     suspend fun markReminderDelivered(alarmRequestCode: Int) {
         dao.markReminderDelivered(alarmRequestCode)
+    }
+
+    suspend fun dismissReminder(item: ReminderCenterItem) {
+        reminderCenterActions.dismiss(item)
+    }
+
+    suspend fun cancelReminder(item: ReminderCenterItem) {
+        reminderCenterActions.cancel(item)
+    }
+
+    suspend fun snoozeReminder(item: ReminderCenterItem, minutes: Int) {
+        reminderCenterActions.snooze(item, minutes)
     }
 
     suspend fun rescheduleFutureReminders() {

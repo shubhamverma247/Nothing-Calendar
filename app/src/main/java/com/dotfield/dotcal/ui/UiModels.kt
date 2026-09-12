@@ -71,6 +71,7 @@ internal enum class SettingsScreen {
     CalendarPreferences,
     CalendarMenu,
     ReminderDefaults,
+    ReminderCenter,
     Widgets,
     DataRestore,
     CalendarAccounts,
@@ -78,6 +79,13 @@ internal enum class SettingsScreen {
     GlobalHolidays,
     AppPrivacy,
     PrivacyPolicy,
+}
+
+internal fun SettingsScreen.parentScreen(): SettingsScreen = when (this) {
+    SettingsScreen.ReminderDefaults -> SettingsScreen.ReminderCenter
+    SettingsScreen.AddAccount -> SettingsScreen.CalendarAccounts
+    SettingsScreen.CalendarMenu -> SettingsScreen.CalendarPreferences
+    else -> SettingsScreen.Root
 }
 
 internal enum class CalendarOverflowAction(

@@ -11,6 +11,7 @@ import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
+import com.dotfield.dotcal.data.ReminderCenterItem
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
@@ -178,6 +179,21 @@ class DotCalViewModel(
 
     val reminders: StateFlow<List<EventReminder>> = repository.observeReminders()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val reminderCenterItems: StateFlow<List<ReminderCenterItem>> = repository.observeReminderCenterItems()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun dismissReminder(item: ReminderCenterItem) {
+        viewModelScope.launch { repository.dismissReminder(item) }
+    }
+
+    fun cancelReminder(item: ReminderCenterItem) {
+        viewModelScope.launch { repository.cancelReminder(item) }
+    }
+
+    fun snoozeReminder(item: ReminderCenterItem, minutes: Int) {
+        viewModelScope.launch { repository.snoozeReminder(item, minutes) }
+    }
 
     private val _detailEvent = MutableStateFlow<CalendarEvent?>(null)
     val detailEvent: StateFlow<CalendarEvent?> = _detailEvent

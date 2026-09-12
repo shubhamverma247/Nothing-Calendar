@@ -24,13 +24,14 @@ import com.dotfield.dotcal.data.recurrence.planNextReminder
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.nothing.ketchum.Common
+import com.dotfield.dotcal.data.ReminderCenterScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import java.text.DateFormat
 import java.util.Date
 
-class ReminderScheduler(private val context: Context) {
+class ReminderScheduler(private val context: Context) : ReminderCenterScheduler {
     private val appContext = context.applicationContext
     private val alarmManager = appContext.getSystemService(AlarmManager::class.java)
 
@@ -65,7 +66,7 @@ class ReminderScheduler(private val context: Context) {
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
     }
 
-    fun scheduleSnooze(eventId: String, eventTitle: String, alarmRequestCode: Int, triggerAtMs: Long, snoozeMinutes: Int, isTask: Boolean = false) {
+    override fun scheduleSnooze(eventId: String, eventTitle: String, alarmRequestCode: Int, triggerAtMs: Long, snoozeMinutes: Int, isTask: Boolean) {
         cancelLiveProgress(alarmRequestCode)
         cancelRepeat(alarmRequestCode)
         NotificationManagerCompat.from(appContext)
@@ -93,7 +94,7 @@ class ReminderScheduler(private val context: Context) {
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
     }
 
-    fun cancelReminder(alarmRequestCode: Int) {
+    override fun cancelReminder(alarmRequestCode: Int) {
         alarmManager.cancel(reminderPendingIntent(alarmRequestCode, payload = ReminderAlarmPayload.EMPTY.copy(alarmRequestCode = alarmRequestCode)))
         cancelLiveProgress(alarmRequestCode)
         cancelSnoozeAlarms(alarmRequestCode)

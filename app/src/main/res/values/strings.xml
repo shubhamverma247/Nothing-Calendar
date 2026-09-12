@@ -133,6 +133,18 @@
     <string name="settings_calendar_accounts">Calendar Accounts</string>
     <string name="settings_calendar_preferences">Calendar Preferences</string>
     <string name="settings_reminder_defaults">Reminder Defaults</string>
+    <string name="settings_reminders">Reminders</string>
+    <string name="settings_reminders_subtitle">Upcoming alerts, sound &amp; defaults</string>
+    <string name="settings_reminders_defaults_alerts">Defaults &amp; alerts</string>
+    <string name="settings_reminders_defaults_summary">Timing, sound &amp; repeat alerts</string>
+    <string name="settings_reminders_pending">Pending reminders</string>
+    <string name="settings_reminders_empty_hint">Add a reminder to an event or task to see its next alert here.</string>
+    <string name="settings_reminders_next_alert">Next alert · %1$s · %2$s</string>
+    <string name="settings_reminder_center_empty">No pending reminders.</string>
+    <string name="settings_reminder_center_snooze">Snooze</string>
+    <string name="settings_reminder_center_dismiss">Dismiss</string>
+    <string name="settings_reminder_center_cancel">Cancel</string>
+    <string name="settings_reminder_center_snooze_minutes">%1$d minutes</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_widgets">Widgets</string>
     <string name="settings_widgets_value_transparent">Transparent</string>
@@ -837,9 +849,9 @@
     <string name="insights_metric_busiest">Busiest</string>
     <string name="insights_metric_tasks">Tasks</string>
     <string name="insights_metric_none">None</string>
-    <string name="insights_section_weekday_load">WEEKDAY LOAD</string>
-    <string name="insights_section_calendars">CALENDARS</string>
-    <string name="insights_section_dead_time">DEAD TIME FINDER</string>
+    <string name="insights_section_weekday_load">Weekday Load</string>
+    <string name="insights_section_calendars">Calendars</string>
+    <string name="insights_section_dead_time">Dead Time Finder</string>
     <string name="insights_no_open_slots">No open slots of 1 hour or longer.</string>
     <string name="insights_no_timed_events">No scheduled timed events in this range.</string>
 

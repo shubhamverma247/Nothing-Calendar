@@ -8,7 +8,7 @@ import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface CalendarDao {
+interface CalendarDao : ReminderCenterStore {
     @Query("SELECT * FROM calendar_accounts ORDER BY sortOrder ASC")
     fun observeAccounts(): Flow<List<CalendarAccount>>
 
@@ -145,7 +145,7 @@ interface CalendarDao {
     suspend fun getUndeliveredReminders(): List<EventReminder>
 
     @Query("UPDATE event_reminders SET triggerAtMs = :triggerAtMs, isDelivered = 0 WHERE id = :reminderId")
-    suspend fun rescheduleReminder(reminderId: Long, triggerAtMs: Long)
+    override suspend fun rescheduleReminder(reminderId: Long, triggerAtMs: Long)
 
     @Query(
         """
@@ -230,6 +230,25 @@ interface CalendarDao {
 
     @Query("SELECT * FROM event_reminders ORDER BY triggerAtMs ASC")
     fun observeReminders(): Flow<List<EventReminder>>
+
+    @Query(
+        """
+        SELECT event_reminders.id AS reminderId,
+               event_reminders.eventId AS eventId,
+               calendar_events.title AS eventTitle,
+               calendar_events.startTimeMs AS eventStartTimeMs,
+               calendar_events.isTask AS isTask,
+               event_reminders.minutesBefore AS minutesBefore,
+               event_reminders.triggerAtMs AS triggerAtMs,
+               event_reminders.alarmRequestCode AS alarmRequestCode,
+               event_reminders.isDelivered AS isDelivered
+        FROM event_reminders
+        INNER JOIN calendar_events ON calendar_events.id = event_reminders.eventId
+        WHERE event_reminders.isDelivered = 0
+        ORDER BY event_reminders.triggerAtMs ASC
+        """,
+    )
+    fun observeReminderCenterItems(): Flow<List<ReminderCenterItem>>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAccountIfAbsent(account: CalendarAccount)
@@ -325,7 +344,10 @@ interface CalendarDao {
     suspend fun insertReminders(reminders: List<EventReminder>)
 
     @Query("UPDATE event_reminders SET isDelivered = 1 WHERE alarmRequestCode = :alarmRequestCode")
-    suspend fun markReminderDelivered(alarmRequestCode: Int)
+    override suspend fun markReminderDelivered(alarmRequestCode: Int)
+
+    @Query("DELETE FROM event_reminders WHERE id = :reminderId")
+    override suspend fun deleteReminder(reminderId: Long)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertDeletedEventLog(deletedEventLog: DeletedEventLog)

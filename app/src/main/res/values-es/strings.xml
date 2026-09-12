@@ -89,6 +89,20 @@
 
     <!-- Settings root -->
     <string name="settings_title">Ajustes</string>
+    <string name="settings_reminders">Recordatorios</string>
+    <string name="settings_reminders_subtitle">Alertas próximas, sonido y valores predeterminados</string>
+    <string name="settings_reminders_defaults_alerts">Valores predeterminados y alertas</string>
+    <string name="settings_reminders_defaults_summary">Hora, sonido y alertas repetidas</string>
+    <string name="settings_reminders_pending">Recordatorios pendientes</string>
+    <string name="settings_reminders_empty_hint">Añade un recordatorio a un evento o tarea para ver aquí su próxima alerta.</string>
+    <string name="settings_reminders_next_alert">Próxima alerta · %1$s · %2$s</string>
+    <string name="settings_reminder_center_empty">No hay recordatorios pendientes.</string>
+    <string name="settings_reminder_center_snooze">Posponer</string>
+    <string name="settings_reminder_center_dismiss">Descartar</string>
+    <string name="settings_reminder_center_cancel">Cancelar</string>
+    <string name="settings_reminder_center_snooze_minutes">%1$d minutos</string>
+    <string name="settings_daily_date_icon">Icono de fecha diaria</string>
+    <string name="settings_daily_date_icon_subtitle">Muestra la fecha de hoy en el icono del lanzador. Desactívalo para mantener una posición estable.</string>
     <string name="settings_panel_accounts">Cuentas</string>
     <string name="settings_calendar_accounts">Cuentas de calendario</string>
     <string name="settings_calendar_preferences">Preferencias del calendario</string>
@@ -167,6 +181,18 @@
     <string name="settings_sync_interval">Intervalo de sincronización</string>
     <string name="settings_sync_now">Sincronizar ahora</string>
     <string name="settings_syncing">Sincronizando...</string>
+    <string name="settings_sync_health_title">Salud de sincronización y widgets</string>
+    <string name="settings_sync_health_healthy">Todo parece estar bien</string>
+    <string name="settings_sync_health_attention">Necesita atención</string>
+    <string name="settings_sync_health_action_required">Acción necesaria</string>
+    <string name="settings_sync_health_summary">%1$d calendarios · %2$d widgets configurados</string>
+    <string name="settings_sync_health_refresh_widgets">Actualizar widgets</string>
+    <string name="settings_sync_health_refresh_widgets_subtitle">Actualiza ahora todos los widgets configurados</string>
+    <string name="settings_sync_health_widgets_refreshed">Widgets actualizados</string>
+    <string name="settings_sync_health_permission_detail">La sincronización requiere permiso para el calendario.</string>
+    <string name="settings_sync_health_sync_failed_detail">La última sincronización del calendario falló. Prueba Sincronizar ahora.</string>
+    <string name="settings_sync_health_widget_failed_detail">La última actualización de widgets falló. Prueba Actualizar widgets.</string>
+    <string name="settings_sync_health_widget_never_refreshed_detail">Los widgets aún no han completado una actualización.</string>
     <string name="sync_interval_manual">Manual</string>
     <string name="sync_last_synced">Última sincronización: %1$s</string>
     <string name="sync_never">nunca</string>

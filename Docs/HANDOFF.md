@@ -9,18 +9,21 @@ Active resume document for `com.dotfield.dotcal`. Historical detail is preserved
 ## Worktree
 
 - Branch: `feature-and-fixes`.
-- Latest local commit: `eb7fd99 fix(launcher): refresh icon at local midnight`.
+- Latest local commit: `7c6e60d fix(launcher): add stable icon fallback toggle`.
 - Current work is uncommitted. Do not commit, push, reset, clean, or switch branches unless explicitly asked.
 - Preserve user-owned untracked files: QA screenshots, icon ZIPs, `.claude`, `Docs/logcat.txt`, and `tools/`.
-- App version: `versionCode 43`, `versionName 1.5.1` (current uncommitted version bump).
+- App version: `versionCode 44`, `versionName 1.6.0`.
 - Package: `com.dotfield.dotcal`. Device: `000153573000720` when connected.
 
 ## Rules
 
 - Read this file and use the Android development workflow before changing code.
+- Before making any change, explain clearly what will be changed and wait for the user's explicit approval; continue implementation only after approval.
 - Use TDD for behavior changes: add/adjust a focused test, run it, implement, then run the relevant suite.
 - Manual QA is post-22-August/new-feature scope only. Run one manual test at a time and state exact expected behavior before asking for the test.
-- No install, commit, push, or branch operation unless requested or explicitly authorized by the current user message.
+- The user performs manual device QA. Do not tap, swipe, launch screens, or capture screenshots for QA unless explicitly asked. Provide one test with expected behavior, then wait for the result. Continue automated tests, builds, and APK installation as required.
+- After Android changes, build and install the verified APK. State the exact manual QA test and expected behavior before each test.
+- Do not commit, push, reset, clean, or switch branches unless requested or explicitly authorized by the current user message.
 - Keep fixes minimal; do not rewrite unrelated code.
 
 ## Current implementation
@@ -158,6 +161,13 @@ as new features. The items below are the next active feature proposals and advan
 
 ## QA baseline
 
+- Reminder UI revision: Settings has one `Reminders` entry. `Defaults & alerts` opens
+  existing defaults; back returns to Reminders. The pending list uses DotCal typography,
+  grouped reminder cards, localized alert times, and visible inline Snooze, Dismiss, and
+  Cancel actions.
+- Reminders uses the existing large-to-centered compact Settings header on scroll.
+  Device QA of this revision is pending. Reminder Readiness Check is still unimplemented.
+
 - Previously passed manual QA includes reminders/full-screen access and snooze, widget theme/config/remove flows, provider availability/RDATE/meeting metadata/colors, calendar-move duplicate protection, shift-pattern export, auto-buffers/Find-a-Time, recurring occurrence sync, and Week/Day detail navigation.
 - Pending manual QA: dynamic launcher icon behavior on small/large devices and external `.ics` open-with flow. Test only the requested new feature, one test at a time.
 
@@ -168,24 +178,30 @@ Passed after the latest code changes:
 ```text
 :app:testDebugUnitTest
 :app:assembleDebug
+:app:lintDebug
+:app:bundleRelease
 git diff --check
 ```
 
-Audit follow-up focused tests and the full debug suite pass after the exception/logging hardening.
+Reminder Center lifecycle tests pass, including deterministic dismiss, cancel, snooze,
+and task/event action behavior. The full debug unit-test suite and debug APK build pass.
+Lint passes with 0 errors and 573 warnings. Release bundle passes through R8 and lint-vital.
+The Room Reminder Center instrumentation test compiles, but connected execution is pending:
+the connected device disappeared before test execution and ADB currently reports no devices.
 
-The current focused ICS intent test also passes:
+Focused tests also pass:
 
 ```text
 :app:testDebugUnitTest --tests com.dotfield.dotcal.MainActivityIntentTest
+:app:testDebugUnitTest --tests com.dotfield.dotcal.data.ReminderCenterLifecycleTest
+:app:connectedDebugAndroidTest (not completed: no connected device)
 ```
-
-The latest combined run passed full `:app:testDebugUnitTest` and `:app:assembleDebug`. `:app:bundleRelease` previously passed before the ICS route edit; the latest run reached `lintVitalAnalyzeRelease` and produced no output for a bounded wait, matching the known lint/tooling stall, so it was stopped. Do not treat that tooling stall as a code failure; rerun the release bundle when release verification is required.
 
 ## Next safe steps
 
 1. Inspect `git diff` and `git status`; leave unrelated user files untouched.
 2. Run the full debug unit tests, debug APK build, release bundle, and diff check after any further edit.
-3. If the user requests install, state the exact manual test and expected result first, then install the verified APK.
+3. After Android changes, state the exact manual test and expected result first, then install the verified APK.
 4. If the user requests release integration, commit/push/merge only the exact requested operation.
 
 ## Resume prompt for next feature
@@ -196,7 +212,7 @@ Before work:
 
 - Read `Docs/HANDOFF.md` and all applicable `AGENTS.md` instructions.
 - Inspect git status and recent commits. Preserve all user-owned tracked and untracked work.
-- Do not reset, clean, force-push, switch branches, install, commit, or push unless explicitly requested.
+- Do not reset, clean, force-push, switch branches, commit, or push unless explicitly requested. Install verified APK after Android changes.
 - Do not change app icon assets or revisit daily launcher icon behavior unless explicitly requested; current folder-placement feedback is documented above and has no verified app-only fix.
 
 For requested feature work:
