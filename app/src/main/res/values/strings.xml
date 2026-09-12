@@ -161,6 +161,8 @@
     <string name="settings_panel_calendar">Calendar</string>
     <string name="settings_week_numbers">Week numbers</string>
     <string name="settings_week_numbers_subtitle">Show ISO week labels in Month and Week</string>
+    <string name="settings_daily_date_icon">Daily date icon</string>
+    <string name="settings_daily_date_icon_subtitle">Show today\'s date on the launcher icon. Turn off to keep a stable icon position.</string>
     <string name="settings_birthday_calendar">Birthday calendar</string>
     <string name="settings_birthday_calendar_subtitle">Import contacts\' birthdays</string>
     <string name="settings_global_holidays">Global Holidays</string>

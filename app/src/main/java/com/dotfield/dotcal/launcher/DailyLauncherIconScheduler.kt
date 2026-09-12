@@ -17,13 +17,8 @@ class DailyLauncherIconScheduler(context: Context) {
     private val alarmManager = requireNotNull(appContext.getSystemService(AlarmManager::class.java))
 
     fun scheduleNextRefresh(now: ZonedDateTime = ZonedDateTime.now()): Boolean {
+        val operation = dailyRefreshPendingIntent()
         val triggerAtMillis = nextLauncherIconRefreshAt(now).toInstant().toEpochMilli()
-        val operation = PendingIntent.getBroadcast(
-            appContext,
-            DAILY_ICON_REQUEST_CODE,
-            Intent(appContext, WidgetMaintenanceReceiver::class.java).setAction(ACTION_DAILY_ICON_REFRESH),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation)
             return false
@@ -31,4 +26,15 @@ class DailyLauncherIconScheduler(context: Context) {
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation)
         return true
     }
+
+    fun cancelNextRefresh() {
+        alarmManager.cancel(dailyRefreshPendingIntent())
+    }
+
+    private fun dailyRefreshPendingIntent(): PendingIntent = PendingIntent.getBroadcast(
+            appContext,
+            DAILY_ICON_REQUEST_CODE,
+            Intent(appContext, WidgetMaintenanceReceiver::class.java).setAction(ACTION_DAILY_ICON_REFRESH),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 }

@@ -7,10 +7,13 @@ import android.util.Log
 import com.dotfield.dotcal.launcher.ACTION_DAILY_ICON_REFRESH
 import com.dotfield.dotcal.launcher.DailyLauncherIconScheduler
 import com.dotfield.dotcal.launcher.DynamicLauncherIconManager
+import com.dotfield.dotcal.prefs.CalendarPreferences
+import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 internal enum class WidgetMaintenanceAction {
     CONFIGURATION,
@@ -39,8 +42,16 @@ class WidgetMaintenanceReceiver : BroadcastReceiver() {
                 val pendingResult = goAsync()
                 CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                     try {
-                        DailyLauncherIconScheduler(context).scheduleNextRefresh()
-                        DynamicLauncherIconManager(context).updateIconForToday()
+                        val enabled = context.calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_DAILY_DATE_ICON_ENABLED] ?: true
+                        val scheduler = DailyLauncherIconScheduler(context)
+                        val iconManager = DynamicLauncherIconManager(context)
+                        if (enabled) {
+                            scheduler.scheduleNextRefresh()
+                            iconManager.updateIconForToday()
+                        } else {
+                            scheduler.cancelNextRefresh()
+                            iconManager.updateIconForFixedDay()
+                        }
                         if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
                             WidgetUpdateWorker.enqueueConfigurationRefresh(context)
                         } else {

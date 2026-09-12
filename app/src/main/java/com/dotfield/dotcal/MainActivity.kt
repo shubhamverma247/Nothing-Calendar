@@ -169,7 +169,12 @@ class MainActivity : ComponentActivity() {
         systemDarkState.value = applicationContext.resources.configuration.isNightMode()
         launcherIconRefreshJob?.cancel()
         launcherIconRefreshJob = lifecycleScope.launch(Dispatchers.IO) {
-            DynamicLauncherIconManager(this@MainActivity).updateIconForToday()
+            val enabled = applicationContext.calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_DAILY_DATE_ICON_ENABLED] ?: true
+            if (enabled) {
+                DynamicLauncherIconManager(this@MainActivity).updateIconForToday()
+            } else {
+                DynamicLauncherIconManager(this@MainActivity).updateIconForFixedDay()
+            }
         }
     }
 

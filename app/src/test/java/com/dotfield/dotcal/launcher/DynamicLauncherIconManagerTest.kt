@@ -55,4 +55,10 @@ class DynamicLauncherIconManagerTest {
         )
     }
 
+    @Test
+    fun selectsCurrentDayWhenDailyIconIsEnabledAndFixedDayWhenDisabled() {
+        assertEquals(17, launcherIconDayForPreference(enabled = true, currentDay = 17))
+        assertEquals(24, launcherIconDayForPreference(enabled = false, currentDay = 17))
+    }
+
 }

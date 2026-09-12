@@ -256,6 +256,8 @@ import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.AppLanguage
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import com.dotfield.dotcal.launcher.DailyLauncherIconScheduler
+import com.dotfield.dotcal.launcher.DynamicLauncherIconManager
 import com.dotfield.dotcal.review.ReviewUsageStore
 import com.dotfield.dotcal.BOOT_LANGUAGE_KEY
 import com.dotfield.dotcal.applyAppLanguage
@@ -757,6 +759,11 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_SHOW_WEEK_NUMBERS] ?: false
         }
     }.collectAsStateWithLifecycle(initialValue = false)
+    val dailyDateIconEnabled by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_DAILY_DATE_ICON_ENABLED] ?: true
+        }
+    }.collectAsStateWithLifecycle(initialValue = true)
     val yearHeatmapEnabled by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_YEAR_HEATMAP] ?: false
@@ -2111,6 +2118,7 @@ fun DotCalApp(
                 defaultCalendarTab = storedCalendarTab,
                 hiddenCalendarMenuActions = hiddenCalendarMenuActions,
                 showWeekNumbers = showWeekNumbers,
+                dailyDateIconEnabled = dailyDateIconEnabled,
                 defaultAllDayReminderTime = defaultAllDayReminderTime,
                 weekStartOption = weekStartOption,
                 widgetTransparent = widgetTransparent,
@@ -2290,6 +2298,22 @@ fun DotCalApp(
                     scope.launch {
                         context.calendarPreferencesDataStore.edit { preferences ->
                             preferences[CalendarPreferences.KEY_SHOW_WEEK_NUMBERS] = enabled
+                        }
+                    }
+                },
+                onDailyDateIconEnabledChange = { enabled ->
+                    scope.launch(Dispatchers.IO) {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_DAILY_DATE_ICON_ENABLED] = enabled
+                        }
+                        val iconManager = DynamicLauncherIconManager(context)
+                        val scheduler = DailyLauncherIconScheduler(context)
+                        if (enabled) {
+                            iconManager.updateIconForToday()
+                            scheduler.scheduleNextRefresh()
+                        } else {
+                            iconManager.updateIconForFixedDay()
+                            scheduler.cancelNextRefresh()
                         }
                     }
                 },

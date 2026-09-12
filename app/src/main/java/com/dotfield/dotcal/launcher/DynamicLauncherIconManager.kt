@@ -23,6 +23,9 @@ internal fun launcherAliasClassNames(): List<String> = (FIRST_DAY..LAST_DAY).map
 
 internal fun localDayOfMonth(date: LocalDate): Int = date.dayOfMonth
 
+internal fun launcherIconDayForPreference(enabled: Boolean, currentDay: Int): Int =
+    if (enabled) currentDay else 24
+
 internal fun nextLauncherIconRefreshAt(now: ZonedDateTime): ZonedDateTime =
     now.toLocalDate().plusDays(1).atStartOfDay(now.zone)
 
@@ -34,6 +37,8 @@ class DynamicLauncherIconManager(context: Context) {
     fun updateIconForToday(today: LocalDate = LocalDate.now()): Boolean {
         return updateIconForDay(localDayOfMonth(today))
     }
+
+    fun updateIconForFixedDay(day: Int = 24): Boolean = updateIconForDay(day)
 
     private fun updateIconForDay(activeDay: Int): Boolean {
         val activeAlias = launcherAliasClassName(activeDay) ?: return false
