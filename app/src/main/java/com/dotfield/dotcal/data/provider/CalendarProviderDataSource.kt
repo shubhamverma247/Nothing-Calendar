@@ -21,6 +21,10 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.TimeZone
 
+internal fun providerCalendarSelection(): String {
+    return "${CalendarContract.Calendars.VISIBLE} != 0 OR ${CalendarContract.Calendars.SYNC_EVENTS} != 0"
+}
+
 class CalendarProviderDataSource(private val context: Context) {
     private val contentResolver: ContentResolver = context.contentResolver
 
@@ -38,7 +42,7 @@ class CalendarProviderDataSource(private val context: Context) {
             contentResolver.query(
                 CalendarContract.Calendars.CONTENT_URI,
                 CALENDAR_PROJECTION,
-                "${CalendarContract.Calendars.VISIBLE} != 0",
+                providerCalendarSelection(),
                 null,
                 "${CalendarContract.Calendars.CALENDAR_DISPLAY_NAME} ASC",
             )

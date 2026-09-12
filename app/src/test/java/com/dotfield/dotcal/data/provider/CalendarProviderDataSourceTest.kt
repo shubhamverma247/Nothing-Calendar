@@ -12,6 +12,14 @@ import java.time.ZoneOffset
 
 class CalendarProviderDataSourceTest {
     @Test
+    fun providerCalendarSelectionIncludesHiddenSyncedCalendars() {
+        assertEquals(
+            "visible != 0 OR sync_events != 0",
+            providerCalendarSelection(),
+        )
+    }
+
+    @Test
     fun providerCalendarIdParsesProviderAccountIds() {
         assertEquals(42L, providerCalendarId(providerAccountId(42L)))
     }
