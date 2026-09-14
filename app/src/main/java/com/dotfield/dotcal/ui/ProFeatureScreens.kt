@@ -245,6 +245,8 @@ import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
+import com.dotfield.dotcal.data.shifts.shiftDurationMinutes
+import com.dotfield.dotcal.data.shifts.shiftEndMinuteOfDay
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.CalendarPreferences
@@ -2798,10 +2800,13 @@ private fun ShiftTypeEditorDialog(
 ) {
     var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
     var isOff by remember(existing?.id) { mutableStateOf(existing?.generatesEvent == false) }
-    var startHour by remember(existing?.id) { mutableStateOf(((existing?.startMinuteOfDay ?: 7 * 60) / 60).toString()) }
-    var durationHours by remember(existing?.id) { mutableStateOf(((existing?.durationMinutes ?: 12 * 60) / 60).coerceAtLeast(1).toString()) }
+    var startMinute by remember(existing?.id) { mutableStateOf(existing?.startMinuteOfDay ?: 7 * 60) }
+    var endMinute by remember(existing?.id) {
+        mutableStateOf(shiftEndMinuteOfDay(existing?.startMinuteOfDay ?: 7 * 60, existing?.durationMinutes ?: 12 * 60))
+    }
     var color by remember(existing?.id) { mutableStateOf(existing?.colorHex ?: NOTHING_RED_HEX) }
     var showColorPicker by remember { mutableStateOf(false) }
+    var pickingTime by remember { mutableStateOf<ShiftTimeField?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
@@ -2811,8 +2816,8 @@ private fun ShiftTypeEditorDialog(
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.shift_field_name)) }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
                 SettingsToggleRow(title = stringResource(R.string.shift_off_day), checked = isOff, palette = palette, onCheckedChange = { isOff = it })
                 if (!isOff) {
-                    OutlinedTextField(value = startHour, onValueChange = { startHour = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.shift_field_start_hour)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
-                    OutlinedTextField(value = durationHours, onValueChange = { durationHours = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.shift_field_duration_hours)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                    ShiftTimeRow(title = stringResource(R.string.event_starts), minuteOfDay = startMinute, palette = palette, onClick = { pickingTime = ShiftTimeField.Start })
+                    ShiftTimeRow(title = stringResource(R.string.event_ends), minuteOfDay = endMinute, palette = palette, onClick = { pickingTime = ShiftTimeField.End })
                     ShiftColorRow(colorHex = color, palette = palette, onClick = { showColorPicker = true })
                 }
             }
@@ -2821,15 +2826,13 @@ private fun ShiftTypeEditorDialog(
             TextButton(
                 enabled = name.isNotBlank(),
                 onClick = {
-                    val hour = startHour.toIntOrNull()?.coerceIn(0, 23) ?: 7
-                    val duration = durationHours.toIntOrNull()?.coerceIn(1, 24) ?: 12
                     onSave(
                         ShiftType(
                             id = existing?.id ?: ShiftType.newId(),
                             name = name.trim(),
                             colorHex = color.takeIf { it.matches(Regex("#[0-9A-Fa-f]{6}")) } ?: NOTHING_RED_HEX,
-                            startMinuteOfDay = if (isOff) null else hour * 60,
-                            durationMinutes = if (isOff) null else duration * 60,
+                            startMinuteOfDay = if (isOff) null else startMinute,
+                            durationMinutes = if (isOff) null else shiftDurationMinutes(startMinute, endMinute),
                             isAllDay = false,
                             reminderMinutes = null,
                             createdAtMs = existing?.createdAtMs ?: System.currentTimeMillis(),
@@ -2852,7 +2855,169 @@ private fun ShiftTypeEditorDialog(
             },
         )
     }
+    pickingTime?.let { field ->
+        ShiftTimeChoiceSheet(
+            title = stringResource(if (field == ShiftTimeField.Start) R.string.event_starts else R.string.event_ends),
+            selected = shiftLocalTime(if (field == ShiftTimeField.Start) startMinute else endMinute),
+            palette = palette,
+            onDismiss = { pickingTime = null },
+            onSelected = { time ->
+                val selectedMinute = time.hour * 60 + time.minute
+                if (field == ShiftTimeField.Start) {
+                    startMinute = selectedMinute
+                } else {
+                    endMinute = selectedMinute
+                }
+                pickingTime = null
+            },
+        )
+    }
 }
+
+private enum class ShiftTimeField {
+    Start,
+    End,
+}
+
+@Composable
+private fun ShiftTimeRow(
+    title: String,
+    minuteOfDay: Int,
+    palette: DotCalPalette,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .border(1.dp, palette.textFieldBorder, RoundedCornerShape(10.dp))
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+            Spacer(Modifier.height(2.dp))
+            Text(shiftLocalTime(minuteOfDay).format(editorTimeFormatter), color = palette.primaryText, fontFamily = mono, fontSize = 15.sp)
+        }
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(20.dp))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ShiftTimeChoiceSheet(
+    title: String,
+    selected: LocalTime,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (LocalTime) -> Unit,
+) {
+    val hours = remember { (1..12).toList() }
+    val minutes = remember { (0..59).toList() }
+    val periods = remember { listOf(false, true) }
+    var pickedHour by remember(selected) { mutableStateOf(selected.toHour12()) }
+    var pickedMinute by remember(selected) { mutableStateOf(selected.minute) }
+    var pickedPm by remember(selected) { mutableStateOf(selected.hour >= 12) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = palette.dialogSurface,
+        contentColor = palette.primaryText,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDragHandle(palette) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(palette.dialogSurface)
+                .padding(horizontal = 20.dp)
+                .padding(top = 4.dp, bottom = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(title, color = palette.primaryText, fontFamily = LocalHeadingFont.current, fontSize = 20.sp)
+            Text(
+                LocalTime.of(hour24From(pickedHour, pickedPm), pickedMinute).format(editorTimeFormatter),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 15.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().height(188.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WheelColumn(
+                    items = hours,
+                    selected = pickedHour,
+                    label = { it.toString() },
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    circular = true,
+                    onSelected = { pickedHour = it },
+                )
+                WheelColumn(
+                    items = minutes,
+                    selected = pickedMinute,
+                    label = { it.toString().padStart(2, '0') },
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    circular = true,
+                    onSelected = { pickedMinute = it },
+                )
+                WheelColumn(
+                    items = periods,
+                    selected = pickedPm,
+                    label = { isPm -> periodLabel(isPm) },
+                    palette = palette,
+                    modifier = Modifier.weight(1f),
+                    onSelected = { pickedPm = it },
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    border = secondaryActionBorder(palette),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = secondaryActionContainer(palette),
+                        contentColor = secondaryActionContent(palette),
+                    ),
+                    shape = RoundedCornerShape(18.dp),
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(stringResource(R.string.action_cancel), fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Button(
+                    onClick = { onSelected(LocalTime.of(hour24From(pickedHour, pickedPm), pickedMinute)) },
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = palette.onAccent),
+                    shape = RoundedCornerShape(18.dp),
+                ) {
+                    Text(stringResource(R.string.action_ok), fontFamily = mono, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+private fun shiftLocalTime(minuteOfDay: Int): LocalTime {
+    val normalized = Math.floorMod(minuteOfDay, 24 * 60)
+    return LocalTime.of(normalized / 60, normalized % 60)
+}
+
+private fun hour24From(hour12: Int, isPm: Boolean): Int =
+    (hour12 % 12) + if (isPm) 12 else 0
+
+private fun periodLabel(isPm: Boolean): String =
+    (if (isPm) LocalTime.NOON else LocalTime.MIDNIGHT).format(localizedFormatter("a"))
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -3219,9 +3384,11 @@ private fun ShiftChip(label: String, palette: DotCalPalette, selected: Boolean =
 private fun shiftTypeSummary(type: ShiftType): String {
     if (!type.generatesEvent) return stringResource(R.string.shift_summary_off)
     val allDay = stringResource(R.string.shift_summary_all_day)
-    val start = minuteOfDayToLocalTimeOrNull(type.startMinuteOfDay)?.format(editorTimeFormatter) ?: allDay
-    val duration = type.durationMinutes?.let { formatDurationShort(it) } ?: allDay
-    return stringResource(R.string.shift_summary_range, start, duration)
+    val startMinute = type.startMinuteOfDay ?: return allDay
+    val duration = type.durationMinutes ?: return allDay
+    val start = minuteOfDayToLocalTimeOrNull(startMinute)?.format(editorTimeFormatter) ?: allDay
+    val end = shiftLocalTime(shiftEndMinuteOfDay(startMinute, duration)).format(editorTimeFormatter)
+    return stringResource(R.string.shift_summary_range, start, end)
 }
 
 @Composable

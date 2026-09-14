@@ -9,6 +9,8 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
+private const val MINUTES_PER_DAY = 24 * 60
+
 data class ShiftType(
     val id: String,
     val name: String,
@@ -43,6 +45,16 @@ data class GeneratedShiftOccurrence(
     val date: LocalDate,
     val shiftType: ShiftType,
 )
+
+fun shiftDurationMinutes(startMinuteOfDay: Int, endMinuteOfDay: Int): Int {
+    val start = Math.floorMod(startMinuteOfDay, MINUTES_PER_DAY)
+    val end = Math.floorMod(endMinuteOfDay, MINUTES_PER_DAY)
+    val duration = Math.floorMod(end - start, MINUTES_PER_DAY)
+    return if (duration == 0) MINUTES_PER_DAY else duration
+}
+
+fun shiftEndMinuteOfDay(startMinuteOfDay: Int, durationMinutes: Int): Int =
+    Math.floorMod(startMinuteOfDay + durationMinutes, MINUTES_PER_DAY)
 
 data class ShiftGenerationRecord(
     val id: String,

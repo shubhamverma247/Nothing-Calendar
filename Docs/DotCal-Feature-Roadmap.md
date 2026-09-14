@@ -1,7 +1,7 @@
 # DotCal — Complete Feature Upgrade and New Ideas List
 
-Prepared: 10 September 2026  
-Language: Hinglish  
+Prepared: 10 September 2026
+Language: Hinglish
 Status: Product proposals, not an implementation audit or approved delivery commitment.
 
 ## Scope and how to read this document
@@ -60,12 +60,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 01. Reminder Center
 
-**Type:** Upgrade: existing reminders aur snooze.  
+**Type:** Upgrade: existing reminders aur snooze.
 **What to add:** Saare pending aur snoozed reminders ek screen par, next alert time ke saath. Individual cancel, dismiss aur resnooze actions.
 
 **Example:** Maine aaj kaunse four reminders postpone kiye? List kholkar unka next alert dekh saku.
 
-**Free / Pro:** Basic list/actions Free; batch actions aur saved snooze presets Pro.  
+**Free / Pro:** Basic list/actions Free; batch actions aur saved snooze presets Pro.
 **Priority / effort:** P1 / Medium.
 
 **First version and boundaries:** Ek pending-reminders screen; app ke apne reminder records se shuru. Delivered notification aur completed task ko same status na samjhein.
@@ -74,12 +74,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 02. Automatic Calendar Sets
 
-**Type:** Upgrade: existing Calendar Sets.  
+**Type:** Upgrade: existing Calendar Sets.
 **What to add:** Work, Personal ya Family calendar sets ko user-defined schedule se switch karna; linked widget ko selected set follow karne ka option.
 
 **Example:** Monday–Friday 9 AM par Work set, 6 PM par Personal set.
 
-**Free / Pro:** Scheduled switching Pro; existing manual access preserve.  
+**Free / Pro:** Scheduled switching Pro; existing manual access preserve.
 **Priority / effort:** P2 / Medium.
 
 **First version and boundaries:** Time-based switching pehle. Location-based switching later, demand aur platform feasibility check ke baad.
@@ -88,12 +88,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 03. Saved Smart Views
 
-**Type:** Upgrade: existing calendar search.  
+**Type:** Upgrade: existing calendar search.
 **What to add:** Date range, calendar, event/task type aur supported fields ke filters save karke ek tap se reopen karna.
 
 **Example:** Next 30 days ke sirf client meetings ya incomplete work tasks.
 
-**Free / Pro:** Basic filters Free; saved combinations Pro.  
+**Free / Pro:** Basic filters Free; saved combinations Pro.
 **Priority / effort:** P1 / Medium.
 
 **First version and boundaries:** Supported existing fields se filters; naya tagging system assume na karein. Saved search aur calendar set ke roles clear rakhein.
@@ -102,12 +102,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 04. Contextual Quick Add
 
-**Type:** Upgrade: existing Quick Add, voice input aur templates.  
+**Type:** Upgrade: existing Quick Add, voice input aur templates.
 **What to add:** User type kare toh previous matching events se location, duration aur reminder settings ka reusable preview suggest ho.
 
 **Example:** Dentist type karne par last appointment ka address aur 45-minute duration suggest ho.
 
-**Free / Pro:** Recent suggestions Free; configurable reusable presets Pro.  
+**Free / Pro:** Recent suggestions Free; configurable reusable presets Pro.
 **Priority / effort:** P2 / Medium.
 
 **First version and boundaries:** Local event history se suggestions; user select kare tab fields fill hon. Existing template capabilities ka duplicate check karein.
@@ -116,12 +116,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 05. Evening Task Review
 
-**Type:** Upgrade: existing task planner.  
+**Type:** Upgrade: existing task planner.
 **What to add:** Unfinished tasks ko short review flow mein Tomorrow, Pick slot, Backlog ya Done karna; repeated postponements visible hon.
 
 **Example:** Aaj ke three pending tasks ko ek-ek karke decide karo.
 
-**Free / Pro:** Manual review Free; scheduling suggestions Pro via feature 06.  
+**Free / Pro:** Manual review Free; scheduling suggestions Pro via feature 06.
 **Priority / effort:** P1 / Medium.
 
 **First version and boundaries:** Manual review first. Recurring task ki current occurrence aur full series ko alag handle karein.
@@ -130,12 +130,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 06. Find Time for This
 
-**Type:** Upgrade: Dead Time Finder + tasks.  
+**Type:** Upgrade: Dead Time Finder + tasks.
 **What to add:** Task duration, deadline, preferred hours aur calendar conflicts ke basis par suitable slots suggest karna; har suggestion ka reason dikhana.
 
 **Example:** 45-minute proposal Friday se pehle finish karna hai; DotCal Tuesday 4 PM ya Thursday 2 PM offer kare.
 
-**Free / Pro:** Advanced matching Pro; existing Dead Time Finder access preserve.  
+**Free / Pro:** Advanced matching Pro; existing Dead Time Finder access preserve.
 **Priority / effort:** P1 / High.
 
 **First version and boundaries:** Single task, fixed duration, two or three suggestions, user-confirmed scheduling. First version ko local rules se scope karein.
@@ -144,12 +144,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 07. Repair My Day
 
-**Type:** Upgrade: rescheduling + feature 06.  
+**Type:** Upgrade: rescheduling + feature 06.
 **What to add:** Day change hone par user-designated flexible tasks ko new slots mein move karne ka proposal; preview aur Undo.
 
 **Example:** Meeting 30 minutes overrun hui; two flexible tasks ko later gaps mein adjust karne ka plan.
 
-**Free / Pro:** Pro.  
+**Free / Pro:** Pro.
 **Priority / effort:** P2 / High.
 
 **First version and boundaries:** Sirf flexible personal tasks. Fixed appointments, shared meetings aur locked items auto-move na hon. Feature 06 ke baad build karein.
@@ -158,12 +158,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 08. Linked Event Kits
 
-**Type:** Upgrade: existing calendar templates.  
+**Type:** Upgrade: existing calendar templates.
 **What to add:** Ek anchor event ke saath relative preparation/follow-up items create karna; anchor move hone par linked changes offer karna.
 
 **Example:** Client meeting + one day pehle preparation + next day follow-up.
 
-**Free / Pro:** Pro extension; existing templates access preserve.  
+**Free / Pro:** Pro extension; existing templates access preserve.
 **Priority / effort:** P1 / Medium–High.
 
 **First version and boundaries:** One anchor aur relative offsets. Preview affected items and change only selected supported records.
@@ -172,12 +172,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 09. Pencil-In Plan Comparison
 
-**Type:** Upgrade: existing Pencil-In Events.  
+**Type:** Upgrade: existing Pencil-In Events.
 **What to add:** Alternative dates ko ek plan ke under group karna, conflicts compare karna, decision deadline aur tentative busy/free treatment set karna.
 
 **Example:** Trip is weekend rakhu ya next weekend? Conflicts compare karke ek option confirm karo.
 
-**Free / Pro:** Grouped alternatives/comparison Pro; existing Pencil-In access preserve.  
+**Free / Pro:** Grouped alternatives/comparison Pro; existing Pencil-In access preserve.
 **Priority / effort:** P2 / High.
 
 **First version and boundaries:** Two alternatives, manual comparison, reminder to decide, selected alternative confirm. Real calendar par changes commit se pehle preview.
@@ -186,12 +186,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 10. Advanced Widget Profiles
 
-**Type:** Upgrade: existing configurable widgets.  
+**Type:** Upgrade: existing configurable widgets.
 **What to add:** Per-widget calendar filters, layout, density, supported actions aur saved appearance profiles.
 
 **Example:** Ek compact Work agenda widget aur ek Personal month widget; dono ke independent filters.
 
-**Free / Pro:** Advanced saved profiles Pro; basic readability and accessibility Free.  
+**Free / Pro:** Advanced saved profiles Pro; basic readability and accessibility Free.
 **Priority / effort:** P1 / Medium.
 
 **First version and boundaries:** Current widget options audit karke sirf missing profile/filter actions add karein. Feature 02 ke saath automatic switching later.
@@ -200,12 +200,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 11. Shift-aware Usable Time
 
-**Type:** Upgrade: shift patterns + Dead Time Finder + availability.  
+**Type:** Upgrade: shift patterns + Dead Time Finder + availability.
 **What to add:** User-defined rest, sleep, commute aur preparation windows ko slot suggestions aur shared availability mein respect karna.
 
 **Example:** Night shift 7 AM khatam; selected rest window ke andar appointment suggest na ho.
 
-**Free / Pro:** Basic availability boundaries Free; shift-linked rules Pro.  
+**Free / Pro:** Basic availability boundaries Free; shift-linked rules Pro.
 **Priority / effort:** P2 / High.
 
 **First version and boundaries:** Manual boundaries first; shift-relative offsets second. User override aur excluded slot ka reason visible rahe.
@@ -214,12 +214,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 12. Advanced Availability Rules
 
-**Type:** Upgrade: Availability Text Generator.  
+**Type:** Upgrade: Availability Text Generator.
 **What to add:** Meeting duration, before/after buffer, minimum notice, selected working hours, daily limit aur recipient timezone ke saath available slots generate karna.
 
 **Example:** Client ko next week ke 30-minute slots bhejo, har meeting ke beech 15-minute gap ke saath.
 
-**Free / Pro:** Pro extension; current sharing access preserve.  
+**Free / Pro:** Pro extension; current sharing access preserve.
 **Priority / effort:** P2 / Medium–High.
 
 **First version and boundaries:** Existing text output pe rules add karein. Live booking website ko first version mein include na karein; output snapshot hai.
@@ -228,12 +228,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 13. Timezone Comparison
 
-**Type:** Upgrade: existing Day/Week views.  
+**Type:** Upgrade: existing Day/Week views.
 **What to add:** Calendar ke saath additional timezone columns aur readable dual-time event display; shared text mein timezone explicit.
 
 **Example:** India mein 7:30 PM meeting New York mein kitne baje hai, same view mein dekho.
 
-**Free / Pro:** Basic event timezone clarity Free; multiple saved comparison zones Pro.  
+**Free / Pro:** Basic event timezone clarity Free; multiple saved comparison zones Pro.
 **Priority / effort:** P2 / Medium.
 
 **First version and boundaries:** Two zones first, daylight-saving-aware calculations. Floating-time and all-day event behavior define karein.
@@ -242,12 +242,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 14. Occupied-Time Heatmap
 
-**Type:** Upgrade: existing Year/Month views.  
+**Type:** Upgrade: existing Year/Month views.
 **What to add:** Busy days ko event count ke bajay selected calendar ke occupied duration se show karna.
 
 **Example:** Five short calls aur five long workshops alag intensity se appear hon.
 
-**Free / Pro:** Basic heatmap Free; custom periods/filters Pro.  
+**Free / Pro:** Basic heatmap Free; custom periods/filters Pro.
 **Priority / effort:** P2 / Medium.
 
 **First version and boundaries:** Overlapping intervals ko double-count na karein; all-day events ka treatment configurable ho. Ye capacity display hai, health score nahi.
@@ -256,12 +256,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 15. Conflict and Move-Impact Preview
 
-**Type:** Upgrade: event creation + drag/drop rescheduling.  
+**Type:** Upgrade: event creation + drag/drop rescheduling.
 **What to add:** Save karte waqt overlap warning; drag karte waqt affected events, buffers aur remaining gap ka preview.
 
 **Example:** Event 4 PM par move karne se lunch overlap hoga aur next appointment se pehle sirf 10 minutes bachenge.
 
-**Free / Pro:** Basic overlap warning Free; impact analysis/alternative suggestions Pro.  
+**Free / Pro:** Basic overlap warning Free; impact analysis/alternative suggestions Pro.
 **Priority / effort:** P1 / Medium–High.
 
 **First version and boundaries:** Overlap detection first. Linked buffers and alternative slot proposals features 06, 08, 23 ke baad.
@@ -270,12 +270,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 16. Routines That Follow Your Day
 
-**Type:** Upgrade: recurrence + shift planning.  
+**Type:** Upgrade: recurrence + shift planning.
 **What to add:** Routine ko fixed clock time ki jagah schedule-relative rule se plan karna.
 
 **Example:** Gym three times/week, shift finish hone ke 90 minutes baad, lekin 10 PM ke baad nahi.
 
-**Free / Pro:** Advanced flexible rules Pro; current recurrence access preserve.  
+**Free / Pro:** Advanced flexible rules Pro; current recurrence access preserve.
 **Priority / effort:** P3 / High.
 
 **First version and boundaries:** One supported anchor type and weekly target first. No suitable slot mile toh explain karein; routine silently drop na ho.
@@ -284,12 +284,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 17. Offline Common-Time QR
 
-**Type:** Upgrade: existing QR event sharing + availability.  
+**Type:** Upgrade: existing QR event sharing + availability.
 **What to add:** Selected date range ke free/busy slots ka QR share karna; receiver ke device par common slots calculate hon, titles/notes share kiye bina.
 
 **Example:** Friend scan kare aur dono ke Wednesday 6–7 PM free hone ka result mile.
 
-**Free / Pro:** Basic two-person comparison Free; longer ranges/advanced rules Pro.  
+**Free / Pro:** Basic two-person comparison Free; longer ranges/advanced rules Pro.
 **Priority / effort:** P2 / Medium–High.
 
 **First version and boundaries:** Two DotCal users, short date range, explicit timezone and generated-at time. Snapshot ko live reservation na present karein. Date granularity/QR payload limits validate karein.
@@ -298,12 +298,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 18. Screenshot-to-Events Import
 
-**Type:** New capability candidate; image attachment se different.  
+**Type:** New capability candidate; image attachment se different.
 **What to add:** Timetable, invitation ya shift roster image se structured event drafts extract karna, review karna aur selected entries import karna.
 
 **Example:** Exam timetable ki image se six exams ke editable drafts milen.
 
-**Free / Pro:** Limited trial Free; batch import Pro, recurring compute costs assess karke.  
+**Free / Pro:** Limited trial Free; batch import Pro, recurring compute costs assess karke.
 **Priority / effort:** P3 / High.
 
 **First version and boundaries:** One image, editable extraction, date/year/timezone confirmation, duplicates preview. Processing location aur supported formats clear hon.
@@ -312,12 +312,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 19. Schedule Change Detector
 
-**Type:** New capability candidate; feature 18 ka advanced extension.  
+**Type:** New capability candidate; feature 18 ka advanced extension.
 **What to add:** Updated timetable/roster ko original imported schedule se compare karke added, moved aur removed entries identify karna.
 
 **Example:** Tuesday shift 9 AM se 11 AM; Friday shift remove; Saturday new shift. Sirf approved changes apply hon.
 
-**Free / Pro:** Pro.  
+**Free / Pro:** Pro.
 **Priority / effort:** P3 — signature prototype / High.
 
 **First version and boundaries:** Feature 18 plus source-linked import identity required. One selected roster only; ambiguous matches highlight. Image mein missing row ko automatically cancelled na samjhein.
@@ -326,12 +326,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 20. Leave Optimizer
 
-**Type:** New planning capability using existing shifts/holidays.  
+**Type:** New planning capability using existing shifts/holidays.
 **What to add:** User ke leave allowance, workdays, shifts, selected holidays aur commitments se continuous-off options calculate karna.
 
 **Example:** Three leave days ke budget mein next two months ka longest practical break find karo.
 
-**Free / Pro:** Pro.  
+**Free / Pro:** Pro.
 **Priority / effort:** P2 / Medium–High.
 
 **First version and boundaries:** User-selected calendar range/work pattern. Show leave days consumed and continuous days off. Employer approval/eligibility infer na karein.
@@ -340,12 +340,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 21. Event Readiness
 
-**Type:** New workflow capability using existing notes/attachments.  
+**Type:** New workflow capability using existing notes/attachments.
 **What to add:** Event-linked preparation checklist, required files aur preparation reminders. Incomplete items event reminder ke saath visible hon.
 
 **Example:** Passport appointment kal hai: confirmation ready, photos ready, original documents collect karne hain.
 
-**Free / Pro:** Basic checklist Free; reusable readiness setups/reminder rules Pro.  
+**Free / Pro:** Basic checklist Free; reusable readiness setups/reminder rules Pro.
 **Priority / effort:** P1 / Medium.
 
 **First version and boundaries:** Manual checklist and attachment references. Feature 08 kit checklist ko reuse kar sakti hai; separate competing template system na banayein.
@@ -354,12 +354,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 22. Plan vs Actual
 
-**Type:** New capability candidate.  
+**Type:** New capability candidate.
 **What to add:** User Start/Finish record kare; planned duration preserve rahe aur actual duration separately save ho. Enough comparable samples par duration suggestions.
 
 **Example:** Four editing sessions 30 minutes plan hue, actual 50–60 lage; next time 55 minutes propose ho.
 
-**Free / Pro:** Manual recording Free; personal duration suggestions/history analysis Pro.  
+**Free / Pro:** Manual recording Free; personal duration suggestions/history analysis Pro.
 **Priority / effort:** P3 / Medium–High.
 
 **First version and boundaries:** Manual tracking first, passive surveillance nahi. Sparse data par prediction nahi. User edit/delete kar sake; fixed meetings ki booked times unchanged rahen.
@@ -368,12 +368,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 23. Travel and Preparation Blocks
 
-**Type:** New linked scheduling capability.  
+**Type:** New linked scheduling capability.
 **What to add:** Event se pehle/baad manual journey, preparation aur recovery blocks reserve karna; anchor move par linked update preview.
 
 **Example:** 3 PM appointment ke liye 30-minute journey aur 15-minute preparation block.
 
-**Free / Pro:** Manual buffer Free; linked reusable rules Pro.  
+**Free / Pro:** Manual buffer Free; linked reusable rules Pro.
 **Priority / effort:** P2 / Medium–High.
 
 **First version and boundaries:** Manual duration and offset first. Feature 08 ka linking model reuse karein. Live traffic integration later and separately scoped.
@@ -382,12 +382,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 24. Usable-Time Insights
 
-**Type:** New analysis capability; feature 14 se related, duplicate nahi.  
+**Type:** New analysis capability; feature 14 se related, duplicate nahi.
 **What to add:** Scheduled categories, continuous free time aur fragmentation ka understandable report; optionally actual data from feature 22 compare karna.
 
 **Example:** Four free hours hain, lekin longest uninterrupted gap sirf 25 minutes hai.
 
-**Free / Pro:** Basic weekly overview Free; trends and advanced filters Pro.  
+**Free / Pro:** Basic weekly overview Free; trends and advanced filters Pro.
 **Priority / effort:** P3 / Medium.
 
 **First version and boundaries:** Scheduled time ko actual work na label karein. Calendar categories first; event-title AI classification assume na karein. Heatmap visual summary; report actionable breakdown hai.
@@ -396,12 +396,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 25. Daily Briefing
 
-**Type:** Free daily-use addition candidate.  
+**Type:** Free daily-use addition candidate.
 **What to add:** First/next event, due or overdue tasks, today's scheduled commitments aur useful available gap ka concise overview.
 
 **Example:** Aaj first meeting 10 AM, two pending tasks aur 3 PM par 40-minute gap.
 
-**Free / Pro:** Free.  
+**Free / Pro:** Free.
 **Priority / effort:** P1 / Low–Medium.
 
 **First version and boundaries:** One simple in-app or widget card, optional scheduled delivery. Feature 06 ke task suggestions later; unrelated notifications add na karein.
@@ -410,12 +410,12 @@ Sources: [DotCal official listing](https://play.google.com/store/apps/details?id
 
 ### 26. Reminder Readiness Check
 
-**Type:** Free reliability addition candidate.  
+**Type:** Free reliability addition candidate.
 **What to add:** Test reminder aur required app/platform settings ki understandable status guidance.
 
 **Example:** Test reminder receive nahi hua; app relevant notification setting ka next action dikhaye.
 
-**Free / Pro:** Free.  
+**Free / Pro:** Free.
 **Priority / effort:** P1 / Medium.
 
 **First version and boundaries:** Supported permission/settings checks and explicit test. App har vendor restriction reliably detect kar sakti hai, ye promise na karein.
@@ -498,4 +498,3 @@ Maintain existing lifetime-Pro access and promises. Favor local rules and user-c
 Cloud AI, live traffic/weather, hosted booking, shared family/team collaboration and cross-device web infrastructure remain deferred directions. They were discussed as larger-cost possibilities, not approved additions. Optional future cloud services require a sustainable cost model and terms consistent with existing entitlements; no subscription change is proposed here.
 
 Avoid clutter by exposing advanced tools contextually: task details → Find Time; tentative plan → Compare; imported roster → Check Changes. Preserve a usable basic calendar.
-

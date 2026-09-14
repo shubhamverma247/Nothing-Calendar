@@ -97,6 +97,10 @@ Active resume document for `com.dotfield.dotcal`. Historical detail is preserved
 - Quick Add voice dictation preserves typed text; Quick Settings/launcher shortcuts reuse `dotcal://quick-add`.
 - Calendar/Week/Agenda share cards, directional Week/Day transitions, Play review gating, and reminder snooze cleanup are implemented locally.
 - Dynamic icon and crash-hardening changes remain local until explicitly approved for commit/push.
+- Deferred Phase 2 polish: add Settings -> Calendar Preferences -> Time format with
+  `System default`, `12-hour`, and `24-hour`. Do this as a separate broad consistency pass
+  because it must affect calendar rows, editors, reminders, widgets, notifications, share text,
+  and time pickers together.
 
 ## Authoritative active product roadmap
 
