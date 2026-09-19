@@ -23,6 +23,8 @@ import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
 import com.dotfield.dotcal.data.provider.ProviderMeetingMetadata
 import com.dotfield.dotcal.data.provider.decodeProviderMeetingMetadata
+import com.dotfield.dotcal.data.readiness.EventReadinessItem
+import com.dotfield.dotcal.data.readiness.EventReadinessStore
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.privacy.AppPrivacyManager
 import com.dotfield.dotcal.data.punchcard.PunchCardStreak
@@ -159,6 +161,7 @@ class DotCalRepository(
     private val focusProfileStore = FocusProfileStore(context)
     private val shiftPatternStore = ShiftPatternStore(context)
     private val sideStore = SharedSideStore(context)
+    private val eventReadinessStore = EventReadinessStore(sideStore)
     private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
     private val calendarProviderDataSource = CalendarProviderDataSource(context.applicationContext)
     private val holidayDataSource = HolidayDataSource(context.applicationContext)
@@ -233,6 +236,31 @@ class DotCalRepository(
             ?.let(::parseEventFileAttachments)
             .orEmpty()
     }
+
+    suspend fun readEventReadiness(eventId: String): List<EventReadinessItem> =
+        eventReadinessStore.read(eventId)
+
+    suspend fun countIncompleteEventReadinessItems(eventId: String): Int =
+        eventReadinessStore.read(eventId.substringBefore(RECURRENCE_OCCURRENCE_SEPARATOR))
+            .count { item -> !item.isCompleted }
+
+    suspend fun addEventReadinessItem(eventId: String, title: String): List<EventReadinessItem> =
+        eventReadinessStore.add(eventId, title)
+
+    suspend fun renameEventReadinessItem(
+        eventId: String,
+        itemId: String,
+        title: String,
+    ): List<EventReadinessItem> = eventReadinessStore.rename(eventId, itemId, title)
+
+    suspend fun setEventReadinessItemCompleted(
+        eventId: String,
+        itemId: String,
+        completed: Boolean,
+    ): List<EventReadinessItem> = eventReadinessStore.setCompleted(eventId, itemId, completed)
+
+    suspend fun removeEventReadinessItem(eventId: String, itemId: String): List<EventReadinessItem> =
+        eventReadinessStore.remove(eventId, itemId)
 
     suspend fun readProviderMeetingMetadata(eventId: String): ProviderMeetingMetadata? = withContext(Dispatchers.IO) {
         sideStore.read(EventSideStoreNamespaces.ProviderMeetingMetadata, eventId)
@@ -1104,6 +1132,7 @@ class DotCalRepository(
             ?: emptyList()
         val event = syncProviderBackedEvent(existingMaster ?: existing, draftEvent, reminderMinutes)
         if (event.id != eventId) {
+            eventReadinessStore.move(eventId, event.id)
             dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
             dao.deleteRemindersForEvent(eventId)
             dao.deleteEvent(eventId)
@@ -1659,6 +1688,7 @@ class DotCalRepository(
     suspend fun listRecentlyDeleted(): List<DeletedSnapshot> = withContext(Dispatchers.IO) {
         recentlyDeletedStore.pruneExpired(System.currentTimeMillis()).forEach { eventId ->
             deleteEventFileAttachments(eventId)
+            eventReadinessStore.clear(eventId)
         }
         recentlyDeletedStore.list(System.currentTimeMillis())
     }
@@ -1696,6 +1726,7 @@ class DotCalRepository(
     /** Permanently drop one snapshot from the trash. */
     suspend fun purgeDeleted(eventId: String) = withContext(Dispatchers.IO) {
         deleteEventFileAttachments(eventId)
+        eventReadinessStore.clear(eventId)
         recentlyDeletedStore.remove(eventId)
     }
 
@@ -1703,6 +1734,7 @@ class DotCalRepository(
     suspend fun emptyRecentlyDeleted() = withContext(Dispatchers.IO) {
         recentlyDeletedStore.list(System.currentTimeMillis()).forEach { snapshot ->
             deleteEventFileAttachments(snapshot.event.id)
+            eventReadinessStore.clear(snapshot.event.id)
         }
         recentlyDeletedStore.clear()
     }

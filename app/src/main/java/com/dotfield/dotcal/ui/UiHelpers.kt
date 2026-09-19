@@ -30,6 +30,7 @@ import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import java.io.File
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -282,6 +283,35 @@ internal fun coerceEndAfterStart(start: LocalTime, end: LocalTime): LocalTime {
         start < LocalTime.of(23, 45) -> LocalTime.of(23, 45)
         else -> LocalTime.of(23, 59)
     }
+}
+
+internal data class EventEditorEnd(
+    val date: LocalDate,
+    val time: LocalTime,
+)
+
+internal fun adjustEventEndForStartChange(
+    previousStartDate: LocalDate,
+    previousStartTime: LocalTime,
+    previousEndDate: LocalDate,
+    previousEndTime: LocalTime,
+    newStartDate: LocalDate,
+    newStartTime: LocalTime,
+    defaultDurationMinutes: Int,
+    endManuallyEdited: Boolean,
+): EventEditorEnd {
+    val previousStart = previousStartDate.atTime(previousStartTime)
+    val previousEnd = previousEndDate.atTime(previousEndTime)
+    val newStart = newStartDate.atTime(newStartTime)
+    if (endManuallyEdited && previousEnd.isAfter(newStart)) {
+        return EventEditorEnd(previousEndDate, previousEndTime)
+    }
+
+    val duration = Duration.between(previousStart, previousEnd)
+        .takeIf { !it.isNegative && !it.isZero }
+        ?: Duration.ofMinutes(defaultDurationMinutes.coerceAtLeast(1).toLong())
+    val adjustedEnd = newStart.plus(duration)
+    return EventEditorEnd(adjustedEnd.toLocalDate(), adjustedEnd.toLocalTime())
 }
 
 @Composable

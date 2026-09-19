@@ -127,6 +127,28 @@ class ReminderNotificationActionsTest {
     }
 
     @Test
+    fun reminderContentIncludesIncompletePreparationSummary() {
+        assertEquals(
+            "Starts in 5 minutes - 2 preparation items remaining",
+            ReminderNotificationActions.contentText(
+                reminderText = "Starts in 5 minutes",
+                readinessText = "2 preparation items remaining",
+            ),
+        )
+    }
+
+    @Test
+    fun reminderContentStaysUnchangedWithoutIncompletePreparation() {
+        assertEquals(
+            "Starts in 5 minutes",
+            ReminderNotificationActions.contentText(
+                reminderText = "Starts in 5 minutes",
+                readinessText = null,
+            ),
+        )
+    }
+
+    @Test
     fun liveProgressCancellationCoversCurrentAndLegacyRequestCodes() {
         val alarmRequestCode = 1234
 

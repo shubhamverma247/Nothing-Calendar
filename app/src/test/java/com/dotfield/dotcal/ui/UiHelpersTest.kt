@@ -5,6 +5,7 @@ import com.dotfield.dotcal.data.CalendarAccount
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 
 class UiHelpersTest {
@@ -38,6 +39,60 @@ class UiHelpersTest {
 
         assertEquals(false, event.shouldShowGhostBorder())
         assertEquals(true, localGhost.shouldShowGhostBorder())
+    }
+
+    @Test
+    fun startChangePreservesCurrentEventDurationWhenEndWasNotManuallyEdited() {
+        val date = LocalDate.of(2026, 9, 20)
+
+        val adjusted = adjustEventEndForStartChange(
+            previousStartDate = date,
+            previousStartTime = LocalTime.of(9, 0),
+            previousEndDate = date,
+            previousEndTime = LocalTime.of(10, 30),
+            newStartDate = date,
+            newStartTime = LocalTime.of(11, 15),
+            defaultDurationMinutes = 60,
+            endManuallyEdited = false,
+        )
+
+        assertEquals(EventEditorEnd(date, LocalTime.of(12, 45)), adjusted)
+    }
+
+    @Test
+    fun startChangeCanCarryDurationAcrossMidnight() {
+        val date = LocalDate.of(2026, 9, 20)
+
+        val adjusted = adjustEventEndForStartChange(
+            previousStartDate = date,
+            previousStartTime = LocalTime.of(22, 30),
+            previousEndDate = date.plusDays(1),
+            previousEndTime = LocalTime.of(0, 30),
+            newStartDate = date,
+            newStartTime = LocalTime.of(23, 15),
+            defaultDurationMinutes = 60,
+            endManuallyEdited = false,
+        )
+
+        assertEquals(EventEditorEnd(date.plusDays(1), LocalTime.of(1, 15)), adjusted)
+    }
+
+    @Test
+    fun manuallyEditedEndStaysPutWhenStillAfterNewStart() {
+        val date = LocalDate.of(2026, 9, 20)
+
+        val adjusted = adjustEventEndForStartChange(
+            previousStartDate = date,
+            previousStartTime = LocalTime.of(9, 0),
+            previousEndDate = date,
+            previousEndTime = LocalTime.of(13, 0),
+            newStartDate = date,
+            newStartTime = LocalTime.of(11, 0),
+            defaultDurationMinutes = 60,
+            endManuallyEdited = true,
+        )
+
+        assertEquals(EventEditorEnd(date, LocalTime.of(13, 0)), adjusted)
     }
 
     private fun allDayEvent(startTimeMs: Long, endTimeMs: Long, timeZone: String, source: String) = CalendarEvent(

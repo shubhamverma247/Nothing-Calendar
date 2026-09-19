@@ -227,6 +227,7 @@ import com.dotfield.dotcal.data.provider.ProviderAttendee
 import com.dotfield.dotcal.data.provider.ProviderMeetingMetadata
 import com.dotfield.dotcal.data.provider.hasMeaningfulMeetingDetails
 import com.dotfield.dotcal.data.privacy.AppLockState
+import com.dotfield.dotcal.data.readiness.EventReadinessItem
 import com.dotfield.dotcal.data.recurrence.ByDay
 import com.dotfield.dotcal.data.recurrence.RecurrenceFreq
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
@@ -274,6 +275,7 @@ internal fun EventDetailScreen(
     isPrivate: Boolean,
     isCountdownPinned: Boolean,
     fileAttachments: List<EventFileAttachment> = emptyList(),
+    readinessItems: List<EventReadinessItem> = emptyList(),
     providerMeetingMetadata: ProviderMeetingMetadata? = null,
     onBack: () -> Unit,
     onEdit: () -> Unit,
@@ -287,12 +289,18 @@ internal fun EventDetailScreen(
     onMoveToPrivate: () -> Unit,
     onRestoreFromPrivate: () -> Unit,
     onOpenFileAttachment: (EventFileAttachment) -> Unit,
+    onAddReadinessItem: (String) -> Unit,
+    onRenameReadinessItem: (String, String) -> Unit,
+    onSetReadinessItemCompleted: (String, Boolean) -> Unit,
+    onRemoveReadinessItem: (String) -> Unit,
     onDelete: () -> Unit,
 ) {
     val isReadOnly = event.source == "BIRTHDAY" || event.source == "HOLIDAY"
     val imageUris = remember(event.imageUris) { parseJsonStringArray(event.imageUris) }
     var previewImageUri by remember { mutableStateOf<String?>(null) }
     var showActions by remember { mutableStateOf(false) }
+    var showReadinessEditor by remember(event.id) { mutableStateOf(false) }
+    var readinessEditorItem by remember(event.id) { mutableStateOf<EventReadinessItem?>(null) }
     Box(modifier = Modifier.fillMaxSize().background(palette.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
@@ -396,6 +404,45 @@ internal fun EventDetailScreen(
                                 color = palette.primaryText,
                                 fontSize = 16.sp,
                                 lineHeight = 23.sp,
+                            )
+                        }
+                    }
+                }
+                if (!isReadOnly || readinessItems.isNotEmpty()) {
+                    item {
+                        DetailDivider(palette)
+                        DetailSection(label = stringResource(R.string.event_section_preparation), palette = palette) {
+                            EventReadinessSummary(
+                                items = readinessItems,
+                                attachedFileCount = fileAttachments.size,
+                                palette = palette,
+                            )
+                        }
+                    }
+                    lazyItems(readinessItems, key = { item -> "readiness-${item.id}" }) { item ->
+                        EventReadinessRow(
+                            item = item,
+                            palette = palette,
+                            canEdit = !isReadOnly,
+                            showDivider = item != readinessItems.lastOrNull(),
+                            onEdit = {
+                                readinessEditorItem = item
+                                showReadinessEditor = true
+                            },
+                            onToggle = {
+                                onSetReadinessItemCompleted(item.id, !item.isCompleted)
+                            },
+                            onRemove = { onRemoveReadinessItem(item.id) },
+                        )
+                    }
+                    if (!isReadOnly) {
+                        item {
+                            EventReadinessAddAction(
+                                palette = palette,
+                                onClick = {
+                                    readinessEditorItem = null
+                                    showReadinessEditor = true
+                                },
                             )
                         }
                     }
@@ -562,6 +609,19 @@ internal fun EventDetailScreen(
                     palette = palette,
                 )
             }
+        }
+        if (showReadinessEditor) {
+            ReadinessItemEditorSheet(
+                item = readinessEditorItem,
+                palette = palette,
+                onDismiss = { showReadinessEditor = false },
+                onSave = { title ->
+                    readinessEditorItem?.let { item ->
+                        onRenameReadinessItem(item.id, title)
+                    } ?: onAddReadinessItem(title)
+                    showReadinessEditor = false
+                },
+            )
         }
     }
 }
@@ -1512,6 +1572,7 @@ internal fun EventEditorScreen(
     var endTime by remember(editorStateKey) {
         mutableStateOf(if (initialEndDate > editorDate) initialEnd else coerceEndAfterStart(initialStart, initialEnd))
     }
+    var endTimeManuallyEdited by remember(editorStateKey) { mutableStateOf(false) }
     var allDay by remember(editorStateKey) { mutableStateOf(event?.let { it.isAllDay == 1 } ?: draft?.isAllDay ?: seed?.isAllDay ?: tpl?.isAllDay ?: false) }
     val draftReminderMinutes = remember(editorStateKey) { draft?.reminderMinutesList?.distinct()?.sorted() }
     val initialReminderSelection = remember(editorStateKey, initialReminderMinutes, initialReminderMinutesList, draftReminderMinutes) {
@@ -2087,15 +2148,28 @@ internal fun EventEditorScreen(
             onSelected = { pickedDate, pickedTime ->
                 if (field == DateTimeField.Start) {
                     val deltaDays = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate).coerceAtLeast(0)
+                    val adjustedEnd = adjustEventEndForStartChange(
+                        previousStartDate = startDate,
+                        previousStartTime = startTime,
+                        previousEndDate = endDate,
+                        previousEndTime = endTime,
+                        newStartDate = pickedDate,
+                        newStartTime = pickedTime,
+                        defaultDurationMinutes = defaultEventDurationMinutes,
+                        endManuallyEdited = endTimeManuallyEdited,
+                    )
                     startDate = pickedDate
                     startTime = pickedTime
-                    endDate = pickedDate.plusDays(deltaDays)
-                    if (!allDay && !endDate.atTime(endTime).isAfter(startDate.atTime(startTime))) {
-                        endTime = coerceEndAfterStart(pickedTime, endTime)
+                    if (allDay) {
+                        endDate = pickedDate.plusDays(deltaDays)
+                    } else {
+                        endDate = adjustedEnd.date
+                        endTime = adjustedEnd.time
                     }
                 } else {
                     endDate = pickedDate
                     endTime = pickedTime
+                    endTimeManuallyEdited = true
                     if (!allDay && !endDate.atTime(endTime).isAfter(startDate.atTime(startTime))) {
                         endDate = startDate
                         endTime = coerceEndAfterStart(startTime, endTime)

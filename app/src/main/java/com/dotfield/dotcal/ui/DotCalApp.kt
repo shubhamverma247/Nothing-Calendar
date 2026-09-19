@@ -375,6 +375,7 @@ fun DotCalApp(
     val detailEvent by viewModel.detailEvent.collectAsStateWithLifecycle()
     val shiftEventMetadata by viewModel.shiftEventMetadata.collectAsStateWithLifecycle()
     val eventFileAttachments by viewModel.eventFileAttachments.collectAsStateWithLifecycle()
+    val eventReadiness by viewModel.eventReadiness.collectAsStateWithLifecycle()
     val providerMeetingMetadata by viewModel.providerMeetingMetadata.collectAsStateWithLifecycle()
     var screenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var previousScreenTab by remember { mutableStateOf(ScreenTab.Calendar) }
@@ -603,7 +604,10 @@ fun DotCalApp(
         }
     }
     LaunchedEffect(detailEvent?.baseEventId()) {
-        detailEvent?.baseEventId()?.let(viewModel::refreshEventFileAttachments)
+        detailEvent?.baseEventId()?.let { eventId ->
+            viewModel.refreshEventFileAttachments(eventId)
+            viewModel.refreshEventReadiness(eventId)
+        }
     }
     val themeMode by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
@@ -2643,6 +2647,7 @@ fun DotCalApp(
                     isPrivate = event.baseEventId() in privateVaultIds,
                     isCountdownPinned = event.baseEventId() in countdownPins,
                     fileAttachments = eventFileAttachments[event.baseEventId()].orEmpty(),
+                    readinessItems = eventReadiness[event.baseEventId()].orEmpty(),
                     providerMeetingMetadata = providerMeetingMetadata[event.baseEventId()],
                     onBack = viewModel::closeEventDetail,
                     onEdit = {
@@ -2731,6 +2736,34 @@ fun DotCalApp(
                     },
                     onOpenFileAttachment = { attachment ->
                         openEventFileAttachment(context, attachment, palette)
+                    },
+                    onAddReadinessItem = { title ->
+                        viewModel.addEventReadinessItem(event.baseEventId(), title) { result ->
+                            if (result.isFailure) {
+                                showDotCalToast(context, palette, R.string.event_readiness_update_error)
+                            }
+                        }
+                    },
+                    onRenameReadinessItem = { itemId, title ->
+                        viewModel.renameEventReadinessItem(event.baseEventId(), itemId, title) { result ->
+                            if (result.isFailure) {
+                                showDotCalToast(context, palette, R.string.event_readiness_update_error)
+                            }
+                        }
+                    },
+                    onSetReadinessItemCompleted = { itemId, completed ->
+                        viewModel.setEventReadinessItemCompleted(event.baseEventId(), itemId, completed) { result ->
+                            if (result.isFailure) {
+                                showDotCalToast(context, palette, R.string.event_readiness_update_error)
+                            }
+                        }
+                    },
+                    onRemoveReadinessItem = { itemId ->
+                        viewModel.removeEventReadinessItem(event.baseEventId(), itemId) { result ->
+                            if (result.isFailure) {
+                                showDotCalToast(context, palette, R.string.event_readiness_update_error)
+                            }
+                        }
                     },
                     onDelete = {
                         if (detailDeleteScope(event) != null) {

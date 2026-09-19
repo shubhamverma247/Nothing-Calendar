@@ -26,6 +26,12 @@ internal object ReminderNotificationActions {
 
     fun notificationId(alarmRequestCode: Int): Int = alarmRequestCode
 
+    fun contentText(reminderText: String, readinessText: String?): String {
+        return readinessText?.takeIf { it.isNotBlank() }
+            ?.let { "$reminderText - $it" }
+            ?: reminderText
+    }
+
     fun liveProgressRequestCodes(alarmRequestCode: Int): List<Int> {
         return listOf(
             alarmRequestCode,

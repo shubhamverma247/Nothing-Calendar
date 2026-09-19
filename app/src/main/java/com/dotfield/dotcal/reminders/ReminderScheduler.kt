@@ -101,7 +101,11 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         cancelRepeat(alarmRequestCode)
     }
 
-    fun showReminderNotification(event: CalendarEvent, reminder: EventReminder) {
+    fun showReminderNotification(
+        event: CalendarEvent,
+        reminder: EventReminder,
+        readinessRemaining: Int = 0,
+    ) {
         showReminderNotification(
             eventId = event.id,
             eventTitle = event.title,
@@ -109,6 +113,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
             alarmRequestCode = reminder.alarmRequestCode,
             isTask = event.isTask == 1,
             eventStartTimeMs = event.startTimeMs,
+            readinessRemaining = readinessRemaining,
         )
     }
 
@@ -122,6 +127,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         snoozedUntilMs: Long = 0L,
         progressOriginMs: Long = System.currentTimeMillis(),
         scheduleRepeatAlarm: Boolean = true,
+        readinessRemaining: Int = 0,
     ) {
         val settings = notificationSettings()
         ensureChannel(settings)
@@ -156,6 +162,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
                 snoozedUntilMs = snoozedUntilMs,
                 progressOriginMs = progressOriginMs,
                 targetTimeMs = targetTimeMs,
+                readinessRemaining = readinessRemaining,
             )
         } else {
             buildStandardNotification(
@@ -167,6 +174,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
                 isTask = isTask,
                 eventStartTimeMs = eventStartTimeMs,
                 snoozedUntilMs = snoozedUntilMs,
+                readinessRemaining = readinessRemaining,
             )
         }
         NotificationManagerCompat.from(appContext).notify(ReminderNotificationActions.notificationId(alarmRequestCode), notification)
@@ -184,6 +192,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
                 snoozedUntilMs = snoozedUntilMs,
                 targetTimeMs = targetTimeMs,
                 progressOriginMs = progressOriginMs,
+                readinessRemaining = readinessRemaining,
             )
         }
     }
@@ -197,11 +206,12 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         isTask: Boolean,
         eventStartTimeMs: Long,
         snoozedUntilMs: Long,
+        readinessRemaining: Int,
     ): Notification {
         val builder = NotificationCompat.Builder(appContext, settings.channelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(eventTitle)
-            .setContentText(reminderText(minutesBefore, snoozedUntilMs))
+            .setContentText(notificationContentText(minutesBefore, snoozedUntilMs, readinessRemaining))
             .setContentIntent(openReminderPendingIntent(eventId, isTask, alarmRequestCode))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -235,6 +245,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         snoozedUntilMs: Long,
         progressOriginMs: Long,
         targetTimeMs: Long,
+        readinessRemaining: Int,
     ): Notification {
         val progress = ReminderNotificationActions.progressPercent(
             originMs = progressOriginMs,
@@ -244,7 +255,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         val builder = Notification.Builder(appContext, settings.channelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(eventTitle)
-            .setContentText(reminderText(minutesBefore, snoozedUntilMs))
+            .setContentText(notificationContentText(minutesBefore, snoozedUntilMs, readinessRemaining))
             .setContentIntent(openReminderPendingIntent(eventId, isTask, alarmRequestCode))
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
@@ -313,6 +324,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         val eventStartTimeMs = intent.getLongExtra(ReminderReceiver.EXTRA_EVENT_START_TIME_MS, 0L)
         val snoozedUntilMs = intent.getLongExtra(ReminderReceiver.EXTRA_SNOOZED_UNTIL_MS, 0L)
         val progressOriginMs = intent.getLongExtra(EXTRA_PROGRESS_ORIGIN_MS, System.currentTimeMillis())
+        val readinessRemaining = intent.getIntExtra(EXTRA_READINESS_REMAINING, 0)
         showReminderNotification(
             eventId = eventId,
             eventTitle = eventTitle,
@@ -323,6 +335,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
             snoozedUntilMs = snoozedUntilMs,
             progressOriginMs = progressOriginMs,
             scheduleRepeatAlarm = false,
+            readinessRemaining = readinessRemaining,
         )
     }
 
@@ -342,6 +355,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         snoozedUntilMs: Long,
         targetTimeMs: Long,
         progressOriginMs: Long,
+        readinessRemaining: Int,
     ) {
         if (targetTimeMs <= System.currentTimeMillis()) return
         val nextUpdateAtMs = (System.currentTimeMillis() + LIVE_PROGRESS_INTERVAL_MS).coerceAtMost(targetTimeMs)
@@ -354,11 +368,15 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
             eventStartTimeMs = eventStartTimeMs,
             snoozedUntilMs = snoozedUntilMs,
         )
-        val intent = liveProgressIntent(payload, progressOriginMs)
+        val intent = liveProgressIntent(payload, progressOriginMs, readinessRemaining)
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextUpdateAtMs, intent)
     }
 
-    private fun liveProgressIntent(payload: ReminderAlarmPayload, progressOriginMs: Long): PendingIntent {
+    private fun liveProgressIntent(
+        payload: ReminderAlarmPayload,
+        progressOriginMs: Long,
+        readinessRemaining: Int = 0,
+    ): PendingIntent {
         val intent = Intent(appContext, ReminderReceiver::class.java).apply {
             action = ReminderReceiver.ACTION_UPDATE_LIVE_PROGRESS
             putExtra(ReminderReceiver.EXTRA_EVENT_ID, payload.eventId)
@@ -369,6 +387,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
             putExtra(ReminderReceiver.EXTRA_EVENT_START_TIME_MS, payload.eventStartTimeMs)
             if (payload.snoozedUntilMs > 0L) putExtra(ReminderReceiver.EXTRA_SNOOZED_UNTIL_MS, payload.snoozedUntilMs)
             putExtra(EXTRA_PROGRESS_ORIGIN_MS, progressOriginMs)
+            putExtra(EXTRA_READINESS_REMAINING, readinessRemaining)
         }
         return PendingIntent.getBroadcast(
             appContext,
@@ -566,6 +585,26 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         }
     }
 
+    private fun notificationContentText(
+        minutesBefore: Int,
+        snoozedUntilMs: Long,
+        readinessRemaining: Int,
+    ): String {
+        val readinessText = readinessRemaining
+            .takeIf { it > 0 }
+            ?.let { remaining ->
+                appContext.resources.getQuantityString(
+                    R.plurals.event_readiness_remaining,
+                    remaining,
+                    remaining,
+                )
+            }
+        return ReminderNotificationActions.contentText(
+            reminderText = reminderText(minutesBefore, snoozedUntilMs),
+            readinessText = readinessText,
+        )
+    }
+
     private fun reminderText(minutesBefore: Int, snoozedUntilMs: Long): String {
         if (snoozedUntilMs > 0L) {
             val formattedTime = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
@@ -584,6 +623,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
     companion object {
         private const val TAG = "ReminderScheduler"
         private const val EXTRA_PROGRESS_ORIGIN_MS = "extra_progress_origin_ms"
+        private const val EXTRA_READINESS_REMAINING = "extra_readiness_remaining"
         private const val LIVE_PROGRESS_INTERVAL_MS = 5_000L
         const val CHANNEL_ID = "dotcal_reminders"
         private fun completeTaskRequestCode(alarmRequestCode: Int): Int = alarmRequestCode xor 0x7C7C7C7C

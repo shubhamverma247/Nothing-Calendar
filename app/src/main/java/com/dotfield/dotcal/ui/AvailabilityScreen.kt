@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,10 +51,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dotfield.dotcal.R
+import com.dotfield.dotcal.data.scheduling.FindTimeForThisMatcher
 import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.temporal.TemporalAdjusters
 import kotlin.math.roundToInt
@@ -120,6 +126,8 @@ internal fun AvailabilityScreen(
     var pickingEnd by remember { mutableStateOf(false) }
     val formScrollState = rememberScrollState()
     val previewScrollState = rememberScrollState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var suggestionNow by remember { mutableStateOf(LocalDateTime.now()) }
 
     val request = remember(
         rangeStart,
@@ -141,7 +149,17 @@ internal fun AvailabilityScreen(
         )
     }
     LaunchedEffect(request, use24HourFormat) {
+        suggestionNow = LocalDateTime.now()
         onRefresh(request)
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                suggestionNow = LocalDateTime.now()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
@@ -296,7 +314,13 @@ internal fun AvailabilityScreen(
                     )
                 }
             }
-            val suggestedSlots = state.days.flatMap { it.freeSlots }.take(6)
+            val suggestedSlots = remember(state.days, minimumMinutes, suggestionNow) {
+                FindTimeForThisMatcher.find(
+                    days = state.days,
+                    durationMinutes = minimumMinutes.toLong(),
+                    now = suggestionNow,
+                ).map { it.slot }
+            }
             if (shouldRenderAvailabilitySuggestions(state.isLoading, state.error)) {
                 Column(
                     modifier = Modifier

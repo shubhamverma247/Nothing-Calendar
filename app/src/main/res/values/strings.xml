@@ -518,6 +518,21 @@
     <string name="event_section_images">IMAGES</string>
     <string name="event_section_voice_note">VOICE NOTE</string>
     <string name="event_section_files">FILES</string>
+    <string name="event_section_preparation">PREPARATION</string>
+    <string name="event_readiness_progress">%1$d of %2$d ready</string>
+    <string name="event_readiness_files">Files attached: %1$d</string>
+    <string name="event_readiness_empty">No preparation items</string>
+    <string name="event_readiness_add">Add item</string>
+    <string name="event_readiness_add_title">New preparation item</string>
+    <string name="event_readiness_edit_title">Edit preparation item</string>
+    <string name="event_readiness_item_hint">Preparation item</string>
+    <string name="event_readiness_mark_ready">Mark %1$s ready</string>
+    <string name="event_readiness_mark_not_ready">Mark %1$s not ready</string>
+    <string name="event_readiness_update_error">Couldn\'t update preparation checklist</string>
+    <plurals name="event_readiness_remaining">
+        <item quantity="one">%1$d preparation item remaining</item>
+        <item quantity="other">%1$d preparation items remaining</item>
+    </plurals>
     <string name="event_all_day">All-day</string>
     <string name="event_delete">Delete Event</string>
     <string name="event_options">Event Options</string>
