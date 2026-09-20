@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,7 +35,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,10 +53,16 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dotfield.dotcal.R
+import com.dotfield.dotcal.data.CalendarEvent
+import com.dotfield.dotcal.data.scheduling.FindTimeForThisMatcher
 import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.temporal.TemporalAdjusters
 import kotlin.math.roundToInt
@@ -102,6 +111,8 @@ internal fun AvailabilityScreen(
     onBack: () -> Unit,
     onRefresh: (FreeSlotRequest) -> Unit,
     onUseFreeSlot: (FreeSlot) -> Unit,
+    findTimeTarget: CalendarEvent? = null,
+    onApplyTargetSlot: (FreeSlot) -> Unit = {},
     onCopy: (String) -> Unit,
     onShare: (String) -> Unit,
 ) {
@@ -113,13 +124,20 @@ internal fun AvailabilityScreen(
         )
     }
     var workingHours by remember { mutableStateOf(9f..21f) }
-    var minimumMinutes by remember { mutableStateOf(30) }
+    var minimumMinutes by remember(findTimeTarget?.id) {
+        mutableStateOf(
+            findTimeTarget?.let(FindTimeForThisMatcher::durationMinutes)?.toInt() ?: 30,
+        )
+    }
     var blockAllDayEvents by remember { mutableStateOf(true) }
     var treatGhostsAsBusy by remember { mutableStateOf(true) }
     var pickingStart by remember { mutableStateOf(false) }
     var pickingEnd by remember { mutableStateOf(false) }
+    var pendingTargetSlot by remember(findTimeTarget?.id) { mutableStateOf<FreeSlot?>(null) }
     val formScrollState = rememberScrollState()
     val previewScrollState = rememberScrollState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var suggestionNow by remember { mutableStateOf(LocalDateTime.now()) }
 
     val request = remember(
         rangeStart,
@@ -141,7 +159,17 @@ internal fun AvailabilityScreen(
         )
     }
     LaunchedEffect(request, use24HourFormat) {
+        suggestionNow = LocalDateTime.now()
         onRefresh(request)
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                suggestionNow = LocalDateTime.now()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
@@ -153,7 +181,9 @@ internal fun AvailabilityScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = palette.primaryText)
             }
             Text(
-                stringResource(R.string.availability_title),
+                stringResource(
+                    if (findTimeTarget == null) R.string.availability_title else R.string.find_time_for_this_title,
+                ),
                 color = palette.primaryText,
                 fontFamily = LocalHeadingFont.current,
                 fontWeight = FontWeight.Bold,
@@ -190,7 +220,9 @@ internal fun AvailabilityScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            stringResource(R.string.availability_preview),
+                            stringResource(
+                                if (findTimeTarget == null) R.string.availability_preview else R.string.find_time_affected_item,
+                            ),
                             color = palette.secondaryText,
                             fontFamily = mono,
                             fontSize = 11.sp,
@@ -228,7 +260,13 @@ internal fun AvailabilityScreen(
                                 fontSize = 13.sp,
                             )
                             else -> Text(
-                                state.text,
+                                findTimeTarget?.let { target ->
+                                    stringResource(
+                                        R.string.find_time_target_summary,
+                                        target.title,
+                                        minimumMinutes,
+                                    )
+                                } ?: state.text,
                                 color = palette.primaryText,
                                 fontFamily = mono,
                                 fontSize = 13.sp,
@@ -296,7 +334,13 @@ internal fun AvailabilityScreen(
                     )
                 }
             }
-            val suggestedSlots = state.days.flatMap { it.freeSlots }.take(6)
+            val suggestedSlots = remember(state.days, minimumMinutes, suggestionNow) {
+                FindTimeForThisMatcher.find(
+                    days = state.days,
+                    durationMinutes = minimumMinutes.toLong(),
+                    now = suggestionNow,
+                ).map { it.slot }
+            }
             if (shouldRenderAvailabilitySuggestions(state.isLoading, state.error)) {
                 Column(
                     modifier = Modifier
@@ -323,7 +367,17 @@ internal fun AvailabilityScreen(
                         )
                     } else {
                         suggestedSlots.forEach { slot ->
-                            AvailabilitySlotRow(slot, palette, use24HourFormat, onUseFreeSlot)
+                            AvailabilitySlotRow(
+                                slot = slot,
+                                palette = palette,
+                                use24HourFormat = use24HourFormat,
+                                actionLabel = stringResource(
+                                    if (findTimeTarget == null) R.string.availability_use_slot else R.string.find_time_review,
+                                ),
+                                onUseSlot = { selected ->
+                                    if (findTimeTarget == null) onUseFreeSlot(selected) else pendingTargetSlot = selected
+                                },
+                            )
                         }
                     }
                 }
@@ -394,15 +448,17 @@ internal fun AvailabilityScreen(
                     },
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                listOf(15, 30, 45, 60).forEach { minutes ->
-                    AvailabilityChoiceChip(
-                        label = stringResource(R.string.availability_minutes_chip, minutes),
-                        selected = minimumMinutes == minutes,
-                        palette = palette,
-                        modifier = Modifier.weight(1f),
-                        onClick = { minimumMinutes = minutes },
-                    )
+            if (findTimeTarget == null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf(15, 30, 45, 60).forEach { minutes ->
+                        AvailabilityChoiceChip(
+                            label = stringResource(R.string.availability_minutes_chip, minutes),
+                            selected = minimumMinutes == minutes,
+                            palette = palette,
+                            modifier = Modifier.weight(1f),
+                            onClick = { minimumMinutes = minutes },
+                        )
+                    }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -436,7 +492,7 @@ internal fun AvailabilityScreen(
                 )
             }
         }
-        Row(
+        if (findTimeTarget == null) Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(palette.bottomNavSurface)
@@ -510,6 +566,43 @@ internal fun AvailabilityScreen(
             },
         )
     }
+    pendingTargetSlot?.let { slot ->
+        AlertDialog(
+            onDismissRequest = { pendingTargetSlot = null },
+            containerColor = palette.dialogSurface,
+            title = { Text(stringResource(R.string.find_time_confirm_title), color = palette.primaryText) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.find_time_confirm_body,
+                        findTimeTarget?.title.orEmpty(),
+                        localizedFormatter("EEE d MMM").format(slot.date),
+                        formatAvailabilityTime(slot.start, use24HourFormat),
+                        formatAvailabilityTime(slot.end, use24HourFormat),
+                    ),
+                    color = palette.secondaryText,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingTargetSlot = null
+                    onApplyTargetSlot(slot)
+                }) {
+                    Text(
+                        stringResource(
+                            if (findTimeTarget?.isTask == 1) R.string.find_time_create_block else R.string.find_time_move_event,
+                        ),
+                        color = palette.accent,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingTargetSlot = null }) {
+                    Text(stringResource(R.string.action_cancel), color = palette.secondaryText)
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -517,6 +610,7 @@ private fun AvailabilitySlotRow(
     slot: FreeSlot,
     palette: DotCalPalette,
     use24HourFormat: Boolean,
+    actionLabel: String,
     onUseSlot: (FreeSlot) -> Unit,
 ) {
     Row(
@@ -546,7 +640,7 @@ private fun AvailabilitySlotRow(
             )
         }
         Text(
-            stringResource(R.string.availability_use_slot),
+            actionLabel,
             color = palette.accent,
             fontFamily = mono,
             fontSize = 10.sp,

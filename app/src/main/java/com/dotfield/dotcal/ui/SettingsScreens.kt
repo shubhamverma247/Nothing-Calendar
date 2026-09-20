@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.ui
 
+import com.dotfield.dotcal.NOTHING_RED_HEX
 import android.Manifest
 import android.accounts.AccountManager
 import android.app.Activity
@@ -13,6 +14,7 @@ import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.media.RingtoneManager
 import com.dotfield.dotcal.reminders.ReminderNotificationActions
+import com.dotfield.dotcal.data.ReminderCenterItem
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -240,6 +242,9 @@ import com.dotfield.dotcal.prefs.AppLanguage
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.sync.CalendarSyncWorkScheduler
+import com.dotfield.dotcal.sync.SyncWidgetHealthSnapshot
+import com.dotfield.dotcal.sync.SyncWidgetHealthStatus
+import com.dotfield.dotcal.sync.syncWidgetHealth
 import com.dotfield.dotcal.widget.WidgetManagerActivity
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import java.time.DayOfWeek
@@ -262,8 +267,8 @@ import kotlinx.coroutines.withContext
 
 
 private const val DISCORD_INVITE_URL = "https://discord.gg/sTAKcAG8R"
-private const val FEATURES_GUIDE_URL = "https://dotcal-website.netlify.app/guide"
-private const val PRIVACY_POLICY_URL = "https://dotcal-website.netlify.app/privacy"
+private const val FEATURES_GUIDE_URL = "https://dotcal.net/guide"
+private const val PRIVACY_POLICY_URL = "https://dotcal.net/privacy"
 
 @Composable
 internal fun SettingsPreview(
@@ -283,8 +288,14 @@ internal fun SettingsPreview(
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
     isSyncing: Boolean,
+    isRefreshingWidgets: Boolean,
+    configuredWidgetCount: Int,
+    lastWidgetRefreshMs: Long?,
+    lastSyncError: String?,
+    lastWidgetRefreshError: String?,
     birthdayEnabled: Boolean,
     defaultReminderMinutes: Int?,
+    reminderCenterItems: List<ReminderCenterItem>,
     defaultEventDurationMinutes: Int,
     autoBufferBeforeMinutes: Int,
     autoBufferAfterMinutes: Int,
@@ -296,6 +307,7 @@ internal fun SettingsPreview(
     defaultCalendarTab: CalendarTab,
     hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
+    dailyDateIconEnabled: Boolean,
     defaultAllDayReminderTime: LocalTime,
     weekStartOption: WeekStartOption,
     widgetTransparent: Boolean,
@@ -307,10 +319,14 @@ internal fun SettingsPreview(
     accounts: List<CalendarAccount>,
     hasCalendarPermission: Boolean,
     onSyncNow: () -> Unit,
+    onRefreshWidgets: () -> Unit,
     onAccountVisibilityChange: (String, Boolean) -> Unit,
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
     onDefaultReminderSelected: (Int?) -> Unit,
+    onReminderCenterDismiss: (ReminderCenterItem) -> Unit,
+    onReminderCenterCancel: (ReminderCenterItem) -> Unit,
+    onReminderCenterSnooze: (ReminderCenterItem, Int) -> Unit,
     onDefaultEventDurationSelected: (Int) -> Unit,
     onAutoBufferBeforeSelected: (Int) -> Unit,
     onAutoBufferAfterSelected: (Int) -> Unit,
@@ -323,6 +339,7 @@ internal fun SettingsPreview(
     onCalendarMenuActionVisibleChange: (CalendarOverflowAction, Boolean) -> Unit,
     onResetCalendarMenuActions: () -> Unit,
     onShowWeekNumbersChange: (Boolean) -> Unit,
+    onDailyDateIconEnabledChange: (Boolean) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
     onWidgetTransparentChange: (Boolean) -> Unit,
@@ -362,8 +379,7 @@ internal fun SettingsPreview(
     BackHandler {
         when (screen) {
             SettingsScreen.Root -> onBack()
-            SettingsScreen.AddAccount -> onScreenChange(SettingsScreen.CalendarAccounts)
-            else -> onScreenChange(SettingsScreen.Root)
+            else -> onScreenChange(screen.parentScreen())
         }
     }
     Box(modifier = Modifier.fillMaxSize()) {
@@ -379,7 +395,7 @@ internal fun SettingsPreview(
             onThemeSettings = { onScreenChange(SettingsScreen.Theme) },
             onSyncSettings = { onScreenChange(SettingsScreen.Sync) },
             onCalendarPreferencesSettings = { onScreenChange(SettingsScreen.CalendarPreferences) },
-            onReminderDefaultsSettings = { onScreenChange(SettingsScreen.ReminderDefaults) },
+            onReminderCenter = { onScreenChange(SettingsScreen.ReminderCenter) },
             onWidgetSettings = { onScreenChange(SettingsScreen.Widgets) },
             onDataSettings = { onScreenChange(SettingsScreen.DataRestore) },
             syncEnabled = syncEnabled,
@@ -388,10 +404,12 @@ internal fun SettingsPreview(
             isSyncing = isSyncing,
             birthdayEnabled = birthdayEnabled,
             defaultReminderMinutes = defaultReminderMinutes,
+            reminderCenterItems = reminderCenterItems,
             defaultEventDurationMinutes = defaultEventDurationMinutes,
             defaultCalendarTab = defaultCalendarTab,
             hiddenCalendarMenuActions = hiddenCalendarMenuActions,
             showWeekNumbers = showWeekNumbers,
+            dailyDateIconEnabled = dailyDateIconEnabled,
             defaultAllDayReminderTime = defaultAllDayReminderTime,
             weekStartOption = weekStartOption,
             widgetTransparent = widgetTransparent,
@@ -410,6 +428,7 @@ internal fun SettingsPreview(
             onDefaultViewSelected = onDefaultViewSelected,
             onCalendarMenuSettings = { onScreenChange(SettingsScreen.CalendarMenu) },
             onShowWeekNumbersChange = onShowWeekNumbersChange,
+            onDailyDateIconEnabledChange = onDailyDateIconEnabledChange,
             onDefaultAllDayReminderTimeSelected = onDefaultAllDayReminderTimeSelected,
             onWeekStartSelected = onWeekStartSelected,
             onWidgetTransparentChange = onWidgetTransparentChange,
@@ -469,6 +488,7 @@ internal fun SettingsPreview(
                 defaultCalendarTab = defaultCalendarTab,
                 hiddenCalendarMenuActions = hiddenCalendarMenuActions,
                 showWeekNumbers = showWeekNumbers,
+                dailyDateIconEnabled = dailyDateIconEnabled,
                 birthdayEnabled = birthdayEnabled,
                 weekStartOption = weekStartOption,
                 holidayCountries = holidayCountries,
@@ -477,6 +497,7 @@ internal fun SettingsPreview(
                 onDefaultViewSelected = onDefaultViewSelected,
                 onCalendarMenuSettings = { onScreenChange(SettingsScreen.CalendarMenu) },
                 onShowWeekNumbersChange = onShowWeekNumbersChange,
+                onDailyDateIconEnabledChange = onDailyDateIconEnabledChange,
                 onBirthdayEnabledChange = onBirthdayEnabledChange,
                 onWeekStartSelected = onWeekStartSelected,
                 onGlobalHolidays = { onScreenChange(SettingsScreen.GlobalHolidays) },
@@ -494,6 +515,22 @@ internal fun SettingsPreview(
                 onBack = { onScreenChange(SettingsScreen.CalendarPreferences) },
                 onActionVisibleChange = onCalendarMenuActionVisibleChange,
                 onReset = onResetCalendarMenuActions,
+            )
+        }
+        AnimatedVisibility(
+            visible = screen == SettingsScreen.ReminderCenter,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+        ) {
+            ReminderCenterSettings(
+                reminderItems = reminderCenterItems,
+                palette = palette,
+                onBack = { onScreenChange(SettingsScreen.Root) },
+                onDefaults = { onScreenChange(SettingsScreen.ReminderDefaults) },
+                onDismiss = onReminderCenterDismiss,
+                onCancel = onReminderCenterCancel,
+                onSnooze = onReminderCenterSnooze,
             )
         }
         AnimatedVisibility(
@@ -515,7 +552,7 @@ internal fun SettingsPreview(
                 isPro = isPro,
                 defaultAllDayReminderTime = defaultAllDayReminderTime,
                 palette = palette,
-                onBack = { onScreenChange(SettingsScreen.Root) },
+                onBack = { onScreenChange(SettingsScreen.ReminderCenter) },
                 onDefaultReminderSelected = onDefaultReminderSelected,
                 onDefaultEventDurationSelected = onDefaultEventDurationSelected,
                 onAutoBufferBeforeSelected = onAutoBufferBeforeSelected,
@@ -573,11 +610,19 @@ internal fun SettingsPreview(
                 syncIntervalMins = syncIntervalMins,
                 syncMetadata = syncMetadata,
                 isSyncing = isSyncing,
+                isRefreshingWidgets = isRefreshingWidgets,
+                accounts = accounts,
+                configuredWidgetCount = configuredWidgetCount,
+                lastWidgetRefreshMs = lastWidgetRefreshMs,
+                lastSyncError = lastSyncError,
+                lastWidgetRefreshError = lastWidgetRefreshError,
+                hasCalendarPermission = hasCalendarPermission,
                 palette = palette,
                 onBack = { onScreenChange(SettingsScreen.Root) },
                 onSyncEnabledChange = onSyncEnabledChange,
                 onSyncIntervalSelected = onSyncIntervalSelected,
                 onSyncNow = onSyncNow,
+                onRefreshWidgets = onRefreshWidgets,
             )
         }
         AnimatedVisibility(
@@ -671,7 +716,7 @@ internal fun SettingsRoot(
     onThemeSettings: () -> Unit,
     onSyncSettings: () -> Unit,
     onCalendarPreferencesSettings: () -> Unit,
-    onReminderDefaultsSettings: () -> Unit,
+    onReminderCenter: () -> Unit,
     onWidgetSettings: () -> Unit,
     onDataSettings: () -> Unit,
     syncEnabled: Boolean,
@@ -680,10 +725,12 @@ internal fun SettingsRoot(
     isSyncing: Boolean,
     birthdayEnabled: Boolean,
     defaultReminderMinutes: Int?,
+    reminderCenterItems: List<ReminderCenterItem>,
     defaultEventDurationMinutes: Int,
     defaultCalendarTab: CalendarTab,
     hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
+    dailyDateIconEnabled: Boolean,
     defaultAllDayReminderTime: LocalTime,
     weekStartOption: WeekStartOption,
     widgetTransparent: Boolean,
@@ -702,6 +749,7 @@ internal fun SettingsRoot(
     onDefaultViewSelected: (CalendarTab) -> Unit,
     onCalendarMenuSettings: () -> Unit,
     onShowWeekNumbersChange: (Boolean) -> Unit,
+    onDailyDateIconEnabledChange: (Boolean) -> Unit,
     onDefaultAllDayReminderTimeSelected: (LocalTime) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
     onWidgetTransparentChange: (Boolean) -> Unit,
@@ -767,11 +815,11 @@ internal fun SettingsRoot(
                     )
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(
-                        title = stringResource(R.string.settings_reminder_defaults),
-                        value = reminderLabel(defaultReminderMinutes),
+                        title = stringResource(R.string.settings_reminders),
+                        value = stringResource(R.string.settings_reminders_subtitle),
                         icon = Icons.Default.Notifications,
                         palette = palette,
-                        onClick = onReminderDefaultsSettings,
+                        onClick = onReminderCenter,
                     )
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(
@@ -804,7 +852,7 @@ internal fun SettingsRoot(
                     )
                     SettingsContentDivider(palette)
                     SettingsIconMenuRow(
-                        title = stringResource(R.string.settings_sync),
+                        title = stringResource(R.string.settings_sync_health_title),
                         value = if (syncEnabled) {
                             syncIntervalLabel(syncIntervalMins)
                         } else {
@@ -884,6 +932,7 @@ private fun CalendarPreferencesSettings(
     defaultCalendarTab: CalendarTab,
     hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
+    dailyDateIconEnabled: Boolean,
     birthdayEnabled: Boolean,
     weekStartOption: WeekStartOption,
     holidayCountries: List<HolidayCountryUiItem>,
@@ -892,6 +941,7 @@ private fun CalendarPreferencesSettings(
     onDefaultViewSelected: (CalendarTab) -> Unit,
     onCalendarMenuSettings: () -> Unit,
     onShowWeekNumbersChange: (Boolean) -> Unit,
+    onDailyDateIconEnabledChange: (Boolean) -> Unit,
     onBirthdayEnabledChange: (Boolean) -> Unit,
     onWeekStartSelected: (WeekStartOption) -> Unit,
     onGlobalHolidays: () -> Unit,
@@ -934,6 +984,14 @@ private fun CalendarPreferencesSettings(
                 )
                 SettingsContentDivider(palette)
                 SettingsToggleRow(
+                    title = stringResource(R.string.settings_daily_date_icon),
+                    subtitle = stringResource(R.string.settings_daily_date_icon_subtitle),
+                    checked = dailyDateIconEnabled,
+                    palette = palette,
+                    onCheckedChange = onDailyDateIconEnabledChange,
+                )
+                SettingsContentDivider(palette)
+                SettingsToggleRow(
                     title = stringResource(R.string.settings_birthday_calendar),
                     subtitle = stringResource(R.string.settings_birthday_calendar_subtitle),
                     checked = birthdayEnabled,
@@ -949,6 +1007,161 @@ private fun CalendarPreferencesSettings(
                 )
             }
         }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ReminderCenterSettings(
+    reminderItems: List<ReminderCenterItem>,
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onDefaults: () -> Unit,
+    onDismiss: (ReminderCenterItem) -> Unit,
+    onCancel: (ReminderCenterItem) -> Unit,
+    onSnooze: (ReminderCenterItem, Int) -> Unit,
+) {
+    var selectedSnooze by remember { mutableStateOf<ReminderCenterItem?>(null) }
+    val listState = rememberLazyListState()
+    val showCompactHeader by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96 }
+    }
+    val context = LocalContext.current
+    Box(modifier = Modifier.fillMaxSize().background(palette.calendarSurface)) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(bottom = 120.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            item(key = "header") {
+                SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_reminders))
+            }
+            item(key = "defaults") {
+                SettingsPanel(title = stringResource(R.string.settings_panel_defaults), palette = palette) {
+                    SettingsActionRow(
+                        title = stringResource(R.string.settings_reminders_defaults_alerts),
+                        subtitle = stringResource(R.string.settings_reminders_defaults_summary),
+                        palette = palette,
+                        onClick = onDefaults,
+                    )
+                }
+            }
+            item(key = "pending") {
+                Column {
+                    SettingsSectionTitle(stringResource(R.string.settings_reminders_pending), palette)
+                    if (reminderItems.isEmpty()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text(stringResource(R.string.settings_reminder_center_empty), color = palette.primaryText, fontFamily = mono, fontSize = 16.sp)
+                            Text(
+                                stringResource(R.string.settings_reminders_empty_hint),
+                                color = palette.secondaryText,
+                                fontFamily = mono,
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    } else {
+                        ReminderPendingCard(
+                            item = reminderItems.first(),
+                            context = context,
+                            palette = palette,
+                            onSnooze = { selectedSnooze = reminderItems.first() },
+                            onDismiss = { onDismiss(reminderItems.first()) },
+                            onCancel = { onCancel(reminderItems.first()) },
+                        )
+                    }
+                }
+            }
+            if (reminderItems.size > 1) {
+                lazyItems(reminderItems.drop(1), key = { "reminder-${it.reminderId}" }) { item ->
+                    ReminderPendingCard(
+                        item = item,
+                        context = context,
+                        palette = palette,
+                        onSnooze = { selectedSnooze = item },
+                        onDismiss = { onDismiss(item) },
+                        onCancel = { onCancel(item) },
+                    )
+                }
+            }
+        }
+        if (showCompactHeader) {
+            SettingsCompactHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_reminders))
+        }
+    }
+    selectedSnooze?.let { item ->
+        val snoozeOptions = listOf(5, 15, 30, 60)
+        SettingsOptionSheet(
+            title = stringResource(R.string.settings_reminder_center_snooze),
+            options = snoozeOptions,
+            selected = -1,
+            palette = palette,
+            label = { minutes -> stringResource(R.string.settings_reminder_center_snooze_minutes, minutes) },
+            onDismiss = { selectedSnooze = null },
+            onSelected = { minutes ->
+                onSnooze(item, minutes)
+                selectedSnooze = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun ReminderPendingCard(
+    item: ReminderCenterItem,
+    context: Context,
+    palette: DotCalPalette,
+    onSnooze: () -> Unit,
+    onDismiss: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(26.dp))
+            .background(palette.cancelSurface)
+            .border(1.dp, palette.cancelBorder.copy(alpha = 0.72f), RoundedCornerShape(26.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Column {
+            Text(item.eventTitle, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = stringResource(
+                    R.string.settings_reminders_next_alert,
+                    android.text.format.DateFormat.getMediumDateFormat(context).format(java.util.Date(item.triggerAtMs)),
+                    android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(item.triggerAtMs)),
+                ),
+                color = palette.secondaryText,
+                fontFamily = mono,
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            ReminderInlineAction(stringResource(R.string.settings_reminder_center_snooze), palette, onSnooze)
+            ReminderInlineAction(stringResource(R.string.settings_reminder_center_dismiss), palette, onDismiss)
+            ReminderInlineAction(stringResource(R.string.settings_reminder_center_cancel), palette, onCancel)
+        }
+    }
+}
+
+@Composable
+private fun ReminderInlineAction(label: String, palette: DotCalPalette, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.heightIn(min = 48.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+    ) {
+        Text(label, color = palette.accent, fontFamily = mono, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -1230,22 +1443,85 @@ private fun SyncSettings(
     syncIntervalMins: Int,
     syncMetadata: List<SyncMetadata>,
     isSyncing: Boolean,
+    isRefreshingWidgets: Boolean,
+    accounts: List<CalendarAccount>,
+    configuredWidgetCount: Int,
+    lastWidgetRefreshMs: Long?,
+    lastSyncError: String?,
+    lastWidgetRefreshError: String?,
+    hasCalendarPermission: Boolean,
     palette: DotCalPalette,
     onBack: () -> Unit,
     onSyncEnabledChange: (Boolean) -> Unit,
     onSyncIntervalSelected: (Int) -> Unit,
     onSyncNow: () -> Unit,
+    onRefreshWidgets: () -> Unit,
 ) {
+    val selectedCalendarCount = selectedCalendarAccountCount(accounts)
+    var healthNowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    val listState = rememberLazyListState()
+    val showCompactHeader = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 96
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L)
+            healthNowMs = System.currentTimeMillis()
+        }
+    }
+    val health = syncWidgetHealth(
+        SyncWidgetHealthSnapshot(
+            syncEnabled = syncEnabled,
+            hasCalendarPermission = hasCalendarPermission,
+            lastSyncMs = syncMetadata.maxOfOrNull { it.lastSyncMs }?.takeIf { it > 0L },
+            syncErrorMessage = lastSyncError ?: syncMetadata.firstNotNullOfOrNull { it.errorMessage },
+            widgetCount = configuredWidgetCount,
+            lastWidgetRefreshMs = lastWidgetRefreshMs,
+            widgetErrorMessage = lastWidgetRefreshError,
+            nowMs = healthNowMs,
+        ),
+    )
+    val healthDetail = when {
+        health.status == SyncWidgetHealthStatus.ActionRequired -> stringResource(R.string.settings_sync_health_permission_detail)
+        lastSyncError != null -> stringResource(R.string.settings_sync_health_sync_failed_detail)
+        lastWidgetRefreshError != null -> stringResource(R.string.settings_sync_health_widget_failed_detail)
+        configuredWidgetCount > 0 && lastWidgetRefreshMs == null -> stringResource(R.string.settings_sync_health_widget_never_refreshed_detail)
+        else -> null
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
+        state = listState,
         contentPadding = PaddingValues(bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_sync))
+            SettingsLargeHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_sync_health_title))
         }
         item {
             SettingsPanel(title = stringResource(R.string.settings_panel_calendar_sync), palette = palette, framed = false) {
+                Text(
+                    text = when (health.status) {
+                        SyncWidgetHealthStatus.Healthy -> stringResource(R.string.settings_sync_health_healthy)
+                        SyncWidgetHealthStatus.NeedsAttention -> stringResource(R.string.settings_sync_health_attention)
+                        SyncWidgetHealthStatus.ActionRequired -> stringResource(R.string.settings_sync_health_action_required)
+                    },
+                    color = palette.primaryText,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                healthDetail?.let { detail ->
+                    Spacer(Modifier.height(6.dp))
+                    Text(detail, color = palette.secondaryText, fontSize = 14.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(
+                        R.string.settings_sync_health_summary,
+                        selectedCalendarCount,
+                        configuredWidgetCount,
+                    ),
+                    color = palette.secondaryText,
+                    fontSize = 14.sp,
+                )
+                Spacer(Modifier.height(14.dp))
                 SettingsToggleRow(
                     title = stringResource(R.string.settings_sync_enabled),
                     subtitle = stringResource(R.string.settings_sync_enabled_subtitle),
@@ -1266,8 +1542,19 @@ private fun SyncSettings(
                     palette = palette,
                     onClick = onSyncNow,
                 )
+                SettingsContentDivider(palette)
+                SettingsActionRow(
+                    title = stringResource(R.string.settings_sync_health_refresh_widgets),
+                    subtitle = stringResource(R.string.settings_sync_health_refresh_widgets_subtitle),
+                    palette = palette,
+                    isLoading = isRefreshingWidgets,
+                    onClick = onRefreshWidgets,
+                )
             }
         }
+    }
+    if (showCompactHeader) {
+        SettingsCompactHeader(palette = palette, onBack = onBack, title = stringResource(R.string.settings_sync_health_title))
     }
 }
 
@@ -2819,6 +3106,36 @@ private fun SettingsIconMenuRow(
 }
 
 @Composable
+private fun SettingsActionRow(
+    title: String,
+    subtitle: String,
+    palette: DotCalPalette,
+    isLoading: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 66.dp)
+            .noRippleClickable(enabled = !isLoading, onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(subtitle, color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        if (isLoading) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = palette.accent, strokeWidth = 2.dp)
+        } else {
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.secondaryText, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
 private fun SettingsIconCell(icon: ImageVector, palette: DotCalPalette, active: Boolean = false) {
     Box(
         modifier = Modifier
@@ -3956,7 +4273,7 @@ internal fun CustomAccentPickerDialog(
     val current = remember(hue, sat, value) {
         Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value)))
     }
-    val currentHex = remember(current) { AccentColor.normalizeHex("#%06X".format(0xFFFFFF and current.toArgb())) ?: "#FF3B30" }
+    val currentHex = remember(current) { AccentColor.normalizeHex("#%06X".format(0xFFFFFF and current.toArgb())) ?: NOTHING_RED_HEX }
     var hexField by remember { mutableStateOf(currentHex) }
     // Keep the hex text field in sync when the user drags the picker.
     LaunchedEffect(currentHex) { hexField = currentHex }

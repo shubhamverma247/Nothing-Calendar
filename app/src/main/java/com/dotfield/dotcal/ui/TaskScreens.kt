@@ -126,10 +126,12 @@ internal fun TaskDetailScreen(
     task: CalendarEvent,
     reminder: EventReminder?,
     palette: DotCalPalette,
+    isPro: Boolean,
     isPrivate: Boolean,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onTimeBlock: () -> Unit,
+    onFindTime: () -> Unit,
     onMoveToPrivate: () -> Unit,
     onRestoreFromPrivate: () -> Unit,
     onComplete: () -> Unit,
@@ -254,6 +256,7 @@ internal fun TaskDetailScreen(
         if (showActions) {
             val editLabel = stringResource(R.string.action_edit)
             val addToCalendarLabel = stringResource(R.string.task_add_to_calendar)
+            val findTimeLabel = stringResource(R.string.find_time_for_this)
             val vaultLabel = stringResource(
                 if (isPrivate) R.string.vault_restore_from else R.string.vault_move_to,
             )
@@ -266,6 +269,10 @@ internal fun TaskDetailScreen(
                     add(CompactActionItem(addToCalendarLabel) {
                         showActions = false
                         onTimeBlock()
+                    })
+                    add(CompactActionItem(findTimeLabel, isPro = !isPro) {
+                        showActions = false
+                        onFindTime()
                     })
                 }
                 add(CompactActionItem(vaultLabel) {

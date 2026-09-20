@@ -59,6 +59,11 @@ class ReminderReceiver : BroadcastReceiver() {
                     ACTION_UPDATE_LIVE_PROGRESS -> scheduler.updateLiveProgress(intent)
                     ACTION_SHOW_REMINDER -> {
                         if (showedFromPayload) {
+                            val readinessRemaining = if (fallbackIsTask) {
+                                0
+                            } else {
+                                runCatching { repository.countIncompleteEventReadinessItems(eventId) }.getOrDefault(0)
+                            }
                             scheduler.showReminderNotification(
                                 eventId = eventId,
                                 eventTitle = fallbackTitle,
@@ -67,6 +72,7 @@ class ReminderReceiver : BroadcastReceiver() {
                                 isTask = fallbackIsTask,
                                 eventStartTimeMs = eventStartTimeMs,
                                 snoozedUntilMs = snoozedUntilMs,
+                                readinessRemaining = readinessRemaining,
                             )
                             val reminder = repository.getReminderByRequestCode(alarmRequestCode)
                             val event = eventId?.let { repository.getEvent(it) }
@@ -88,6 +94,13 @@ class ReminderReceiver : BroadcastReceiver() {
                         val targetEventId = eventId ?: reminder?.eventId
                         val event = targetEventId?.let { repository.getEvent(it) }
                         if (event != null && reminder != null) {
+                            val readinessRemaining = if (event.isTask == 1) {
+                                0
+                            } else {
+                                runCatching {
+                                    repository.countIncompleteEventReadinessItems(event.baseEventId())
+                                }.getOrDefault(0)
+                            }
                             DotCalGlyphBridge.reminderExpired(
                                 context,
                                 reminderGlyphEventId(
@@ -96,7 +109,7 @@ class ReminderReceiver : BroadcastReceiver() {
                                     reminder.triggerAtMs + reminder.minutesBefore * 60_000L,
                                 ),
                             )
-                            scheduler.showReminderNotification(event, reminder)
+                            scheduler.showReminderNotification(event, reminder, readinessRemaining)
                             val rescheduled = repository.rescheduleRecurringReminder(reminder, event, reminder.triggerAtMs + reminder.minutesBefore * 60_000L)
                             if (!rescheduled) repository.markReminderDelivered(alarmRequestCode)
                             return@runCatching
@@ -115,6 +128,13 @@ class ReminderReceiver : BroadcastReceiver() {
                                 isTask = fallbackIsTask,
                                 eventStartTimeMs = event?.startTimeMs ?: 0L,
                                 snoozedUntilMs = snoozedUntilMs,
+                                readinessRemaining = if (fallbackIsTask) {
+                                    0
+                                } else {
+                                    runCatching {
+                                        repository.countIncompleteEventReadinessItems(targetEventId)
+                                    }.getOrDefault(0)
+                                },
                             )
                             if (reminder != null) repository.markReminderDelivered(alarmRequestCode)
                             return@runCatching

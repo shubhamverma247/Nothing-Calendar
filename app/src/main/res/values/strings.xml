@@ -133,6 +133,18 @@
     <string name="settings_calendar_accounts">Calendar Accounts</string>
     <string name="settings_calendar_preferences">Calendar Preferences</string>
     <string name="settings_reminder_defaults">Reminder Defaults</string>
+    <string name="settings_reminders">Reminders</string>
+    <string name="settings_reminders_subtitle">Upcoming alerts, sound &amp; defaults</string>
+    <string name="settings_reminders_defaults_alerts">Defaults &amp; alerts</string>
+    <string name="settings_reminders_defaults_summary">Timing, sound &amp; repeat alerts</string>
+    <string name="settings_reminders_pending">Pending reminders</string>
+    <string name="settings_reminders_empty_hint">Add a reminder to an event or task to see its next alert here.</string>
+    <string name="settings_reminders_next_alert">Next alert · %1$s · %2$s</string>
+    <string name="settings_reminder_center_empty">No pending reminders.</string>
+    <string name="settings_reminder_center_snooze">Snooze</string>
+    <string name="settings_reminder_center_dismiss">Dismiss</string>
+    <string name="settings_reminder_center_cancel">Cancel</string>
+    <string name="settings_reminder_center_snooze_minutes">%1$d minutes</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_widgets">Widgets</string>
     <string name="settings_widgets_value_transparent">Transparent</string>
@@ -161,6 +173,8 @@
     <string name="settings_panel_calendar">Calendar</string>
     <string name="settings_week_numbers">Week numbers</string>
     <string name="settings_week_numbers_subtitle">Show ISO week labels in Month and Week</string>
+    <string name="settings_daily_date_icon">Daily date icon</string>
+    <string name="settings_daily_date_icon_subtitle">Show today\'s date on the launcher icon. Turn off to keep a stable icon position.</string>
     <string name="settings_birthday_calendar">Birthday calendar</string>
     <string name="settings_birthday_calendar_subtitle">Import contacts\' birthdays</string>
     <string name="settings_global_holidays">Global Holidays</string>
@@ -237,6 +251,18 @@
     <string name="settings_sync_interval">Sync interval</string>
     <string name="settings_sync_now">Sync Now</string>
     <string name="settings_syncing">Syncing...</string>
+    <string name="settings_sync_health_title">Sync &amp; Widget Health</string>
+    <string name="settings_sync_health_healthy">Everything looks healthy</string>
+    <string name="settings_sync_health_attention">Needs attention</string>
+    <string name="settings_sync_health_action_required">Action required</string>
+    <string name="settings_sync_health_summary">%1$d calendars · %2$d configured widgets</string>
+    <string name="settings_sync_health_refresh_widgets">Refresh widgets</string>
+    <string name="settings_sync_health_refresh_widgets_subtitle">Update every configured widget now</string>
+    <string name="settings_sync_health_widgets_refreshed">Widgets refreshed</string>
+    <string name="settings_sync_health_permission_detail">Calendar permission is required for sync.</string>
+    <string name="settings_sync_health_sync_failed_detail">The last calendar sync failed. Try Sync Now.</string>
+    <string name="settings_sync_health_widget_failed_detail">The last widget refresh failed. Try Refresh widgets.</string>
+    <string name="settings_sync_health_widget_never_refreshed_detail">Widgets have not completed a refresh yet.</string>
     <string name="sync_interval_manual">Manual</string>
     <string name="sync_last_synced">Last synced %1$s</string>
     <string name="sync_never">never</string>
@@ -492,6 +518,21 @@
     <string name="event_section_images">IMAGES</string>
     <string name="event_section_voice_note">VOICE NOTE</string>
     <string name="event_section_files">FILES</string>
+    <string name="event_section_preparation">PREPARATION</string>
+    <string name="event_readiness_progress">%1$d of %2$d ready</string>
+    <string name="event_readiness_files">Files attached: %1$d</string>
+    <string name="event_readiness_empty">No preparation items</string>
+    <string name="event_readiness_add">Add item</string>
+    <string name="event_readiness_add_title">New preparation item</string>
+    <string name="event_readiness_edit_title">Edit preparation item</string>
+    <string name="event_readiness_item_hint">Preparation item</string>
+    <string name="event_readiness_mark_ready">Mark %1$s ready</string>
+    <string name="event_readiness_mark_not_ready">Mark %1$s not ready</string>
+    <string name="event_readiness_update_error">Couldn\'t update preparation checklist</string>
+    <plurals name="event_readiness_remaining">
+        <item quantity="one">%1$d preparation item remaining</item>
+        <item quantity="other">%1$d preparation items remaining</item>
+    </plurals>
     <string name="event_all_day">All-day</string>
     <string name="event_delete">Delete Event</string>
     <string name="event_options">Event Options</string>
@@ -737,6 +778,8 @@
     <string name="pro_feature_dead_time_desc">Find open blocks across the next seven days</string>
     <string name="pro_feature_share_availability">Share Availability</string>
     <string name="pro_feature_share_availability_desc">Turn free time into text you can paste anywhere</string>
+    <string name="pro_feature_find_time_for_this">Find Time for This</string>
+    <string name="pro_feature_find_time_for_this_desc">Review ranked slots for a task or local event before confirming</string>
     <string name="pro_feature_year_heatmap">Year Heatmap</string>
     <string name="pro_feature_year_heatmap_desc">See busy and open seasons across the whole year</string>
 
@@ -823,9 +866,9 @@
     <string name="insights_metric_busiest">Busiest</string>
     <string name="insights_metric_tasks">Tasks</string>
     <string name="insights_metric_none">None</string>
-    <string name="insights_section_weekday_load">WEEKDAY LOAD</string>
-    <string name="insights_section_calendars">CALENDARS</string>
-    <string name="insights_section_dead_time">DEAD TIME FINDER</string>
+    <string name="insights_section_weekday_load">Weekday Load</string>
+    <string name="insights_section_calendars">Calendars</string>
+    <string name="insights_section_dead_time">Dead Time Finder</string>
     <string name="insights_no_open_slots">No open slots of 1 hour or longer.</string>
     <string name="insights_no_timed_events">No scheduled timed events in this range.</string>
 
@@ -1198,6 +1241,19 @@
     <string name="availability_share_button">Share</string>
     <string name="availability_start_date">Start date</string>
     <string name="availability_end_date">End date</string>
+    <string name="find_time_for_this">Find Time for This</string>
+    <string name="find_time_for_this_title">Find Time for This</string>
+    <string name="find_time_affected_item">Affected item</string>
+    <string name="find_time_target_summary">%1$s\n%2$d minutes</string>
+    <string name="find_time_review">Review</string>
+    <string name="find_time_confirm_title">Confirm proposed time</string>
+    <string name="find_time_confirm_body">%1$s\n%2$s\n%3$s - %4$s</string>
+    <string name="find_time_create_block">Create event</string>
+    <string name="find_time_move_event">Move event</string>
+    <string name="find_time_moved">Event moved</string>
+    <string name="find_time_move_failed">Couldn\'t move event</string>
+    <string name="find_time_block_created">Calendar event created</string>
+    <string name="find_time_block_failed">Couldn\'t create calendar event</string>
 
     <!-- Share-as-QR / scan-QR screens. -->
     <string name="qr_share_title">Share as QR</string>

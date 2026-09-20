@@ -1,5 +1,7 @@
 package com.dotfield.dotcal.widget
 
+import com.dotfield.dotcal.NOTHING_RED_ARGB
+import com.dotfield.dotcal.NOTHING_RED_HEX
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Intent
@@ -87,7 +89,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
-internal val EditorAccent = Color(0xFFFF3B30)
+internal val EditorAccent = Color(NOTHING_RED_ARGB)
 
 /** Shared light/dark chrome palette for the widget config editor and manager screens. */
 internal data class EditorPalette(val isDark: Boolean) {
@@ -1001,7 +1003,7 @@ private fun WidgetConfigScreen(
 
     if (showColorPicker) {
         val initialColor = runCatching {
-            Color(android.graphics.Color.parseColor(config.appearance.accentColor?.takeIf { it.startsWith("#") } ?: "#FF3B30"))
+            Color(android.graphics.Color.parseColor(config.appearance.accentColor?.takeIf { it.startsWith("#") } ?: NOTHING_RED_HEX))
         }.getOrDefault(EditorAccent)
         com.dotfield.dotcal.ui.CustomAccentPickerDialog(
             initial = initialColor,

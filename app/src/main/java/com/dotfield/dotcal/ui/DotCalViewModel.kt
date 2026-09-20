@@ -11,6 +11,7 @@ import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventEditorData
 import com.dotfield.dotcal.data.EventReminder
+import com.dotfield.dotcal.data.ReminderCenterItem
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
@@ -21,6 +22,7 @@ import com.dotfield.dotcal.data.countdown.CountdownPinResult
 import com.dotfield.dotcal.data.provider.ProviderMeetingMetadata
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.profiles.FocusProfile
+import com.dotfield.dotcal.data.readiness.EventReadinessItem
 import com.dotfield.dotcal.data.scheduling.AvailabilityTextFormatter
 import com.dotfield.dotcal.data.scheduling.DayAvailability
 import com.dotfield.dotcal.data.scheduling.FreeSlot
@@ -179,6 +181,21 @@ class DotCalViewModel(
     val reminders: StateFlow<List<EventReminder>> = repository.observeReminders()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val reminderCenterItems: StateFlow<List<ReminderCenterItem>> = repository.observeReminderCenterItems()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun dismissReminder(item: ReminderCenterItem) {
+        viewModelScope.launch { repository.dismissReminder(item) }
+    }
+
+    fun cancelReminder(item: ReminderCenterItem) {
+        viewModelScope.launch { repository.cancelReminder(item) }
+    }
+
+    fun snoozeReminder(item: ReminderCenterItem, minutes: Int) {
+        viewModelScope.launch { repository.snoozeReminder(item, minutes) }
+    }
+
     private val _detailEvent = MutableStateFlow<CalendarEvent?>(null)
     val detailEvent: StateFlow<CalendarEvent?> = _detailEvent
     val shiftEventMetadata: StateFlow<Map<String, ShiftEventMetadata>> = combine(
@@ -191,6 +208,8 @@ class DotCalViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
     private val _eventFileAttachments = MutableStateFlow<Map<String, List<EventFileAttachment>>>(emptyMap())
     val eventFileAttachments: StateFlow<Map<String, List<EventFileAttachment>>> = _eventFileAttachments
+    private val _eventReadiness = MutableStateFlow<Map<String, List<EventReadinessItem>>>(emptyMap())
+    val eventReadiness: StateFlow<Map<String, List<EventReadinessItem>>> = _eventReadiness
     private val _providerMeetingMetadata = MutableStateFlow<Map<String, ProviderMeetingMetadata>>(emptyMap())
     val providerMeetingMetadata: StateFlow<Map<String, ProviderMeetingMetadata>> = _providerMeetingMetadata
 
@@ -240,9 +259,25 @@ class DotCalViewModel(
         viewModelScope.launch { repository.addLocalEvent(title = title, date = date, startTime = startTime) }
     }
 
+    fun createTimeBlock(task: CalendarEvent, slot: FreeSlot, onDone: (Result<Unit>) -> Unit) {
+        viewModelScope.launch {
+            onDone(
+                runCatching {
+                    repository.addLocalEvent(
+                        title = task.title,
+                        date = slot.date,
+                        startTime = slot.start,
+                        endTime = slot.end,
+                    )
+                },
+            )
+        }
+    }
+
     fun openEventDetail(event: CalendarEvent) {
         _detailEvent.value = event
         refreshProviderMeetingMetadata(event.baseEventId())
+        refreshEventReadiness(event.baseEventId())
     }
 
     fun dismissOnThisDay(date: LocalDate) {
@@ -268,6 +303,7 @@ class DotCalViewModel(
                 selectDate(event.startDate())
                 _detailEvent.value = event
                 refreshProviderMeetingMetadata(event.baseEventId())
+                refreshEventReadiness(event.baseEventId())
             }
             onComplete()
         }
@@ -282,6 +318,58 @@ class DotCalViewModel(
             _eventFileAttachments.value = _eventFileAttachments.value + (
                 eventId to repository.readEventFileAttachments(eventId)
             )
+        }
+    }
+
+    fun refreshEventReadiness(eventId: String) {
+        viewModelScope.launch {
+            _eventReadiness.value = _eventReadiness.value + (eventId to repository.readEventReadiness(eventId))
+        }
+    }
+
+    fun addEventReadinessItem(eventId: String, title: String, onDone: (Result<Unit>) -> Unit = {}) {
+        updateEventReadiness(eventId, onDone) { repository.addEventReadinessItem(eventId, title) }
+    }
+
+    fun renameEventReadinessItem(
+        eventId: String,
+        itemId: String,
+        title: String,
+        onDone: (Result<Unit>) -> Unit = {},
+    ) {
+        updateEventReadiness(eventId, onDone) {
+            repository.renameEventReadinessItem(eventId, itemId, title)
+        }
+    }
+
+    fun setEventReadinessItemCompleted(
+        eventId: String,
+        itemId: String,
+        completed: Boolean,
+        onDone: (Result<Unit>) -> Unit = {},
+    ) {
+        updateEventReadiness(eventId, onDone) {
+            repository.setEventReadinessItemCompleted(eventId, itemId, completed)
+        }
+    }
+
+    fun removeEventReadinessItem(eventId: String, itemId: String, onDone: (Result<Unit>) -> Unit = {}) {
+        updateEventReadiness(eventId, onDone) {
+            repository.removeEventReadinessItem(eventId, itemId)
+        }
+    }
+
+    private fun updateEventReadiness(
+        eventId: String,
+        onDone: (Result<Unit>) -> Unit,
+        action: suspend () -> List<EventReadinessItem>,
+    ) {
+        viewModelScope.launch {
+            val result = runCatching { action() }
+            result.getOrNull()?.let { items ->
+                _eventReadiness.value = _eventReadiness.value + (eventId to items)
+            }
+            onDone(result.map { Unit })
         }
     }
 
@@ -414,7 +502,10 @@ class DotCalViewModel(
             if (existing == null) {
                 _lastSelectedEventAccountId.value = data.accountId
             }
-            (savedEvent?.baseEventId() ?: existing?.baseEventId() ?: data.eventId)?.let { refreshEventFileAttachments(it) }
+            (savedEvent?.baseEventId() ?: existing?.baseEventId() ?: data.eventId)?.let { eventId ->
+                refreshEventFileAttachments(eventId)
+                refreshEventReadiness(eventId)
+            }
             onSaved(savedEvent?.id ?: savedEvent?.baseEventId())
         }
     }

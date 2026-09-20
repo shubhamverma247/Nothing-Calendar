@@ -22,6 +22,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.os.SystemClock
 import android.widget.Toast
+import android.util.Log
 import android.util.Size
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -250,11 +251,14 @@ import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
 import com.dotfield.dotcal.data.shifts.SHIFT_PLAN_QR_EVENT_LIMIT
+import com.dotfield.dotcal.data.scheduling.FindTimeForThisMatcher
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.AppLanguage
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
+import com.dotfield.dotcal.launcher.DailyLauncherIconScheduler
+import com.dotfield.dotcal.launcher.DynamicLauncherIconManager
 import com.dotfield.dotcal.review.ReviewUsageStore
 import com.dotfield.dotcal.BOOT_LANGUAGE_KEY
 import com.dotfield.dotcal.applyAppLanguage
@@ -290,6 +294,7 @@ private const val BOOT_THEME_KEY = "theme_mode"
 private const val BOOT_ACCENT_KEY = "accent_color"
 private const val BOOT_DEFAULT_VIEW_KEY = "default_view"
 private const val BULK_UNDO_SNACKBAR_MILLIS = 4_000L
+private const val ICS_IMPORT_TAG = "DotCalIcsImport"
 
 internal fun shareViewDate(
     activeCalendarTab: CalendarTab,
@@ -344,6 +349,7 @@ fun DotCalApp(
     initialSearch: Boolean = false,
     initialPaywall: Boolean = false,
     initialTasksTab: Boolean = false,
+    initialIcsUri: String? = null,
     initialRouteToken: Long? = null,
     systemDark: Boolean = false,
 ) {
@@ -365,10 +371,12 @@ fun DotCalApp(
     val conflictWarnings by viewModel.conflictWarnings.collectAsStateWithLifecycle()
     val holidayCountries by viewModel.holidayCountries.collectAsStateWithLifecycle()
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
+    val reminderCenterItems by viewModel.reminderCenterItems.collectAsStateWithLifecycle()
     val syncMetadata by viewModel.syncMetadata.collectAsStateWithLifecycle()
     val detailEvent by viewModel.detailEvent.collectAsStateWithLifecycle()
     val shiftEventMetadata by viewModel.shiftEventMetadata.collectAsStateWithLifecycle()
     val eventFileAttachments by viewModel.eventFileAttachments.collectAsStateWithLifecycle()
+    val eventReadiness by viewModel.eventReadiness.collectAsStateWithLifecycle()
     val providerMeetingMetadata by viewModel.providerMeetingMetadata.collectAsStateWithLifecycle()
     var screenTab by remember { mutableStateOf(ScreenTab.Calendar) }
     var previousScreenTab by remember { mutableStateOf(ScreenTab.Calendar) }
@@ -387,6 +395,7 @@ fun DotCalApp(
     var showDateCalculator by remember { mutableStateOf(false) }
     var showTimeInsights by remember { mutableStateOf(false) }
     var showAvailability by remember { mutableStateOf(false) }
+    var findTimeTarget by remember { mutableStateOf<CalendarEvent?>(null) }
     var availabilityInitialDate by remember { mutableStateOf(LocalDate.now()) }
     var availabilityInitialEndDate by remember { mutableStateOf(LocalDate.now().plusDays(2)) }
     var showQuickAdd by remember { mutableStateOf(false) }
@@ -444,11 +453,13 @@ fun DotCalApp(
                         initialSearch ||
                         initialCalendarDate != null ||
                         initialPaywall ||
-                        initialTasksTab
+                        initialTasksTab ||
+                        initialIcsUri != null
                     ),
         )
     }
     var isSyncing by remember { mutableStateOf(false) }
+    var isRefreshingWidgets by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val hasCameraHardware = remember(context) {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
@@ -595,7 +606,10 @@ fun DotCalApp(
         }
     }
     LaunchedEffect(detailEvent?.baseEventId()) {
-        detailEvent?.baseEventId()?.let(viewModel::refreshEventFileAttachments)
+        detailEvent?.baseEventId()?.let { eventId ->
+            viewModel.refreshEventFileAttachments(eventId)
+            viewModel.refreshEventReadiness(eventId)
+        }
     }
     val themeMode by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
@@ -637,6 +651,26 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_SYNC_INTERVAL_MINS] ?: CalendarSyncWorkScheduler.DEFAULT_SYNC_INTERVAL_MINS
         }
     }.collectAsStateWithLifecycle(initialValue = CalendarSyncWorkScheduler.DEFAULT_SYNC_INTERVAL_MINS)
+    val lastWidgetRefreshMs by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_LAST_WIDGET_REFRESH_MS]
+        }
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val lastSyncError by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_LAST_SYNC_ERROR]
+        }
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val lastWidgetRefreshError by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_LAST_WIDGET_REFRESH_ERROR]
+        }
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val configuredWidgetCount by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_WIDGET_CONFIGURED_ENTRIES]?.size ?: 0
+        }
+    }.collectAsStateWithLifecycle(initialValue = 0)
     val birthdayEnabled by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_BIRTHDAY_ENABLED] ?: false
@@ -732,6 +766,11 @@ fun DotCalApp(
             preferences[CalendarPreferences.KEY_SHOW_WEEK_NUMBERS] ?: false
         }
     }.collectAsStateWithLifecycle(initialValue = false)
+    val dailyDateIconEnabled by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_DAILY_DATE_ICON_ENABLED] ?: true
+        }
+    }.collectAsStateWithLifecycle(initialValue = true)
     val yearHeatmapEnabled by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_YEAR_HEATMAP] ?: false
@@ -892,6 +931,28 @@ fun DotCalApp(
             } else {
                 pendingIcsImport = PendingIcsImport(icsText, items)
             }
+        }
+    }
+
+    LaunchedEffect(initialRouteToken, initialIcsUri) {
+        if (initialRouteToken == null || handledRouteToken == initialRouteToken || initialIcsUri.isNullOrBlank()) return@LaunchedEffect
+        val readResult = withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.openInputStream(Uri.parse(initialIcsUri))
+                    ?.bufferedReader()
+                    ?.use { it.readText() }
+            }
+        }
+        val text = readResult.getOrNull()
+        handledRouteToken = initialRouteToken
+        routePending = false
+        if (text.isNullOrBlank()) {
+            readResult.exceptionOrNull()?.let { error ->
+                Log.w(ICS_IMPORT_TAG, "Unable to read external calendar document", error)
+            } ?: Log.w(ICS_IMPORT_TAG, "External calendar document was empty")
+            showDotCalToast(context, palette, R.string.toast_file_read_failed)
+        } else {
+            openIcsPreview(text, context.getString(R.string.toast_import_invalid_ics))
         }
     }
 
@@ -1137,6 +1198,25 @@ fun DotCalApp(
         )
         taskDetail = null
         openQuickAddResult(prefill)
+    }
+    fun openFindTimeFor(item: CalendarEvent) {
+        if (!isPro) {
+            showPaywall = true
+            return
+        }
+        val today = LocalDate.now()
+        val targetEnd = if (item.isTask == 1 && item.hasTaskDate() && !item.localDate().isBefore(today)) {
+            item.localDate()
+        } else {
+            today.plusDays(7)
+        }
+        taskDetail = null
+        viewModel.closeEventDetail()
+        findTimeTarget = item
+        availabilityInitialDate = today
+        availabilityInitialEndDate = targetEnd
+        viewModel.clearAvailability()
+        showAvailability = true
     }
     fun useTemplate(template: EventTemplate) {
         showTemplates = false
@@ -1501,7 +1581,7 @@ fun DotCalApp(
             taskDetail != null -> taskDetail = null
             detailEvent != null -> viewModel.closeEventDetail()
             screenTab == ScreenTab.Settings && settingsScreen != SettingsScreen.Root -> {
-                settingsScreen = SettingsScreen.Root
+                settingsScreen = settingsScreen.parentScreen()
             }
             screenTab == ScreenTab.Settings -> {
                 settingsScreen = SettingsScreen.Root
@@ -2046,8 +2126,14 @@ fun DotCalApp(
                 syncIntervalMins = syncIntervalMins,
                 syncMetadata = syncMetadata,
                 isSyncing = isSyncing,
+                isRefreshingWidgets = isRefreshingWidgets,
+                configuredWidgetCount = configuredWidgetCount,
+                lastWidgetRefreshMs = lastWidgetRefreshMs,
+                lastSyncError = lastSyncError,
+                lastWidgetRefreshError = lastWidgetRefreshError,
                 birthdayEnabled = birthdayEnabled,
                 defaultReminderMinutes = defaultReminderMinutes,
+                reminderCenterItems = reminderCenterItems,
                 defaultEventDurationMinutes = defaultEventDurationMinutes,
                 autoBufferBeforeMinutes = autoBufferBeforeMinutes,
                 autoBufferAfterMinutes = autoBufferAfterMinutes,
@@ -2059,6 +2145,7 @@ fun DotCalApp(
                 defaultCalendarTab = storedCalendarTab,
                 hiddenCalendarMenuActions = hiddenCalendarMenuActions,
                 showWeekNumbers = showWeekNumbers,
+                dailyDateIconEnabled = dailyDateIconEnabled,
                 defaultAllDayReminderTime = defaultAllDayReminderTime,
                 weekStartOption = weekStartOption,
                 widgetTransparent = widgetTransparent,
@@ -2070,6 +2157,27 @@ fun DotCalApp(
                 accounts = accounts,
                 hasCalendarPermission = hasCalendarPermission,
                 onSyncNow = { runSyncNow(showToast = true) },
+                onRefreshWidgets = {
+                    if (!isRefreshingWidgets) {
+                        isRefreshingWidgets = true
+                        scope.launch {
+                            val refreshStartedAt = SystemClock.elapsedRealtime()
+                            val refreshResult = runCatching { WidgetUpdateWorker.updateNow(context) }
+                            val elapsed = SystemClock.elapsedRealtime() - refreshStartedAt
+                            if (elapsed < 900L) delay(900L - elapsed)
+                            isRefreshingWidgets = false
+                            showDotCalToast(
+                                context,
+                                palette,
+                                if (refreshResult.isSuccess) {
+                                    R.string.settings_sync_health_widgets_refreshed
+                                } else {
+                                    R.string.settings_sync_health_widget_failed_detail
+                                },
+                            )
+                        }
+                    }
+                },
                 onAccountVisibilityChange = { accountId, visible ->
                     viewModel.setAccountVisible(accountId, visible)
                     runSyncNow(showToast = false)
@@ -2217,6 +2325,25 @@ fun DotCalApp(
                     scope.launch {
                         context.calendarPreferencesDataStore.edit { preferences ->
                             preferences[CalendarPreferences.KEY_SHOW_WEEK_NUMBERS] = enabled
+                        }
+                    }
+                },
+                onReminderCenterDismiss = viewModel::dismissReminder,
+                onReminderCenterCancel = viewModel::cancelReminder,
+                onReminderCenterSnooze = viewModel::snoozeReminder,
+                onDailyDateIconEnabledChange = { enabled ->
+                    scope.launch(Dispatchers.IO) {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_DAILY_DATE_ICON_ENABLED] = enabled
+                        }
+                        val iconManager = DynamicLauncherIconManager(context)
+                        val scheduler = DailyLauncherIconScheduler(context)
+                        if (enabled) {
+                            iconManager.updateIconForToday()
+                            scheduler.scheduleNextRefresh()
+                        } else {
+                            iconManager.updateIconForFixedDay()
+                            scheduler.cancelNextRefresh()
                         }
                     }
                 },
@@ -2538,9 +2665,11 @@ fun DotCalApp(
                     reminders = reminders.filter { it.eventId == event.baseEventId() },
                     account = accounts.firstOrNull { it.id == event.accountId },
                     palette = palette,
+                    isPro = isPro,
                     isPrivate = event.baseEventId() in privateVaultIds,
                     isCountdownPinned = event.baseEventId() in countdownPins,
                     fileAttachments = eventFileAttachments[event.baseEventId()].orEmpty(),
+                    readinessItems = eventReadiness[event.baseEventId()].orEmpty(),
                     providerMeetingMetadata = providerMeetingMetadata[event.baseEventId()],
                     onBack = viewModel::closeEventDetail,
                     onEdit = {
@@ -2612,6 +2741,11 @@ fun DotCalApp(
                     },
                     onDuplicate = { openDuplicateEditor(event) },
                     onCopyToDate = { pendingCopyToDateEvent = event },
+                    onFindTime = if (FindTimeForThisMatcher.canMove(event)) {
+                        { openFindTimeFor(event) }
+                    } else {
+                        null
+                    },
                     onMoveToPrivate = {
                         if (!isPro) {
                             showPaywall = true
@@ -2629,6 +2763,34 @@ fun DotCalApp(
                     },
                     onOpenFileAttachment = { attachment ->
                         openEventFileAttachment(context, attachment, palette)
+                    },
+                    onAddReadinessItem = { title ->
+                        viewModel.addEventReadinessItem(event.baseEventId(), title) { result ->
+                            if (result.isFailure) {
+                                showDotCalToast(context, palette, R.string.event_readiness_update_error)
+                            }
+                        }
+                    },
+                    onRenameReadinessItem = { itemId, title ->
+                        viewModel.renameEventReadinessItem(event.baseEventId(), itemId, title) { result ->
+                            if (result.isFailure) {
+                                showDotCalToast(context, palette, R.string.event_readiness_update_error)
+                            }
+                        }
+                    },
+                    onSetReadinessItemCompleted = { itemId, completed ->
+                        viewModel.setEventReadinessItemCompleted(event.baseEventId(), itemId, completed) { result ->
+                            if (result.isFailure) {
+                                showDotCalToast(context, palette, R.string.event_readiness_update_error)
+                            }
+                        }
+                    },
+                    onRemoveReadinessItem = { itemId ->
+                        viewModel.removeEventReadinessItem(event.baseEventId(), itemId) { result ->
+                            if (result.isFailure) {
+                                showDotCalToast(context, palette, R.string.event_readiness_update_error)
+                            }
+                        }
                     },
                     onDelete = {
                         if (detailDeleteScope(event) != null) {
@@ -3012,6 +3174,7 @@ fun DotCalApp(
                     task = task,
                     reminder = reminders.firstOrNull { it.eventId == task.baseEventId() },
                     palette = palette,
+                    isPro = isPro,
                     isPrivate = task.baseEventId() in privateVaultIds,
                     onBack = { taskDetail = null },
                     onEdit = {
@@ -3020,6 +3183,7 @@ fun DotCalApp(
                         showTaskEditor = true
                     },
                     onTimeBlock = { blockFromTask(task) },
+                    onFindTime = { openFindTimeFor(task) },
                     onMoveToPrivate = {
                         if (!isPro) {
                             showPaywall = true
@@ -3241,11 +3405,49 @@ fun DotCalApp(
                 state = availabilityState,
                 onBack = {
                     showAvailability = false
+                    findTimeTarget = null
                     viewModel.clearAvailability()
                 },
                 onRefresh = { request -> viewModel.refreshAvailability(request, use24HourFormat) },
+                findTimeTarget = findTimeTarget,
+                onApplyTargetSlot = { slot ->
+                    val target = findTimeTarget
+                    if (target == null) {
+                        Unit
+                    } else if (target.isTask == 1) {
+                        viewModel.createTimeBlock(target, slot) { result ->
+                            result.onSuccess {
+                                showAvailability = false
+                                findTimeTarget = null
+                                viewModel.clearAvailability()
+                                showDotCalToast(context, palette, R.string.find_time_block_created)
+                            }.onFailure {
+                                showDotCalToast(context, palette, R.string.find_time_block_failed)
+                            }
+                        }
+                    } else if (FindTimeForThisMatcher.canMove(target)) {
+                        val targetStart = slot.date.atTime(slot.start)
+                        val targetEnd = slot.date.atTime(slot.end)
+                        viewModel.rescheduleEvent(
+                            event = target,
+                            targetStart = targetStart,
+                            targetEnd = targetEnd,
+                            recurringEditScope = RecurringEditScope.WholeSeries,
+                        ) { result ->
+                            result.onSuccess {
+                                showAvailability = false
+                                findTimeTarget = null
+                                viewModel.clearAvailability()
+                                showDotCalToast(context, palette, R.string.find_time_moved)
+                            }.onFailure {
+                                showDotCalToast(context, palette, R.string.find_time_move_failed)
+                            }
+                        }
+                    }
+                },
                 onUseFreeSlot = { slot ->
                     showAvailability = false
+                    findTimeTarget = null
                     openQuickAddResult(
                         QuickAddResult(
                             title = "",

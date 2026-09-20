@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabaseLockedException
 import android.database.sqlite.SQLiteException
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Log
 import androidx.datastore.preferences.core.edit
 import com.dotfield.dotcal.data.backup.BackupData
 import com.dotfield.dotcal.data.backup.BackupFileAttachment
@@ -22,6 +23,8 @@ import com.dotfield.dotcal.data.provider.CalendarProviderDataSource
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource
 import com.dotfield.dotcal.data.provider.ProviderMeetingMetadata
 import com.dotfield.dotcal.data.provider.decodeProviderMeetingMetadata
+import com.dotfield.dotcal.data.readiness.EventReadinessItem
+import com.dotfield.dotcal.data.readiness.EventReadinessStore
 import com.dotfield.dotcal.data.privacy.AppLockState
 import com.dotfield.dotcal.data.privacy.AppPrivacyManager
 import com.dotfield.dotcal.data.punchcard.PunchCardStreak
@@ -74,7 +77,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.withContext
@@ -149,12 +154,14 @@ class DotCalRepository(
     private val context: Context,
 ) {
     private val reminderScheduler = ReminderScheduler(context)
+    private val reminderCenterActions = ReminderCenterActions(dao, reminderScheduler)
     private val privacyManager = AppPrivacyManager(context.applicationContext)
     private val recentlyDeletedStore = RecentlyDeletedStore(context)
     private val eventTemplateStore = EventTemplateStore(context)
     private val focusProfileStore = FocusProfileStore(context)
     private val shiftPatternStore = ShiftPatternStore(context)
     private val sideStore = SharedSideStore(context)
+    private val eventReadinessStore = EventReadinessStore(sideStore)
     private val contactsProviderDataSource = ContactsProviderDataSource(context.applicationContext)
     private val calendarProviderDataSource = CalendarProviderDataSource(context.applicationContext)
     private val holidayDataSource = HolidayDataSource(context.applicationContext)
@@ -229,6 +236,31 @@ class DotCalRepository(
             ?.let(::parseEventFileAttachments)
             .orEmpty()
     }
+
+    suspend fun readEventReadiness(eventId: String): List<EventReadinessItem> =
+        eventReadinessStore.read(eventId)
+
+    suspend fun countIncompleteEventReadinessItems(eventId: String): Int =
+        eventReadinessStore.read(eventId.substringBefore(RECURRENCE_OCCURRENCE_SEPARATOR))
+            .count { item -> !item.isCompleted }
+
+    suspend fun addEventReadinessItem(eventId: String, title: String): List<EventReadinessItem> =
+        eventReadinessStore.add(eventId, title)
+
+    suspend fun renameEventReadinessItem(
+        eventId: String,
+        itemId: String,
+        title: String,
+    ): List<EventReadinessItem> = eventReadinessStore.rename(eventId, itemId, title)
+
+    suspend fun setEventReadinessItemCompleted(
+        eventId: String,
+        itemId: String,
+        completed: Boolean,
+    ): List<EventReadinessItem> = eventReadinessStore.setCompleted(eventId, itemId, completed)
+
+    suspend fun removeEventReadinessItem(eventId: String, itemId: String): List<EventReadinessItem> =
+        eventReadinessStore.remove(eventId, itemId)
 
     suspend fun readProviderMeetingMetadata(eventId: String): ProviderMeetingMetadata? = withContext(Dispatchers.IO) {
         sideStore.read(EventSideStoreNamespaces.ProviderMeetingMetadata, eventId)
@@ -321,10 +353,10 @@ class DotCalRepository(
         updateWidgets()
     }
 
-    fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts()
+    fun observeAccounts(): Flow<List<CalendarAccount>> = dao.observeAccounts().retryOnDatabaseLocked()
 
     fun observeAssignableAccounts(): Flow<List<CalendarAccount>> {
-        return dao.observeAccounts().map { accounts ->
+        return dao.observeAccounts().retryOnDatabaseLocked().map { accounts ->
             accounts
                 .filterNot { it.isReadOnlyGeneratedAccount() }
                 .sortedWith(compareBy<CalendarAccount> { it.sortOrder }.thenBy { it.displayName })
@@ -560,10 +592,10 @@ class DotCalRepository(
         }
     }
 
-    fun observeSelectedHolidayCountries(): Flow<List<String>> = dao.observeHolidayAccountIds()
+    fun observeSelectedHolidayCountries(): Flow<List<String>> = dao.observeHolidayAccountIds().retryOnDatabaseLocked()
         .map { ids -> ids.mapNotNull { it.removePrefix(HOLIDAY_ACCOUNT_PREFIX).takeIf(String::isNotBlank) } }
 
-    fun observeSyncMetadata(): Flow<List<SyncMetadata>> = dao.observeSyncMetadata()
+    fun observeSyncMetadata(): Flow<List<SyncMetadata>> = dao.observeSyncMetadata().retryOnDatabaseLocked()
 
     fun observeEventsForMonth(month: LocalDate): Flow<List<CalendarEvent>> {
         val monthStart = month.withDayOfMonth(1)
@@ -684,7 +716,7 @@ class DotCalRepository(
         val dismissedFlow = context.calendarPreferencesDataStore.data
             .map { it[CalendarPreferences.KEY_ON_THIS_DAY_DISMISSED_DATE] }
         return combine(
-            dao.observeOnThisDayCandidates(targetDayStartMs),
+            dao.observeOnThisDayCandidates(targetDayStartMs).retryOnDatabaseLocked(),
             privacyManager.observePrivateVaultIds(),
             dismissedFlow,
         ) { events, privateIds, dismissedDate ->
@@ -757,7 +789,7 @@ class DotCalRepository(
         }
     }
 
-    fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks()
+    fun observeTasks(): Flow<List<CalendarEvent>> = dao.observeTasks().retryOnDatabaseLocked()
         .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
         .map { tasks ->
             withContext(Dispatchers.Default) { expandRecurringTasks(tasks) }
@@ -794,12 +826,12 @@ class DotCalRepository(
 
     fun observeTodayTasks(day: LocalDate): Flow<List<CalendarEvent>> {
         val start = day.atStartMs()
-        return dao.observeTodayTasks(start, day.plusDays(1).atStartMs() - 1)
+        return dao.observeTodayTasks(start, day.plusDays(1).atStartMs() - 1).retryOnDatabaseLocked()
             .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
     }
 
     fun observeUpcomingTasks(nowMs: Long = System.currentTimeMillis()): Flow<List<CalendarEvent>> =
-        dao.observeUpcomingTasks(nowMs)
+        dao.observeUpcomingTasks(nowMs).retryOnDatabaseLocked()
             .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
 
     /**
@@ -833,10 +865,13 @@ class DotCalRepository(
     }
 
     fun observeCompletedTasks(): Flow<List<CalendarEvent>> =
-        dao.observeCompletedTasks()
+        dao.observeCompletedTasks().retryOnDatabaseLocked()
             .combine(privacyManager.observePrivateVaultIds()) { tasks, privateIds -> tasks.filterOutPrivate(privateIds) }
 
-    fun observeReminders(): Flow<List<EventReminder>> = dao.observeReminders()
+    fun observeReminders(): Flow<List<EventReminder>> = dao.observeReminders().retryOnDatabaseLocked()
+
+    fun observeReminderCenterItems(): Flow<List<ReminderCenterItem>> =
+        dao.observeReminderCenterItems().retryOnDatabaseLocked()
 
     suspend fun getEvent(eventId: String): CalendarEvent? = dao.getEvent(eventId)?.withGhostFlag()
 
@@ -846,6 +881,18 @@ class DotCalRepository(
 
     suspend fun markReminderDelivered(alarmRequestCode: Int) {
         dao.markReminderDelivered(alarmRequestCode)
+    }
+
+    suspend fun dismissReminder(item: ReminderCenterItem) {
+        reminderCenterActions.dismiss(item)
+    }
+
+    suspend fun cancelReminder(item: ReminderCenterItem) {
+        reminderCenterActions.cancel(item)
+    }
+
+    suspend fun snoozeReminder(item: ReminderCenterItem, minutes: Int) {
+        reminderCenterActions.snooze(item, minutes)
     }
 
     suspend fun rescheduleFutureReminders() {
@@ -904,11 +951,23 @@ class DotCalRepository(
     }
 
     suspend fun syncNow(): CalendarSyncResult = withContext(Dispatchers.IO) {
-        val result = syncRepository.sync()
-        if (!result.permissionDenied) {
+        val result = try {
+            syncRepository.sync()
+        } catch (error: Exception) {
             context.calendarPreferencesDataStore.edit { preferences ->
-                preferences[CalendarPreferences.KEY_LAST_SYNC_MS] = System.currentTimeMillis()
+                preferences[CalendarPreferences.KEY_LAST_SYNC_ERROR] = "SYNC_FAILED"
             }
+            throw error
+        }
+        context.calendarPreferencesDataStore.edit { preferences ->
+            if (result.permissionDenied) {
+                preferences[CalendarPreferences.KEY_LAST_SYNC_ERROR] = "PERMISSION_REQUIRED"
+            } else {
+                preferences[CalendarPreferences.KEY_LAST_SYNC_MS] = System.currentTimeMillis()
+                preferences.remove(CalendarPreferences.KEY_LAST_SYNC_ERROR)
+            }
+        }
+        if (!result.permissionDenied) {
             updateWidgets()
         }
         result
@@ -1073,6 +1132,7 @@ class DotCalRepository(
             ?: emptyList()
         val event = syncProviderBackedEvent(existingMaster ?: existing, draftEvent, reminderMinutes)
         if (event.id != eventId) {
+            eventReadinessStore.move(eventId, event.id)
             dao.getRemindersForEvent(eventId).forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
             dao.deleteRemindersForEvent(eventId)
             dao.deleteEvent(eventId)
@@ -1188,7 +1248,12 @@ class DotCalRepository(
         return event.withProviderSyncResult(providerEvent)
     }
 
-    suspend fun addLocalEvent(title: String, date: LocalDate, startTime: LocalTime = LocalTime.of(9, 0)) {
+    suspend fun addLocalEvent(
+        title: String,
+        date: LocalDate,
+        startTime: LocalTime = LocalTime.of(9, 0),
+        endTime: LocalTime = startTime.plusHours(1),
+    ) {
         saveLocalEvent(
             existing = null,
             data = EventEditorData(
@@ -1198,7 +1263,7 @@ class DotCalRepository(
                 date = date,
                 endDate = date,
                 startTime = startTime,
-                endTime = startTime.plusHours(1),
+                endTime = endTime,
                 isAllDay = false,
                 reminderMinutes = null,
                 rrule = null,
@@ -1628,6 +1693,7 @@ class DotCalRepository(
     suspend fun listRecentlyDeleted(): List<DeletedSnapshot> = withContext(Dispatchers.IO) {
         recentlyDeletedStore.pruneExpired(System.currentTimeMillis()).forEach { eventId ->
             deleteEventFileAttachments(eventId)
+            eventReadinessStore.clear(eventId)
         }
         recentlyDeletedStore.list(System.currentTimeMillis())
     }
@@ -1665,6 +1731,7 @@ class DotCalRepository(
     /** Permanently drop one snapshot from the trash. */
     suspend fun purgeDeleted(eventId: String) = withContext(Dispatchers.IO) {
         deleteEventFileAttachments(eventId)
+        eventReadinessStore.clear(eventId)
         recentlyDeletedStore.remove(eventId)
     }
 
@@ -1672,6 +1739,7 @@ class DotCalRepository(
     suspend fun emptyRecentlyDeleted() = withContext(Dispatchers.IO) {
         recentlyDeletedStore.list(System.currentTimeMillis()).forEach { snapshot ->
             deleteEventFileAttachments(snapshot.event.id)
+            eventReadinessStore.clear(snapshot.event.id)
         }
         recentlyDeletedStore.clear()
     }
@@ -2395,18 +2463,32 @@ private fun CalendarAccount.isReadOnlyGeneratedAccount(): Boolean {
 private const val RECURRENCE_OCCURRENCE_SEPARATOR = "::occurrence::"
 private const val DATABASE_LOCK_RETRY_LIMIT = 4L
 private const val DATABASE_LOCK_RETRY_BASE_DELAY_MS = 120L
+private const val DATABASE_LOCK_TAG = "DotCalRepository"
 
-private fun Flow<List<CalendarEvent>>.retryOnDatabaseLocked(): Flow<List<CalendarEvent>> =
-    retryWhen { cause, attempt ->
-        if (attempt >= DATABASE_LOCK_RETRY_LIMIT || !cause.hasDatabaseLockedCause()) {
-            false
-        } else {
-            delay(DATABASE_LOCK_RETRY_BASE_DELAY_MS * (attempt + 1))
-            true
-        }
+internal fun <T> Flow<List<T>>.retryOnDatabaseLocked(): Flow<List<T>> = flow {
+    var emittedValue = false
+    try {
+        this@retryOnDatabaseLocked
+            .retryWhen { cause, attempt ->
+                if (attempt >= DATABASE_LOCK_RETRY_LIMIT || !cause.hasDatabaseLockedCause()) {
+                    false
+                } else {
+                    delay(DATABASE_LOCK_RETRY_BASE_DELAY_MS * (attempt + 1))
+                    true
+                }
+            }
+            .collect { value ->
+                emittedValue = true
+                emit(value)
+            }
+    } catch (cause: Throwable) {
+        if (!cause.hasDatabaseLockedCause()) throw cause
+        runCatching { Log.w(DATABASE_LOCK_TAG, "Database stayed locked; retaining last list value", cause) }
+        if (!emittedValue) emit(emptyList())
     }
+}
 
-private fun Throwable.hasDatabaseLockedCause(): Boolean {
+internal fun Throwable.hasDatabaseLockedCause(): Boolean {
     var current: Throwable? = this
     while (current != null) {
         if (current is SQLiteDatabaseLockedException) return true

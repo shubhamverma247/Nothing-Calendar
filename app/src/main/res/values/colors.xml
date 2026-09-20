@@ -12,5 +12,6 @@
     <color name="widget_preview_secondary">#666666</color>
     <color name="widget_preview_dim">#B5B5B5</color>
     <color name="widget_preview_dot">#EDEDED</color>
-    <color name="widget_accent">#FF3B30</color>
+    <color name="nothing_red">#C8102E</color>
+    <item name="widget_accent" type="color">@color/nothing_red</item>
 </resources>
