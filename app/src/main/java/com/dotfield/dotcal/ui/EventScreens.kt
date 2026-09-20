@@ -272,6 +272,7 @@ internal fun EventDetailScreen(
     reminders: List<EventReminder>,
     account: CalendarAccount?,
     palette: DotCalPalette,
+    isPro: Boolean,
     isPrivate: Boolean,
     isCountdownPinned: Boolean,
     fileAttachments: List<EventFileAttachment> = emptyList(),
@@ -286,6 +287,7 @@ internal fun EventDetailScreen(
     onShareCountdownImage: () -> Unit,
     onDuplicate: () -> Unit,
     onCopyToDate: () -> Unit,
+    onFindTime: (() -> Unit)?,
     onMoveToPrivate: () -> Unit,
     onRestoreFromPrivate: () -> Unit,
     onOpenFileAttachment: (EventFileAttachment) -> Unit,
@@ -552,6 +554,7 @@ internal fun EventDetailScreen(
             val shareCountdownLabel = stringResource(R.string.event_share_countdown_image)
             val duplicateLabel = stringResource(R.string.action_duplicate)
             val copyToDateLabel = stringResource(R.string.event_copy_to_date)
+            val findTimeLabel = stringResource(R.string.find_time_for_this)
             val vaultLabel = stringResource(
                 if (isPrivate) R.string.vault_restore_from else R.string.vault_move_to,
             )
@@ -591,6 +594,12 @@ internal fun EventDetailScreen(
                         showActions = false
                         onCopyToDate()
                     })
+                    onFindTime?.let { findTime ->
+                        add(CompactActionItem(findTimeLabel, isPro = !isPro) {
+                            showActions = false
+                            findTime()
+                        })
+                    }
                     add(CompactActionItem(vaultLabel) {
                         showActions = false
                         if (isPrivate) onRestoreFromPrivate() else onMoveToPrivate()
@@ -628,6 +637,7 @@ internal fun EventDetailScreen(
 
 internal data class CompactActionItem(
     val label: String,
+    val isPro: Boolean = false,
     val onClick: () -> Unit,
 )
 
@@ -653,16 +663,31 @@ internal fun CompactActionSheetContent(
             modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
         )
         actions.forEach { action ->
-            Text(
-                action.label,
-                color = palette.primaryText,
-                fontFamily = mono,
-                fontSize = 16.sp,
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = action.onClick)
                     .padding(vertical = 16.dp),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    action.label,
+                    color = palette.primaryText,
+                    fontFamily = mono,
+                    fontSize = 16.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                if (action.isPro) {
+                    Text(
+                        stringResource(R.string.badge_pro),
+                        color = palette.accent,
+                        fontFamily = mono,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                    )
+                }
+            }
             HorizontalDivider(color = palette.line.copy(alpha = 0.45f), thickness = 1.dp)
         }
     }

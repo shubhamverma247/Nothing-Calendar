@@ -1248,7 +1248,12 @@ class DotCalRepository(
         return event.withProviderSyncResult(providerEvent)
     }
 
-    suspend fun addLocalEvent(title: String, date: LocalDate, startTime: LocalTime = LocalTime.of(9, 0)) {
+    suspend fun addLocalEvent(
+        title: String,
+        date: LocalDate,
+        startTime: LocalTime = LocalTime.of(9, 0),
+        endTime: LocalTime = startTime.plusHours(1),
+    ) {
         saveLocalEvent(
             existing = null,
             data = EventEditorData(
@@ -1258,7 +1263,7 @@ class DotCalRepository(
                 date = date,
                 endDate = date,
                 startTime = startTime,
-                endTime = startTime.plusHours(1),
+                endTime = endTime,
                 isAllDay = false,
                 reminderMinutes = null,
                 rrule = null,

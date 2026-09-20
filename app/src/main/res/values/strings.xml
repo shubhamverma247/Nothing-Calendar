@@ -778,6 +778,8 @@
     <string name="pro_feature_dead_time_desc">Find open blocks across the next seven days</string>
     <string name="pro_feature_share_availability">Share Availability</string>
     <string name="pro_feature_share_availability_desc">Turn free time into text you can paste anywhere</string>
+    <string name="pro_feature_find_time_for_this">Find Time for This</string>
+    <string name="pro_feature_find_time_for_this_desc">Review ranked slots for a task or local event before confirming</string>
     <string name="pro_feature_year_heatmap">Year Heatmap</string>
     <string name="pro_feature_year_heatmap_desc">See busy and open seasons across the whole year</string>
 
@@ -1239,6 +1241,19 @@
     <string name="availability_share_button">Share</string>
     <string name="availability_start_date">Start date</string>
     <string name="availability_end_date">End date</string>
+    <string name="find_time_for_this">Find Time for This</string>
+    <string name="find_time_for_this_title">Find Time for This</string>
+    <string name="find_time_affected_item">Affected item</string>
+    <string name="find_time_target_summary">%1$s\n%2$d minutes</string>
+    <string name="find_time_review">Review</string>
+    <string name="find_time_confirm_title">Confirm proposed time</string>
+    <string name="find_time_confirm_body">%1$s\n%2$s\n%3$s - %4$s</string>
+    <string name="find_time_create_block">Create event</string>
+    <string name="find_time_move_event">Move event</string>
+    <string name="find_time_moved">Event moved</string>
+    <string name="find_time_move_failed">Couldn\'t move event</string>
+    <string name="find_time_block_created">Calendar event created</string>
+    <string name="find_time_block_failed">Couldn\'t create calendar event</string>
 
     <!-- Share-as-QR / scan-QR screens. -->
     <string name="qr_share_title">Share as QR</string>

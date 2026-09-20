@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-09-12
+Updated: 2026-09-19
 
 Active resume document for `com.dotfield.dotcal`. Historical detail is preserved in
 `Docs/HANDOFF.original.md`. Do not edit `Docs/HANDOFF - Copy.md` or user-owned
@@ -9,10 +9,10 @@ Active resume document for `com.dotfield.dotcal`. Historical detail is preserved
 ## Worktree
 
 - Branch: `feature-and-fixes`.
-- Latest local commit: `7c6e60d fix(launcher): add stable icon fallback toggle`.
-- Current work is uncommitted. Do not commit, push, reset, clean, or switch branches unless explicitly asked.
+- Latest local commit: `f115db8 feat(events): add readiness checklist`.
+- Worktree was clean before this handoff edit; only `Docs/HANDOFF.md` is now modified. Do not commit, push, reset, clean, or switch branches unless explicitly asked.
 - Preserve user-owned untracked files: QA screenshots, icon ZIPs, `.claude`, `Docs/logcat.txt`, and `tools/`.
-- App version: `versionCode 44`, `versionName 1.6.0`.
+- App version: `versionCode 45`, `versionName 1.7`.
 - Package: `com.dotfield.dotcal`. Device: `000153573000720` when connected.
 
 ## Rules
@@ -96,7 +96,11 @@ Active resume document for `com.dotfield.dotcal`. Historical detail is preserved
 - Billing code keeps one-time and subscription product sources separate; do not merge product types.
 - Quick Add voice dictation preserves typed text; Quick Settings/launcher shortcuts reuse `dotcal://quick-add`.
 - Calendar/Week/Agenda share cards, directional Week/Day transitions, Play review gating, and reminder snooze cleanup are implemented locally.
-- Dynamic icon and crash-hardening changes remain local until explicitly approved for commit/push.
+- Sync & Widget Health Center is implemented in Settings with calendar permission, sync, and widget refresh status plus manual recovery actions.
+- Reminder Center is implemented with grouped pending reminders and inline snooze, dismiss, and cancel actions.
+- Event Readiness Checklist is implemented in Event Detail with add, edit, delete, and complete actions. Data uses the existing side store; Room schema is unchanged. Reminder notifications include the remaining preparation-item summary.
+- `Find Time for This` first slice is implemented on Share Availability: future-only duration-specific suggestions, active-slot trimming, and refresh on resume. It is not the complete roadmap workflow yet.
+- Event editor start-time changes preserve duration unless the end time was manually edited.
 - Deferred Phase 2 polish: add Settings -> Calendar Preferences -> Time format with
   `System default`, `12-hour`, and `24-hour`. Do this as a separate broad consistency pass
   because it must affect calendar rows, editors, reminders, widgets, notifications, share text,
@@ -118,12 +122,12 @@ as new features. The items below are the next active feature proposals and advan
 
 | # | Feature | Access | Type | Priority |
 |---|---|---|---|---|
-| 1 | Sync & Widget Health Center | Free | New reliability surface | P0 |
-| 2 | Reminder Center + Reminder Readiness Check | Free basic; Pro batch actions and saved snooze presets | Reminder advancement | P1 |
-| 3 | Saved Smart Views | Free basic filters; Pro saved combinations | Search/filter advancement | P1 |
-| 4 | Evening Task Review | Free manual review; Pro scheduling suggestions | Task-planning advancement | P1 |
-| 5 | Event Readiness Checklist | Free basic checklist; Pro reusable setups and rules | New workflow | P1 |
-| 6 | Find Time for This | Pro advanced matching; preserve current Find-a-Time | Scheduling advancement | P1 |
+| 1 | Sync & Widget Health Center | Free | Implemented; future diagnostics polish only | Complete |
+| 2 | Reminder Center + Reminder Readiness Check | Free basic; Pro batch actions and saved snooze presets | Center complete; readiness check and Pro actions pending | P1 |
+| 3 | Find Time for This | Pro advanced matching; preserve current Find-a-Time | First slice complete; full task/event workflow is next | P1 next |
+| 4 | Saved Smart Views | Free basic filters; Pro saved combinations | Search/filter advancement | P1 |
+| 5 | Evening Task Review | Free manual review; Pro scheduling suggestions | Task-planning advancement | P1 |
+| 6 | Event Readiness Checklist | Free basic checklist; Pro reusable setups and rules | Basic checklist complete; reusable setups/rules pending | P1 advancement |
 | 7 | Repair My Day | Pro | Rescheduling advancement | P1 |
 | 8 | Linked Event Kits | Pro; preserve current templates | Template advancement | P1 |
 | 9 | Advanced Widget Profiles + 14-day view | Free core readability; Pro advanced profiles and filters | Widget advancement | P1 |
@@ -133,6 +137,46 @@ as new features. The items below are the next active feature proposals and advan
 | 13 | Shift-aware Usable Time + Routines | Free basic boundaries; Pro shift-relative rules | Shift-planning advancement | P2 |
 | 14 | Pencil-In Plan Comparison | Pro; preserve current Pencil-In Events | Tentative-planning advancement | P2 |
 | 15 | Schedule Change Detector | Pro prototype | New high-risk workflow | P2 |
+
+### Research-reconciled feature decisions
+
+The 2026-09-19 competitor review did not replace the roadmap above. It clarified which
+existing DotCal capabilities are worth advancing and the order in which they should be built.
+
+Existing-feature advancements:
+
+1. Complete `Find Time for This`: task/event entry, duration derivation, deadline or date-range
+   constraints, preferred hours, ranked slots, and preview/confirm behavior.
+2. Build Saved Smart Views on the existing Search filters and Calendar Sets. Support useful
+   combinations such as Work this week, Pending tasks, and Upcoming appointments; later allow
+   compatible saved views to drive widget content.
+3. Advance Event Readiness with reusable setups and rules for repeated event types while
+   preserving occurrence-specific completion state.
+4. Add Reminder Readiness Check for notification permission, exact-alarm access, relevant
+   channel state, and a test reminder. Add Pro batch actions and saved snooze presets later.
+5. Advance availability with weekday-specific hours, multiple daily windows, minimum notice,
+   before/after buffers, and reusable rule presets.
+6. Link advanced widget profiles to Saved Smart Views and reusable Work/Personal calendar
+   combinations. `Next14Days` already exists in widget configuration; treat broader 14-day
+   exposure as an advancement, not a wholly new capability.
+
+New workflows worth building:
+
+1. Evening Task Review: process unfinished tasks through Complete, Tomorrow, Choose date,
+   Unscheduled/Inbox, Delete, Skip, and Undo. Do not blindly carry recurring tasks forward.
+2. Repair My Day: preview a revised plan for selected flexible tasks after disruption. Never
+   move fixed/shared/provider events silently; confirmation and undo are required.
+3. Linked Event Kits: create related preparation, main-event, and follow-up items from one kit;
+   preview linked changes when the anchor event moves.
+4. Offline Common-Time QR: exchange privacy-preserving availability snapshots and calculate
+   common slots locally. Prototype before committing because both participants need compatible
+   data and snapshots can become stale.
+5. Shift-aware Usable Time + Routines: support routines relative to shift start/end and off-days.
+   Validate with shift users before expanding beyond a prototype.
+
+Lower-priority ideas from the review: cloud AI assistants, public booking infrastructure,
+weather subscriptions, and screenshot-to-events import. These add backend, accuracy, privacy,
+or maintenance cost before the higher-value local workflows above are complete.
 
 ### Roadmap constraints
 
@@ -158,6 +202,14 @@ as new features. The items below are the next active feature proposals and advan
   and <https://flexibits.com/blog/2026/07/new-feature-roundup-you-asked-we-built/>
 - Reclaim benchmarks habits, auto-rescheduling, buffers, and time analytics:
   <https://reclaim.ai/features/habits>
+- Fantastical Openings benchmarks duration choices, day-specific availability windows,
+  lead time, and before/after buffers:
+  <https://flexibits.com/account/help/openings>
+- Morgen benchmarks task-aware scheduling with a visible preview and explicit approval:
+  <https://www.morgen.so/guides/plan-your-day-using-the-ai-planner>
+- Structured Replan benchmarks guided processing of unfinished tasks with reschedule,
+  inbox, complete, delete, skip, and undo actions:
+  <https://help.structured.app/en/articles/4511874>
 - User-feedback themes include sync reliability, widget freshness, reminder reliability,
   recurrence handling, and automatic schedule shifting:
   <https://digibites.zendesk.com/hc/en-us/articles/200243176-Widgets-not-updating-task-killer-issue>
@@ -171,6 +223,8 @@ as new features. The items below are the next active feature proposals and advan
   Cancel actions.
 - Reminders uses the existing large-to-centered compact Settings header on scroll.
   Device QA of this revision is pending. Reminder Readiness Check is still unimplemented.
+- Manual QA passed for Event Readiness Checklist, `Find Time for This` suggestions,
+  readiness sheet polish, and event-editor duration adjustment.
 
 - Previously passed manual QA includes reminders/full-screen access and snooze, widget theme/config/remove flows, provider availability/RDATE/meeting metadata/colors, calendar-move duplicate protection, shift-pattern export, auto-buffers/Find-a-Time, recurring occurrence sync, and Week/Day detail navigation.
 - Pending manual QA: dynamic launcher icon behavior on small/large devices and external `.ics` open-with flow. Test only the requested new feature, one test at a time.
@@ -198,6 +252,7 @@ Focused tests also pass:
 ```text
 :app:testDebugUnitTest --tests com.dotfield.dotcal.MainActivityIntentTest
 :app:testDebugUnitTest --tests com.dotfield.dotcal.data.ReminderCenterLifecycleTest
+:app:testDebugUnitTest --tests com.dotfield.dotcal.data.scheduling.FindTimeForThisMatcherTest
 :app:connectedDebugAndroidTest (not completed: no connected device)
 ```
 
@@ -207,6 +262,18 @@ Focused tests also pass:
 2. Run the full debug unit tests, debug APK build, release bundle, and diff check after any further edit.
 3. After Android changes, state the exact manual test and expected result first, then install the verified APK.
 4. If the user requests release integration, commit/push/merge only the exact requested operation.
+
+## Next selected feature
+
+Complete `Find Time for This` before starting Saved Smart Views. Build on the existing
+Share Availability first slice and matcher. The complete workflow should start from a task
+or event, derive its duration, allow constraints such as deadline/date range and preferred
+hours, rank suitable future slots, and require a preview plus explicit confirmation before
+creating or moving anything. Fixed, shared, and provider events must never move silently.
+Keep the work offline-first and preserve the current Room schema and existing Find-a-Time flow.
+
+After this item, preferred order is Saved Smart Views, Evening Task Review, reusable Event
+Readiness setups, Smart View widget integration, then Repair My Day.
 
 ## Resume prompt for next feature
 
@@ -221,7 +288,10 @@ Before work:
 
 For requested feature work:
 
-- Reconcile feature against current code and authoritative roadmap before editing.
+- Complete `Find Time for This`: add task/event entry, duration derivation, user-selectable
+  constraints, ranked future slots, and preview/confirm behavior while preserving the existing
+  Share Availability and Find-a-Time flows.
+- Reconcile the feature against current code and authoritative roadmap before editing.
 - Use focused tests first, then relevant build checks.
 - Run one manual QA test at a time and state expected behavior before each test.
 - Audit all changes before any explicitly requested commit.

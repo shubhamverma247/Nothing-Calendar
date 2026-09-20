@@ -303,6 +303,7 @@ private val PRO_FEATURES = listOf(
     ProFeature(R.string.pro_feature_time_insights, R.string.pro_feature_time_insights_desc),
     ProFeature(R.string.pro_feature_dead_time, R.string.pro_feature_dead_time_desc),
     ProFeature(R.string.pro_feature_share_availability, R.string.pro_feature_share_availability_desc),
+    ProFeature(R.string.pro_feature_find_time_for_this, R.string.pro_feature_find_time_for_this_desc),
     ProFeature(R.string.pro_feature_year_heatmap, R.string.pro_feature_year_heatmap_desc),
     ProFeature(R.string.pro_feature_large_widget, R.string.pro_feature_large_widget_desc),
     ProFeature(R.string.pro_feature_widget_pack, R.string.pro_feature_widget_pack_desc),

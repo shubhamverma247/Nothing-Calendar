@@ -561,6 +561,8 @@
     <string name="pro_feature_dead_time_desc">Находите свободные блоки на следующие семь дней</string>
     <string name="pro_feature_share_availability">Podelitsya Dostupnost</string>
     <string name="pro_feature_share_availability_desc">Превратите свободное время в текст, который можно вставить куда угодно</string>
+    <string name="pro_feature_find_time_for_this">Find Time for This</string>
+    <string name="pro_feature_find_time_for_this_desc">Review ranked slots for a task or local event before confirming</string>
     <string name="pro_feature_pdf_attachments">PDF-vlozheniya</string>
     <string name="pro_feature_pdf_attachments_desc">Prikreplyayte do 5 PDF k lyubomu sobytiyu</string>
     <string name="pro_feature_unlimited_countdowns">Neogranichennye otschety</string>
@@ -1251,4 +1253,17 @@
     <string name="availability_use_slot">Использовать интервал</string>
     <string name="availability_no_slots">Подходящих свободных интервалов нет</string>
     <string name="widget_accent_custom_hint">#RRGGBB</string>
+    <string name="find_time_for_this">Найти время для этого</string>
+    <string name="find_time_for_this_title">Найти время для этого</string>
+    <string name="find_time_affected_item">Затрагиваемый элемент</string>
+    <string name="find_time_target_summary">%1$s\n%2$d мин.</string>
+    <string name="find_time_review">Проверить</string>
+    <string name="find_time_confirm_title">Подтвердить предложенное время</string>
+    <string name="find_time_confirm_body">%1$s\n%2$s\n%3$s - %4$s</string>
+    <string name="find_time_create_block">Создать событие</string>
+    <string name="find_time_move_event">Перенести событие</string>
+    <string name="find_time_moved">Событие перенесено</string>
+    <string name="find_time_move_failed">Не удалось перенести событие</string>
+    <string name="find_time_block_created">Событие календаря создано</string>
+    <string name="find_time_block_failed">Не удалось создать событие календаря</string>
 </resources>

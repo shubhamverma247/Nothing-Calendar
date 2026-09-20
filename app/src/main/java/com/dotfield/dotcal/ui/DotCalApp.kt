@@ -251,6 +251,7 @@ import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
 import com.dotfield.dotcal.data.shifts.SHIFT_PLAN_QR_EVENT_LIMIT
+import com.dotfield.dotcal.data.scheduling.FindTimeForThisMatcher
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.AppLanguage
@@ -394,6 +395,7 @@ fun DotCalApp(
     var showDateCalculator by remember { mutableStateOf(false) }
     var showTimeInsights by remember { mutableStateOf(false) }
     var showAvailability by remember { mutableStateOf(false) }
+    var findTimeTarget by remember { mutableStateOf<CalendarEvent?>(null) }
     var availabilityInitialDate by remember { mutableStateOf(LocalDate.now()) }
     var availabilityInitialEndDate by remember { mutableStateOf(LocalDate.now().plusDays(2)) }
     var showQuickAdd by remember { mutableStateOf(false) }
@@ -1196,6 +1198,25 @@ fun DotCalApp(
         )
         taskDetail = null
         openQuickAddResult(prefill)
+    }
+    fun openFindTimeFor(item: CalendarEvent) {
+        if (!isPro) {
+            showPaywall = true
+            return
+        }
+        val today = LocalDate.now()
+        val targetEnd = if (item.isTask == 1 && item.hasTaskDate() && !item.localDate().isBefore(today)) {
+            item.localDate()
+        } else {
+            today.plusDays(7)
+        }
+        taskDetail = null
+        viewModel.closeEventDetail()
+        findTimeTarget = item
+        availabilityInitialDate = today
+        availabilityInitialEndDate = targetEnd
+        viewModel.clearAvailability()
+        showAvailability = true
     }
     fun useTemplate(template: EventTemplate) {
         showTemplates = false
@@ -2644,6 +2665,7 @@ fun DotCalApp(
                     reminders = reminders.filter { it.eventId == event.baseEventId() },
                     account = accounts.firstOrNull { it.id == event.accountId },
                     palette = palette,
+                    isPro = isPro,
                     isPrivate = event.baseEventId() in privateVaultIds,
                     isCountdownPinned = event.baseEventId() in countdownPins,
                     fileAttachments = eventFileAttachments[event.baseEventId()].orEmpty(),
@@ -2719,6 +2741,11 @@ fun DotCalApp(
                     },
                     onDuplicate = { openDuplicateEditor(event) },
                     onCopyToDate = { pendingCopyToDateEvent = event },
+                    onFindTime = if (FindTimeForThisMatcher.canMove(event)) {
+                        { openFindTimeFor(event) }
+                    } else {
+                        null
+                    },
                     onMoveToPrivate = {
                         if (!isPro) {
                             showPaywall = true
@@ -3147,6 +3174,7 @@ fun DotCalApp(
                     task = task,
                     reminder = reminders.firstOrNull { it.eventId == task.baseEventId() },
                     palette = palette,
+                    isPro = isPro,
                     isPrivate = task.baseEventId() in privateVaultIds,
                     onBack = { taskDetail = null },
                     onEdit = {
@@ -3155,6 +3183,7 @@ fun DotCalApp(
                         showTaskEditor = true
                     },
                     onTimeBlock = { blockFromTask(task) },
+                    onFindTime = { openFindTimeFor(task) },
                     onMoveToPrivate = {
                         if (!isPro) {
                             showPaywall = true
@@ -3376,11 +3405,49 @@ fun DotCalApp(
                 state = availabilityState,
                 onBack = {
                     showAvailability = false
+                    findTimeTarget = null
                     viewModel.clearAvailability()
                 },
                 onRefresh = { request -> viewModel.refreshAvailability(request, use24HourFormat) },
+                findTimeTarget = findTimeTarget,
+                onApplyTargetSlot = { slot ->
+                    val target = findTimeTarget
+                    if (target == null) {
+                        Unit
+                    } else if (target.isTask == 1) {
+                        viewModel.createTimeBlock(target, slot) { result ->
+                            result.onSuccess {
+                                showAvailability = false
+                                findTimeTarget = null
+                                viewModel.clearAvailability()
+                                showDotCalToast(context, palette, R.string.find_time_block_created)
+                            }.onFailure {
+                                showDotCalToast(context, palette, R.string.find_time_block_failed)
+                            }
+                        }
+                    } else if (FindTimeForThisMatcher.canMove(target)) {
+                        val targetStart = slot.date.atTime(slot.start)
+                        val targetEnd = slot.date.atTime(slot.end)
+                        viewModel.rescheduleEvent(
+                            event = target,
+                            targetStart = targetStart,
+                            targetEnd = targetEnd,
+                            recurringEditScope = RecurringEditScope.WholeSeries,
+                        ) { result ->
+                            result.onSuccess {
+                                showAvailability = false
+                                findTimeTarget = null
+                                viewModel.clearAvailability()
+                                showDotCalToast(context, palette, R.string.find_time_moved)
+                            }.onFailure {
+                                showDotCalToast(context, palette, R.string.find_time_move_failed)
+                            }
+                        }
+                    }
+                },
                 onUseFreeSlot = { slot ->
                     showAvailability = false
+                    findTimeTarget = null
                     openQuickAddResult(
                         QuickAddResult(
                             title = "",

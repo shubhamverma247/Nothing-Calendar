@@ -1,8 +1,10 @@
 package com.dotfield.dotcal.data.scheduling
 
+import com.dotfield.dotcal.data.CalendarEvent
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -86,6 +88,33 @@ class FindTimeForThisMatcherTest {
         )
     }
 
+    @Test
+    fun derivesTimedItemDurationAndFallsBackForUntimedTask() {
+        val timedTask = event(
+            isTask = 1,
+            isAllDay = 0,
+            start = LocalDateTime.of(monday, LocalTime.of(14, 0)),
+            end = LocalDateTime.of(monday, LocalTime.of(15, 30)),
+        )
+        val untimedTask = event(isTask = 1, isAllDay = 1)
+
+        assertEquals(90L, FindTimeForThisMatcher.durationMinutes(timedTask))
+        assertEquals(60L, FindTimeForThisMatcher.durationMinutes(untimedTask))
+    }
+
+    @Test
+    fun onlyStandaloneLocalTimedEventsCanBeMoved() {
+        val local = event()
+
+        assertEquals(true, FindTimeForThisMatcher.canMove(local))
+        assertEquals(false, FindTimeForThisMatcher.canMove(local.copy(isAllDay = 1)))
+        assertEquals(false, FindTimeForThisMatcher.canMove(local.copy(isTask = 1)))
+        assertEquals(false, FindTimeForThisMatcher.canMove(local.copy(rrule = "FREQ=WEEKLY")))
+        assertEquals(false, FindTimeForThisMatcher.canMove(local.copy(source = "GOOGLE")))
+        assertEquals(false, FindTimeForThisMatcher.canMove(local.copy(googleEventId = "42")))
+        assertEquals(false, FindTimeForThisMatcher.canMove(local.apply { providerRdate = "20260713T120000Z" }))
+    }
+
     private fun day(vararg slots: FreeSlot) = DayAvailability(
         date = slots.firstOrNull()?.date ?: monday,
         workingStart = LocalTime.of(9, 0),
@@ -108,4 +137,35 @@ class FindTimeForThisMatcherTest {
         slot = FreeSlot(date, LocalTime.parse(start), LocalTime.parse(end)),
         unusedMinutes = unusedMinutes,
     )
+
+    private fun event(
+        isTask: Int = 0,
+        isAllDay: Int = 0,
+        start: LocalDateTime = LocalDateTime.of(monday, LocalTime.of(12, 0)),
+        end: LocalDateTime = start.plusHours(1),
+        rrule: String? = null,
+        source: String = "LOCAL",
+        googleEventId: String? = null,
+    ): CalendarEvent {
+        val zone = ZoneId.systemDefault()
+        return CalendarEvent(
+            id = "item",
+            accountId = "local",
+            title = "Write proposal",
+            startTimeMs = start.atZone(zone).toInstant().toEpochMilli(),
+            endTimeMs = end.atZone(zone).toInstant().toEpochMilli(),
+            timeZone = zone.id,
+            isAllDay = isAllDay,
+            colorHex = null,
+            rrule = rrule,
+            source = source,
+            googleEventId = googleEventId,
+            googleCalendarId = null,
+            isTask = isTask,
+            completedAtMs = null,
+            voiceNotePath = null,
+            createdAtMs = 0,
+            updatedAtMs = 0,
+        )
+    }
 }

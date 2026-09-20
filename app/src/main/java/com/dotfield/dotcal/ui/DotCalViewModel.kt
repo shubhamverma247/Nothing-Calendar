@@ -259,6 +259,21 @@ class DotCalViewModel(
         viewModelScope.launch { repository.addLocalEvent(title = title, date = date, startTime = startTime) }
     }
 
+    fun createTimeBlock(task: CalendarEvent, slot: FreeSlot, onDone: (Result<Unit>) -> Unit) {
+        viewModelScope.launch {
+            onDone(
+                runCatching {
+                    repository.addLocalEvent(
+                        title = task.title,
+                        date = slot.date,
+                        startTime = slot.start,
+                        endTime = slot.end,
+                    )
+                },
+            )
+        }
+    }
+
     fun openEventDetail(event: CalendarEvent) {
         _detailEvent.value = event
         refreshProviderMeetingMetadata(event.baseEventId())

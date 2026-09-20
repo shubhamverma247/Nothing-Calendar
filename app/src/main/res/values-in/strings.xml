@@ -523,6 +523,8 @@
     <string name="pro_feature_dead_time_desc">Temukan blok kosong dalam tujuh hari ke depan</string>
     <string name="pro_feature_share_availability">Bagikan Ketersediaan</string>
     <string name="pro_feature_share_availability_desc">Turn livre Waktu into text anda can paste anywhere</string>
+    <string name="pro_feature_find_time_for_this">Find Time for This</string>
+    <string name="pro_feature_find_time_for_this_desc">Review ranked slots for a task or local event before confirming</string>
     <string name="pro_feature_pdf_attachments">Lampiran PDF</string>
     <string name="pro_feature_pdf_attachments_desc">Lampirkan hingga 5 PDF ke acara apa pun</string>
     <string name="pro_feature_unlimited_countdowns">Hitung mundur tanpa batas</string>
@@ -1183,4 +1185,17 @@
     <string name="availability_use_slot">Gunakan slot</string>
     <string name="availability_no_slots">Tidak ada waktu luang yang cocok</string>
     <string name="widget_accent_custom_hint">#RRGGBB</string>
+    <string name="find_time_for_this">Cari waktu untuk ini</string>
+    <string name="find_time_for_this_title">Cari waktu untuk ini</string>
+    <string name="find_time_affected_item">Item yang terpengaruh</string>
+    <string name="find_time_target_summary">%1$s\n%2$d menit</string>
+    <string name="find_time_review">Tinjau</string>
+    <string name="find_time_confirm_title">Konfirmasi waktu usulan</string>
+    <string name="find_time_confirm_body">%1$s\n%2$s\n%3$s - %4$s</string>
+    <string name="find_time_create_block">Buat acara</string>
+    <string name="find_time_move_event">Pindahkan acara</string>
+    <string name="find_time_moved">Acara dipindahkan</string>
+    <string name="find_time_move_failed">Acara tidak dapat dipindahkan</string>
+    <string name="find_time_block_created">Acara kalender dibuat</string>
+    <string name="find_time_block_failed">Acara kalender tidak dapat dibuat</string>
 </resources>

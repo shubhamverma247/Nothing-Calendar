@@ -523,6 +523,8 @@
     <string name="pro_feature_dead_time_desc">Önümüzdeki yedi gündeki boş blokları bul</string>
     <string name="pro_feature_share_availability">Paylas Musaitlik</string>
     <string name="pro_feature_share_availability_desc">Turn livre Saat into text sen can paste anywhere</string>
+    <string name="pro_feature_find_time_for_this">Find Time for This</string>
+    <string name="pro_feature_find_time_for_this_desc">Review ranked slots for a task or local event before confirming</string>
     <string name="pro_feature_pdf_attachments">PDF ekleri</string>
     <string name="pro_feature_pdf_attachments_desc">Her etkinlige en fazla 5 PDF ekle</string>
     <string name="pro_feature_unlimited_countdowns">Sinirsiz geri sayim</string>
@@ -1183,4 +1185,17 @@
     <string name="availability_use_slot">Zaman aralığını kullan</string>
     <string name="availability_no_slots">Uygun boş zaman bulunamadı</string>
     <string name="widget_accent_custom_hint">#RRGGBB</string>
+    <string name="find_time_for_this">Bunun için zaman bul</string>
+    <string name="find_time_for_this_title">Bunun için zaman bul</string>
+    <string name="find_time_affected_item">Etkilenen öğe</string>
+    <string name="find_time_target_summary">%1$s\n%2$d dakika</string>
+    <string name="find_time_review">İncele</string>
+    <string name="find_time_confirm_title">Önerilen zamanı onayla</string>
+    <string name="find_time_confirm_body">%1$s\n%2$s\n%3$s - %4$s</string>
+    <string name="find_time_create_block">Etkinlik oluştur</string>
+    <string name="find_time_move_event">Etkinliği taşı</string>
+    <string name="find_time_moved">Etkinlik taşındı</string>
+    <string name="find_time_move_failed">Etkinlik taşınamadı</string>
+    <string name="find_time_block_created">Takvim etkinliği oluşturuldu</string>
+    <string name="find_time_block_failed">Takvim etkinliği oluşturulamadı</string>
 </resources>

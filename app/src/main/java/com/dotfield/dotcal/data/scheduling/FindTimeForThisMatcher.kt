@@ -1,5 +1,6 @@
 package com.dotfield.dotcal.data.scheduling
 
+import com.dotfield.dotcal.data.CalendarEvent
 import java.time.Duration
 import java.time.LocalDateTime
 
@@ -9,6 +10,23 @@ data class FindTimeSuggestion(
 )
 
 object FindTimeForThisMatcher {
+    fun durationMinutes(item: CalendarEvent, fallbackMinutes: Long = 60): Long {
+        require(fallbackMinutes > 0) { "Fallback duration must be positive" }
+        if (item.isAllDay == 1 || item.endTimeMs <= item.startTimeMs) return fallbackMinutes
+        return ((item.endTimeMs - item.startTimeMs) / 60_000L).coerceAtLeast(1L)
+    }
+
+    fun canMove(event: CalendarEvent): Boolean =
+        event.isTask == 0 &&
+            event.isAllDay == 0 &&
+            event.source == "LOCAL" &&
+            event.googleEventId == null &&
+            event.googleCalendarId == null &&
+            event.rrule.isNullOrBlank() &&
+            event.providerRdate.isNullOrBlank() &&
+            event.providerOriginalGoogleEventId == null &&
+            event.providerOriginalInstanceTimeMs == null
+
     fun find(
         days: List<DayAvailability>,
         durationMinutes: Long,

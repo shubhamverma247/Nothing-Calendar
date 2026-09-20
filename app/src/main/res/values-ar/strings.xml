@@ -599,6 +599,8 @@
     <string name="pro_feature_dead_time_desc">اعثر على فترات فارغة خلال الأيام السبعة القادمة</string>
     <string name="pro_feature_share_availability">مشاركة Availability</string>
     <string name="pro_feature_share_availability_desc">حوّل وقت الفراغ إلى نص يمكنك لصقه في أي مكان</string>
+    <string name="pro_feature_find_time_for_this">Find Time for This</string>
+    <string name="pro_feature_find_time_for_this_desc">Review ranked slots for a task or local event before confirming</string>
     <string name="pro_feature_pdf_attachments">PDF attachments</string>
     <string name="pro_feature_pdf_attachments_desc">Attach up to 5 PDF files to any event</string>
     <string name="pro_feature_unlimited_countdowns">Unlimited countdowns</string>
@@ -1319,4 +1321,17 @@
     <string name="availability_use_slot">استخدام الموعد</string>
     <string name="availability_no_slots">لا توجد أوقات فراغ مطابقة</string>
     <string name="widget_accent_custom_hint">#RRGGBB</string>
+    <string name="find_time_for_this">العثور على وقت لهذا</string>
+    <string name="find_time_for_this_title">العثور على وقت لهذا</string>
+    <string name="find_time_affected_item">العنصر المتأثر</string>
+    <string name="find_time_target_summary">%1$s\n%2$d دقيقة</string>
+    <string name="find_time_review">مراجعة</string>
+    <string name="find_time_confirm_title">تأكيد الوقت المقترح</string>
+    <string name="find_time_confirm_body">%1$s\n%2$s\n%3$s - %4$s</string>
+    <string name="find_time_create_block">إنشاء حدث</string>
+    <string name="find_time_move_event">نقل الحدث</string>
+    <string name="find_time_moved">تم نقل الحدث</string>
+    <string name="find_time_move_failed">تعذر نقل الحدث</string>
+    <string name="find_time_block_created">تم إنشاء حدث التقويم</string>
+    <string name="find_time_block_failed">تعذر إنشاء حدث التقويم</string>
 </resources>
