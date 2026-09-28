@@ -329,6 +329,21 @@
     <string name="event_section_images">IMAGENS</string>
     <string name="event_section_voice_note">VOZ NOTA</string>
     <string name="event_section_files">DOSYALAR</string>
+    <string name="event_section_preparation">HAZIRLIK</string>
+    <string name="event_readiness_progress">%1$d / %2$d hazır</string>
+    <string name="event_readiness_files">Eklenen dosyalar: %1$d</string>
+    <string name="event_readiness_empty">Hazırlık öğesi yok</string>
+    <string name="event_readiness_add">Öğe ekle</string>
+    <string name="event_readiness_add_title">Yeni hazırlık öğesi</string>
+    <string name="event_readiness_edit_title">Hazırlık öğesini düzenle</string>
+    <string name="event_readiness_item_hint">Hazırlık öğesi</string>
+    <string name="event_readiness_mark_ready">%1$s hazır olarak işaretle</string>
+    <string name="event_readiness_mark_not_ready">%1$s hazır değil olarak işaretle</string>
+    <string name="event_readiness_update_error">Hazırlık listesi güncellenemedi</string>
+    <plurals name="event_readiness_remaining">
+        <item quantity="one">%1$d hazırlık öğesi kaldı</item>
+        <item quantity="other">%1$d hazırlık öğesi kaldı</item>
+    </plurals>
     <string name="event_all_day">todos-Gun</string>
     <string name="event_delete">Sil etkinlik</string>
     <string name="event_options">etkinlik Opcoes</string>
@@ -856,6 +871,7 @@
     <string name="toast_file_attachment_failed">PDF eklenemedi</string>
     <string name="toast_file_attachment_missing">Dosya eksik</string>
     <string name="toast_file_attachment_no_app">Bu dosyayı açabilecek uygulama yok</string>
+    <string name="toast_google_maps_unavailable">Google Maps yüklü değil</string>
     <string name="toast_holidays_add_failed">Tatiller eklenemedi</string>
     <string name="toast_holidays_remove_failed">Tatiller kaldirilamadi</string>
     <string name="toast_import_invalid_ics">Ice aktarma basarisiz - gecerli bir .ics dosyasi degil</string>

@@ -165,7 +165,7 @@
     <!-- Sibling app's store name — a brand, not copy. -->
     <string name="settings_more_apps_value" translatable="false">DotFiles — File Manager</string>
     <string name="settings_join_discord">Join Discord</string>
-    <string name="settings_join_discord_value" translatable="false">discord.gg/sTAKcAG8R</string>
+    <string name="settings_join_discord_value" translatable="false">discord.gg/B7WGhf89SU</string>
     <string name="settings_send_feedback">Send Feedback</string>
     <string name="settings_version">Version</string>
 
@@ -1140,6 +1140,7 @@
     <string name="toast_file_attachment_failed">Could not attach PDF</string>
     <string name="toast_file_attachment_missing">File is missing</string>
     <string name="toast_file_attachment_no_app">No app can open this file</string>
+    <string name="toast_google_maps_unavailable">Google Maps is not installed</string>
     <string name="toast_import_invalid_ics">Import failed - not a valid .ics file</string>
     <!-- Restore/import summaries. Two independent counts, so a plural on either one would be
          wrong; the counts are formatted into a neutral frame instead. -->

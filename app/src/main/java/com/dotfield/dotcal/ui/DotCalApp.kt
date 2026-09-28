@@ -179,8 +179,6 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
@@ -1039,7 +1037,7 @@ fun DotCalApp(
     }
     val activeCalendarTab = calendarTab
     SystemBarColorSync(palette)
-    LaunchedEffect(resolvedThemeMode, resolvedAccentColor, storedCalendarTab, systemDark) {
+    LaunchedEffect(resolvedThemeMode, resolvedAccentColor, storedCalendarTab, systemDark, weekStartDay) {
         bootPreferences.edit()
             .putString(BOOT_THEME_KEY, resolvedThemeMode.name)
             .putString(BOOT_ACCENT_KEY, resolvedAccentColor.storageValue)
@@ -1204,17 +1202,12 @@ fun DotCalApp(
             showPaywall = true
             return
         }
-        val today = LocalDate.now()
-        val targetEnd = if (item.isTask == 1 && item.hasTaskDate() && !item.localDate().isBefore(today)) {
-            item.localDate()
-        } else {
-            today.plusDays(7)
-        }
+        val targetRange = FindTimeForThisMatcher.initialDateRange(item, LocalDate.now())
         taskDetail = null
         viewModel.closeEventDetail()
         findTimeTarget = item
-        availabilityInitialDate = today
-        availabilityInitialEndDate = targetEnd
+        availabilityInitialDate = targetRange.first
+        availabilityInitialEndDate = targetRange.second
         viewModel.clearAvailability()
         showAvailability = true
     }
@@ -2052,7 +2045,7 @@ fun DotCalApp(
             visible = showOnboarding,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             OnboardingScreen(
                 page = onboardingPages[onboardingPageIndex],
@@ -2072,10 +2065,7 @@ fun DotCalApp(
             visible = screenTab == ScreenTab.Settings,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier
-                .fillMaxSize()
-                .background(palette.calendarSurface)
-                .statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.calendarSurface),
         ) {
             SettingsPreview(
                 themeMode = resolvedThemeMode,
@@ -2657,7 +2647,7 @@ fun DotCalApp(
             visible = detailEvent != null,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             detailEvent?.let { event ->
                 EventDetailScreen(
@@ -2848,7 +2838,7 @@ fun DotCalApp(
                 visible = true,
                 enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
                 exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-                modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+                modifier = Modifier.modalOverlayModifier(palette.background),
             ) {
                 QrEventShareScreen(
                     eventTitle = session.event.title,
@@ -2881,7 +2871,7 @@ fun DotCalApp(
             visible = showQrScanner && hasCameraHardware,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             QrEventScannerScreen(
                 palette = palette,
@@ -2911,7 +2901,7 @@ fun DotCalApp(
                 visible = true,
                 enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
                 exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-                modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+                modifier = Modifier.modalOverlayModifier(palette.background),
             ) {
                 IcsImportPreviewScreen(
                     items = pending.items,
@@ -3167,7 +3157,7 @@ fun DotCalApp(
             visible = taskDetail != null,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             lastTaskDetail?.let { task ->
                 TaskDetailScreen(
@@ -3248,7 +3238,7 @@ fun DotCalApp(
             visible = addSheet,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             EventEditorScreen(
                 event = editingEvent,
@@ -3324,7 +3314,7 @@ fun DotCalApp(
             visible = showPaywall,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             PaywallScreen(
                 viewModel = viewModel,
@@ -3336,7 +3326,7 @@ fun DotCalApp(
             visible = showDateCalculator,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             DateCalculatorScreen(
                 palette = palette,
@@ -3347,7 +3337,7 @@ fun DotCalApp(
             visible = showTimeInsights,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             TimeInsightsScreen(
                 palette = palette,
@@ -3394,7 +3384,7 @@ fun DotCalApp(
             visible = showAvailability,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             AvailabilityScreen(
                 palette = palette,
@@ -3434,11 +3424,26 @@ fun DotCalApp(
                             targetEnd = targetEnd,
                             recurringEditScope = RecurringEditScope.WholeSeries,
                         ) { result ->
-                            result.onSuccess {
+                            result.onSuccess { summary ->
                                 showAvailability = false
                                 findTimeTarget = null
                                 viewModel.clearAvailability()
-                                showDotCalToast(context, palette, R.string.find_time_moved)
+                                scope.launch {
+                                    val dismissJob = launch {
+                                        delay(BULK_UNDO_SNACKBAR_MILLIS)
+                                        snackbarHostState.currentSnackbarData?.dismiss()
+                                    }
+                                    val snackbarResult = snackbarHostState.showSnackbar(
+                                        message = resources.getString(R.string.find_time_moved),
+                                        actionLabel = undoActionLabel,
+                                    )
+                                    dismissJob.cancel()
+                                    if (snackbarResult == SnackbarResult.ActionPerformed) {
+                                        viewModel.undoBulkEdit(summary.undoToken) {
+                                            showDotCalToast(context, palette, R.string.toast_change_undone)
+                                        }
+                                    }
+                                }
                             }.onFailure {
                                 showDotCalToast(context, palette, R.string.find_time_move_failed)
                             }
@@ -3472,7 +3477,7 @@ fun DotCalApp(
             visible = showQuickAdd,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             QuickAddScreen(
                 palette = palette,
@@ -3526,7 +3531,7 @@ fun DotCalApp(
             visible = showTemplates,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             val templateItems by viewModel.templates.collectAsStateWithLifecycle()
             TemplatesScreen(
@@ -3541,7 +3546,7 @@ fun DotCalApp(
             visible = showFocusProfiles,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             val focusProfileItems by viewModel.focusProfiles.collectAsStateWithLifecycle()
             FocusProfilesScreen(
@@ -3573,7 +3578,7 @@ fun DotCalApp(
             visible = showShiftPatterns,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             val shiftTypes by viewModel.shiftTypes.collectAsStateWithLifecycle()
             val shiftPatterns by viewModel.shiftPatterns.collectAsStateWithLifecycle()
@@ -3655,7 +3660,7 @@ fun DotCalApp(
             visible = showRecentlyDeleted,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             val deletedItems by viewModel.recentlyDeleted.collectAsStateWithLifecycle()
             RecentlyDeletedScreen(
@@ -3671,7 +3676,7 @@ fun DotCalApp(
             visible = showSearch,
             enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
-            modifier = Modifier.fillMaxSize().background(palette.background).statusBarsPadding(),
+            modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
             val searchAccounts by viewModel.assignableAccounts.collectAsStateWithLifecycle()

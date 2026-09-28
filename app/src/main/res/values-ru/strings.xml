@@ -355,6 +355,23 @@
     <string name="event_section_images">BILDER</string>
     <string name="event_section_voice_note">SPRACHE NOTIZ</string>
     <string name="event_section_files">ФАЙЛЫ</string>
+    <string name="event_section_preparation">ПОДГОТОВКА</string>
+    <string name="event_readiness_progress">%1$d из %2$d готово</string>
+    <string name="event_readiness_files">Файлов прикреплено: %1$d</string>
+    <string name="event_readiness_empty">Нет элементов подготовки</string>
+    <string name="event_readiness_add">Добавить элемент</string>
+    <string name="event_readiness_add_title">Новый элемент подготовки</string>
+    <string name="event_readiness_edit_title">Изменить элемент подготовки</string>
+    <string name="event_readiness_item_hint">Элемент подготовки</string>
+    <string name="event_readiness_mark_ready">Отметить %1$s как готово</string>
+    <string name="event_readiness_mark_not_ready">Отметить %1$s как не готово</string>
+    <string name="event_readiness_update_error">Не удалось обновить список подготовки</string>
+    <plurals name="event_readiness_remaining">
+        <item quantity="one">Остался %1$d элемент подготовки</item>
+        <item quantity="few">Осталось %1$d элемента подготовки</item>
+        <item quantity="many">Осталось %1$d элементов подготовки</item>
+        <item quantity="other">Осталось %1$d элементов подготовки</item>
+    </plurals>
     <string name="event_all_day">alle-Den</string>
     <string name="event_delete">Udalit sobytie</string>
     <string name="event_options">sobytie Optionen</string>
@@ -910,6 +927,7 @@
     <string name="toast_file_attachment_failed">Не удалось прикрепить PDF</string>
     <string name="toast_file_attachment_missing">Файл отсутствует</string>
     <string name="toast_file_attachment_no_app">Нет приложения для открытия этого файла</string>
+    <string name="toast_google_maps_unavailable">Google Maps не установлен</string>
     <string name="toast_holidays_add_failed">Ne udalos dobavit prazdniki</string>
     <string name="toast_holidays_remove_failed">Ne udalos udalit prazdniki</string>
     <string name="toast_import_invalid_ics">Import ne udalsya - eto ne dopustimyy .ics fayl</string>

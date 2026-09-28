@@ -297,6 +297,7 @@ internal fun EventDetailScreen(
     onRemoveReadinessItem: (String) -> Unit,
     onDelete: () -> Unit,
 ) {
+    val context = LocalContext.current
     val isReadOnly = event.source == "BIRTHDAY" || event.source == "HOLIDAY"
     val imageUris = remember(event.imageUris) { parseJsonStringArray(event.imageUris) }
     var previewImageUri by remember { mutableStateOf<String?>(null) }
@@ -393,7 +394,18 @@ internal fun EventDetailScreen(
                     item {
                         DetailDivider(palette)
                         DetailSection(label = stringResource(R.string.event_section_location), palette = palette) {
-                            Text(event.location, color = palette.primaryText, fontSize = 16.sp, lineHeight = 23.sp)
+                            Text(
+                                event.location,
+                                color = palette.accent,
+                                fontSize = 16.sp,
+                                lineHeight = 23.sp,
+                                textDecoration = TextDecoration.Underline,
+                                modifier = Modifier.clickable {
+                                    if (!openEventLocationNavigation(context, event.location)) {
+                                        showDotCalToast(context, palette, R.string.toast_google_maps_unavailable)
+                                    }
+                                },
+                            )
                         }
                     }
                 }

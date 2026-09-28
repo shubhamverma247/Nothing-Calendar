@@ -30,7 +30,7 @@ class DotCalApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        ReminderScheduler(this).ensureChannel()
+        runStartupTask { ReminderScheduler(this@DotCalApplication).ensureChannel() }
         proManager.initialize()
         runStartupTask {
             val enabled = calendarPreferencesDataStore.data.first()[CalendarPreferences.KEY_DAILY_DATE_ICON_ENABLED] ?: true

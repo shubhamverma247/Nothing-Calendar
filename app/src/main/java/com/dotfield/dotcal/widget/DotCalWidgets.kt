@@ -61,7 +61,6 @@ import com.dotfield.dotcal.R
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import java.time.Duration
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -138,19 +137,6 @@ abstract class DotCalWidget(
             }
         }
     }
-}
-
-private fun compactMonthDays(displayMonthDate: LocalDate, today: LocalDate): List<WidgetCalendarDay> {
-    val month = YearMonth.from(displayMonthDate)
-    val monthStart = month.atDay(1)
-    val leadingBlanks = monthStart.dayOfWeek.value % 7
-    val days = MutableList(leadingBlanks) { WidgetCalendarDay(dayOfMonth = null) }
-    days += (1..month.lengthOfMonth()).map { day ->
-        val date = month.atDay(day)
-        WidgetCalendarDay(dayOfMonth = day, dateIso = date.toString(), isToday = date == today)
-    }
-    while (days.size % 7 != 0) days += WidgetCalendarDay(dayOfMonth = null)
-    return days
 }
 
 @Composable
@@ -304,7 +290,7 @@ private fun CompactMonthWidget(context: Context, palette: DotCalWidgetPalette) {
     val settings = currentDotCalWidgetSettings()
     val monthDate = LocalDate.now().plusMonths(settings.monthOffset.toLong())
     val monthLabel = monthDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
-    val days = compactMonthDays(monthDate, LocalDate.now())
+    val days = widgetMonthDays(monthDate, LocalDate.now(), settings.weekStart)
     WidgetSurfaceBox(palette) {
         Column(
             modifier = GlanceModifier
@@ -938,8 +924,9 @@ private fun MonthCalendar(context: Context, data: WidgetCalendarData, palette: D
 
 @Composable
 private fun MonthGrid(context: Context, days: List<WidgetCalendarDay>, palette: DotCalWidgetPalette) {
+    val settings = currentDotCalWidgetSettings()
     Row(GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        listOf("S", "M", "T", "W", "T", "F", "S").forEach {
+        widgetWeekdayLabels(settings.weekStart).forEach {
             Box(GlanceModifier.width(CalendarCellWidth).height(15.dp), contentAlignment = Alignment.Center) {
                 Text(it, style = monoStyle(palette.secondary, 10, FontWeight.Bold))
             }
@@ -1575,7 +1562,7 @@ private fun buildCompactMonthGridGraphic(
         canvas.drawText(text, x, baseline, paint)
     }
 
-    listOf("S", "M", "T", "W", "T", "F", "S").forEachIndexed { index, label ->
+    widgetWeekdayLabels(settings.weekStart).forEachIndexed { index, label ->
         val x = ((index * (metrics.cellWidth + metrics.columnGap)) + (metrics.cellWidth / 2f)) * scale
         drawCenteredText(label, x, metrics.weekdayHeight * scale / 2f, metrics.weekdayTextSize, colors.secondary, bold = true)
     }

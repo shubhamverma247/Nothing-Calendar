@@ -383,6 +383,21 @@
     <string name="event_section_images">IMÁGENES</string>
     <string name="event_section_voice_note">NOTA DE VOZ</string>
     <string name="event_section_files">ARCHIVOS</string>
+    <string name="event_section_preparation">PREPARACIÓN</string>
+    <string name="event_readiness_progress">%1$d de %2$d listos</string>
+    <string name="event_readiness_files">Archivos adjuntos: %1$d</string>
+    <string name="event_readiness_empty">No hay elementos de preparación</string>
+    <string name="event_readiness_add">Añadir elemento</string>
+    <string name="event_readiness_add_title">Nuevo elemento de preparación</string>
+    <string name="event_readiness_edit_title">Editar elemento de preparación</string>
+    <string name="event_readiness_item_hint">Elemento de preparación</string>
+    <string name="event_readiness_mark_ready">Marcar %1$s como listo</string>
+    <string name="event_readiness_mark_not_ready">Marcar %1$s como no listo</string>
+    <string name="event_readiness_update_error">No se pudo actualizar la lista de preparación</string>
+    <plurals name="event_readiness_remaining">
+        <item quantity="one">Queda %1$d elemento de preparación</item>
+        <item quantity="other">Quedan %1$d elementos de preparación</item>
+    </plurals>
     <string name="event_all_day">Todo el día</string>
     <string name="event_delete">Eliminar evento</string>
     <string name="event_options">Opciones del evento</string>
@@ -990,6 +1005,7 @@
     <string name="toast_file_attachment_failed">No se pudo adjuntar el PDF</string>
     <string name="toast_file_attachment_missing">Falta el archivo</string>
     <string name="toast_file_attachment_no_app">Ninguna app puede abrir este archivo</string>
+    <string name="toast_google_maps_unavailable">Google Maps no está instalado</string>
     <string name="toast_holidays_add_failed">No se pudieron añadir los festivos</string>
     <string name="toast_holidays_remove_failed">No se pudieron eliminar los festivos</string>
     <string name="toast_import_invalid_ics">Importación fallida - no es un archivo .ics válido</string>

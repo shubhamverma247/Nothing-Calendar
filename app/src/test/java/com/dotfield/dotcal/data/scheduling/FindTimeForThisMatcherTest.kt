@@ -103,6 +103,35 @@ class FindTimeForThisMatcherTest {
     }
 
     @Test
+    fun durationOptionsIncludeDerivedDurationAndCommonChoices() {
+        val item = event(
+            start = LocalDateTime.of(monday, LocalTime.of(14, 0)),
+            end = LocalDateTime.of(monday, LocalTime.of(15, 30)),
+        )
+
+        assertEquals(listOf(30, 45, 60, 90, 120), FindTimeForThisMatcher.durationOptions(item))
+    }
+
+    @Test
+    fun initialDateRangeUsesFutureDeadlineWhenAvailable() {
+        val today = monday
+        val dueTask = event(
+            isTask = 1,
+            start = LocalDateTime.of(monday.plusDays(3), LocalTime.of(18, 0)),
+            end = LocalDateTime.of(monday.plusDays(3), LocalTime.of(19, 0)),
+        )
+        val futureEvent = event(
+            start = LocalDateTime.of(monday.plusDays(5), LocalTime.of(10, 0)),
+            end = LocalDateTime.of(monday.plusDays(5), LocalTime.of(11, 0)),
+        )
+        val noDueTask = event(isTask = 1, isAllDay = 1).copy(startTimeMs = 0L, endTimeMs = 0L)
+
+        assertEquals(today to today.plusDays(3), FindTimeForThisMatcher.initialDateRange(dueTask, today))
+        assertEquals(today to today.plusDays(5), FindTimeForThisMatcher.initialDateRange(futureEvent, today))
+        assertEquals(today to today.plusDays(7), FindTimeForThisMatcher.initialDateRange(noDueTask, today))
+    }
+
+    @Test
     fun onlyStandaloneLocalTimedEventsCanBeMoved() {
         val local = event()
 

@@ -25,8 +25,6 @@ import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.nothing.ketchum.Common
 import com.dotfield.dotcal.data.ReminderCenterScheduler
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import java.text.DateFormat
 import java.util.Date
@@ -101,7 +99,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         cancelRepeat(alarmRequestCode)
     }
 
-    fun showReminderNotification(
+    suspend fun showReminderNotification(
         event: CalendarEvent,
         reminder: EventReminder,
         readinessRemaining: Int = 0,
@@ -117,7 +115,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         )
     }
 
-    fun showReminderNotification(
+    suspend fun showReminderNotification(
         eventId: String,
         eventTitle: String,
         minutesBefore: Int,
@@ -314,7 +312,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         }
     }
 
-    fun updateLiveProgress(intent: Intent) {
+    suspend fun updateLiveProgress(intent: Intent) {
         val eventId = intent.getStringExtra(ReminderReceiver.EXTRA_EVENT_ID) ?: return
         val alarmRequestCode = intent.getIntExtra(ReminderReceiver.EXTRA_ALARM_REQUEST_CODE, Int.MIN_VALUE)
         if (alarmRequestCode == Int.MIN_VALUE) return
@@ -404,7 +402,7 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
             runCatching { Common.is23112() }.getOrDefault(false)
 
-    fun ensureChannel() = ensureChannel(notificationSettings())
+    suspend fun ensureChannel() = ensureChannel(notificationSettings())
 
     private fun ensureChannel(settings: ReminderNotificationSettings) {
         val channel = NotificationChannel(
@@ -422,9 +420,9 @@ class ReminderScheduler(private val context: Context) : ReminderCenterScheduler 
         appContext.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    private fun notificationSettings(): ReminderNotificationSettings = runBlocking(Dispatchers.IO) {
+    private suspend fun notificationSettings(): ReminderNotificationSettings {
         val preferences = appContext.calendarPreferencesDataStore.data.first()
-        ReminderNotificationSettings.from(preferences, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+        return ReminderNotificationSettings.from(preferences, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
     }
 
     private fun scheduleRepeat(

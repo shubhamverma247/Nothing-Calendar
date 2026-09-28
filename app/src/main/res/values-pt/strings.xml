@@ -329,6 +329,21 @@
     <string name="event_section_images">IMAGENS</string>
     <string name="event_section_voice_note">VOZ NOTA</string>
     <string name="event_section_files">ARQUIVOS</string>
+    <string name="event_section_preparation">PREPARACAO</string>
+    <string name="event_readiness_progress">%1$d de %2$d prontos</string>
+    <string name="event_readiness_files">Arquivos anexados: %1$d</string>
+    <string name="event_readiness_empty">Nenhum item de preparacao</string>
+    <string name="event_readiness_add">Adicionar item</string>
+    <string name="event_readiness_add_title">Novo item de preparacao</string>
+    <string name="event_readiness_edit_title">Editar item de preparacao</string>
+    <string name="event_readiness_item_hint">Item de preparacao</string>
+    <string name="event_readiness_mark_ready">Marcar %1$s como pronto</string>
+    <string name="event_readiness_mark_not_ready">Marcar %1$s como nao pronto</string>
+    <string name="event_readiness_update_error">Nao foi possivel atualizar a lista de preparacao</string>
+    <plurals name="event_readiness_remaining">
+        <item quantity="one">%1$d item de preparacao restante</item>
+        <item quantity="other">%1$d itens de preparacao restantes</item>
+    </plurals>
     <string name="event_all_day">Dia todo</string>
     <string name="event_delete">Excluir evento</string>
     <string name="event_options">evento Opcoes</string>
@@ -856,6 +871,7 @@
     <string name="toast_file_attachment_failed">Nao foi possivel anexar o PDF</string>
     <string name="toast_file_attachment_missing">Arquivo ausente</string>
     <string name="toast_file_attachment_no_app">Nenhum app pode abrir este arquivo</string>
+    <string name="toast_google_maps_unavailable">Google Maps não está instalado</string>
     <string name="toast_holidays_add_failed">Nao foi possivel adicionar feriados</string>
     <string name="toast_holidays_remove_failed">Nao foi possivel remover feriados</string>
     <string name="toast_import_invalid_ics">Importacao falhou - arquivo .ics invalido</string>

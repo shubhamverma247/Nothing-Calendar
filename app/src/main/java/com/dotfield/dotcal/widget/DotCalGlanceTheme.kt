@@ -18,6 +18,7 @@ import com.dotfield.dotcal.R
 import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import kotlinx.coroutines.flow.first
+import java.time.DayOfWeek
 
 data class DotCalWidgetPalette(
     val background: ColorProvider,
@@ -41,6 +42,7 @@ data class DotCalWidgetSettings(
     val systemDark: Boolean = false,
     val accountId: String? = null,
     val monthOffset: Int = 0,
+    val weekStart: DayOfWeek = widgetWeekStartFromStorage(null),
     val instanceConfig: WidgetInstanceConfig = WidgetInstanceConfig.legacyDefault(LegacyWidgetKind.Medium),
 )
 
@@ -83,12 +85,14 @@ suspend fun syncDotCalWidgetState(
             this[CalendarPreferences.KEY_WIDGET_OPACITY_PERCENT] = settings.opacityPercent
             this[CalendarPreferences.KEY_WIDGET_DOT_TEXTURE] = settings.showDotTexture
             this[CalendarPreferences.KEY_WIDGET_SYSTEM_DARK] = systemDark
+            this[CalendarPreferences.KEY_WEEK_START] = settings.weekStart.name
         }
     }
     return settings.copy(
         systemDark = systemDark,
         accountId = accountId,
         monthOffset = monthOffset,
+        weekStart = settings.weekStart,
         instanceConfig = instanceConfig,
     )
 }
@@ -186,6 +190,7 @@ private fun Preferences.toDotCalWidgetSettings(): DotCalWidgetSettings {
         systemDark = this[CalendarPreferences.KEY_WIDGET_SYSTEM_DARK] ?: false,
         accountId = accountId,
         monthOffset = this[CalendarPreferences.KEY_WIDGET_MONTH_OFFSET] ?: 0,
+        weekStart = widgetWeekStartFromPreferences(this),
         instanceConfig = WidgetInstanceConfig.decodeOrDefault(
             this[CalendarPreferences.KEY_WIDGET_INSTANCE_CONFIG],
             fallback,

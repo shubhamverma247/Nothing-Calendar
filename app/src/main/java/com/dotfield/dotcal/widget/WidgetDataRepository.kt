@@ -10,9 +10,11 @@ import com.dotfield.dotcal.data.provider.providerRdateStartTimes
 import com.dotfield.dotcal.data.privacy.AppPrivacyManager
 import com.dotfield.dotcal.data.sidestore.EventSideStoreNamespaces
 import com.dotfield.dotcal.data.sidestore.SharedSideStore
+import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -72,6 +74,8 @@ class WidgetDataRepository(
         val displayMonth = YearMonth.from(displayMonthDate)
         val displayMonthStart = displayMonth.atDay(1)
         val displayMonthEndExclusive = displayMonth.atEndOfMonth().plusDays(1)
+        val preferences = context.calendarPreferencesDataStore.data.first()
+        val weekStart = widgetWeekStartFromPreferences(preferences)
         val rangeStart = minOf(today, displayMonthStart)
         val rangeEnd = maxOf(today.plusDays(config.effectiveRangeDays()), displayMonthEndExclusive)
         val privateIds = privacyManager.observePrivateVaultIds().first()
@@ -118,7 +122,7 @@ class WidgetDataRepository(
             todayEventCount = visibleItems.count { it.startTimeMs < todayEndMs },
             remainingEventCount = remainingEventsToday,
             moreItemCount = (displayItems.size - maxItems).coerceAtLeast(0),
-            days = if (config.category == WidgetCategory.Calendar) monthDays(displayMonthDate, today, visibleItems, zoneId) else emptyList(),
+            days = if (config.category == WidgetCategory.Calendar) monthDays(displayMonthDate, today, weekStart, visibleItems, zoneId) else emptyList(),
         )
     }
 
@@ -310,21 +314,19 @@ class WidgetDataRepository(
         return exceptionDates.removePrefix("[").removeSuffix("]").split(',').mapNotNull { it.trim().toLongOrNull() }.toSet()
     }
 
-    private fun monthDays(displayMonthDate: LocalDate, today: LocalDate, events: List<CalendarEvent>, zoneId: ZoneId): List<WidgetCalendarDay> {
+    private fun monthDays(
+        displayMonthDate: LocalDate,
+        today: LocalDate,
+        weekStart: DayOfWeek,
+        events: List<CalendarEvent>,
+        zoneId: ZoneId,
+    ): List<WidgetCalendarDay> {
         val month = YearMonth.from(displayMonthDate)
-        val monthStart = month.atDay(1)
-        val leadingBlanks = monthStart.dayOfWeek.value % 7
         val eventDays = events
             .filter { YearMonth.from(Instant.ofEpochMilli(it.startTimeMs).atZone(zoneId)) == month }
             .map { Instant.ofEpochMilli(it.startTimeMs).atZone(zoneId).dayOfMonth }
             .toSet()
-        val days = MutableList(leadingBlanks) { WidgetCalendarDay(dayOfMonth = null) }
-        days += (1..month.lengthOfMonth()).map { day ->
-            val date = month.atDay(day)
-            WidgetCalendarDay(dayOfMonth = day, dateIso = date.toString(), isToday = date == today, hasEvents = day in eventDays)
-        }
-        while (days.size % 7 != 0) days += WidgetCalendarDay(dayOfMonth = null)
-        return days
+        return widgetMonthDays(displayMonthDate, today, weekStart, eventDays)
     }
 
     private fun LocalDate.atStartMs(zoneId: ZoneId): Long = atStartOfDay(zoneId).toInstant().toEpochMilli()

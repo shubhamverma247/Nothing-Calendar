@@ -381,6 +381,25 @@
     <string name="event_section_images">BILDER</string>
     <string name="event_section_voice_note">SPRACHE NOTIZ</string>
     <string name="event_section_files">الملفات</string>
+    <string name="event_section_preparation">التحضير</string>
+    <string name="event_readiness_progress">%1$d من %2$d جاهز</string>
+    <string name="event_readiness_files">الملفات المرفقة: %1$d</string>
+    <string name="event_readiness_empty">لا توجد عناصر تحضير</string>
+    <string name="event_readiness_add">إضافة عنصر</string>
+    <string name="event_readiness_add_title">عنصر تحضير جديد</string>
+    <string name="event_readiness_edit_title">تعديل عنصر التحضير</string>
+    <string name="event_readiness_item_hint">عنصر التحضير</string>
+    <string name="event_readiness_mark_ready">اجعل %1$s جاهزا</string>
+    <string name="event_readiness_mark_not_ready">اجعل %1$s غير جاهز</string>
+    <string name="event_readiness_update_error">تعذر تحديث قائمة التحضير</string>
+    <plurals name="event_readiness_remaining">
+        <item quantity="zero">لا توجد عناصر تحضير متبقية</item>
+        <item quantity="one">بقي عنصر تحضير واحد</item>
+        <item quantity="two">بقي عنصرا تحضير</item>
+        <item quantity="few">بقي %1$d عناصر تحضير</item>
+        <item quantity="many">بقي %1$d عنصر تحضير</item>
+        <item quantity="other">بقي %1$d عناصر تحضير</item>
+    </plurals>
     <string name="event_all_day">alle-اليوم</string>
     <string name="event_delete">حذف حدث</string>
     <string name="event_options">حدث Optionen</string>
@@ -964,6 +983,7 @@
     <string name="toast_file_attachment_failed">تعذر إرفاق ملف PDF</string>
     <string name="toast_file_attachment_missing">الملف مفقود</string>
     <string name="toast_file_attachment_no_app">لا يوجد تطبيق يمكنه فتح هذا الملف</string>
+    <string name="toast_google_maps_unavailable">Google Maps غير مثبت</string>
     <string name="toast_holidays_add_failed">تعذرت إضافة العطلات</string>
     <string name="toast_holidays_remove_failed">تعذرت إزالة العطلات</string>
     <string name="toast_import_invalid_ics">فشل الاستيراد - ليس ملف .ics صالحا</string>

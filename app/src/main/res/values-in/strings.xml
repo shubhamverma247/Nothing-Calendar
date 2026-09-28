@@ -329,6 +329,21 @@
     <string name="event_section_images">IMAGENS</string>
     <string name="event_section_voice_note">VOZ NOTA</string>
     <string name="event_section_files">FILE</string>
+    <string name="event_section_preparation">PERSIAPAN</string>
+    <string name="event_readiness_progress">%1$d dari %2$d siap</string>
+    <string name="event_readiness_files">File terlampir: %1$d</string>
+    <string name="event_readiness_empty">Tidak ada item persiapan</string>
+    <string name="event_readiness_add">Tambah item</string>
+    <string name="event_readiness_add_title">Item persiapan baru</string>
+    <string name="event_readiness_edit_title">Edit item persiapan</string>
+    <string name="event_readiness_item_hint">Item persiapan</string>
+    <string name="event_readiness_mark_ready">Tandai %1$s siap</string>
+    <string name="event_readiness_mark_not_ready">Tandai %1$s belum siap</string>
+    <string name="event_readiness_update_error">Tidak dapat memperbarui daftar persiapan</string>
+    <plurals name="event_readiness_remaining">
+        <item quantity="one">%1$d item persiapan tersisa</item>
+        <item quantity="other">%1$d item persiapan tersisa</item>
+    </plurals>
     <string name="event_all_day">todos-Hari</string>
     <string name="event_delete">Hapus acara</string>
     <string name="event_options">acara Opcoes</string>
@@ -856,6 +871,7 @@
     <string name="toast_file_attachment_failed">Tidak dapat melampirkan PDF</string>
     <string name="toast_file_attachment_missing">File tidak ditemukan</string>
     <string name="toast_file_attachment_no_app">Tidak ada aplikasi yang dapat membuka file ini</string>
+    <string name="toast_google_maps_unavailable">Google Maps belum terinstal</string>
     <string name="toast_holidays_add_failed">Tidak dapat menambahkan hari libur</string>
     <string name="toast_holidays_remove_failed">Tidak dapat menghapus hari libur</string>
     <string name="toast_import_invalid_ics">Impor gagal - bukan file .ics yang valid</string>

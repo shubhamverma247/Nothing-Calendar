@@ -16,8 +16,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -109,6 +115,18 @@ internal fun showDotCalToastPlural(
         duration,
     )
 }
+
+internal fun Modifier.modalOverlayModifier(background: Color): Modifier =
+    fillMaxSize()
+        .background(background)
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    awaitPointerEvent(PointerEventPass.Final).changes.forEach { it.consume() }
+                }
+            }
+        }
+        .statusBarsPadding()
 
 @Composable
 internal fun secondaryActionContainer(palette: DotCalPalette) =

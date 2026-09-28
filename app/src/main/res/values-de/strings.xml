@@ -329,6 +329,21 @@
     <string name="event_section_images">BILDER</string>
     <string name="event_section_voice_note">SPRACHE NOTIZ</string>
     <string name="event_section_files">DATEIEN</string>
+    <string name="event_section_preparation">VORBEREITUNG</string>
+    <string name="event_readiness_progress">%1$d von %2$d bereit</string>
+    <string name="event_readiness_files">Dateien angehaengt: %1$d</string>
+    <string name="event_readiness_empty">Keine Vorbereitungselemente</string>
+    <string name="event_readiness_add">Element hinzufuegen</string>
+    <string name="event_readiness_add_title">Neues Vorbereitungselement</string>
+    <string name="event_readiness_edit_title">Vorbereitungselement bearbeiten</string>
+    <string name="event_readiness_item_hint">Vorbereitungselement</string>
+    <string name="event_readiness_mark_ready">%1$s als bereit markieren</string>
+    <string name="event_readiness_mark_not_ready">%1$s als nicht bereit markieren</string>
+    <string name="event_readiness_update_error">Vorbereitungscheckliste konnte nicht aktualisiert werden</string>
+    <plurals name="event_readiness_remaining">
+        <item quantity="one">%1$d Vorbereitungselement uebrig</item>
+        <item quantity="other">%1$d Vorbereitungselemente uebrig</item>
+    </plurals>
     <string name="event_all_day">Ganztaegig</string>
     <string name="event_delete">Loeschen Termin</string>
     <string name="event_options">Termin Optionen</string>
@@ -856,6 +871,7 @@
     <string name="toast_file_attachment_failed">PDF konnte nicht angehaengt werden</string>
     <string name="toast_file_attachment_missing">Datei fehlt</string>
     <string name="toast_file_attachment_no_app">Keine App kann diese Datei oeffnen</string>
+    <string name="toast_google_maps_unavailable">Google Maps ist nicht installiert</string>
     <string name="toast_holidays_add_failed">Feiertage konnten nicht hinzugefuegt werden</string>
     <string name="toast_holidays_remove_failed">Feiertage konnten nicht entfernt werden</string>
     <string name="toast_import_invalid_ics">Import fehlgeschlagen - keine gueltige .ics-Datei</string>

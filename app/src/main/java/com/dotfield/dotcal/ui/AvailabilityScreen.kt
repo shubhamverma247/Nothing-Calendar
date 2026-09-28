@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -100,6 +102,7 @@ internal fun availabilityScrollbarThumb(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun AvailabilityScreen(
     palette: DotCalPalette,
@@ -128,6 +131,9 @@ internal fun AvailabilityScreen(
         mutableStateOf(
             findTimeTarget?.let(FindTimeForThisMatcher::durationMinutes)?.toInt() ?: 30,
         )
+    }
+    val durationOptions = remember(findTimeTarget?.id) {
+        findTimeTarget?.let(FindTimeForThisMatcher::durationOptions) ?: listOf(15, 30, 45, 60)
     }
     var blockAllDayEvents by remember { mutableStateOf(true) }
     var treatGhostsAsBusy by remember { mutableStateOf(true) }
@@ -448,17 +454,19 @@ internal fun AvailabilityScreen(
                     },
                 )
             }
-            if (findTimeTarget == null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                    listOf(15, 30, 45, 60).forEach { minutes ->
-                        AvailabilityChoiceChip(
-                            label = stringResource(R.string.availability_minutes_chip, minutes),
-                            selected = minimumMinutes == minutes,
-                            palette = palette,
-                            modifier = Modifier.weight(1f),
-                            onClick = { minimumMinutes = minutes },
-                        )
-                    }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                durationOptions.forEach { minutes ->
+                    AvailabilityChoiceChip(
+                        label = stringResource(R.string.availability_minutes_chip, minutes),
+                        selected = minimumMinutes == minutes,
+                        palette = palette,
+                        modifier = Modifier.weight(1f).height(42.dp),
+                        onClick = { minimumMinutes = minutes },
+                    )
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {

@@ -266,7 +266,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 
-private const val DISCORD_INVITE_URL = "https://discord.gg/sTAKcAG8R"
+private const val DISCORD_INVITE_URL = "https://discord.gg/B7WGhf89SU"
 private const val FEATURES_GUIDE_URL = "https://dotcal.net/guide"
 private const val PRIVACY_POLICY_URL = "https://dotcal.net/privacy"
 
