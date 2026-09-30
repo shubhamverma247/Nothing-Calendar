@@ -101,7 +101,13 @@ internal fun EventListSheet(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     lazyItems(events, key = { it.id }) { event ->
-                        EventRow(event = event, palette = palette, onClick = { onEdit(event) }, modifier = Modifier.animateItem())
+                        EventRow(
+                            event = event,
+                            palette = palette,
+                            onClick = { onEdit(event) },
+                            modifier = Modifier.animateItem(),
+                            showCalendarColor = true,
+                        )
                     }
                 }
             }
@@ -187,7 +193,14 @@ internal fun EventListSheet(
 }
 
 @Composable
-internal fun EventRow(event: CalendarEvent, palette: DotCalPalette, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
+internal fun EventRow(
+    event: CalendarEvent,
+    palette: DotCalPalette,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    showCalendarColor: Boolean = false,
+) {
+    val calendarMarkerColor = eventRowCalendarMarkerColor(event, palette, showCalendarColor)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -199,6 +212,16 @@ internal fun EventRow(event: CalendarEvent, palette: DotCalPalette, onClick: (()
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (calendarMarkerColor != null) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(42.dp)
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(calendarMarkerColor),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(event.timeRange(), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, maxLines = 1)
             Spacer(modifier = Modifier.height(2.dp))

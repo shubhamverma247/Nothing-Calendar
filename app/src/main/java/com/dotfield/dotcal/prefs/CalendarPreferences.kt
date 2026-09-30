@@ -49,6 +49,7 @@ internal class ResilientPreferencesDataStore(
 
 object CalendarPreferences {
     val KEY_DEFAULT_VIEW = stringPreferencesKey("default_view")
+    val KEY_DEFAULT_EVENT_ACCOUNT_ID = stringPreferencesKey("default_event_account_id")
     val KEY_WEEK_START = stringPreferencesKey("week_start")
     val KEY_DEFAULT_REMINDER = intPreferencesKey("default_reminder")
     val KEY_DEFAULT_EVENT_DURATION = intPreferencesKey("default_event_duration")

@@ -98,6 +98,7 @@ internal enum class CalendarOverflowAction(
     AddShift("add_shift", R.string.menu_add_shift, R.string.menu_add_shift_subtitle),
     GoToDate("go_to_date", R.string.menu_go_to_date, R.string.menu_go_to_date_subtitle),
     QuickAdd("quick_add", R.string.menu_quick_add, R.string.menu_quick_add_subtitle),
+    Sync("sync", R.string.menu_sync, R.string.menu_sync_subtitle),
     ShareAvailability("share_availability", R.string.menu_share_availability, R.string.menu_share_availability_subtitle),
     Templates("templates", R.string.menu_templates, R.string.menu_templates_subtitle),
     CalendarSets("calendar_sets", R.string.menu_calendar_sets, R.string.menu_calendar_sets_subtitle),

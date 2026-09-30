@@ -1560,6 +1560,7 @@ internal fun EventEditorScreen(
     initialReminderMinutesList: List<Int>? = null,
     defaultEventDurationMinutes: Int = 60,
     accounts: List<CalendarAccount>,
+    defaultEventAccountId: String?,
     lastSelectedAccountId: String?,
     palette: DotCalPalette,
     isPro: Boolean,
@@ -1636,10 +1637,11 @@ internal fun EventEditorScreen(
     val latestFileAttachments by rememberUpdatedState(fileAttachments)
     val latestShouldCleanUpDraftFiles by rememberUpdatedState(!fileAttachmentSaveStarted)
     val writableAccounts = accounts
-    var selectedAccountId by remember(editorStateKey, writableAccounts, lastSelectedAccountId) {
+    var selectedAccountId by remember(editorStateKey, writableAccounts, defaultEventAccountId, lastSelectedAccountId) {
         mutableStateOf(event?.accountId?.takeIf { id -> writableAccounts.any { it.id == id } }
             ?: draft?.accountId?.takeIf { id -> writableAccounts.any { it.id == id } }
             ?: tpl?.accountId?.takeIf { id -> writableAccounts.any { it.id == id } }
+            ?: defaultEventAccountId?.takeIf { id -> event == null && writableAccounts.any { it.id == id } }
             ?: lastSelectedAccountId?.takeIf { id -> event == null && writableAccounts.any { it.id == id } }
             ?: writableAccounts.firstOrNull { it.isPrimary == 1 }?.id
             ?: writableAccounts.firstOrNull()?.id

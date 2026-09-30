@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -122,6 +123,7 @@ internal fun CalendarTabContainer(
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
     onShiftPatterns: (() -> Unit)? = null,
+    onSyncNow: (() -> Unit)? = null,
     onShareView: (() -> Unit)? = null,
     visibleOverflowActions: Set<CalendarOverflowAction> = CalendarOverflowAction.Defaults,
     showProBadges: Boolean = true,
@@ -156,6 +158,7 @@ internal fun CalendarTabContainer(
                 onTimeInsights = onTimeInsights,
                 onDateCalculator = onDateCalculator,
                 onShiftPatterns = onShiftPatterns,
+                onSyncNow = onSyncNow,
                 onShareView = onShareView,
                 visibleOverflowActions = visibleOverflowActions,
                 showProBadges = showProBadges,
@@ -207,6 +210,7 @@ internal fun CalendarActionBar(
     onTimeInsights: (() -> Unit)? = null,
     onDateCalculator: (() -> Unit)? = null,
     onShiftPatterns: (() -> Unit)? = null,
+    onSyncNow: (() -> Unit)? = null,
     onShareView: (() -> Unit)? = null,
     visibleOverflowActions: Set<CalendarOverflowAction> = CalendarOverflowAction.Defaults,
     showProBadges: Boolean = true,
@@ -221,6 +225,7 @@ internal fun CalendarActionBar(
         (onAvailability != null && CalendarOverflowAction.ShareAvailability.isVisible()) ||
         (onQuickShiftAdd != null && CalendarOverflowAction.AddShift.isVisible()) ||
         (onQuickAdd != null && CalendarOverflowAction.QuickAdd.isVisible()) ||
+        (onSyncNow != null && CalendarOverflowAction.Sync.isVisible()) ||
         (onTemplates != null && CalendarOverflowAction.Templates.isVisible()) ||
         (onCalendarSets != null && CalendarOverflowAction.CalendarSets.isVisible()) ||
         (onShiftPatterns != null && CalendarOverflowAction.ShiftPatterns.isVisible())
@@ -346,6 +351,18 @@ internal fun CalendarActionBar(
                                 onClick = {
                                     showOverflow = false
                                     onQuickAdd()
+                                },
+                            )
+                        }
+                        if (onSyncNow != null && CalendarOverflowAction.Sync.isVisible()) {
+                            ActionBarMenuItem(
+                                label = stringResource(R.string.menu_sync),
+                                subtitle = stringResource(R.string.menu_sync_subtitle),
+                                icon = Icons.Default.Sync,
+                                palette = palette,
+                                onClick = {
+                                    showOverflow = false
+                                    onSyncNow()
                                 },
                             )
                         }

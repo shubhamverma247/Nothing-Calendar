@@ -38,6 +38,8 @@
     <string name="menu_go_to_date_subtitle">انتقال بدون تغيير العروض</string>
     <string name="menu_quick_add">إضافة سريعة</string>
     <string name="menu_quick_add_subtitle">Tippen , نحن Planen</string>
+    <string name="menu_sync">Sync</string>
+    <string name="menu_sync_subtitle">Refresh calendar changes</string>
     <string name="menu_share_availability">مشاركة Availability</string>
     <string name="menu_share_availability_subtitle">انسخ أوقات فراغك</string>
     <string name="menu_templates">القوالب</string>
@@ -114,6 +116,7 @@
     <string name="settings_birthday_calendar_subtitle">استيراد Kontakte\' Geburtstage</string>
     <string name="settings_global_holidays">Global Feiertage</string>
     <string name="settings_default_view">افتراضي عرض</string>
+    <string name="settings_default_event_calendar">Default event calendar</string>
     <string name="settings_default_event_duration">افتراضي حدث Dauer</string>
     <string name="settings_start_of_week">البداية of الأسبوع</string>
     <string name="settings_panel_defaults">الافتراضيات</string>

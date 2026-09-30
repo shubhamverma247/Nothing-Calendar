@@ -2,7 +2,12 @@ package com.dotfield.dotcal.ui
 
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.CalendarAccount
+import com.dotfield.dotcal.data.CALENDAR_ACCESS_READ
+import androidx.compose.ui.graphics.Color
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalTime
@@ -39,6 +44,48 @@ class UiHelpersTest {
 
         assertEquals(false, event.shouldShowGhostBorder())
         assertEquals(true, localGhost.shouldShowGhostBorder())
+    }
+
+    @Test
+    fun temporaryCalendarTabSelectionDoesNotPersistDefaultView() {
+        assertFalse(CalendarTabSelectionSource.TemporaryNavigation.shouldPersistDefaultView())
+        assertTrue(CalendarTabSelectionSource.SettingsDefault.shouldPersistDefaultView())
+    }
+
+    @Test
+    fun eventRowMarkerUsesCalendarColorOnlyWhenEnabled() {
+        val event = allDayEvent(0L, 86_400_000L, "UTC", "GOOGLE").copy(colorHex = null)
+        val palette = testPalette()
+
+        assertEquals(palette.accent, eventRowCalendarMarkerColor(event, palette, showCalendarColor = true))
+        assertNull(eventRowCalendarMarkerColor(event, palette, showCalendarColor = false))
+    }
+
+    @Test
+    fun defaultEventAccountUsesSavedWritableAccount() {
+        val accounts = listOf(
+            CalendarAccount("local-primary", "", "Local", "LOCAL", "", 1, 1, 0),
+            CalendarAccount("work", "me@example.com", "Work", "GOOGLE", "", 1, 0, 1),
+        )
+
+        assertEquals("work", resolveDefaultEventAccountId("work", accounts))
+    }
+
+    @Test
+    fun defaultEventAccountFallsBackWhenSavedAccountIsReadOnlyOrMissing() {
+        val accounts = listOf(
+            CalendarAccount("readonly", "me@example.com", "Read only", "GOOGLE", "", 1, 1, 0, accessLevel = CALENDAR_ACCESS_READ),
+            CalendarAccount("work", "me@example.com", "Work", "GOOGLE", "", 1, 0, 1),
+            CalendarAccount("local-primary", "", "Local", "LOCAL", "", 1, 0, 2),
+        )
+
+        assertEquals("work", resolveDefaultEventAccountId("readonly", accounts))
+        assertEquals("work", resolveDefaultEventAccountId("missing", accounts))
+    }
+
+    @Test
+    fun defaultEventAccountFallsBackToLocalWhenNoWritableAccountLoaded() {
+        assertEquals("local-primary", resolveDefaultEventAccountId("missing", emptyList()))
     }
 
     @Test
@@ -112,5 +159,34 @@ class UiHelpersTest {
         createdAtMs = 0L,
         updatedAtMs = 0L,
         voiceNotePath = null,
+    )
+
+    private fun testPalette() = DotCalPalette(
+        background = Color.White,
+        primaryText = Color.Black,
+        secondaryText = Color.Gray,
+        dimText = Color.LightGray,
+        line = Color.LightGray,
+        cell = Color.White,
+        calendarSurface = Color.White,
+        topBarSurface = Color.White,
+        bottomNavSurface = Color.White,
+        dialogSurface = Color.White,
+        cancelSurface = Color.White,
+        cancelBorder = Color.LightGray,
+        dragHandle = Color.LightGray,
+        eventCardSurface = Color.White,
+        eventCardBorder = Color.LightGray,
+        eventCardChevron = Color.Gray,
+        textFieldBorder = Color.LightGray,
+        segmentSelected = Color.LightGray,
+        disabledText = Color.LightGray,
+        switchOffTrack = Color.LightGray,
+        dot = Color.Gray,
+        yearWeekday = Color.Gray,
+        yearMonthLabel = Color.Black,
+        accent = Color.Red,
+        onAccent = Color.White,
+        isDark = false,
     )
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
@@ -14,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SyncMetadata::class,
         DeletedEventLog::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class DotCalDatabase : RoomDatabase() {
@@ -40,6 +41,7 @@ abstract class DotCalDatabase : RoomDatabase() {
                 DATABASE_NAME,
             )
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
+                .addMigrations(MIGRATION_1_2)
                 .addCallback(
                     object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
@@ -48,6 +50,12 @@ abstract class DotCalDatabase : RoomDatabase() {
                     },
                 )
                 .build()
+        }
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE calendar_accounts ADD COLUMN accessLevel INTEGER NOT NULL DEFAULT $CALENDAR_ACCESS_OWNER")
+            }
         }
     }
 }

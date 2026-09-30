@@ -694,6 +694,14 @@ fun DotCalApp(
             stored.takeIf { it in defaultEventDurationOptions } ?: 60
         }
     }.collectAsStateWithLifecycle(initialValue = 60)
+    val storedDefaultEventAccountId by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            preferences[CalendarPreferences.KEY_DEFAULT_EVENT_ACCOUNT_ID]
+        }
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val defaultEventAccountId = remember(storedDefaultEventAccountId, assignableAccounts) {
+        resolveDefaultEventAccountId(storedDefaultEventAccountId, assignableAccounts)
+    }
     val storedQuickAddContextEventId by remember(context) {
         context.calendarPreferencesDataStore.data.map { preferences ->
             preferences[CalendarPreferences.KEY_SMART_QUICK_ADD_CONTEXT_EVENT_ID]
@@ -1134,12 +1142,17 @@ fun DotCalApp(
             viewModel.refreshBirthdayCalendarIfEnabled()
         }
     }
-    fun selectCalendarTab(tab: CalendarTab) {
+    fun selectCalendarTab(
+        tab: CalendarTab,
+        source: CalendarTabSelectionSource = CalendarTabSelectionSource.TemporaryNavigation,
+    ) {
         calendarTab = tab
-        bootPreferences.edit().putString(BOOT_DEFAULT_VIEW_KEY, tab.name).apply()
-        scope.launch {
-            context.calendarPreferencesDataStore.edit { preferences ->
-                preferences[CalendarPreferences.KEY_DEFAULT_VIEW] = tab.name
+        if (source.shouldPersistDefaultView()) {
+            bootPreferences.edit().putString(BOOT_DEFAULT_VIEW_KEY, tab.name).apply()
+            scope.launch {
+                context.calendarPreferencesDataStore.edit { preferences ->
+                    preferences[CalendarPreferences.KEY_DEFAULT_VIEW] = tab.name
+                }
             }
         }
     }
@@ -1713,6 +1726,7 @@ fun DotCalApp(
                                 }
                             },
                             onQuickAdd = { showQuickAdd = true },
+                            onSyncNow = { runSyncNow() },
                             onSearch = { showSearch = true },
                             canScanQr = hasCameraHardware,
                             onScanQr = { showQrScanner = true },
@@ -2125,6 +2139,8 @@ fun DotCalApp(
                 defaultReminderMinutes = defaultReminderMinutes,
                 reminderCenterItems = reminderCenterItems,
                 defaultEventDurationMinutes = defaultEventDurationMinutes,
+                defaultEventAccountId = defaultEventAccountId,
+                assignableAccounts = assignableAccounts,
                 autoBufferBeforeMinutes = autoBufferBeforeMinutes,
                 autoBufferAfterMinutes = autoBufferAfterMinutes,
                 reminderSoundUri = reminderSoundUri,
@@ -2216,8 +2232,15 @@ fun DotCalApp(
                         }
                     }
                 },
+                onDefaultEventAccountSelected = { accountId ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences[CalendarPreferences.KEY_DEFAULT_EVENT_ACCOUNT_ID] = accountId
+                        }
+                    }
+                },
                 onDefaultViewSelected = { tab ->
-                    selectCalendarTab(tab)
+                    selectCalendarTab(tab, CalendarTabSelectionSource.SettingsDefault)
                 },
                 onCalendarMenuActionVisibleChange = { action, visible ->
                     scope.launch {
@@ -3259,6 +3282,7 @@ fun DotCalApp(
                 },
                 defaultEventDurationMinutes = defaultEventDurationMinutes,
                 accounts = assignableAccounts,
+                defaultEventAccountId = defaultEventAccountId,
                 lastSelectedAccountId = lastSelectedEventAccountId,
                 palette = palette,
                 isPro = isPro,

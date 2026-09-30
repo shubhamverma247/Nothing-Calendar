@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
+import com.dotfield.dotcal.data.CALENDAR_ACCESS_READ
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
 import kotlin.math.absoluteValue
@@ -23,6 +24,10 @@ import java.util.TimeZone
 
 internal fun providerCalendarSelection(): String {
     return "${CalendarContract.Calendars.VISIBLE} != 0 OR ${CalendarContract.Calendars.SYNC_EVENTS} != 0"
+}
+
+internal fun providerCalendarAccessLevel(rawAccessLevel: Int?): Int {
+    return rawAccessLevel ?: CALENDAR_ACCESS_READ
 }
 
 class CalendarProviderDataSource(private val context: Context) {
@@ -65,6 +70,7 @@ class CalendarProviderDataSource(private val context: Context) {
                             isVisible = calendars.getIntOrDefault(CALENDAR_VISIBLE_INDEX, 1),
                             isPrimary = 0,
                             sortOrder = calendars.position + PROVIDER_SORT_OFFSET,
+                            accessLevel = providerCalendarAccessLevel(calendars.getIntOrNull(CALENDAR_ACCESS_LEVEL_INDEX)),
                         ),
                     )
                 }
@@ -525,6 +531,7 @@ class CalendarProviderDataSource(private val context: Context) {
             CalendarContract.Calendars.ACCOUNT_TYPE,
             CalendarContract.Calendars.CALENDAR_COLOR,
             CalendarContract.Calendars.VISIBLE,
+            "calendar_access_level",
         )
         private const val CALENDAR_ID_INDEX = 0
         private const val CALENDAR_ACCOUNT_NAME_INDEX = 1
@@ -532,6 +539,7 @@ class CalendarProviderDataSource(private val context: Context) {
         private const val CALENDAR_ACCOUNT_TYPE_INDEX = 3
         private const val CALENDAR_COLOR_INDEX = 4
         private const val CALENDAR_VISIBLE_INDEX = 5
+        private const val CALENDAR_ACCESS_LEVEL_INDEX = 6
 
         private val EVENT_PROJECTION = arrayOf(
             CalendarContract.Events._ID,

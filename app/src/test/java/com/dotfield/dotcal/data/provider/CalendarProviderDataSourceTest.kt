@@ -32,6 +32,12 @@ class CalendarProviderDataSourceTest {
     }
 
     @Test
+    fun providerCalendarAccessFallsBackToReadOnlyWhenMissing() {
+        assertEquals(200, providerCalendarAccessLevel(null))
+        assertEquals(700, providerCalendarAccessLevel(700))
+    }
+
+    @Test
     fun providerDurationMillisParsesAllDayMultiDayDuration() {
         assertEquals(2L * 24L * 60L * 60L * 1000L, providerDurationMillis("P2D"))
     }

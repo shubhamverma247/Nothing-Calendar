@@ -262,7 +262,8 @@ interface CalendarDao : ReminderCenterStore {
             color = :color,
             isVisible = :isVisible,
             isPrimary = :isPrimary,
-            sortOrder = :sortOrder
+            sortOrder = :sortOrder,
+            accessLevel = :accessLevel
         WHERE id = :id
         """,
     )
@@ -275,6 +276,7 @@ interface CalendarDao : ReminderCenterStore {
         isVisible: Int,
         isPrimary: Int,
         sortOrder: Int,
+        accessLevel: Int,
     )
 
     @Query("UPDATE calendar_accounts SET isVisible = :isVisible WHERE id = :accountId")
@@ -292,6 +294,7 @@ interface CalendarDao : ReminderCenterStore {
             isVisible = account.isVisible,
             isPrimary = account.isPrimary,
             sortOrder = account.sortOrder,
+            accessLevel = account.accessLevel,
         )
     }
 

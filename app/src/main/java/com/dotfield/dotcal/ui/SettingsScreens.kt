@@ -297,6 +297,8 @@ internal fun SettingsPreview(
     defaultReminderMinutes: Int?,
     reminderCenterItems: List<ReminderCenterItem>,
     defaultEventDurationMinutes: Int,
+    defaultEventAccountId: String,
+    assignableAccounts: List<CalendarAccount>,
     autoBufferBeforeMinutes: Int,
     autoBufferAfterMinutes: Int,
     reminderSoundUri: String,
@@ -328,6 +330,7 @@ internal fun SettingsPreview(
     onReminderCenterCancel: (ReminderCenterItem) -> Unit,
     onReminderCenterSnooze: (ReminderCenterItem, Int) -> Unit,
     onDefaultEventDurationSelected: (Int) -> Unit,
+    onDefaultEventAccountSelected: (String) -> Unit,
     onAutoBufferBeforeSelected: (Int) -> Unit,
     onAutoBufferAfterSelected: (Int) -> Unit,
     onReminderSoundSelected: (String) -> Unit,
@@ -406,6 +409,8 @@ internal fun SettingsPreview(
             defaultReminderMinutes = defaultReminderMinutes,
             reminderCenterItems = reminderCenterItems,
             defaultEventDurationMinutes = defaultEventDurationMinutes,
+            defaultEventAccountId = defaultEventAccountId,
+            assignableAccounts = assignableAccounts,
             defaultCalendarTab = defaultCalendarTab,
             hiddenCalendarMenuActions = hiddenCalendarMenuActions,
             showWeekNumbers = showWeekNumbers,
@@ -425,6 +430,7 @@ internal fun SettingsPreview(
             onSyncIntervalSelected = onSyncIntervalSelected,
             onDefaultReminderSelected = onDefaultReminderSelected,
             onDefaultEventDurationSelected = onDefaultEventDurationSelected,
+            onDefaultEventAccountSelected = onDefaultEventAccountSelected,
             onDefaultViewSelected = onDefaultViewSelected,
             onCalendarMenuSettings = { onScreenChange(SettingsScreen.CalendarMenu) },
             onShowWeekNumbersChange = onShowWeekNumbersChange,
@@ -486,6 +492,8 @@ internal fun SettingsPreview(
         ) {
             CalendarPreferencesSettings(
                 defaultCalendarTab = defaultCalendarTab,
+                defaultEventAccountId = defaultEventAccountId,
+                assignableAccounts = assignableAccounts,
                 hiddenCalendarMenuActions = hiddenCalendarMenuActions,
                 showWeekNumbers = showWeekNumbers,
                 dailyDateIconEnabled = dailyDateIconEnabled,
@@ -495,6 +503,7 @@ internal fun SettingsPreview(
                 palette = palette,
                 onBack = { onScreenChange(SettingsScreen.Root) },
                 onDefaultViewSelected = onDefaultViewSelected,
+                onDefaultEventAccountSelected = onDefaultEventAccountSelected,
                 onCalendarMenuSettings = { onScreenChange(SettingsScreen.CalendarMenu) },
                 onShowWeekNumbersChange = onShowWeekNumbersChange,
                 onDailyDateIconEnabledChange = onDailyDateIconEnabledChange,
@@ -727,6 +736,8 @@ internal fun SettingsRoot(
     defaultReminderMinutes: Int?,
     reminderCenterItems: List<ReminderCenterItem>,
     defaultEventDurationMinutes: Int,
+    defaultEventAccountId: String,
+    assignableAccounts: List<CalendarAccount>,
     defaultCalendarTab: CalendarTab,
     hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
@@ -746,6 +757,7 @@ internal fun SettingsRoot(
     onSyncIntervalSelected: (Int) -> Unit,
     onDefaultReminderSelected: (Int?) -> Unit,
     onDefaultEventDurationSelected: (Int) -> Unit,
+    onDefaultEventAccountSelected: (String) -> Unit,
     onDefaultViewSelected: (CalendarTab) -> Unit,
     onCalendarMenuSettings: () -> Unit,
     onShowWeekNumbersChange: (Boolean) -> Unit,
@@ -930,6 +942,8 @@ internal fun SettingsRoot(
 @Composable
 private fun CalendarPreferencesSettings(
     defaultCalendarTab: CalendarTab,
+    defaultEventAccountId: String,
+    assignableAccounts: List<CalendarAccount>,
     hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
     dailyDateIconEnabled: Boolean,
@@ -939,6 +953,7 @@ private fun CalendarPreferencesSettings(
     palette: DotCalPalette,
     onBack: () -> Unit,
     onDefaultViewSelected: (CalendarTab) -> Unit,
+    onDefaultEventAccountSelected: (String) -> Unit,
     onCalendarMenuSettings: () -> Unit,
     onShowWeekNumbersChange: (Boolean) -> Unit,
     onDailyDateIconEnabledChange: (Boolean) -> Unit,
@@ -966,6 +981,13 @@ private fun CalendarPreferencesSettings(
                     selectedTab = defaultCalendarTab,
                     palette = palette,
                     onViewSelected = onDefaultViewSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsDefaultEventCalendarRow(
+                    selectedAccountId = defaultEventAccountId,
+                    accounts = assignableAccounts,
+                    palette = palette,
+                    onAccountSelected = onDefaultEventAccountSelected,
                 )
                 SettingsContentDivider(palette)
                 SettingsMenuRow(
@@ -2561,6 +2583,52 @@ private fun SettingsDefaultViewRow(
             },
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsDefaultEventCalendarRow(
+    selectedAccountId: String,
+    accounts: List<CalendarAccount>,
+    palette: DotCalPalette,
+    onAccountSelected: (String) -> Unit,
+) {
+    var showSheet by remember { mutableStateOf(false) }
+    val selectedAccount = accounts.firstOrNull { it.id == selectedAccountId } ?: accounts.firstOrNull()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .noRippleClickable { if (accounts.isNotEmpty()) showSheet = true },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(stringResource(R.string.settings_default_event_calendar), color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Normal, fontSize = 16.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(selectedAccount?.defaultEventCalendarLabel() ?: stringResource(R.string.settings_value_local), color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            UpDownChevron(tint = palette.secondaryText)
+        }
+    }
+    if (showSheet && accounts.isNotEmpty()) {
+        SettingsOptionSheet(
+            title = stringResource(R.string.settings_default_event_calendar),
+            options = accounts,
+            selected = selectedAccount ?: accounts.first(),
+            palette = palette,
+            label = { it.defaultEventCalendarLabel() },
+            onDismiss = { showSheet = false },
+            onSelected = {
+                onAccountSelected(it.id)
+                showSheet = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun CalendarAccount.defaultEventCalendarLabel(): String {
+    return displayName.ifBlank { stringResource(R.string.settings_value_local) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

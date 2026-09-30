@@ -30,9 +30,11 @@ import androidx.compose.material3.SwitchDefaults
 import com.dotfield.dotcal.R
 import com.dotfield.dotcal.data.CalendarAccount
 import com.dotfield.dotcal.data.CalendarEvent
+import com.dotfield.dotcal.data.DotCalRepository
 import com.dotfield.dotcal.data.EventReminder
 import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
+import com.dotfield.dotcal.data.isWritableDestination
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
 import java.io.File
 import java.time.DayOfWeek
@@ -421,6 +423,16 @@ internal fun calendarAccountsLabel(accounts: List<CalendarAccount>, hasCalendarP
 internal fun selectedCalendarAccountCount(accounts: List<CalendarAccount>): Int =
     accounts.count { it.id != "local-primary" && it.isVisible == 1 }
 
+internal fun resolveDefaultEventAccountId(
+    savedAccountId: String?,
+    writableAccounts: List<CalendarAccount>,
+): String {
+    return savedAccountId?.takeIf { id -> writableAccounts.any { it.id == id && it.isWritableDestination() } }
+        ?: writableAccounts.firstOrNull { it.isPrimary == 1 && it.isWritableDestination() }?.id
+        ?: writableAccounts.firstOrNull { it.isWritableDestination() }?.id
+        ?: DotCalRepository.LOCAL_ACCOUNT_ID
+}
+
 @Composable
 internal fun selectedHolidayCountriesLabel(countries: List<HolidayCountryUiItem>): String {
     val count = countries.count { it.isSelected }
@@ -653,6 +665,23 @@ internal fun parseColor(hex: String): Int {
 
 internal fun CalendarEvent.displayColor(palette: DotCalPalette): Color {
     return colorHex?.let { Color(parseColor(it)) } ?: palette.accent
+}
+
+internal enum class CalendarTabSelectionSource {
+    TemporaryNavigation,
+    SettingsDefault,
+}
+
+internal fun CalendarTabSelectionSource.shouldPersistDefaultView(): Boolean {
+    return this == CalendarTabSelectionSource.SettingsDefault
+}
+
+internal fun eventRowCalendarMarkerColor(
+    event: CalendarEvent,
+    palette: DotCalPalette,
+    showCalendarColor: Boolean,
+): Color? {
+    return if (showCalendarColor) event.displayColor(palette) else null
 }
 
 internal fun android.content.Context.findActivity(): android.app.Activity? {

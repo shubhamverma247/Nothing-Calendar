@@ -1,6 +1,6 @@
 # DotCal Handoff
 
-Updated: 2026-09-19
+Updated: 2026-09-30
 
 Active resume document for `com.dotfield.dotcal`. Historical detail is preserved in
 `Docs/HANDOFF.original.md`. Do not edit `Docs/HANDOFF - Copy.md` or user-owned
@@ -8,11 +8,11 @@ Active resume document for `com.dotfield.dotcal`. Historical detail is preserved
 
 ## Worktree
 
-- Branch: `feature-and-fixes`.
-- Latest local commit: `f115db8 feat(events): add readiness checklist`.
-- Worktree was clean before this handoff edit; only `Docs/HANDOFF.md` is now modified. Do not commit, push, reset, clean, or switch branches unless explicitly asked.
+- Branch: `main`, tracking `origin/main`.
+- Latest pushed commit: `afeadb1 feat: polish planning and widget workflows`.
+- Worktree was clean at `afeadb1` before this handoff edit; only `Docs/HANDOFF.md` should be modified by this documentation update. Do not commit, push, reset, clean, or switch branches unless explicitly asked.
 - Preserve user-owned untracked files: QA screenshots, icon ZIPs, `.claude`, `Docs/logcat.txt`, and `tools/`.
-- App version: `versionCode 45`, `versionName 1.7`.
+- App version: `versionCode 47`, `versionName 1.8`.
 - Package: `com.dotfield.dotcal`. Device: `000153573000720` when connected.
 
 ## Rules
@@ -178,6 +178,65 @@ Lower-priority ideas from the review: cloud AI assistants, public booking infras
 weather subscriptions, and screenshot-to-events import. These add backend, accuracy, privacy,
 or maintenance cost before the higher-value local workflows above are complete.
 
+### User feedback audit: calendar reliability and defaults
+
+The 2026-09-28 Victor feedback contains four valid core-calendar improvements. These are Free
+reliability/usability work, not Pro gates. All four are implemented in the current working tree.
+
+1. **Default View persistence (P1 bug) - complete.** Calendar tab changes now update only
+   current UI state. Settings -> Default view is the path that persists
+   `CalendarPreferences.KEY_DEFAULT_VIEW` and the boot/startup mirror, so temporary navigation
+   no longer overwrites the startup default.
+2. **Colors in the month-day event sheet (P1 polish) - complete.** `EventListSheet` now shows
+   the established calendar color marker for event rows without redesigning the sheet.
+3. **Read-only/subscribed Google calendars (P1 sync compatibility) - complete.** Calendar
+   accounts retain provider access level, readable subscribed calendars remain visible, and
+   non-writable/read-only calendars are excluded from create/move destinations. Existing events
+   from those calendars remain viewable while edits that CalendarProvider would reject are not
+   presented as writable destinations. Offline-first behavior is preserved; no backend or
+   Google API dependency was added.
+4. **Default event calendar (P1 preference) - complete.** Settings -> Calendar Preferences has
+   a DataStore-backed Default event calendar row using writable/assignable calendars only. New
+   events preselect the resolved default; edits retain the event's existing calendar. If the
+   saved calendar is missing or read-only, DotCal falls back deterministically to another
+   writable calendar or DotCal Local. Changing the setting does not move existing events.
+
+The separate widget feedback requesting Monday-first widgets is complete in `afeadb1`.
+Compact and large month widgets now resolve `KEY_WEEK_START`, rotate weekday labels, align the
+month grid, and refresh after the preference changes. Focused widget tests, full debug unit
+tests, debug assembly, lint, and `git diff --check` passed before that commit.
+
+### Shift Pro advancement audit
+
+Shift is already a Pro feature. Existing behavior includes shift types with minute-precise
+start/duration, all-day and reminder options, reusable rotation patterns, quick shift add,
+range generation, and shift-plan sharing. Keep the entire advanced Shift lane under the
+existing Pro entitlement; do not create another Shift paywall tier.
+
+Recommended implementation order:
+
+1. **Generation reliability and preview.** Make regeneration range-safe, show exactly which
+   generated events will be created, updated, skipped, or removed, and require confirmation.
+   Current `DotCalRepository.applyShiftPattern` can remove overlapping prior generation records
+   for the same pattern when regenerating a smaller range; fix this before adding more pattern
+   power. Preserve manually edited/cancelled generated occurrences and provide undo where
+   existing events change.
+2. **Pattern management.** Add edit, duplicate, archive/delete confirmation, and practical
+   presets such as rotating days/nights and four-on/four-off. Keep custom rotations available
+   and preview the resulting cycle before save/generation.
+3. **Richer shift types.** Expose per-type reminders clearly, then consider breaks and explicit
+   overnight/rest-boundary handling. Night shifts must remain one logical shift across midnight.
+4. **Shift-aware planning.** Use shift start/end and off-days as constraints for usable-time
+   suggestions and routines. Suggestions remain local, previewable, and explicitly confirmed;
+   never move provider-backed, shared, recurring, or all-day events silently.
+5. **Reports later.** Pay, overtime, allowances, and work-hour reports are valuable competitor
+   benchmarks but are lower priority because regional rules and payroll expectations expand the
+   product surface. Do not begin these without a separate product decision.
+
+Competitor patterns used for this audit: Supershift for long-range rotations/share/widgets,
+MyShiftPlanner for presets and saved pattern editing, and WorkShift for profile and
+pay/overtime concepts. These are benchmarks, not requirements to clone.
+
 ### Roadmap constraints
 
 - Keep Free as a complete, useful calendar. Pro should unlock automation, deeper planning,
@@ -231,19 +290,19 @@ or maintenance cost before the higher-value local workflows above are complete.
 
 ## Verification state
 
-Passed after the latest code changes:
+Passed for pushed commit `afeadb1`:
 
 ```text
 :app:testDebugUnitTest
 :app:assembleDebug
 :app:lintDebug
-:app:bundleRelease
 git diff --check
 ```
 
 Reminder Center lifecycle tests pass, including deterministic dismiss, cancel, snooze,
 and task/event action behavior. The full debug unit-test suite and debug APK build pass.
-Lint passes with 0 errors and 573 warnings. Release bundle passes through R8 and lint-vital.
+Lint passes without errors. A release bundle passed on the prior baseline through R8 and
+lint-vital, but `bundleRelease` was not rerun for `afeadb1`.
 The Room Reminder Center instrumentation test compiles, but connected execution is pending:
 the connected device disappeared before test execution and ADB currently reports no devices.
 
@@ -253,8 +312,22 @@ Focused tests also pass:
 :app:testDebugUnitTest --tests com.dotfield.dotcal.MainActivityIntentTest
 :app:testDebugUnitTest --tests com.dotfield.dotcal.data.ReminderCenterLifecycleTest
 :app:testDebugUnitTest --tests com.dotfield.dotcal.data.scheduling.FindTimeForThisMatcherTest
+:app:testDebugUnitTest --tests com.dotfield.dotcal.ui.EventLocationNavigationTest
+:app:testDebugUnitTest --tests com.dotfield.dotcal.widget.WidgetCalendarWeekStartTest
 :app:connectedDebugAndroidTest (not completed: no connected device)
 ```
+
+Passed for current uncommitted Victor feedback working tree:
+
+```text
+.\gradlew.bat testDebugUnitTest --tests com.dotfield.dotcal.ui.UiHelpersTest
+.\gradlew.bat testDebugUnitTest assembleDebug
+.\gradlew.bat lintDebug
+git diff --check
+```
+
+`git diff --check` reports only CRLF normalization warnings. Debug APK install was not run
+because no device was attached when checked with the Android SDK `adb.exe`.
 
 ## Next safe steps
 
@@ -263,19 +336,13 @@ Focused tests also pass:
 3. After Android changes, state the exact manual test and expected result first, then install the verified APK.
 4. If the user requests release integration, commit/push/merge only the exact requested operation.
 
-## Next selected feature
+## Next selected work
 
-Complete `Find Time for This` before starting Saved Smart Views. Build on the existing
-Share Availability first slice and matcher. The complete workflow should start from a task
-or event, derive its duration, allow constraints such as deadline/date range and preferred
-hours, rank suitable future slots, and require a preview plus explicit confirmation before
-creating or moving anything. Fixed, shared, and provider events must never move silently.
-Keep the work offline-first and preserve the current Room schema and existing Find-a-Time flow.
+Victor feedback work is implemented and verified in the current working tree. Next scoped work
+is Shift Pro generation reliability: range-safe regeneration plus an affected-event preview,
+not reports/pay calculations.
 
-After this item, preferred order is Saved Smart Views, Evening Task Review, reusable Event
-Readiness setups, Smart View widget integration, then Repair My Day.
-
-## Resume prompt for next feature
+## Resume prompt for next session
 
 Continue DotCal development from `D:\Caveman\caveman\Nothing-Calendar`.
 
@@ -286,12 +353,18 @@ Before work:
 - Do not reset, clean, force-push, switch branches, commit, or push unless explicitly requested. Install verified APK after Android changes.
 - Do not change app icon assets or revisit daily launcher icon behavior unless explicitly requested; current folder-placement feedback is documented above and has no verified app-only fix.
 
-For requested feature work:
+Current pushed baseline is `main` at `afeadb1`, version `1.8` (`versionCode 47`). Continue the
+audited feedback work one item at a time:
 
-- Complete `Find Time for This`: add task/event entry, duration derivation, user-selectable
-  constraints, ranked future slots, and preview/confirm behavior while preserving the existing
-  Share Availability and Find-a-Time flows.
-- Reconcile the feature against current code and authoritative roadmap before editing.
-- Use focused tests first, then relevant build checks.
-- Run one manual QA test at a time and state expected behavior before each test.
-- Audit all changes before any explicitly requested commit.
+1. Victor feedback points are complete in the current dirty working tree: Default View
+   persistence, month-sheet colors, read-only/subscribed CalendarProvider access handling, and
+   Default Event Calendar.
+2. If a device is connected, install the verified debug APK. Current automated verification has
+   already passed for the feedback work.
+3. Keep these four reliability/default features Free. Preserve offline-first behavior and do
+   not add a backend or Google API dependency.
+4. Continue Shift Pro with range-safe regeneration and a preview of
+   created/updated/skipped/removed events. Preserve manual edits and never silently move or
+   delete provider-backed, shared, recurring, or all-day events.
+5. Reconcile each slice against current code before editing, follow focused TDD, and audit all
+   changes before any explicitly requested commit.

@@ -38,6 +38,8 @@
     <string name="menu_go_to_date_subtitle">Springen ohne Wechsel Ansichten</string>
     <string name="menu_quick_add">Bystro dobavit</string>
     <string name="menu_quick_add_subtitle">Tippen , my Planen</string>
+    <string name="menu_sync">Sync</string>
+    <string name="menu_sync_subtitle">Refresh calendar changes</string>
     <string name="menu_share_availability">Podelitsya Dostupnost</string>
     <string name="menu_share_availability_subtitle">Kopirovat wann vy\'re frei</string>
     <string name="menu_templates">Shablony</string>
@@ -114,6 +116,7 @@
     <string name="settings_birthday_calendar_subtitle">Importirovat dni rozhdeniya kontaktov</string>
     <string name="settings_global_holidays">Global Feiertage</string>
     <string name="settings_default_view">Вид по умолчанию</string>
+    <string name="settings_default_event_calendar">Default event calendar</string>
     <string name="settings_default_event_duration">Длительность события по умолчанию</string>
     <string name="settings_start_of_week">Nachalo of Nedelya</string>
     <string name="settings_panel_defaults">Defaults</string>

@@ -38,6 +38,8 @@
     <string name="menu_go_to_date_subtitle">Springen ohne Wechsel Ansichten</string>
     <string name="menu_quick_add">Schnell hinzufuegen</string>
     <string name="menu_quick_add_subtitle">Tippen es, wir Planen es</string>
+    <string name="menu_sync">Sync</string>
+    <string name="menu_sync_subtitle">Refresh calendar changes</string>
     <string name="menu_share_availability">Verfuegbarkeit teilen</string>
     <string name="menu_share_availability_subtitle">Kopieren wann du\'re frei</string>
     <string name="menu_templates">Vorlagen</string>
@@ -114,6 +116,7 @@
     <string name="settings_birthday_calendar_subtitle">Importieren Kontakte\' Geburtstage</string>
     <string name="settings_global_holidays">Global Feiertage</string>
     <string name="settings_default_view">Standard Ansicht</string>
+    <string name="settings_default_event_calendar">Default event calendar</string>
     <string name="settings_default_event_duration">Standard Termin Dauer</string>
     <string name="settings_start_of_week">Wochenbeginn</string>
     <string name="settings_panel_defaults">Defaults</string>

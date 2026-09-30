@@ -38,6 +38,8 @@
     <string name="menu_go_to_date_subtitle">Aller sans changer de vue</string>
     <string name="menu_quick_add">Ajout rapide</string>
     <string name="menu_quick_add_subtitle">Saisissez-le, nous le planifions</string>
+    <string name="menu_sync">Sync</string>
+    <string name="menu_sync_subtitle">Refresh calendar changes</string>
     <string name="menu_share_availability">Partager les disponibilites</string>
     <string name="menu_share_availability_subtitle">Copier vos moments libres</string>
     <string name="menu_templates">Modeles</string>
@@ -114,6 +116,7 @@
     <string name="settings_birthday_calendar_subtitle">Importer contacts\' Anniversaires</string>
     <string name="settings_global_holidays">Mondial jours feries</string>
     <string name="settings_default_view">Par defaut Vue</string>
+    <string name="settings_default_event_calendar">Default event calendar</string>
     <string name="settings_default_event_duration">Par defaut evenement Duree</string>
     <string name="settings_start_of_week">Debut of Semaine</string>
     <string name="settings_panel_defaults">Defaults</string>

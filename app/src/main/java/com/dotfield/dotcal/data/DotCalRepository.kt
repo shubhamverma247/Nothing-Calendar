@@ -359,6 +359,7 @@ class DotCalRepository(
         return dao.observeAccounts().retryOnDatabaseLocked().map { accounts ->
             accounts
                 .filterNot { it.isReadOnlyGeneratedAccount() }
+                .filter { it.isWritableDestination() }
                 .sortedWith(compareBy<CalendarAccount> { it.sortOrder }.thenBy { it.displayName })
         }
     }

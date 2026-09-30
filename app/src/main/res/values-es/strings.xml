@@ -46,6 +46,8 @@
     <string name="menu_go_to_date_subtitle">Salta sin cambiar de vista</string>
     <string name="menu_quick_add">Añadir rápido</string>
     <string name="menu_quick_add_subtitle">Escríbelo y lo programamos</string>
+    <string name="menu_sync">Sync</string>
+    <string name="menu_sync_subtitle">Refresh calendar changes</string>
     <string name="menu_share_availability">Compartir disponibilidad</string>
     <string name="menu_share_availability_subtitle">Copia cuándo estás libre</string>
     <string name="menu_templates">Plantillas</string>
@@ -134,6 +136,7 @@
     <string name="settings_birthday_calendar_subtitle">Importa los cumpleaños de tus contactos</string>
     <string name="settings_global_holidays">Festivos internacionales</string>
     <string name="settings_default_view">Vista predeterminada</string>
+    <string name="settings_default_event_calendar">Default event calendar</string>
     <string name="settings_default_event_duration">Duración predeterminada del evento</string>
     <string name="settings_start_of_week">Inicio de la semana</string>
 

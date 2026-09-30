@@ -103,6 +103,7 @@ object BackupSerializer {
             .put("isVisible", account.isVisible)
             .put("isPrimary", account.isPrimary)
             .put("sortOrder", account.sortOrder)
+            .put("accessLevel", account.accessLevel)
 
     private fun decodeAccount(a: JSONObject): CalendarAccount =
         CalendarAccount(
@@ -114,6 +115,7 @@ object BackupSerializer {
             isVisible = a.optInt("isVisible", 1),
             isPrimary = a.optInt("isPrimary", 0),
             sortOrder = a.optInt("sortOrder", 0),
+            accessLevel = a.optInt("accessLevel", com.dotfield.dotcal.data.CALENDAR_ACCESS_OWNER),
         )
 
     private fun encodeEvent(event: CalendarEvent): JSONObject =

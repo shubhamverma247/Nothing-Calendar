@@ -26,4 +26,14 @@ class CalendarOverflowActionTest {
         assertEquals("add_shift,templates", stored)
         assertEquals(hidden, CalendarOverflowAction.hiddenFromStorage(stored))
     }
+
+    @Test
+    fun syncActionIsAvailableByDefaultAndHideable() {
+        assertTrue(CalendarOverflowAction.Sync in CalendarOverflowAction.Defaults)
+
+        val hidden = CalendarOverflowAction.hiddenFromStorage("sync")
+
+        assertEquals(setOf(CalendarOverflowAction.Sync), hidden)
+        assertEquals("sync", CalendarOverflowAction.hiddenToStorage(hidden))
+    }
 }
