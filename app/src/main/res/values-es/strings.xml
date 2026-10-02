@@ -136,6 +136,10 @@
     <string name="settings_birthday_calendar_subtitle">Importa los cumpleaños de tus contactos</string>
     <string name="settings_global_holidays">Festivos internacionales</string>
     <string name="settings_default_view">Vista predeterminada</string>
+    <string name="settings_calendar_views">Vistas del calendario</string>
+    <string name="settings_calendar_views_visible_count">%1$d/%2$d visibles</string>
+    <string name="settings_panel_calendar_views">Vistas visibles del calendario</string>
+    <string name="settings_calendar_view_toggle_subtitle">Mostrar en el selector superior</string>
     <string name="settings_default_event_calendar">Default event calendar</string>
     <string name="settings_default_event_duration">Duración predeterminada del evento</string>
     <string name="settings_start_of_week">Inicio de la semana</string>

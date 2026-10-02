@@ -116,6 +116,10 @@
     <string name="settings_birthday_calendar_subtitle">استيراد Kontakte\' Geburtstage</string>
     <string name="settings_global_holidays">Global Feiertage</string>
     <string name="settings_default_view">افتراضي عرض</string>
+    <string name="settings_calendar_views">عروض التقويم</string>
+    <string name="settings_calendar_views_visible_count">%1$d/%2$d مرئي</string>
+    <string name="settings_panel_calendar_views">عروض التقويم المرئية</string>
+    <string name="settings_calendar_view_toggle_subtitle">إظهار في المحدد العلوي</string>
     <string name="settings_default_event_calendar">Default event calendar</string>
     <string name="settings_default_event_duration">افتراضي حدث Dauer</string>
     <string name="settings_start_of_week">البداية of الأسبوع</string>

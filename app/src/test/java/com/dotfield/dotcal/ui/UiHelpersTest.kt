@@ -53,6 +53,47 @@ class UiHelpersTest {
     }
 
     @Test
+    fun visibleCalendarTabsIgnoreHiddenEntries() {
+        val hidden = setOf(CalendarTab.Week, CalendarTab.Day)
+
+        assertEquals(
+            listOf(CalendarTab.Year, CalendarTab.Month, CalendarTab.Agenda),
+            CalendarTab.visiblePickerEntries(hidden),
+        )
+    }
+
+    @Test
+    fun visibleCalendarTabsFallbackWhenAllViewsHidden() {
+        assertEquals(
+            CalendarTab.pickerEntries,
+            CalendarTab.visiblePickerEntries(CalendarTab.pickerEntries.toSet()),
+        )
+    }
+
+    @Test
+    fun calendarTabVisibilityDoesNotHideLastVisibleView() {
+        val hidden = CalendarTab.pickerEntries.filterNot { it == CalendarTab.Month }.toSet()
+
+        assertEquals(hidden, updateHiddenCalendarViews(hidden, CalendarTab.Month, visible = false))
+        assertEquals(hidden - CalendarTab.Week, updateHiddenCalendarViews(hidden, CalendarTab.Week, visible = true))
+    }
+
+    @Test
+    fun calendarTabStorageRoundTripsPublicTabsOnly() {
+        val hidden = setOf(CalendarTab.Week, CalendarTab.Agenda, CalendarTab.ThreeDay)
+        val stored = CalendarTab.hiddenToStorage(hidden)
+
+        assertEquals(setOf(CalendarTab.Agenda, CalendarTab.Week), CalendarTab.hiddenFromStorage(stored))
+    }
+
+    @Test
+    fun datePickerMillisRoundTripsThroughUtcDate() {
+        val date = LocalDate.of(2036, 2, 29)
+
+        assertEquals(date, datePickerDateFromMillis(date.toDatePickerUtcMillis()))
+    }
+
+    @Test
     fun eventRowMarkerUsesCalendarColorOnlyWhenEnabled() {
         val event = allDayEvent(0L, 86_400_000L, "UTC", "GOOGLE").copy(colorHex = null)
         val palette = testPalette()

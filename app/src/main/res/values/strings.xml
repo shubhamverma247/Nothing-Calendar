@@ -199,6 +199,10 @@
     <string name="settings_reminder_full_screen_subtitle">Open DotCal over other apps at reminder time</string>
     <string name="settings_reminder_minutes">%1$d min</string>
     <string name="settings_default_view">Default view</string>
+    <string name="settings_calendar_views">Calendar views</string>
+    <string name="settings_calendar_views_visible_count">%1$d/%2$d visible</string>
+    <string name="settings_panel_calendar_views">Visible calendar views</string>
+    <string name="settings_calendar_view_toggle_subtitle">Show in the top selector</string>
     <string name="settings_calendar_menu">Calendar menu</string>
     <string name="settings_calendar_menu_visible_count">%1$d/%2$d visible</string>
     <string name="settings_panel_calendar_menu">Visible menu actions</string>

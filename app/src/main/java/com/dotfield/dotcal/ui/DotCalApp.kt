@@ -679,6 +679,14 @@ fun DotCalApp(
             CalendarOverflowAction.hiddenFromStorage(preferences[CalendarPreferences.KEY_HIDDEN_CALENDAR_MENU_ACTIONS])
         }
     }.collectAsStateWithLifecycle(initialValue = emptySet())
+    val hiddenCalendarViews by remember(context) {
+        context.calendarPreferencesDataStore.data.map { preferences ->
+            CalendarTab.hiddenFromStorage(preferences[CalendarPreferences.KEY_HIDDEN_CALENDAR_VIEWS])
+        }
+    }.collectAsStateWithLifecycle(initialValue = emptySet())
+    val visibleCalendarTabs = remember(hiddenCalendarViews) {
+        CalendarTab.visiblePickerEntries(hiddenCalendarViews)
+    }
     val visibleCalendarMenuActions = remember(hiddenCalendarMenuActions) {
         CalendarOverflowAction.Defaults - hiddenCalendarMenuActions
     }
@@ -1040,10 +1048,10 @@ fun DotCalApp(
         }
     }
     var calendarTab by remember { mutableStateOf(storedCalendarTab) }
-    LaunchedEffect(storedCalendarTab) {
-        calendarTab = storedCalendarTab
+    LaunchedEffect(storedCalendarTab, visibleCalendarTabs) {
+        calendarTab = storedCalendarTab.takeIf { it in visibleCalendarTabs } ?: visibleCalendarTabs.first()
     }
-    val activeCalendarTab = calendarTab
+    val activeCalendarTab = calendarTab.takeIf { it in visibleCalendarTabs } ?: visibleCalendarTabs.first()
     SystemBarColorSync(palette)
     LaunchedEffect(resolvedThemeMode, resolvedAccentColor, storedCalendarTab, systemDark, weekStartDay) {
         bootPreferences.edit()
@@ -1146,12 +1154,13 @@ fun DotCalApp(
         tab: CalendarTab,
         source: CalendarTabSelectionSource = CalendarTabSelectionSource.TemporaryNavigation,
     ) {
-        calendarTab = tab
+        val resolvedTab = tab.takeIf { it in visibleCalendarTabs } ?: visibleCalendarTabs.first()
+        calendarTab = resolvedTab
         if (source.shouldPersistDefaultView()) {
-            bootPreferences.edit().putString(BOOT_DEFAULT_VIEW_KEY, tab.name).apply()
+            bootPreferences.edit().putString(BOOT_DEFAULT_VIEW_KEY, resolvedTab.name).apply()
             scope.launch {
                 context.calendarPreferencesDataStore.edit { preferences ->
-                    preferences[CalendarPreferences.KEY_DEFAULT_VIEW] = tab.name
+                    preferences[CalendarPreferences.KEY_DEFAULT_VIEW] = resolvedTab.name
                 }
             }
         }
@@ -1705,6 +1714,7 @@ fun DotCalApp(
                         ScreenTab.Calendar -> CalendarTabContainer(
                             title = calendarHeaderLabel,
                             activeCalendarTab = activeCalendarTab,
+                            visibleCalendarTabs = visibleCalendarTabs,
                             palette = palette,
                             onTitleClick = { jumpToDate(LocalDate.now()) },
                             onTitleLongClick = { showJumpToDatePicker = true },
@@ -2149,6 +2159,7 @@ fun DotCalApp(
                 reminderVibrationEnabled = reminderVibrationEnabled,
                 reminderFullScreenEnabled = reminderFullScreenEnabled,
                 defaultCalendarTab = storedCalendarTab,
+                hiddenCalendarViews = hiddenCalendarViews,
                 hiddenCalendarMenuActions = hiddenCalendarMenuActions,
                 showWeekNumbers = showWeekNumbers,
                 dailyDateIconEnabled = dailyDateIconEnabled,
@@ -2242,6 +2253,25 @@ fun DotCalApp(
                 onDefaultViewSelected = { tab ->
                     selectCalendarTab(tab, CalendarTabSelectionSource.SettingsDefault)
                 },
+                onCalendarViewVisibleChange = { tab, visible ->
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            val current = CalendarTab.hiddenFromStorage(
+                                preferences[CalendarPreferences.KEY_HIDDEN_CALENDAR_VIEWS],
+                            )
+                            val updated = updateHiddenCalendarViews(current, tab, visible)
+                            val updatedVisibleTabs = CalendarTab.visiblePickerEntries(updated)
+                            val savedDefault = CalendarTab.fromStorage(preferences[CalendarPreferences.KEY_DEFAULT_VIEW])
+                            preferences[CalendarPreferences.KEY_HIDDEN_CALENDAR_VIEWS] =
+                                CalendarTab.hiddenToStorage(updated)
+                            if (savedDefault !in updatedVisibleTabs) {
+                                val fallback = updatedVisibleTabs.first()
+                                preferences[CalendarPreferences.KEY_DEFAULT_VIEW] = fallback.name
+                                bootPreferences.edit().putString(BOOT_DEFAULT_VIEW_KEY, fallback.name).apply()
+                            }
+                        }
+                    }
+                },
                 onCalendarMenuActionVisibleChange = { action, visible ->
                     scope.launch {
                         context.calendarPreferencesDataStore.edit { preferences ->
@@ -2331,6 +2361,13 @@ fun DotCalApp(
                     scope.launch {
                         context.calendarPreferencesDataStore.edit { preferences ->
                             preferences.remove(CalendarPreferences.KEY_HIDDEN_CALENDAR_MENU_ACTIONS)
+                        }
+                    }
+                },
+                onResetCalendarViews = {
+                    scope.launch {
+                        context.calendarPreferencesDataStore.edit { preferences ->
+                            preferences.remove(CalendarPreferences.KEY_HIDDEN_CALENDAR_VIEWS)
                         }
                     }
                 },

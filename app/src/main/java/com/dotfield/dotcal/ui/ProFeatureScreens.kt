@@ -128,6 +128,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -144,6 +147,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -3797,19 +3801,16 @@ internal fun DateCalculatorScreen(
             CalcDateField.To -> toDate
             CalcDateField.Start -> startDate
         } ?: LocalDate.now()
-        DateTimeChoiceSheet(
+        DateCalculatorDatePickerDialog(
             title = when (field) {
                 CalcDateField.From -> stringResource(R.string.event_from)
                 CalcDateField.To -> stringResource(R.string.event_to)
                 CalcDateField.Start -> stringResource(R.string.calc_start_date_row)
             },
             selectedDate = current,
-            selectedTime = LocalTime.of(9, 0),
-            minDate = null,
-            includeTime = false,
             palette = palette,
             onDismiss = { picker = null },
-            onSelected = { date, _ ->
+            onSelected = { date ->
                 when (field) {
                     CalcDateField.From -> calcViewModel.setFromDate(date)
                     CalcDateField.To -> calcViewModel.setToDate(date)
@@ -3868,6 +3869,61 @@ private fun CalcResultLine(label: String, value: String, palette: DotCalPalette)
     ) {
         Text(label, color = palette.secondaryText, fontFamily = mono, fontSize = 14.sp)
         Text(value, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateCalculatorDatePickerDialog(
+    title: String,
+    selectedDate: LocalDate,
+    palette: DotCalPalette,
+    onDismiss: () -> Unit,
+    onSelected: (LocalDate) -> Unit,
+) {
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = selectedDate.toDatePickerUtcMillis(),
+        initialDisplayedMonthMillis = selectedDate.toDatePickerUtcMillis(),
+        yearRange = 1900..2200,
+        initialDisplayMode = DisplayMode.Picker,
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                enabled = state.selectedDateMillis != null,
+                onClick = {
+                    state.selectedDateMillis?.let { millis ->
+                        onSelected(datePickerDateFromMillis(millis))
+                    }
+                },
+                colors = ButtonDefaults.textButtonColors(contentColor = palette.accent),
+            ) {
+                Text(stringResource(R.string.action_ok), fontFamily = mono, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = palette.secondaryText),
+            ) {
+                Text(stringResource(R.string.action_cancel), fontFamily = mono)
+            }
+        },
+    ) {
+        DatePicker(
+            state = state,
+            title = {
+                Text(
+                    title,
+                    color = palette.primaryText,
+                    fontFamily = LocalHeadingFont.current,
+                    fontSize = 20.sp,
+                    modifier = Modifier.padding(start = 24.dp, end = 12.dp, top = 18.dp),
+                )
+            },
+            headline = null,
+        )
     }
 }
 

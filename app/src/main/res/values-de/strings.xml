@@ -116,6 +116,10 @@
     <string name="settings_birthday_calendar_subtitle">Importieren Kontakte\' Geburtstage</string>
     <string name="settings_global_holidays">Global Feiertage</string>
     <string name="settings_default_view">Standard Ansicht</string>
+    <string name="settings_calendar_views">Kalenderansichten</string>
+    <string name="settings_calendar_views_visible_count">%1$d/%2$d sichtbar</string>
+    <string name="settings_panel_calendar_views">Sichtbare Kalenderansichten</string>
+    <string name="settings_calendar_view_toggle_subtitle">Im oberen Umschalter anzeigen</string>
     <string name="settings_default_event_calendar">Default event calendar</string>
     <string name="settings_default_event_duration">Standard Termin Dauer</string>
     <string name="settings_start_of_week">Wochenbeginn</string>

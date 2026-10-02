@@ -116,6 +116,10 @@
     <string name="settings_birthday_calendar_subtitle">Ice aktar contatos\' Aniversarios</string>
     <string name="settings_global_holidays">Global feriados</string>
     <string name="settings_default_view">Varsayilan Vista</string>
+    <string name="settings_calendar_views">Takvim gorunumleri</string>
+    <string name="settings_calendar_views_visible_count">%1$d/%2$d gorunur</string>
+    <string name="settings_panel_calendar_views">Gorunur takvim gorunumleri</string>
+    <string name="settings_calendar_view_toggle_subtitle">Ust secicide goster</string>
     <string name="settings_default_event_calendar">Default event calendar</string>
     <string name="settings_default_event_duration">Varsayilan etkinlik Duracao</string>
     <string name="settings_start_of_week">Baslangic of Hafta</string>

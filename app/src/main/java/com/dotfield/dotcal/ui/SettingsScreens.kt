@@ -307,6 +307,7 @@ internal fun SettingsPreview(
     reminderVibrationEnabled: Boolean,
     reminderFullScreenEnabled: Boolean,
     defaultCalendarTab: CalendarTab,
+    hiddenCalendarViews: Set<CalendarTab>,
     hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
     dailyDateIconEnabled: Boolean,
@@ -339,6 +340,8 @@ internal fun SettingsPreview(
     onReminderVibrationEnabledChange: (Boolean) -> Unit,
     onReminderFullScreenEnabledChange: (Boolean) -> Unit,
     onDefaultViewSelected: (CalendarTab) -> Unit,
+    onCalendarViewVisibleChange: (CalendarTab, Boolean) -> Unit,
+    onResetCalendarViews: () -> Unit,
     onCalendarMenuActionVisibleChange: (CalendarOverflowAction, Boolean) -> Unit,
     onResetCalendarMenuActions: () -> Unit,
     onShowWeekNumbersChange: (Boolean) -> Unit,
@@ -412,6 +415,7 @@ internal fun SettingsPreview(
             defaultEventAccountId = defaultEventAccountId,
             assignableAccounts = assignableAccounts,
             defaultCalendarTab = defaultCalendarTab,
+            hiddenCalendarViews = hiddenCalendarViews,
             hiddenCalendarMenuActions = hiddenCalendarMenuActions,
             showWeekNumbers = showWeekNumbers,
             dailyDateIconEnabled = dailyDateIconEnabled,
@@ -432,6 +436,7 @@ internal fun SettingsPreview(
             onDefaultEventDurationSelected = onDefaultEventDurationSelected,
             onDefaultEventAccountSelected = onDefaultEventAccountSelected,
             onDefaultViewSelected = onDefaultViewSelected,
+            onCalendarViewSettings = { onScreenChange(SettingsScreen.CalendarViews) },
             onCalendarMenuSettings = { onScreenChange(SettingsScreen.CalendarMenu) },
             onShowWeekNumbersChange = onShowWeekNumbersChange,
             onDailyDateIconEnabledChange = onDailyDateIconEnabledChange,
@@ -494,6 +499,7 @@ internal fun SettingsPreview(
                 defaultCalendarTab = defaultCalendarTab,
                 defaultEventAccountId = defaultEventAccountId,
                 assignableAccounts = assignableAccounts,
+                hiddenCalendarViews = hiddenCalendarViews,
                 hiddenCalendarMenuActions = hiddenCalendarMenuActions,
                 showWeekNumbers = showWeekNumbers,
                 dailyDateIconEnabled = dailyDateIconEnabled,
@@ -504,12 +510,27 @@ internal fun SettingsPreview(
                 onBack = { onScreenChange(SettingsScreen.Root) },
                 onDefaultViewSelected = onDefaultViewSelected,
                 onDefaultEventAccountSelected = onDefaultEventAccountSelected,
+                onCalendarViewSettings = { onScreenChange(SettingsScreen.CalendarViews) },
                 onCalendarMenuSettings = { onScreenChange(SettingsScreen.CalendarMenu) },
                 onShowWeekNumbersChange = onShowWeekNumbersChange,
                 onDailyDateIconEnabledChange = onDailyDateIconEnabledChange,
                 onBirthdayEnabledChange = onBirthdayEnabledChange,
                 onWeekStartSelected = onWeekStartSelected,
                 onGlobalHolidays = { onScreenChange(SettingsScreen.GlobalHolidays) },
+            )
+        }
+        AnimatedVisibility(
+            visible = screen == SettingsScreen.CalendarViews,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.fillMaxSize().background(palette.calendarSurface),
+        ) {
+            CalendarViewSettings(
+                hiddenTabs = hiddenCalendarViews,
+                palette = palette,
+                onBack = { onScreenChange(SettingsScreen.CalendarPreferences) },
+                onTabVisibleChange = onCalendarViewVisibleChange,
+                onReset = onResetCalendarViews,
             )
         }
         AnimatedVisibility(
@@ -739,6 +760,7 @@ internal fun SettingsRoot(
     defaultEventAccountId: String,
     assignableAccounts: List<CalendarAccount>,
     defaultCalendarTab: CalendarTab,
+    hiddenCalendarViews: Set<CalendarTab>,
     hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
     dailyDateIconEnabled: Boolean,
@@ -759,6 +781,7 @@ internal fun SettingsRoot(
     onDefaultEventDurationSelected: (Int) -> Unit,
     onDefaultEventAccountSelected: (String) -> Unit,
     onDefaultViewSelected: (CalendarTab) -> Unit,
+    onCalendarViewSettings: () -> Unit,
     onCalendarMenuSettings: () -> Unit,
     onShowWeekNumbersChange: (Boolean) -> Unit,
     onDailyDateIconEnabledChange: (Boolean) -> Unit,
@@ -944,6 +967,7 @@ private fun CalendarPreferencesSettings(
     defaultCalendarTab: CalendarTab,
     defaultEventAccountId: String,
     assignableAccounts: List<CalendarAccount>,
+    hiddenCalendarViews: Set<CalendarTab>,
     hiddenCalendarMenuActions: Set<CalendarOverflowAction>,
     showWeekNumbers: Boolean,
     dailyDateIconEnabled: Boolean,
@@ -954,6 +978,7 @@ private fun CalendarPreferencesSettings(
     onBack: () -> Unit,
     onDefaultViewSelected: (CalendarTab) -> Unit,
     onDefaultEventAccountSelected: (String) -> Unit,
+    onCalendarViewSettings: () -> Unit,
     onCalendarMenuSettings: () -> Unit,
     onShowWeekNumbersChange: (Boolean) -> Unit,
     onDailyDateIconEnabledChange: (Boolean) -> Unit,
@@ -979,8 +1004,16 @@ private fun CalendarPreferencesSettings(
                 SettingsContentDivider(palette)
                 SettingsDefaultViewRow(
                     selectedTab = defaultCalendarTab,
+                    visibleTabs = CalendarTab.visiblePickerEntries(hiddenCalendarViews),
                     palette = palette,
                     onViewSelected = onDefaultViewSelected,
+                )
+                SettingsContentDivider(palette)
+                SettingsMenuRow(
+                    title = stringResource(R.string.settings_calendar_views),
+                    value = calendarViewSummary(hiddenCalendarViews),
+                    palette = palette,
+                    onClick = onCalendarViewSettings,
                 )
                 SettingsContentDivider(palette)
                 SettingsDefaultEventCalendarRow(
@@ -2391,6 +2424,59 @@ private fun PrivacyPolicySettings(
 }
 
 @Composable
+private fun CalendarViewSettings(
+    hiddenTabs: Set<CalendarTab>,
+    palette: DotCalPalette,
+    onBack: () -> Unit,
+    onTabVisibleChange: (CalendarTab, Boolean) -> Unit,
+    onReset: () -> Unit,
+) {
+    val visibleTabs = CalendarTab.visiblePickerEntries(hiddenTabs)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(palette.calendarSurface).padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item {
+            SettingsLargeHeader(
+                palette = palette,
+                onBack = onBack,
+                title = stringResource(R.string.settings_calendar_views),
+                trailing = {
+                    TextButton(onClick = onReset) {
+                        Text(
+                            stringResource(R.string.settings_reset),
+                            color = palette.accent,
+                            fontFamily = mono,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                },
+            )
+        }
+        item {
+            SettingsPanel(title = stringResource(R.string.settings_panel_calendar_views), palette = palette, framed = false) {
+                CalendarTab.pickerEntries.forEachIndexed { index, tab ->
+                    val isVisible = tab in visibleTabs
+                    SettingsWidgetToggleRow(
+                        title = tab.shortLabel,
+                        subtitle = stringResource(R.string.settings_calendar_view_toggle_subtitle),
+                        checked = isVisible,
+                        enabled = !isVisible || visibleTabs.size > 1,
+                        isPro = true,
+                        palette = palette,
+                        onCheckedChange = { visible -> onTabVisibleChange(tab, visible) },
+                    )
+                    if (index != CalendarTab.pickerEntries.lastIndex) {
+                        SettingsContentDivider(palette)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun CalendarMenuSettings(
     hiddenActions: Set<CalendarOverflowAction>,
     palette: DotCalPalette,
@@ -2550,6 +2636,7 @@ private fun CalendarAccountToggleRow(
 @Composable
 private fun SettingsDefaultViewRow(
     selectedTab: CalendarTab,
+    visibleTabs: List<CalendarTab>,
     palette: DotCalPalette,
     onViewSelected: (CalendarTab) -> Unit,
 ) {
@@ -2572,7 +2659,7 @@ private fun SettingsDefaultViewRow(
     if (showSheet) {
         SettingsOptionSheet(
             title = stringResource(R.string.settings_default_view),
-            options = CalendarTab.pickerEntries,
+            options = visibleTabs.ifEmpty { CalendarTab.pickerEntries },
             selected = selectedTab,
             palette = palette,
             label = { it.shortLabel },

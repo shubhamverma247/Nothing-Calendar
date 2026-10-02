@@ -61,6 +61,7 @@ object CalendarPreferences {
     val KEY_SYNC_INTERVAL_MINS = intPreferencesKey("sync_interval_mins")
     val KEY_BIRTHDAY_ENABLED = booleanPreferencesKey("birthday_enabled")
     val KEY_HIDDEN_CALENDAR_MENU_ACTIONS = stringPreferencesKey("hidden_calendar_menu_actions")
+    val KEY_HIDDEN_CALENDAR_VIEWS = stringPreferencesKey("hidden_calendar_views")
     val KEY_ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
     val KEY_LAST_SYNC_MS = longPreferencesKey("last_sync_ms")
     val KEY_LAST_SYNC_ERROR = stringPreferencesKey("last_sync_error")

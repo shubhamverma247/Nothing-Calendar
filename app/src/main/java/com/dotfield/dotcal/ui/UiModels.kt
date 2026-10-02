@@ -70,6 +70,7 @@ internal enum class SettingsScreen {
     Sync,
     CalendarPreferences,
     CalendarMenu,
+    CalendarViews,
     ReminderDefaults,
     ReminderCenter,
     Widgets,
@@ -85,6 +86,7 @@ internal fun SettingsScreen.parentScreen(): SettingsScreen = when (this) {
     SettingsScreen.ReminderDefaults -> SettingsScreen.ReminderCenter
     SettingsScreen.AddAccount -> SettingsScreen.CalendarAccounts
     SettingsScreen.CalendarMenu -> SettingsScreen.CalendarPreferences
+    SettingsScreen.CalendarViews -> SettingsScreen.CalendarPreferences
     else -> SettingsScreen.Root
 }
 

@@ -43,6 +43,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.time.temporal.WeekFields
@@ -454,6 +455,16 @@ internal fun calendarMenuSummary(hiddenActions: Set<CalendarOverflowAction>): St
 }
 
 @Composable
+internal fun calendarViewSummary(hiddenTabs: Set<CalendarTab>): String {
+    val visibleCount = CalendarTab.visiblePickerEntries(hiddenTabs).size
+    return stringResource(
+        R.string.settings_calendar_views_visible_count,
+        visibleCount,
+        CalendarTab.pickerEntries.size,
+    )
+}
+
+@Composable
 internal fun List<SyncMetadata>.lastSyncedSubtitle(): String {
     return stringResource(R.string.sync_last_synced, lastSyncedRelativeLabel())
 }
@@ -674,6 +685,28 @@ internal enum class CalendarTabSelectionSource {
 
 internal fun CalendarTabSelectionSource.shouldPersistDefaultView(): Boolean {
     return this == CalendarTabSelectionSource.SettingsDefault
+}
+
+internal fun updateHiddenCalendarViews(
+    currentHidden: Set<CalendarTab>,
+    tab: CalendarTab,
+    visible: Boolean,
+): Set<CalendarTab> {
+    if (tab !in CalendarTab.pickerEntries) return currentHidden
+    val updated = if (visible) currentHidden - tab else currentHidden + tab
+    return if (CalendarTab.visiblePickerEntries(updated).size == CalendarTab.pickerEntries.size && updated.isNotEmpty()) {
+        currentHidden
+    } else {
+        updated
+    }
+}
+
+internal fun LocalDate.toDatePickerUtcMillis(): Long {
+    return atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+}
+
+internal fun datePickerDateFromMillis(utcMillis: Long): LocalDate {
+    return Instant.ofEpochMilli(utcMillis).atZone(ZoneOffset.UTC).toLocalDate()
 }
 
 internal fun eventRowCalendarMarkerColor(

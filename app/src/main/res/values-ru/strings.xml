@@ -116,6 +116,10 @@
     <string name="settings_birthday_calendar_subtitle">Importirovat dni rozhdeniya kontaktov</string>
     <string name="settings_global_holidays">Global Feiertage</string>
     <string name="settings_default_view">Вид по умолчанию</string>
+    <string name="settings_calendar_views">Виды календаря</string>
+    <string name="settings_calendar_views_visible_count">%1$d/%2$d видимых</string>
+    <string name="settings_panel_calendar_views">Видимые виды календаря</string>
+    <string name="settings_calendar_view_toggle_subtitle">Показывать в верхнем переключателе</string>
     <string name="settings_default_event_calendar">Default event calendar</string>
     <string name="settings_default_event_duration">Длительность события по умолчанию</string>
     <string name="settings_start_of_week">Nachalo of Nedelya</string>

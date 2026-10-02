@@ -116,6 +116,10 @@
     <string name="settings_birthday_calendar_subtitle">Importar contatos\' Aniversarios</string>
     <string name="settings_global_holidays">Global feriados</string>
     <string name="settings_default_view">Padrao Vista</string>
+    <string name="settings_calendar_views">Vistas do calendario</string>
+    <string name="settings_calendar_views_visible_count">%1$d/%2$d visiveis</string>
+    <string name="settings_panel_calendar_views">Vistas visiveis do calendario</string>
+    <string name="settings_calendar_view_toggle_subtitle">Mostrar no seletor superior</string>
     <string name="settings_default_event_calendar">Default event calendar</string>
     <string name="settings_default_event_duration">Padrao evento Duracao</string>
     <string name="settings_start_of_week">Inicio of Semana</string>

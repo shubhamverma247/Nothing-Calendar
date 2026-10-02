@@ -107,6 +107,7 @@ internal fun SystemBarColorSync(palette: DotCalPalette) {
 internal fun CalendarTabContainer(
     title: String,
     activeCalendarTab: CalendarTab,
+    visibleCalendarTabs: List<CalendarTab> = CalendarTab.pickerEntries,
     palette: DotCalPalette,
     onTitleClick: () -> Unit,
     onTitleLongClick: () -> Unit,
@@ -172,6 +173,7 @@ internal fun CalendarTabContainer(
         )
         CalendarViewSegmentedControl(
             selected = activeCalendarTab,
+            tabs = visibleCalendarTabs,
             palette = palette,
             onSelected = onCalendarTabSelected,
         )
@@ -597,11 +599,12 @@ private fun BottomNavItem(
 @Composable
 private fun CalendarViewSegmentedControl(
     selected: CalendarTab,
+    tabs: List<CalendarTab>,
     palette: DotCalPalette,
     onSelected: (CalendarTab) -> Unit,
 ) {
     val segmentShape = RoundedCornerShape(28.dp)
-    val compactTabs = CalendarTab.pickerEntries
+    val compactTabs = tabs.ifEmpty { CalendarTab.pickerEntries }
     val segmentSurface = palette.topBarSurface
     val segmentBorder = palette.disabledText.copy(alpha = if (palette.isDark) 0.35f else 0.45f)
     val segmentSelected = palette.segmentSelected
@@ -768,6 +771,20 @@ internal enum class CalendarTab(
         fun fromStorage(value: String?): CalendarTab {
             val stored = entries.firstOrNull { it.name == value } ?: Month
             return if (stored == ThreeDay) Month else stored
+        }
+
+        fun hiddenFromStorage(value: String?): Set<CalendarTab> {
+            if (value.isNullOrBlank()) return emptySet()
+            val names = value.split(",").map(String::trim).filter(String::isNotEmpty).toSet()
+            return pickerEntries.filter { it.name in names }.toSet()
+        }
+
+        fun hiddenToStorage(hidden: Set<CalendarTab>): String {
+            return hidden.filter { it in pickerEntries }.map(CalendarTab::name).sorted().joinToString(",")
+        }
+
+        fun visiblePickerEntries(hidden: Set<CalendarTab>): List<CalendarTab> {
+            return pickerEntries.filterNot { it in hidden }.ifEmpty { pickerEntries }
         }
     }
 }
