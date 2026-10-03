@@ -1239,4 +1239,19 @@
     <string name="find_time_move_failed">Acara tidak dapat dipindahkan</string>
     <string name="find_time_block_created">Acara kalender dibuat</string>
     <string name="find_time_block_failed">Acara kalender tidak dapat dibuat</string>
+    <string name="shift_patterns_archived">Pola yang diarsipkan</string>
+    <string name="shift_pattern_copy_name">Salinan %1$s</string>
+    <string name="shift_pattern_archived_label">DIARSIPKAN</string>
+    <string name="shift_pattern_actions">Tindakan pola</string>
+    <string name="shift_pattern_duplicate">Duplikat</string>
+    <string name="shift_pattern_restore">Pulihkan</string>
+    <string name="shift_pattern_archive">Arsipkan</string>
+    <string name="shift_pattern_archive_title">Arsipkan pola?</string>
+    <string name="shift_pattern_delete_message">Pilih apakah shift yang dibuat tetap ada di kalender. Menghapusnya memerlukan pilihan tegas di bawah.</string>
+    <string name="shift_pattern_delete_keep_events">Hapus pola saja</string>
+    <string name="shift_pattern_delete_with_events">Hapus pola dan shift</string>
+    <string name="shift_edit_pattern_title">Edit pola</string>
+    <string name="shift_pattern_presets">PRESET</string>
+    <string name="shift_preset_rotating_days_nights">Rotasi siang/malam</string>
+    <string name="shift_preset_four_on_four_off">Empat kerja/empat libur</string>
 </resources>

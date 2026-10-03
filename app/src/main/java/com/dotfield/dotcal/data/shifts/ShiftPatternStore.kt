@@ -11,6 +11,7 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 private const val MINUTES_PER_DAY = 24 * 60
+const val SHIFT_OFF_TYPE_ID = "__off__"
 
 data class ShiftType(
     val id: String,
@@ -36,11 +37,40 @@ data class ShiftPattern(
     val cycleShiftTypeIds: List<String>,
     val cycleStartDate: LocalDate,
     val createdAtMs: Long,
+    val archivedAtMs: Long? = null,
 ) {
     companion object {
         fun newId(): String = UUID.randomUUID().toString()
     }
 }
+
+enum class ShiftPatternPreset {
+    RotatingDaysNights,
+    FourOnFourOff,
+}
+
+fun shiftPatternPresetCycle(
+    preset: ShiftPatternPreset,
+    primaryTypeId: String,
+    secondaryTypeId: String? = null,
+): List<String> = when (preset) {
+    ShiftPatternPreset.RotatingDaysNights -> {
+        val nightTypeId = requireNotNull(secondaryTypeId) { "Rotating days/nights needs two shift types" }
+        listOf(primaryTypeId, primaryTypeId, nightTypeId, nightTypeId) + List(4) { SHIFT_OFF_TYPE_ID }
+    }
+    ShiftPatternPreset.FourOnFourOff -> List(4) { primaryTypeId } + List(4) { SHIFT_OFF_TYPE_ID }
+}
+
+fun duplicateShiftPattern(
+    original: ShiftPattern,
+    copyName: String,
+    createdAtMs: Long = System.currentTimeMillis(),
+): ShiftPattern = original.copy(
+    id = ShiftPattern.newId(),
+    name = copyName,
+    createdAtMs = createdAtMs,
+    archivedAtMs = null,
+)
 
 data class GeneratedShiftOccurrence(
     val date: LocalDate,
@@ -231,6 +261,7 @@ class ShiftPatternStore internal constructor(private val rootDir: File) {
             .put("cycleShiftTypeIds", cycle)
             .put("cycleStartDate", pattern.cycleStartDate.toString())
             .put("createdAtMs", pattern.createdAtMs)
+            .put("archivedAtMs", pattern.archivedAtMs ?: JSONObject.NULL)
     }
 
     private fun decodePattern(text: String): ShiftPattern {
@@ -246,6 +277,7 @@ class ShiftPatternStore internal constructor(private val rootDir: File) {
             cycleShiftTypeIds = ids,
             cycleStartDate = LocalDate.parse(o.optString("cycleStartDate", LocalDate.now().toString())),
             createdAtMs = o.optLong("createdAtMs", 0L),
+            archivedAtMs = if (o.isNull("archivedAtMs")) null else o.optLong("archivedAtMs"),
         )
     }
 

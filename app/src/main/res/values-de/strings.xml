@@ -1239,4 +1239,19 @@
     <string name="find_time_move_failed">Termin konnte nicht verschoben werden</string>
     <string name="find_time_block_created">Kalendertermin erstellt</string>
     <string name="find_time_block_failed">Kalendertermin konnte nicht erstellt werden</string>
+    <string name="shift_patterns_archived">Archivierte Muster</string>
+    <string name="shift_pattern_copy_name">Kopie von %1$s</string>
+    <string name="shift_pattern_archived_label">ARCHIVIERT</string>
+    <string name="shift_pattern_actions">Musteraktionen</string>
+    <string name="shift_pattern_duplicate">Duplizieren</string>
+    <string name="shift_pattern_restore">Wiederherstellen</string>
+    <string name="shift_pattern_archive">Archivieren</string>
+    <string name="shift_pattern_archive_title">Muster archivieren?</string>
+    <string name="shift_pattern_delete_message">Wählen Sie, ob erstellte Schichten im Kalender bleiben sollen. Das Entfernen erfordert die ausdrückliche Option unten.</string>
+    <string name="shift_pattern_delete_keep_events">Nur Muster löschen</string>
+    <string name="shift_pattern_delete_with_events">Muster und Schichten löschen</string>
+    <string name="shift_edit_pattern_title">Muster bearbeiten</string>
+    <string name="shift_pattern_presets">VORLAGEN</string>
+    <string name="shift_preset_rotating_days_nights">Wechselnde Tag-/Nachtschichten</string>
+    <string name="shift_preset_four_on_four_off">Vier Arbeitstage, vier frei</string>
 </resources>

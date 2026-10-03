@@ -1309,4 +1309,19 @@
     <string name="find_time_move_failed">Не удалось перенести событие</string>
     <string name="find_time_block_created">Событие календаря создано</string>
     <string name="find_time_block_failed">Не удалось создать событие календаря</string>
+    <string name="shift_patterns_archived">Архивные шаблоны</string>
+    <string name="shift_pattern_copy_name">Копия: %1$s</string>
+    <string name="shift_pattern_archived_label">В АРХИВЕ</string>
+    <string name="shift_pattern_actions">Действия с шаблоном</string>
+    <string name="shift_pattern_duplicate">Дублировать</string>
+    <string name="shift_pattern_restore">Восстановить</string>
+    <string name="shift_pattern_archive">Архивировать</string>
+    <string name="shift_pattern_archive_title">Архивировать шаблон?</string>
+    <string name="shift_pattern_delete_message">Выберите, должны ли созданные смены остаться в календаре. Для их удаления явно выберите вариант ниже.</string>
+    <string name="shift_pattern_delete_keep_events">Удалить только шаблон</string>
+    <string name="shift_pattern_delete_with_events">Удалить шаблон и смены</string>
+    <string name="shift_edit_pattern_title">Изменить шаблон</string>
+    <string name="shift_pattern_presets">ГОТОВЫЕ СХЕМЫ</string>
+    <string name="shift_preset_rotating_days_nights">Чередование дней и ночей</string>
+    <string name="shift_preset_four_on_four_off">Четыре рабочих/четыре выходных</string>
 </resources>

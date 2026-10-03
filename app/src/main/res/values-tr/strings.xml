@@ -1239,4 +1239,19 @@
     <string name="find_time_move_failed">Etkinlik taşınamadı</string>
     <string name="find_time_block_created">Takvim etkinliği oluşturuldu</string>
     <string name="find_time_block_failed">Takvim etkinliği oluşturulamadı</string>
+    <string name="shift_patterns_archived">Arşivlenmiş düzenler</string>
+    <string name="shift_pattern_copy_name">%1$s kopyası</string>
+    <string name="shift_pattern_archived_label">ARŞİVLENDİ</string>
+    <string name="shift_pattern_actions">Düzen işlemleri</string>
+    <string name="shift_pattern_duplicate">Çoğalt</string>
+    <string name="shift_pattern_restore">Geri yükle</string>
+    <string name="shift_pattern_archive">Arşivle</string>
+    <string name="shift_pattern_archive_title">Düzen arşivlensin mi?</string>
+    <string name="shift_pattern_delete_message">Oluşturulan vardiyaların takvimde kalıp kalmayacağını seçin. Kaldırmak için aşağıdaki açık seçeneği kullanın.</string>
+    <string name="shift_pattern_delete_keep_events">Yalnızca düzeni sil</string>
+    <string name="shift_pattern_delete_with_events">Düzeni ve vardiyaları sil</string>
+    <string name="shift_edit_pattern_title">Düzeni düzenle</string>
+    <string name="shift_pattern_presets">HAZIR DÜZENLER</string>
+    <string name="shift_preset_rotating_days_nights">Dönüşümlü gündüz/gece</string>
+    <string name="shift_preset_four_on_four_off">Dört gün çalışma/dört gün izin</string>
 </resources>

@@ -248,11 +248,15 @@ import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.shifts.ShiftPattern
+import com.dotfield.dotcal.data.shifts.ShiftPatternPreset
 import com.dotfield.dotcal.data.shifts.ShiftGenerationPreview
 import com.dotfield.dotcal.data.shifts.ShiftGenerationPreviewItem
 import com.dotfield.dotcal.data.shifts.ShiftPreviewAction
 import com.dotfield.dotcal.data.shifts.ShiftSkipReason
 import com.dotfield.dotcal.data.shifts.ShiftType
+import com.dotfield.dotcal.data.shifts.SHIFT_OFF_TYPE_ID
+import com.dotfield.dotcal.data.shifts.duplicateShiftPattern
+import com.dotfield.dotcal.data.shifts.shiftPatternPresetCycle
 import com.dotfield.dotcal.data.shifts.shiftDurationMinutes
 import com.dotfield.dotcal.data.shifts.shiftEndMinuteOfDay
 import com.dotfield.dotcal.data.templates.EventTemplate
@@ -2180,9 +2184,13 @@ internal fun ShiftPatternsScreen(
     var showTypeEditor by remember { mutableStateOf(false) }
     var showPatternEditor by remember { mutableStateOf(false) }
     var editingType by remember { mutableStateOf<ShiftType?>(null) }
+    var editingPattern by remember { mutableStateOf<ShiftPattern?>(null) }
     var generatingPattern by remember { mutableStateOf<ShiftPattern?>(null) }
     var sharingPattern by remember { mutableStateOf<ShiftPattern?>(null) }
+    var archivePattern by remember { mutableStateOf<ShiftPattern?>(null) }
     var deletePattern by remember { mutableStateOf<ShiftPattern?>(null) }
+    val activePatterns = patterns.filter { it.archivedAtMs == null }
+    val archivedPatterns = patterns.filter { it.archivedAtMs != null }
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
         Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
             IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp).size(44.dp)) {
@@ -2200,7 +2208,7 @@ internal fun ShiftPatternsScreen(
                 ShiftScreenHeader(
                     palette = palette,
                     typeCount = shiftTypes.size,
-                    patternCount = patterns.size,
+                    patternCount = activePatterns.size,
                 )
             }
             item {
@@ -2230,19 +2238,43 @@ internal fun ShiftPatternsScreen(
                     palette = palette,
                     onAction = { showPatternEditor = true },
                 )
-                if (patterns.isEmpty()) {
+                if (activePatterns.isEmpty()) {
                     ShiftEmptyText(stringResource(R.string.shift_patterns_empty), palette)
                 }
             }
-            lazyItems(patterns, key = { it.id }) { pattern ->
+            lazyItems(activePatterns, key = { it.id }) { pattern ->
+                val copyName = stringResource(R.string.shift_pattern_copy_name, pattern.name)
                 ShiftPatternCard(
                     pattern = pattern,
                     shiftTypes = shiftTypes,
                     palette = palette,
                     onGenerate = { generatingPattern = pattern },
                     onShare = { sharingPattern = pattern },
+                    onEdit = { editingPattern = pattern },
+                    onDuplicate = { onSavePattern(duplicateShiftPattern(pattern, copyName)) },
+                    onArchive = { archivePattern = pattern },
                     onDelete = { deletePattern = pattern },
                 )
+            }
+            if (archivedPatterns.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(stringResource(R.string.shift_patterns_archived), color = palette.secondaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+                lazyItems(archivedPatterns, key = { "archived-${it.id}" }) { pattern ->
+                    val copyName = stringResource(R.string.shift_pattern_copy_name, pattern.name)
+                    ShiftPatternCard(
+                        pattern = pattern,
+                        shiftTypes = shiftTypes,
+                        palette = palette,
+                        onGenerate = {},
+                        onShare = { sharingPattern = pattern },
+                        onEdit = { editingPattern = pattern },
+                        onDuplicate = { onSavePattern(duplicateShiftPattern(pattern, copyName)) },
+                        onArchive = { onSavePattern(pattern.copy(archivedAtMs = null)) },
+                        onDelete = { deletePattern = pattern },
+                    )
+                }
             }
             item {
                 Spacer(modifier = Modifier.height(12.dp))
@@ -2275,6 +2307,7 @@ internal fun ShiftPatternsScreen(
         ShiftPatternEditorDialog(
             palette = palette,
             shiftTypes = shiftTypes,
+            existing = null,
             onDismiss = { showPatternEditor = false },
             onSave = {
                 onSavePattern(it)
@@ -2282,9 +2315,22 @@ internal fun ShiftPatternsScreen(
             },
         )
     }
+    editingPattern?.let { pattern ->
+        ShiftPatternEditorDialog(
+            palette = palette,
+            shiftTypes = shiftTypes,
+            existing = pattern,
+            onDismiss = { editingPattern = null },
+            onSave = {
+                onSavePattern(it)
+                editingPattern = null
+            },
+        )
+    }
     generatingPattern?.let { pattern ->
         ShiftGenerateDialog(
             pattern = pattern,
+            shiftTypes = shiftTypes,
             accounts = accounts,
             palette = palette,
             onDismiss = { generatingPattern = null },
@@ -2309,14 +2355,37 @@ internal fun ShiftPatternsScreen(
         )
     }
     deletePattern?.let { pattern ->
+        AlertDialog(
+            onDismissRequest = { deletePattern = null },
+            containerColor = palette.dialogSurface,
+            title = { Text(stringResource(R.string.shift_pattern_delete_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
+            text = { Text(stringResource(R.string.shift_pattern_delete_message), color = palette.secondaryText, fontFamily = mono) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeletePattern(pattern.id, false)
+                    deletePattern = null
+                }) { Text(stringResource(R.string.shift_pattern_delete_keep_events), color = palette.accent) }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { deletePattern = null }) { Text(stringResource(R.string.action_cancel), color = palette.primaryText) }
+                    TextButton(onClick = {
+                        onDeletePattern(pattern.id, true)
+                        deletePattern = null
+                    }) { Text(stringResource(R.string.shift_pattern_delete_with_events), color = palette.accent) }
+                }
+            },
+        )
+    }
+    archivePattern?.let { pattern ->
         ConfirmDeleteDialog(
-            title = stringResource(R.string.shift_pattern_delete_title),
-            confirmLabel = stringResource(R.string.action_delete),
+            title = stringResource(R.string.shift_pattern_archive_title),
+            confirmLabel = stringResource(R.string.shift_pattern_archive),
             palette = palette,
-            onDismiss = { deletePattern = null },
+            onDismiss = { archivePattern = null },
             onConfirm = {
-                onDeletePattern(pattern.id, true)
-                deletePattern = null
+                onSavePattern(pattern.copy(archivedAtMs = System.currentTimeMillis()))
+                archivePattern = null
             },
         )
     }
@@ -2758,21 +2827,29 @@ private fun ShiftPatternCard(
     palette: DotCalPalette,
     onGenerate: () -> Unit,
     onShare: () -> Unit,
+    onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
+    onArchive: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val typeMap = remember(shiftTypes) { shiftTypes.associateBy { it.id } }
+    var menuExpanded by remember { mutableStateOf(false) }
+    val archived = pattern.archivedAtMs != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(palette.eventCardSurface)
             .border(1.dp, palette.eventCardBorder, RoundedCornerShape(18.dp))
-            .noRippleClickable(onClick = onGenerate)
+            .noRippleClickable(onClick = if (archived) onEdit else onGenerate)
             .padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text(pattern.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (archived) {
+                Text(stringResource(R.string.shift_pattern_archived_label), color = palette.accent, fontFamily = mono, fontSize = 11.sp)
+            }
             Spacer(Modifier.height(5.dp))
             Text(shiftPatternSummary(pattern, typeMap), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
@@ -2781,9 +2858,19 @@ private fun ShiftPatternCard(
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ShiftMiniActionButton(icon = Icons.Default.CalendarMonth, contentDescription = "Generate shifts", tint = palette.accent, palette = palette, onClick = onGenerate)
+            if (!archived) {
+                ShiftMiniActionButton(icon = Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.shift_generate_confirm), tint = palette.accent, palette = palette, onClick = onGenerate)
+            }
             ShiftMiniActionButton(icon = Icons.Default.Share, contentDescription = stringResource(R.string.shift_share_plan), tint = palette.secondaryText, palette = palette, onClick = onShare)
-            ShiftMiniActionButton(icon = Icons.Default.DeleteOutline, contentDescription = "Delete shift pattern", tint = palette.secondaryText, palette = palette, onClick = onDelete)
+            Box {
+                ShiftMiniActionButton(icon = Icons.Default.MoreVert, contentDescription = stringResource(R.string.shift_pattern_actions), tint = palette.secondaryText, palette = palette, onClick = { menuExpanded = true })
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }, containerColor = palette.dialogSurface) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.action_edit), color = palette.primaryText, fontFamily = mono) }, onClick = { menuExpanded = false; onEdit() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.shift_pattern_duplicate), color = palette.primaryText, fontFamily = mono) }, onClick = { menuExpanded = false; onDuplicate() })
+                    DropdownMenuItem(text = { Text(stringResource(if (archived) R.string.shift_pattern_restore else R.string.shift_pattern_archive), color = palette.primaryText, fontFamily = mono) }, onClick = { menuExpanded = false; onArchive() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.action_delete), color = palette.accent, fontFamily = mono) }, onClick = { menuExpanded = false; onDelete() })
+                }
+            }
         }
     }
 }
@@ -3037,26 +3124,43 @@ private fun periodLabel(isPm: Boolean): String =
 private fun ShiftPatternEditorDialog(
     palette: DotCalPalette,
     shiftTypes: List<ShiftType>,
+    existing: ShiftPattern?,
     onDismiss: () -> Unit,
     onSave: (ShiftPattern) -> Unit,
 ) {
     // Hoisted: the remember {} lambda is not composable.
     val defaultPatternName = stringResource(R.string.shift_pattern_default_name)
-    var name by remember { mutableStateOf(defaultPatternName) }
-    var cycle by remember { mutableStateOf<List<String>>(emptyList()) }
-    var startDate by remember { mutableStateOf(LocalDate.now()) }
+    var name by remember(existing?.id) { mutableStateOf(existing?.name ?: defaultPatternName) }
+    var cycle by remember(existing?.id) { mutableStateOf(existing?.cycleShiftTypeIds ?: emptyList()) }
+    var startDate by remember(existing?.id) { mutableStateOf(existing?.cycleStartDate ?: LocalDate.now()) }
     var showStartDatePicker by remember { mutableStateOf(false) }
+    val generatingTypes = shiftTypes.filter { it.generatesEvent }
+    val dayType = generatingTypes.firstOrNull { it.name.contains("day", ignoreCase = true) } ?: generatingTypes.firstOrNull()
+    val nightType = generatingTypes.firstOrNull { it.id != dayType?.id && it.name.contains("night", ignoreCase = true) }
+        ?: generatingTypes.firstOrNull { it.id != dayType?.id }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
-        title = { Text(stringResource(R.string.shift_build_pattern_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
+        title = { Text(stringResource(if (existing == null) R.string.shift_build_pattern_title else R.string.shift_edit_pattern_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.shift_field_name)) }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
                 ShiftDateRow(label = stringResource(R.string.calc_start_date_row), date = startDate, palette = palette, onClick = { showStartDatePicker = true })
+
+                Text(stringResource(R.string.shift_pattern_presets), color = palette.secondaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.6.sp)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        enabled = dayType != null && nightType != null,
+                        onClick = { cycle = shiftPatternPresetCycle(ShiftPatternPreset.RotatingDaysNights, dayType!!.id, nightType!!.id) },
+                    ) { Text(stringResource(R.string.shift_preset_rotating_days_nights), color = if (dayType != null && nightType != null) palette.accent else palette.disabledText, fontFamily = mono) }
+                    TextButton(
+                        enabled = dayType != null,
+                        onClick = { cycle = shiftPatternPresetCycle(ShiftPatternPreset.FourOnFourOff, dayType!!.id) },
+                    ) { Text(stringResource(R.string.shift_preset_four_on_four_off), color = if (dayType != null) palette.accent else palette.disabledText, fontFamily = mono) }
+                }
 
                 Text(stringResource(R.string.shift_pattern_type_picker), color = palette.secondaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.6.sp)
                 if (shiftTypes.isEmpty()) {
@@ -3098,11 +3202,12 @@ private fun ShiftPatternEditorDialog(
                 onClick = {
                     onSave(
                         ShiftPattern(
-                            id = ShiftPattern.newId(),
+                            id = existing?.id ?: ShiftPattern.newId(),
                             name = name.trim(),
                             cycleShiftTypeIds = cycle,
                             cycleStartDate = startDate,
-                            createdAtMs = System.currentTimeMillis(),
+                            createdAtMs = existing?.createdAtMs ?: System.currentTimeMillis(),
+                            archivedAtMs = existing?.archivedAtMs,
                         ),
                     )
                 },
@@ -3177,7 +3282,7 @@ private fun ShiftPatternCyclePreview(
                     val type = typeMap[item.value]
                     ShiftPatternCycleChip(
                         index = item.index + 1,
-                        label = type?.name ?: item.value,
+                        label = if (item.value == SHIFT_OFF_TYPE_ID) stringResource(R.string.shift_summary_off) else type?.name ?: item.value,
                         colorHex = type?.colorHex ?: NOTHING_RED_HEX,
                         palette = palette,
                     )
@@ -3208,6 +3313,7 @@ private fun ShiftPatternCycleChip(index: Int, label: String, colorHex: String, p
 @Composable
 private fun ShiftGenerateDialog(
     pattern: ShiftPattern,
+    shiftTypes: List<ShiftType>,
     accounts: List<CalendarAccount>,
     palette: DotCalPalette,
     onDismiss: () -> Unit,
@@ -3230,6 +3336,7 @@ private fun ShiftGenerateDialog(
             } ?: run {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(pattern.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold)
+                    ShiftPatternCyclePreview(pattern.cycleShiftTypeIds, shiftTypes.associateBy { it.id }, palette)
                     ShiftDateRow(label = stringResource(R.string.shift_generate_from), date = startDate, palette = palette, onClick = { showStartDatePicker = true })
                     OutlinedTextField(value = months, onValueChange = { months = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.shift_months_ahead)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
                     Text(stringResource(R.string.shift_calendar), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
@@ -3506,8 +3613,9 @@ private fun shiftPatternSummary(pattern: ShiftPattern, types: Map<String, ShiftT
 private fun shiftCycleLabel(ids: List<String>, types: Map<String, ShiftType>): String {
     // Hoisted: joinToString / map / ifBlank lambdas are not composable.
     val missing = stringResource(R.string.shift_type_missing)
+    val off = stringResource(R.string.shift_summary_off)
     val none = stringResource(R.string.shift_no_shifts_selected)
-    return ids.map { types[it]?.name ?: missing }.joinToString(", ").ifBlank { none }
+    return ids.map { id -> if (id == SHIFT_OFF_TYPE_ID) off else types[id]?.name ?: missing }.joinToString(", ").ifBlank { none }
 }
 
 @Composable

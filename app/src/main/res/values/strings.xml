@@ -1488,4 +1488,19 @@
     <string name="widget_sub_countdown">D-Day timer</string>
     <string name="widget_sub_shift">Shift roster</string>
     <string name="widget_sub_quick">Shortcut buttons</string>
+    <string name="shift_patterns_archived">Archived patterns</string>
+    <string name="shift_pattern_copy_name">Copy of %1$s</string>
+    <string name="shift_pattern_archived_label">ARCHIVED</string>
+    <string name="shift_pattern_actions">Pattern actions</string>
+    <string name="shift_pattern_duplicate">Duplicate</string>
+    <string name="shift_pattern_restore">Restore</string>
+    <string name="shift_pattern_archive">Archive</string>
+    <string name="shift_pattern_archive_title">Archive pattern?</string>
+    <string name="shift_pattern_delete_message">Choose whether generated shifts should stay in your calendar. Removing them requires the explicit option below.</string>
+    <string name="shift_pattern_delete_keep_events">Delete pattern only</string>
+    <string name="shift_pattern_delete_with_events">Delete pattern and shifts</string>
+    <string name="shift_edit_pattern_title">Edit pattern</string>
+    <string name="shift_pattern_presets">PRESETS</string>
+    <string name="shift_preset_rotating_days_nights">Rotating days/nights</string>
+    <string name="shift_preset_four_on_four_off">Four-on/four-off</string>
 </resources>

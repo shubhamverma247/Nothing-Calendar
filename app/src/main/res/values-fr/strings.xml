@@ -1239,4 +1239,19 @@
     <string name="find_time_move_failed">Impossible de déplacer l’événement</string>
     <string name="find_time_block_created">Événement de calendrier créé</string>
     <string name="find_time_block_failed">Impossible de créer l’événement de calendrier</string>
+    <string name="shift_patterns_archived">Modèles archivés</string>
+    <string name="shift_pattern_copy_name">Copie de %1$s</string>
+    <string name="shift_pattern_archived_label">ARCHIVÉ</string>
+    <string name="shift_pattern_actions">Actions du modèle</string>
+    <string name="shift_pattern_duplicate">Dupliquer</string>
+    <string name="shift_pattern_restore">Restaurer</string>
+    <string name="shift_pattern_archive">Archiver</string>
+    <string name="shift_pattern_archive_title">Archiver le modèle ?</string>
+    <string name="shift_pattern_delete_message">Choisissez si les horaires générés doivent rester dans le calendrier. Leur suppression exige l’option explicite ci-dessous.</string>
+    <string name="shift_pattern_delete_keep_events">Supprimer le modèle uniquement</string>
+    <string name="shift_pattern_delete_with_events">Supprimer le modèle et les horaires</string>
+    <string name="shift_edit_pattern_title">Modifier le modèle</string>
+    <string name="shift_pattern_presets">PRÉRÉGLAGES</string>
+    <string name="shift_preset_rotating_days_nights">Rotation jours/nuits</string>
+    <string name="shift_preset_four_on_four_off">Quatre jours travaillés, quatre repos</string>
 </resources>

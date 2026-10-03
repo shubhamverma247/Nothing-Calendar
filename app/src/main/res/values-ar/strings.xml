@@ -1379,4 +1379,19 @@
     <string name="find_time_move_failed">تعذر نقل الحدث</string>
     <string name="find_time_block_created">تم إنشاء حدث التقويم</string>
     <string name="find_time_block_failed">تعذر إنشاء حدث التقويم</string>
+    <string name="shift_patterns_archived">الأنماط المؤرشفة</string>
+    <string name="shift_pattern_copy_name">نسخة من %1$s</string>
+    <string name="shift_pattern_archived_label">مؤرشف</string>
+    <string name="shift_pattern_actions">إجراءات النمط</string>
+    <string name="shift_pattern_duplicate">تكرار</string>
+    <string name="shift_pattern_restore">استعادة</string>
+    <string name="shift_pattern_archive">أرشفة</string>
+    <string name="shift_pattern_archive_title">أرشفة النمط؟</string>
+    <string name="shift_pattern_delete_message">اختر ما إذا كانت الورديات المنشأة ستبقى في التقويم. تتطلب إزالتها اختيار الخيار الصريح أدناه.</string>
+    <string name="shift_pattern_delete_keep_events">حذف النمط فقط</string>
+    <string name="shift_pattern_delete_with_events">حذف النمط والورديات</string>
+    <string name="shift_edit_pattern_title">تعديل النمط</string>
+    <string name="shift_pattern_presets">إعدادات مسبقة</string>
+    <string name="shift_preset_rotating_days_nights">تناوب نهاري/ليلي</string>
+    <string name="shift_preset_four_on_four_off">أربعة عمل/أربعة راحة</string>
 </resources>

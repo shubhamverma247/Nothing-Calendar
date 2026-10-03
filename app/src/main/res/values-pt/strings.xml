@@ -1239,4 +1239,19 @@
     <string name="find_time_move_failed">Não foi possível mover o evento</string>
     <string name="find_time_block_created">Evento de calendário criado</string>
     <string name="find_time_block_failed">Não foi possível criar o evento de calendário</string>
+    <string name="shift_patterns_archived">Padrões arquivados</string>
+    <string name="shift_pattern_copy_name">Cópia de %1$s</string>
+    <string name="shift_pattern_archived_label">ARQUIVADO</string>
+    <string name="shift_pattern_actions">Ações do padrão</string>
+    <string name="shift_pattern_duplicate">Duplicar</string>
+    <string name="shift_pattern_restore">Restaurar</string>
+    <string name="shift_pattern_archive">Arquivar</string>
+    <string name="shift_pattern_archive_title">Arquivar padrão?</string>
+    <string name="shift_pattern_delete_message">Escolha se os turnos gerados devem permanecer no calendário. Para removê-los, use a opção explícita abaixo.</string>
+    <string name="shift_pattern_delete_keep_events">Excluir apenas o padrão</string>
+    <string name="shift_pattern_delete_with_events">Excluir padrão e turnos</string>
+    <string name="shift_edit_pattern_title">Editar padrão</string>
+    <string name="shift_pattern_presets">PREDEFINIÇÕES</string>
+    <string name="shift_preset_rotating_days_nights">Dias/noites alternados</string>
+    <string name="shift_preset_four_on_four_off">Quatro de trabalho/quatro de folga</string>
 </resources>
