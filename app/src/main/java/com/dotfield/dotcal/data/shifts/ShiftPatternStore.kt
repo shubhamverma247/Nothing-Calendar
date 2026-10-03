@@ -2,6 +2,7 @@ package com.dotfield.dotcal.data.shifts
 
 import com.dotfield.dotcal.NOTHING_RED_HEX
 import android.content.Context
+import com.dotfield.dotcal.data.BulkEditUndoToken
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -60,19 +61,34 @@ data class ShiftGenerationRecord(
     val id: String,
     val patternId: String,
     val generatedAtMs: Long,
-    val eventIds: List<String>,
+    val events: List<ShiftGenerationEvent>,
     val rangeStart: LocalDate,
     val rangeEnd: LocalDate,
 ) {
+    val eventIds: List<String> get() = events.map { it.eventId }
+
     companion object {
         fun newId(): String = UUID.randomUUID().toString()
     }
 }
 
-data class ShiftApplyResult(
-    val generatedCount: Int,
-    val replacedCount: Int = 0,
+data class ShiftGenerationEvent(
+    val eventId: String,
+    val date: LocalDate? = null,
+    val updatedAtMs: Long? = null,
+    val cancelled: Boolean = false,
 )
+
+data class ShiftApplyResult(
+    val createdCount: Int,
+    val updatedCount: Int,
+    val skippedCount: Int,
+    val removedCount: Int,
+    val undoToken: BulkEditUndoToken? = null,
+) {
+    val generatedCount: Int get() = createdCount + updatedCount
+    val replacedCount: Int get() = updatedCount + removedCount
+}
 
 fun expandShiftPattern(
     pattern: ShiftPattern,
@@ -96,9 +112,9 @@ fun expandShiftPattern(
     return result
 }
 
-class ShiftPatternStore(context: Context) {
+class ShiftPatternStore internal constructor(private val rootDir: File) {
 
-    private val rootDir: File = context.applicationContext.filesDir
+    constructor(context: Context) : this(context.applicationContext.filesDir)
     private val typeDir: File = File(rootDir, TYPE_DIR)
     private val patternDir: File = File(rootDir, PATTERN_DIR)
     private val generationDir: File = File(rootDir, GENERATION_DIR)
@@ -131,22 +147,39 @@ class ShiftPatternStore(context: Context) {
         runCatching { fileFor(patternDir, id).delete() }
     }
 
-    fun saveGeneration(record: ShiftGenerationRecord) {
+    fun saveGeneration(record: ShiftGenerationRecord): Boolean =
         runCatching {
             if (!generationDir.exists()) generationDir.mkdirs()
             fileFor(generationDir, record.id).writeText(encodeGeneration(record).toString())
-        }
-    }
+            true
+        }.getOrDefault(false)
 
     fun listGenerations(): List<ShiftGenerationRecord> =
         listJson(generationDir, ::decodeGeneration).sortedByDescending { it.generatedAtMs }
 
-    fun removeGeneration(id: String) {
-        runCatching { fileFor(generationDir, id).delete() }
-    }
+    fun removeGeneration(id: String): Boolean =
+        runCatching { !fileFor(generationDir, id).exists() || fileFor(generationDir, id).delete() }
+            .getOrDefault(false)
 
     fun removeGenerationsForPattern(patternId: String) {
         listGenerations().filter { it.patternId == patternId }.forEach { removeGeneration(it.id) }
+    }
+
+    fun markEventCancelled(eventId: String, date: LocalDate?): Boolean {
+        var changed = false
+        var persisted = true
+        listGenerations().forEach { record ->
+            if (record.events.none { it.eventId == eventId }) return@forEach
+            changed = true
+            persisted = saveGeneration(
+                record.copy(
+                    events = record.events.map { event ->
+                        if (event.eventId == eventId) event.copy(date = event.date ?: date, cancelled = true) else event
+                    },
+                ),
+            ) && persisted
+        }
+        return changed && persisted
     }
 
     private fun <T> listJson(dir: File, decode: (String) -> T): List<T> {
@@ -219,27 +252,55 @@ class ShiftPatternStore(context: Context) {
     private fun encodeGeneration(record: ShiftGenerationRecord): JSONObject {
         val ids = JSONArray()
         record.eventIds.forEach { ids.put(it) }
+        val events = JSONArray()
+        record.events.forEach { event ->
+            events.put(
+                JSONObject()
+                    .put("eventId", event.eventId)
+                    .put("date", event.date?.toString() ?: JSONObject.NULL)
+                    .put("updatedAtMs", event.updatedAtMs ?: JSONObject.NULL)
+                    .put("cancelled", event.cancelled),
+            )
+        }
         return JSONObject()
             .put("id", record.id)
             .put("patternId", record.patternId)
             .put("generatedAtMs", record.generatedAtMs)
             .put("eventIds", ids)
+            .put("events", events)
             .put("rangeStart", record.rangeStart.toString())
             .put("rangeEnd", record.rangeEnd.toString())
     }
 
     private fun decodeGeneration(text: String): ShiftGenerationRecord {
         val o = JSONObject(text)
-        val idsArray = o.optJSONArray("eventIds")
-        val ids = ArrayList<String>()
-        if (idsArray != null) {
-            for (i in 0 until idsArray.length()) ids.add(idsArray.getString(i))
+        val events = ArrayList<ShiftGenerationEvent>()
+        val eventsArray = o.optJSONArray("events")
+        if (eventsArray != null) {
+            for (i in 0 until eventsArray.length()) {
+                val event = eventsArray.getJSONObject(i)
+                events.add(
+                    ShiftGenerationEvent(
+                        eventId = event.getString("eventId"),
+                        date = if (event.isNull("date")) null else event.optString("date").takeIf { it.isNotBlank() }?.let(LocalDate::parse),
+                        updatedAtMs = if (event.isNull("updatedAtMs")) null else event.optLong("updatedAtMs"),
+                        cancelled = event.optBoolean("cancelled", false),
+                    ),
+                )
+            }
+        } else {
+            val idsArray = o.optJSONArray("eventIds")
+            if (idsArray != null) {
+                for (i in 0 until idsArray.length()) {
+                    events.add(ShiftGenerationEvent(eventId = idsArray.getString(i)))
+                }
+            }
         }
         return ShiftGenerationRecord(
             id = o.getString("id"),
             patternId = o.getString("patternId"),
             generatedAtMs = o.optLong("generatedAtMs", 0L),
-            eventIds = ids,
+            events = events,
             rangeStart = LocalDate.parse(o.getString("rangeStart")),
             rangeEnd = LocalDate.parse(o.getString("rangeEnd")),
         )

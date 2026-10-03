@@ -29,6 +29,7 @@ import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
 import com.dotfield.dotcal.data.shifts.ShiftEventMetadata
+import com.dotfield.dotcal.data.shifts.ShiftGenerationPreview
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
 import com.dotfield.dotcal.data.templates.EventTemplate
@@ -927,15 +928,24 @@ class DotCalViewModel(
         }
     }
 
-    fun applyShiftPattern(
+    fun previewShiftPattern(
         patternId: String,
         rangeStart: LocalDate,
         rangeEnd: LocalDate,
         accountId: String?,
+        onDone: (ShiftGenerationPreview) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onDone(repository.previewShiftPattern(patternId, rangeStart, rangeEnd, accountId))
+        }
+    }
+
+    fun applyShiftPattern(
+        preview: ShiftGenerationPreview,
         onDone: (ShiftApplyResult) -> Unit = {},
     ) {
         viewModelScope.launch {
-            onDone(repository.applyShiftPattern(patternId, rangeStart, rangeEnd, accountId))
+            onDone(repository.applyShiftPattern(preview))
         }
     }
 

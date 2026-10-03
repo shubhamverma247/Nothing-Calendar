@@ -3657,19 +3657,39 @@ fun DotCalApp(
                         showDotCalToast(context, palette, R.string.shift_pattern_deleted)
                     }
                 },
-                onGenerate = { patternId, rangeStart, rangeEnd, accountId ->
-                    viewModel.applyShiftPattern(patternId, rangeStart, rangeEnd, accountId) { result ->
-                        val messageRes = when {
-                            result.generatedCount == 0 -> R.string.shift_none_added
-                            result.replacedCount > 0 -> R.string.shift_added_with_replaced
-                            else -> R.string.shift_added
+                onPreviewGenerate = { patternId, rangeStart, rangeEnd, accountId, onReady ->
+                    viewModel.previewShiftPattern(patternId, rangeStart, rangeEnd, accountId, onReady)
+                },
+                onGenerate = { preview ->
+                    viewModel.applyShiftPattern(preview) { result ->
+                        val message = resources.getString(
+                            R.string.shift_apply_summary,
+                            result.createdCount,
+                            result.updatedCount,
+                            result.skippedCount,
+                            result.removedCount,
+                        )
+                        val undoToken = result.undoToken
+                        if (undoToken == null) {
+                            showDotCalToast(context, palette, message, duration = Toast.LENGTH_LONG)
+                        } else {
+                            scope.launch {
+                                val dismissJob = launch {
+                                    delay(BULK_UNDO_SNACKBAR_MILLIS)
+                                    snackbarHostState.currentSnackbarData?.dismiss()
+                                }
+                                val snackbarResult = snackbarHostState.showSnackbar(
+                                    message = message,
+                                    actionLabel = undoActionLabel,
+                                )
+                                dismissJob.cancel()
+                                if (snackbarResult == SnackbarResult.ActionPerformed) {
+                                    viewModel.undoBulkEdit(undoToken) {
+                                        showDotCalToast(context, palette, R.string.toast_change_undone)
+                                    }
+                                }
+                            }
                         }
-                        val formatArgs = when {
-                            result.generatedCount == 0 -> emptyArray<Any>()
-                            result.replacedCount > 0 -> arrayOf(result.generatedCount, result.replacedCount)
-                            else -> arrayOf(result.generatedCount)
-                        }
-                        showDotCalToast(context, palette, messageRes, *formatArgs, duration = Toast.LENGTH_LONG)
                     }
                 },
                 onSharePlan = { pattern, rangeStart, rangeEnd, format ->

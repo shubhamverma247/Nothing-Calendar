@@ -248,6 +248,10 @@ import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.shifts.ShiftPattern
+import com.dotfield.dotcal.data.shifts.ShiftGenerationPreview
+import com.dotfield.dotcal.data.shifts.ShiftGenerationPreviewItem
+import com.dotfield.dotcal.data.shifts.ShiftPreviewAction
+import com.dotfield.dotcal.data.shifts.ShiftSkipReason
 import com.dotfield.dotcal.data.shifts.ShiftType
 import com.dotfield.dotcal.data.shifts.shiftDurationMinutes
 import com.dotfield.dotcal.data.shifts.shiftEndMinuteOfDay
@@ -2169,7 +2173,8 @@ internal fun ShiftPatternsScreen(
     onDeleteType: (String) -> Unit,
     onSavePattern: (ShiftPattern) -> Unit,
     onDeletePattern: (String, Boolean) -> Unit,
-    onGenerate: (String, LocalDate, LocalDate, String?) -> Unit,
+    onPreviewGenerate: (String, LocalDate, LocalDate, String?, (ShiftGenerationPreview) -> Unit) -> Unit,
+    onGenerate: (ShiftGenerationPreview) -> Unit,
     onSharePlan: (ShiftPattern, LocalDate, LocalDate, ShiftPlanShareFormat) -> Unit,
 ) {
     var showTypeEditor by remember { mutableStateOf(false) }
@@ -2283,8 +2288,11 @@ internal fun ShiftPatternsScreen(
             accounts = accounts,
             palette = palette,
             onDismiss = { generatingPattern = null },
-            onGenerate = { start, months, accountId ->
-                onGenerate(pattern.id, start, start.plusMonths(months.toLong()), accountId)
+            onPreview = { start, months, accountId, onReady ->
+                onPreviewGenerate(pattern.id, start, start.plusMonths(months.toLong()), accountId, onReady)
+            },
+            onGenerate = { preview ->
+                onGenerate(preview)
                 generatingPattern = null
             },
         )
@@ -3203,35 +3211,61 @@ private fun ShiftGenerateDialog(
     accounts: List<CalendarAccount>,
     palette: DotCalPalette,
     onDismiss: () -> Unit,
-    onGenerate: (LocalDate, Int, String?) -> Unit,
+    onPreview: (LocalDate, Int, String?, (ShiftGenerationPreview) -> Unit) -> Unit,
+    onGenerate: (ShiftGenerationPreview) -> Unit,
 ) {
     var startDate by remember(pattern.id) { mutableStateOf(LocalDate.now()) }
     var months by remember { mutableStateOf("6") }
     var accountId by remember(accounts) { mutableStateOf(accounts.firstOrNull()?.id) }
     var showStartDatePicker by remember { mutableStateOf(false) }
+    var preview by remember(pattern.id) { mutableStateOf<ShiftGenerationPreview?>(null) }
+    var isLoading by remember(pattern.id) { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
-        title = { Text(stringResource(R.string.shift_generate_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
+        title = { Text(stringResource(if (preview == null) R.string.shift_generate_title else R.string.shift_preview_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(pattern.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold)
-                ShiftDateRow(label = stringResource(R.string.shift_generate_from), date = startDate, palette = palette, onClick = { showStartDatePicker = true })
-                OutlinedTextField(value = months, onValueChange = { months = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.shift_months_ahead)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
-                Text(stringResource(R.string.shift_calendar), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    lazyItems(accounts, key = { it.id }) { account ->
-                        ShiftChip(account.displayName.readableCalendarLabel(), palette, selected = account.id == accountId, onClick = { accountId = account.id })
+            preview?.let { result ->
+                ShiftGenerationPreviewContent(result, palette)
+            } ?: run {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(pattern.name, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold)
+                    ShiftDateRow(label = stringResource(R.string.shift_generate_from), date = startDate, palette = palette, onClick = { showStartDatePicker = true })
+                    OutlinedTextField(value = months, onValueChange = { months = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.shift_months_ahead)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
+                    Text(stringResource(R.string.shift_calendar), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        lazyItems(accounts, key = { it.id }) { account ->
+                            ShiftChip(account.displayName.readableCalendarLabel(), palette, selected = account.id == accountId, onClick = { accountId = account.id })
+                        }
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onGenerate(startDate, months.toIntOrNull()?.coerceIn(1, 24) ?: 6, accountId) }) {
-                Text(stringResource(R.string.shift_generate_confirm), color = palette.accent)
+            TextButton(
+                enabled = !isLoading,
+                onClick = {
+                    preview?.let(onGenerate) ?: run {
+                        isLoading = true
+                        onPreview(startDate, months.toIntOrNull()?.coerceIn(1, 24) ?: 6, accountId) {
+                            preview = it
+                            isLoading = false
+                        }
+                    }
+                },
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = palette.accent, strokeWidth = 2.dp)
+                } else {
+                    Text(stringResource(if (preview == null) R.string.shift_preview_review else R.string.shift_preview_apply), color = palette.accent)
+                }
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = palette.primaryText) } },
+        dismissButton = {
+            TextButton(onClick = { if (preview == null) onDismiss() else preview = null }) {
+                Text(stringResource(if (preview == null) R.string.action_cancel else R.string.shift_preview_back), color = palette.primaryText)
+            }
+        },
     )
     if (showStartDatePicker) {
         DateTimeChoiceSheet(
@@ -3247,6 +3281,70 @@ private fun ShiftGenerateDialog(
                 showStartDatePicker = false
             },
         )
+    }
+}
+
+@Composable
+private fun ShiftGenerationPreviewContent(preview: ShiftGenerationPreview, palette: DotCalPalette) {
+    val formatter = remember { DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault()) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            stringResource(
+                R.string.shift_preview_summary,
+                preview.createdCount,
+                preview.updatedCount,
+                preview.skippedCount,
+                preview.removedCount,
+            ),
+            color = palette.secondaryText,
+            fontFamily = mono,
+            fontSize = 12.sp,
+        )
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            lazyItems(preview.items, key = { "${it.date}:${it.eventId}:${it.action}" }) { item ->
+                ShiftGenerationPreviewRow(item, formatter, palette)
+            }
+        }
+        Text(stringResource(R.string.shift_preview_confirmation), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun ShiftGenerationPreviewRow(
+    item: ShiftGenerationPreviewItem,
+    formatter: DateTimeFormatter,
+    palette: DotCalPalette,
+) {
+    val action = when (item.action) {
+        ShiftPreviewAction.Created -> stringResource(R.string.shift_preview_created)
+        ShiftPreviewAction.Updated -> stringResource(R.string.shift_preview_updated)
+        ShiftPreviewAction.Skipped -> stringResource(R.string.shift_preview_skipped)
+        ShiftPreviewAction.Removed -> stringResource(R.string.shift_preview_removed)
+    }
+    val reason = when (item.skipReason) {
+        ShiftSkipReason.Unchanged -> stringResource(R.string.shift_skip_unchanged)
+        ShiftSkipReason.ManuallyEdited -> stringResource(R.string.shift_skip_edited)
+        ShiftSkipReason.Cancelled -> stringResource(R.string.shift_skip_cancelled)
+        ShiftSkipReason.ProviderBacked -> stringResource(R.string.shift_skip_provider)
+        ShiftSkipReason.Shared -> stringResource(R.string.shift_skip_shared)
+        ShiftSkipReason.Recurring -> stringResource(R.string.shift_skip_recurring)
+        ShiftSkipReason.AllDay -> stringResource(R.string.shift_skip_all_day)
+        null -> null
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.eventCardSurface).padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(item.title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(item.date.format(formatter), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+            reason?.let { Text(it, color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp) }
+        }
+        Text(action, color = if (item.action == ShiftPreviewAction.Removed) palette.accent else palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
     }
 }
 
