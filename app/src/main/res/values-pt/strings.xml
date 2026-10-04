@@ -671,6 +671,11 @@
     <string name="shift_add_type">Adicionar Turno Digite</string>
     <string name="shift_build_pattern_row">Criar Pattern</string>
     <string name="shift_pattern_delete_title">Excluir Turno pattern?</string>
+    <string name="shift_type_mode">TIPO DE TURNO</string>
+    <string name="shift_type_timed">Com horário</string>
+    <string name="shift_type_delete_title">Excluir tipo de turno?</string>
+    <string name="shift_type_delete_unused_message">Os eventos existentes no calendário serão mantidos. Este tipo de turno não poderá ser restaurado após a exclusão.</string>
+    <string name="shift_type_delete_used_message">Este tipo de turno é usado por %1$d padrões salvos. Os eventos existentes serão mantidos, mas esses dias do ciclo ficarão indefinidos.</string>
     <string name="shift_type_title">Turno Digite</string>
     <string name="shift_type_edit_title">Editar Turno Digite</string>
     <string name="shift_field_name">Name</string>

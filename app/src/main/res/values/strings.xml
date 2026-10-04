@@ -928,6 +928,11 @@
     <string name="shift_add_type">Add Shift Type</string>
     <string name="shift_build_pattern_row">Build Pattern</string>
     <string name="shift_pattern_delete_title">Delete shift pattern?</string>
+    <string name="shift_type_mode">SHIFT TYPE</string>
+    <string name="shift_type_timed">Timed</string>
+    <string name="shift_type_delete_title">Delete shift type?</string>
+    <string name="shift_type_delete_unused_message">Existing calendar events will stay. This shift type cannot be restored after deletion.</string>
+    <string name="shift_type_delete_used_message">This shift type is used by %1$d saved pattern(s). Existing events will stay, but those cycle days will be unresolved.</string>
     <string name="shift_type_title">Shift type</string>
     <string name="shift_type_edit_title">Edit shift type</string>
     <string name="shift_field_name">Name</string>

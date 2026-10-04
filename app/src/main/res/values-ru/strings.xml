@@ -711,6 +711,11 @@
     <string name="shift_add_type">Dobavit Schicht Tippen</string>
     <string name="shift_build_pattern_row">Erstellen Pattern</string>
     <string name="shift_pattern_delete_title">Udalit Schicht pattern?</string>
+    <string name="shift_type_mode">ТИП СМЕНЫ</string>
+    <string name="shift_type_timed">По времени</string>
+    <string name="shift_type_delete_title">Удалить тип смены?</string>
+    <string name="shift_type_delete_unused_message">Существующие события календаря сохранятся. После удаления этот тип смены нельзя будет восстановить.</string>
+    <string name="shift_type_delete_used_message">Этот тип смены используется в %1$d сохранённых шаблонах. Существующие события сохранятся, но эти дни цикла останутся неопределёнными.</string>
     <string name="shift_type_title">Schicht Tippen</string>
     <string name="shift_type_edit_title">Izmenit Schicht Tippen</string>
     <string name="shift_field_name">Name</string>

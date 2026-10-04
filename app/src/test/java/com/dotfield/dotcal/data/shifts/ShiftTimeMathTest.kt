@@ -5,6 +5,17 @@ import org.junit.Test
 
 class ShiftTimeMathTest {
     @Test
+    fun shiftTypeModePreservesTimedAllDayAndOffDayTypes() {
+        val timed = shiftType(startMinuteOfDay = 8 * 60, durationMinutes = 8 * 60)
+        val allDay = shiftType(startMinuteOfDay = null, durationMinutes = null, isAllDay = true)
+        val offDay = shiftType(startMinuteOfDay = null, durationMinutes = null)
+
+        assertEquals(ShiftTypeMode.Timed, timed.mode())
+        assertEquals(ShiftTypeMode.AllDay, allDay.mode())
+        assertEquals(ShiftTypeMode.OffDay, offDay.mode())
+    }
+
+    @Test
     fun durationAllowsMinutePrecision() {
         val duration = shiftDurationMinutes(
             startMinuteOfDay = 8 * 60,
@@ -49,4 +60,19 @@ class ShiftTimeMathTest {
         assertEquals(false, isValidShiftBreakMinutes(480, durationMinutes = 8 * 60))
         assertEquals(false, isValidShiftBreakMinutes(-1, durationMinutes = 8 * 60))
     }
+
+    private fun shiftType(
+        startMinuteOfDay: Int?,
+        durationMinutes: Int?,
+        isAllDay: Boolean = false,
+    ) = ShiftType(
+        id = "shift",
+        name = "Shift",
+        colorHex = "#FF3B30",
+        startMinuteOfDay = startMinuteOfDay,
+        durationMinutes = durationMinutes,
+        isAllDay = isAllDay,
+        reminderMinutes = null,
+        createdAtMs = 1L,
+    )
 }

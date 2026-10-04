@@ -671,6 +671,11 @@
     <string name="shift_add_type">Hinzufuegen Schicht Tippen</string>
     <string name="shift_build_pattern_row">Erstellen Pattern</string>
     <string name="shift_pattern_delete_title">Loeschen Schicht pattern?</string>
+    <string name="shift_type_mode">SCHICHTTYP</string>
+    <string name="shift_type_timed">Mit Uhrzeit</string>
+    <string name="shift_type_delete_title">Schichttyp löschen?</string>
+    <string name="shift_type_delete_unused_message">Bestehende Kalendertermine bleiben erhalten. Dieser Schichttyp kann nach dem Löschen nicht wiederhergestellt werden.</string>
+    <string name="shift_type_delete_used_message">Dieser Schichttyp wird von %1$d gespeicherten Mustern verwendet. Bestehende Termine bleiben erhalten, aber diese Zyklustage sind danach nicht aufgelöst.</string>
     <string name="shift_type_title">Schicht Tippen</string>
     <string name="shift_type_edit_title">Bearbeiten Schicht Tippen</string>
     <string name="shift_field_name">Name</string>

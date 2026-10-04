@@ -254,9 +254,12 @@ import com.dotfield.dotcal.data.shifts.ShiftGenerationPreviewItem
 import com.dotfield.dotcal.data.shifts.ShiftPreviewAction
 import com.dotfield.dotcal.data.shifts.ShiftSkipReason
 import com.dotfield.dotcal.data.shifts.ShiftType
+import com.dotfield.dotcal.data.shifts.ShiftTypeMode
 import com.dotfield.dotcal.data.shifts.SHIFT_OFF_TYPE_ID
 import com.dotfield.dotcal.data.shifts.duplicateShiftPattern
+import com.dotfield.dotcal.data.shifts.mode
 import com.dotfield.dotcal.data.shifts.shiftPatternPresetCycle
+import com.dotfield.dotcal.data.shifts.shiftTypeUsageCount
 import com.dotfield.dotcal.data.shifts.shiftDurationMinutes
 import com.dotfield.dotcal.data.shifts.shiftEndMinuteOfDay
 import com.dotfield.dotcal.data.shifts.shiftEndDayOffset
@@ -2191,6 +2194,7 @@ internal fun ShiftPatternsScreen(
     var sharingPattern by remember { mutableStateOf<ShiftPattern?>(null) }
     var archivePattern by remember { mutableStateOf<ShiftPattern?>(null) }
     var deletePattern by remember { mutableStateOf<ShiftPattern?>(null) }
+    var deleteType by remember { mutableStateOf<ShiftType?>(null) }
     val activePatterns = patterns.filter { it.archivedAtMs == null }
     val archivedPatterns = patterns.filter { it.archivedAtMs != null }
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
@@ -2229,7 +2233,7 @@ internal fun ShiftPatternsScreen(
                     type = type,
                     palette = palette,
                     onClick = { editingType = type },
-                    onDelete = { onDeleteType(type.id) },
+                    onDelete = { deleteType = type },
                 )
             }
             item {
@@ -2375,6 +2379,46 @@ internal fun ShiftPatternsScreen(
                         onDeletePattern(pattern.id, true)
                         deletePattern = null
                     }) { Text(stringResource(R.string.shift_pattern_delete_with_events), color = palette.accent) }
+                }
+            },
+        )
+    }
+    deleteType?.let { type ->
+        val usageCount = shiftTypeUsageCount(patterns, type.id)
+        AlertDialog(
+            onDismissRequest = { deleteType = null },
+            containerColor = palette.dialogSurface,
+            title = {
+                Text(
+                    stringResource(R.string.shift_type_delete_title),
+                    color = palette.primaryText,
+                    fontFamily = LocalHeadingFont.current,
+                )
+            },
+            text = {
+                Text(
+                    if (usageCount == 0) {
+                        stringResource(R.string.shift_type_delete_unused_message)
+                    } else {
+                        stringResource(R.string.shift_type_delete_used_message, usageCount)
+                    },
+                    color = palette.secondaryText,
+                    fontFamily = mono,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteType(type.id)
+                        deleteType = null
+                    },
+                ) {
+                    Text(stringResource(R.string.action_delete), color = palette.accent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteType = null }) {
+                    Text(stringResource(R.string.action_cancel), color = palette.primaryText)
                 }
             },
         )
@@ -2902,7 +2946,7 @@ private fun ShiftTypeEditorDialog(
     onSave: (ShiftType) -> Unit,
 ) {
     var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
-    var isOff by remember(existing?.id) { mutableStateOf(existing?.generatesEvent == false) }
+    var mode by remember(existing?.id) { mutableStateOf(existing?.mode() ?: ShiftTypeMode.Timed) }
     var startMinute by remember(existing?.id) { mutableStateOf(existing?.startMinuteOfDay ?: 7 * 60) }
     var endMinute by remember(existing?.id) {
         mutableStateOf(shiftEndMinuteOfDay(existing?.startMinuteOfDay ?: 7 * 60, existing?.durationMinutes ?: 12 * 60))
@@ -2925,19 +2969,31 @@ private fun ShiftTypeEditorDialog(
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.shift_field_name)) }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
-                SettingsToggleRow(title = stringResource(R.string.shift_off_day), checked = isOff, palette = palette, onCheckedChange = { isOff = it })
-                if (!isOff) {
-                    ShiftTimeRow(title = stringResource(R.string.event_starts), minuteOfDay = startMinute, palette = palette, onClick = { pickingTime = ShiftTimeField.Start })
-                    ShiftTimeRow(
-                        title = if (shiftEndDayOffset(startMinute, durationMinutes) > 0) {
-                            stringResource(R.string.shift_ends_next_day)
-                        } else {
-                            stringResource(R.string.event_ends)
-                        },
-                        minuteOfDay = endMinute,
-                        palette = palette,
-                        onClick = { pickingTime = ShiftTimeField.End },
-                    )
+                Text(stringResource(R.string.shift_type_mode), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ShiftTypeMode.entries.forEach { option ->
+                        val label = when (option) {
+                            ShiftTypeMode.Timed -> stringResource(R.string.shift_type_timed)
+                            ShiftTypeMode.AllDay -> stringResource(R.string.event_all_day)
+                            ShiftTypeMode.OffDay -> stringResource(R.string.shift_off_day)
+                        }
+                        ShiftChip(label = label, palette = palette, selected = mode == option, onClick = { mode = option })
+                    }
+                }
+                if (mode != ShiftTypeMode.OffDay) {
+                    if (mode == ShiftTypeMode.Timed) {
+                        ShiftTimeRow(title = stringResource(R.string.event_starts), minuteOfDay = startMinute, palette = palette, onClick = { pickingTime = ShiftTimeField.Start })
+                        ShiftTimeRow(
+                            title = if (shiftEndDayOffset(startMinute, durationMinutes) > 0) {
+                                stringResource(R.string.shift_ends_next_day)
+                            } else {
+                                stringResource(R.string.event_ends)
+                            },
+                            minuteOfDay = endMinute,
+                            palette = palette,
+                            onClick = { pickingTime = ShiftTimeField.End },
+                        )
+                    }
                     Text(stringResource(R.string.shift_reminder_label), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         reminderOptions.forEach { minutes ->
@@ -2949,43 +3005,45 @@ private fun ShiftTypeEditorDialog(
                             )
                         }
                     }
-                    OutlinedTextField(
-                        value = breakText,
-                        onValueChange = { breakText = it.filter(Char::isDigit).take(4) },
-                        label = { Text(stringResource(R.string.shift_break_label)) },
-                        placeholder = { Text(stringResource(R.string.shift_break_optional)) },
-                        supportingText = if (breakIsValid) null else {
-                            { Text(stringResource(R.string.shift_break_invalid)) }
-                        },
-                        isError = !breakIsValid,
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        colors = dotCalTextFieldColors(palette),
-                        textStyle = TextStyle(color = palette.primaryText, fontFamily = mono),
-                    )
+                    if (mode == ShiftTypeMode.Timed) {
+                        OutlinedTextField(
+                            value = breakText,
+                            onValueChange = { breakText = it.filter(Char::isDigit).take(4) },
+                            label = { Text(stringResource(R.string.shift_break_label)) },
+                            placeholder = { Text(stringResource(R.string.shift_break_optional)) },
+                            supportingText = if (breakIsValid) null else {
+                                { Text(stringResource(R.string.shift_break_invalid)) }
+                            },
+                            isError = !breakIsValid,
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = dotCalTextFieldColors(palette),
+                            textStyle = TextStyle(color = palette.primaryText, fontFamily = mono),
+                        )
+                    }
                     ShiftColorRow(colorHex = color, palette = palette, onClick = { showColorPicker = true })
                 }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = name.isNotBlank() && (isOff || breakIsValid),
+                enabled = name.isNotBlank() && (mode != ShiftTypeMode.Timed || breakIsValid),
                 onClick = {
                     onSave(
                         ShiftType(
                             id = existing?.id ?: ShiftType.newId(),
                             name = name.trim(),
                             colorHex = color.takeIf { it.matches(Regex("#[0-9A-Fa-f]{6}")) } ?: NOTHING_RED_HEX,
-                            startMinuteOfDay = if (isOff) null else startMinute,
-                            durationMinutes = if (isOff) null else shiftDurationMinutes(startMinute, endMinute),
-                            isAllDay = false,
-                            reminderMinutes = if (isOff) null else reminderMinutes,
-                            breakMinutes = if (isOff || breakText.isBlank()) null else parsedBreakMinutes,
+                            startMinuteOfDay = if (mode == ShiftTypeMode.Timed) startMinute else null,
+                            durationMinutes = if (mode == ShiftTypeMode.Timed) shiftDurationMinutes(startMinute, endMinute) else null,
+                            isAllDay = mode == ShiftTypeMode.AllDay,
+                            reminderMinutes = if (mode == ShiftTypeMode.OffDay) null else reminderMinutes,
+                            breakMinutes = if (mode != ShiftTypeMode.Timed || breakText.isBlank()) null else parsedBreakMinutes,
                             createdAtMs = existing?.createdAtMs ?: System.currentTimeMillis(),
                         ),
                     )
                 },
-            ) { Text(stringResource(R.string.action_save), color = if (name.isNotBlank() && (isOff || breakIsValid)) palette.accent else palette.disabledText) }
+            ) { Text(stringResource(R.string.action_save), color = if (name.isNotBlank() && (mode != ShiftTypeMode.Timed || breakIsValid)) palette.accent else palette.disabledText) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = palette.primaryText) } },
     )

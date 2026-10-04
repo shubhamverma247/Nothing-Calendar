@@ -671,6 +671,11 @@
     <string name="shift_add_type">Ekle Turno Digite</string>
     <string name="shift_build_pattern_row">Criar Pattern</string>
     <string name="shift_pattern_delete_title">Sil Turno pattern?</string>
+    <string name="shift_type_mode">VARDİYA TÜRÜ</string>
+    <string name="shift_type_timed">Saatli</string>
+    <string name="shift_type_delete_title">Vardiya türü silinsin mi?</string>
+    <string name="shift_type_delete_unused_message">Mevcut takvim etkinlikleri kalır. Bu vardiya türü silindikten sonra geri yüklenemez.</string>
+    <string name="shift_type_delete_used_message">Bu vardiya türü %1$d kayıtlı düzende kullanılıyor. Mevcut etkinlikler kalır ancak bu döngü günleri çözümlenemez.</string>
     <string name="shift_type_title">Turno Digite</string>
     <string name="shift_type_edit_title">Duzenle Turno Digite</string>
     <string name="shift_field_name">Name</string>

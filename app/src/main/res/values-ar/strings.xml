@@ -751,6 +751,11 @@
     <string name="shift_add_type">إضافة Schicht Tippen</string>
     <string name="shift_build_pattern_row">إنشاء Pattern</string>
     <string name="shift_pattern_delete_title">حذف Schicht pattern?</string>
+    <string name="shift_type_mode">نوع الوردية</string>
+    <string name="shift_type_timed">محددة الوقت</string>
+    <string name="shift_type_delete_title">حذف نوع الوردية؟</string>
+    <string name="shift_type_delete_unused_message">ستبقى أحداث التقويم الحالية. لا يمكن استعادة نوع الوردية بعد حذفه.</string>
+    <string name="shift_type_delete_used_message">يُستخدم نوع الوردية هذا في %1$d من الأنماط المحفوظة. ستبقى الأحداث الحالية، لكن أيام الدورة هذه ستصبح غير محددة.</string>
     <string name="shift_type_title">Schicht Tippen</string>
     <string name="shift_type_edit_title">تعديل Schicht Tippen</string>
     <string name="shift_field_name">Name</string>

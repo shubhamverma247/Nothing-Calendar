@@ -32,6 +32,18 @@ data class ShiftType(
     }
 }
 
+enum class ShiftTypeMode {
+    Timed,
+    AllDay,
+    OffDay,
+}
+
+fun ShiftType.mode(): ShiftTypeMode = when {
+    isAllDay -> ShiftTypeMode.AllDay
+    startMinuteOfDay != null && durationMinutes != null && durationMinutes > 0 -> ShiftTypeMode.Timed
+    else -> ShiftTypeMode.OffDay
+}
+
 data class ShiftPattern(
     val id: String,
     val name: String,
@@ -72,6 +84,9 @@ fun duplicateShiftPattern(
     createdAtMs = createdAtMs,
     archivedAtMs = null,
 )
+
+fun shiftTypeUsageCount(patterns: List<ShiftPattern>, shiftTypeId: String): Int =
+    patterns.count { shiftTypeId in it.cycleShiftTypeIds }
 
 data class GeneratedShiftOccurrence(
     val date: LocalDate,

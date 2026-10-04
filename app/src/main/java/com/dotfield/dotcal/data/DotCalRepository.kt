@@ -70,6 +70,7 @@ import com.dotfield.dotcal.data.shifts.buildShiftPlanShareEvents
 import com.dotfield.dotcal.data.shifts.expandShiftPattern
 import com.dotfield.dotcal.data.shifts.buildShiftGenerationPreview
 import com.dotfield.dotcal.data.shifts.parseShiftEventMetadata
+import com.dotfield.dotcal.data.shifts.removableGeneratedShiftEventIds
 import com.dotfield.dotcal.data.shifts.shiftMetadataFor
 import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import com.dotfield.dotcal.data.sidestore.EventSideStoreNamespaces
@@ -2049,14 +2050,14 @@ class DotCalRepository(
     }
 
     private suspend fun removeGeneratedShiftEvents(patternId: String) {
-        shiftPatternStore.listGenerations()
-            .filter { it.patternId == patternId }
-            .forEach { record ->
-                record.eventIds.forEach { eventId ->
-                    dao.getEvent(eventId)?.let { deleteLocalEvent(it) }
-                }
-                shiftPatternStore.removeGeneration(record.id)
-            }
+        val pattern = shiftPatternStore.listPatterns().firstOrNull { it.id == patternId } ?: return
+        val shiftTypes = shiftPatternStore.listTypes().associateBy { it.id }
+        val records = shiftPatternStore.listGenerations().filter { it.patternId == patternId }
+        val tracked = resolveTrackedShiftEvents(pattern, shiftTypes, records)
+        removableGeneratedShiftEventIds(tracked).forEach { eventId ->
+            dao.getEvent(eventId)?.let { deleteLocalEvent(it, trackShiftCancellation = false) }
+        }
+        records.forEach { shiftPatternStore.removeGeneration(it.id) }
     }
 
     private suspend fun saveShiftOccurrence(

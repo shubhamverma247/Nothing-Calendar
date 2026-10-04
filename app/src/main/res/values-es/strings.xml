@@ -777,6 +777,11 @@
     <string name="shift_add_type">Añadir tipo de turno</string>
     <string name="shift_build_pattern_row">Crear patrón</string>
     <string name="shift_pattern_delete_title">¿Eliminar patrón de turnos?</string>
+    <string name="shift_type_mode">TIPO DE TURNO</string>
+    <string name="shift_type_timed">Con horario</string>
+    <string name="shift_type_delete_title">¿Eliminar tipo de turno?</string>
+    <string name="shift_type_delete_unused_message">Los eventos existentes del calendario se conservarán. Este tipo de turno no se podrá recuperar después de eliminarlo.</string>
+    <string name="shift_type_delete_used_message">Este tipo de turno se usa en %1$d patrones guardados. Los eventos existentes se conservarán, pero esos días del ciclo quedarán sin resolver.</string>
     <string name="shift_type_title">Tipo de turno</string>
     <string name="shift_type_edit_title">Editar tipo de turno</string>
     <string name="shift_field_name">Nombre</string>

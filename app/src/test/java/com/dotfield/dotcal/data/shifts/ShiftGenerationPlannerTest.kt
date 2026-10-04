@@ -107,6 +107,22 @@ class ShiftGenerationPlannerTest {
         assertEquals(1, preview.items.single().displayTime?.endDayOffset)
     }
 
+    @Test
+    fun patternCleanupRemovesOnlyUnprotectedGeneratedEvents() {
+        val date = LocalDate.of(2026, 10, 10)
+        val tracked = listOf(
+            tracked(date, "safe", fingerprint("Safe")),
+            tracked(date, "edited", fingerprint("Edited"), ShiftSkipReason.ManuallyEdited),
+            tracked(date, "cancelled", null, ShiftSkipReason.Cancelled),
+            tracked(date, "provider", fingerprint("Provider"), ShiftSkipReason.ProviderBacked),
+            tracked(date, "shared", fingerprint("Shared"), ShiftSkipReason.Shared),
+            tracked(date, "recurring", fingerprint("Recurring"), ShiftSkipReason.Recurring),
+            tracked(date, "all-day", fingerprint("All day"), ShiftSkipReason.AllDay),
+        )
+
+        assertEquals(listOf("safe"), removableGeneratedShiftEventIds(tracked))
+    }
+
     private fun expected(date: LocalDate, title: String) = ShiftExpectedEvent(
         date = date,
         title = title,

@@ -671,6 +671,11 @@
     <string name="shift_add_type">Ajouter Travail Saisir</string>
     <string name="shift_build_pattern_row">Creer Pattern</string>
     <string name="shift_pattern_delete_title">Supprimer Travail pattern?</string>
+    <string name="shift_type_mode">TYPE DE QUART</string>
+    <string name="shift_type_timed">Avec horaires</string>
+    <string name="shift_type_delete_title">Supprimer le type de quart ?</string>
+    <string name="shift_type_delete_unused_message">Les événements existants resteront dans le calendrier. Ce type de quart ne pourra pas être restauré après sa suppression.</string>
+    <string name="shift_type_delete_used_message">Ce type de quart est utilisé par %1$d modèles enregistrés. Les événements existants resteront, mais ces jours du cycle ne seront plus définis.</string>
     <string name="shift_type_title">Travail Saisir</string>
     <string name="shift_type_edit_title">Modifier Travail Saisir</string>
     <string name="shift_field_name">Name</string>

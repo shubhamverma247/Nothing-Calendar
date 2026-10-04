@@ -52,6 +52,13 @@ data class ShiftTrackedEvent(
     val protectedReason: ShiftSkipReason? = null,
 )
 
+fun removableGeneratedShiftEventIds(tracked: List<ShiftTrackedEvent>): List<String> =
+    tracked.asSequence()
+        .filter { it.protectedReason == null }
+        .map { it.eventId }
+        .distinct()
+        .toList()
+
 data class ShiftGenerationPreviewItem(
     val action: ShiftPreviewAction,
     val date: LocalDate,

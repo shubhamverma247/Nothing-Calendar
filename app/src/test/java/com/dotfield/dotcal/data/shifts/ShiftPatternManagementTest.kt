@@ -103,6 +103,19 @@ class ShiftPatternManagementTest {
     }
 
     @Test
+    fun shiftTypeUsageIncludesActiveAndArchivedPatterns() {
+        val patterns = listOf(
+            pattern(id = "active", cycle = listOf("day", SHIFT_OFF_TYPE_ID)),
+            pattern(id = "archived", cycle = listOf("night", "day")).copy(archivedAtMs = 9L),
+            pattern(id = "other", cycle = listOf("night")),
+        )
+
+        assertEquals(2, shiftTypeUsageCount(patterns, "day"))
+        assertEquals(2, shiftTypeUsageCount(patterns, "night"))
+        assertEquals(0, shiftTypeUsageCount(patterns, "missing"))
+    }
+
+    @Test
     fun presetExpansionWrapsAcrossBothCycleBoundaries() {
         val day = shiftType("day")
         val night = shiftType("night")
