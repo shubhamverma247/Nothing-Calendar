@@ -713,6 +713,16 @@
     <string name="shift_summary_off">Aus</string>
     <string name="shift_summary_all_day">Ganztaegig</string>
     <string name="shift_summary_range">%1$s - %2$s</string>
+    <string name="shift_summary_range_next_day">%1$s - %2$s (+1 Tag)</string>
+    <string name="shift_ends_next_day">Ende (+1 Tag)</string>
+    <string name="shift_reminder_label">ERINNERUNG</string>
+    <string name="shift_reminder_none">Keine Erinnerung</string>
+    <string name="shift_reminder_at_start">Bei Beginn</string>
+    <string name="shift_reminder_minutes_before">%1$d Min. vorher</string>
+    <string name="shift_break_label">Pausendauer (Minuten)</string>
+    <string name="shift_break_optional">Optional</string>
+    <string name="shift_break_invalid">Pause muss kürzer als die Schicht sein.</string>
+    <string name="shift_summary_break">%1$d Min. Pause</string>
     <string name="shift_pattern_summary">%1$s: %2$s</string>
     <string name="shift_type_missing">Missing</string>
     <string name="shift_no_shifts_selected">Keine Schichten ausgewählt</string>

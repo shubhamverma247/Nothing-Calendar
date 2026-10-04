@@ -793,6 +793,16 @@
     <string name="shift_summary_off">Aus</string>
     <string name="shift_summary_all_day">alle-اليوم</string>
     <string name="shift_summary_range">%1$s - %2$s</string>
+    <string name="shift_summary_range_next_day">%1$s - %2$s (+1 يوم)</string>
+    <string name="shift_ends_next_day">ينتهي (+1 يوم)</string>
+    <string name="shift_reminder_label">تذكير</string>
+    <string name="shift_reminder_none">بلا تذكير</string>
+    <string name="shift_reminder_at_start">عند البدء</string>
+    <string name="shift_reminder_minutes_before">قبل %1$d دقيقة</string>
+    <string name="shift_break_label">مدة الاستراحة (بالدقائق)</string>
+    <string name="shift_break_optional">اختياري</string>
+    <string name="shift_break_invalid">يجب أن تكون الاستراحة أقصر من المناوبة.</string>
+    <string name="shift_summary_break">استراحة %1$d دقيقة</string>
     <string name="shift_pattern_summary">%1$s: %2$s</string>
     <string name="shift_type_missing">Missing</string>
     <string name="shift_no_shifts_selected">لم يتم تحديد ورديات</string>

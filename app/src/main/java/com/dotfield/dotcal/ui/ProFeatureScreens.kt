@@ -259,6 +259,8 @@ import com.dotfield.dotcal.data.shifts.duplicateShiftPattern
 import com.dotfield.dotcal.data.shifts.shiftPatternPresetCycle
 import com.dotfield.dotcal.data.shifts.shiftDurationMinutes
 import com.dotfield.dotcal.data.shifts.shiftEndMinuteOfDay
+import com.dotfield.dotcal.data.shifts.shiftEndDayOffset
+import com.dotfield.dotcal.data.shifts.isValidShiftBreakMinutes
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.CalendarPreferences
@@ -2891,6 +2893,7 @@ private fun ShiftMiniActionButton(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ShiftTypeEditorDialog(
     palette: DotCalPalette,
@@ -2905,26 +2908,68 @@ private fun ShiftTypeEditorDialog(
         mutableStateOf(shiftEndMinuteOfDay(existing?.startMinuteOfDay ?: 7 * 60, existing?.durationMinutes ?: 12 * 60))
     }
     var color by remember(existing?.id) { mutableStateOf(existing?.colorHex ?: NOTHING_RED_HEX) }
+    var reminderMinutes by remember(existing?.id) { mutableStateOf(existing?.reminderMinutes) }
+    var breakText by remember(existing?.id) { mutableStateOf(existing?.breakMinutes?.toString().orEmpty()) }
     var showColorPicker by remember { mutableStateOf(false) }
     var pickingTime by remember { mutableStateOf<ShiftTimeField?>(null) }
+    val durationMinutes = shiftDurationMinutes(startMinute, endMinute)
+    val parsedBreakMinutes = breakText.toIntOrNull()
+    val breakIsValid = breakText.isBlank() || isValidShiftBreakMinutes(parsedBreakMinutes, durationMinutes)
+    val reminderOptions = remember(existing?.id) {
+        (listOf<Int?>(null, 0, 5, 10, 15, 30, 60) + listOf(existing?.reminderMinutes)).distinct()
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.dialogSurface,
         title = { Text(stringResource(if (existing == null) R.string.shift_type_title else R.string.shift_type_edit_title), color = palette.primaryText, fontFamily = LocalHeadingFont.current) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.shift_field_name)) }, singleLine = true, colors = dotCalTextFieldColors(palette), textStyle = TextStyle(color = palette.primaryText, fontFamily = mono))
                 SettingsToggleRow(title = stringResource(R.string.shift_off_day), checked = isOff, palette = palette, onCheckedChange = { isOff = it })
                 if (!isOff) {
                     ShiftTimeRow(title = stringResource(R.string.event_starts), minuteOfDay = startMinute, palette = palette, onClick = { pickingTime = ShiftTimeField.Start })
-                    ShiftTimeRow(title = stringResource(R.string.event_ends), minuteOfDay = endMinute, palette = palette, onClick = { pickingTime = ShiftTimeField.End })
+                    ShiftTimeRow(
+                        title = if (shiftEndDayOffset(startMinute, durationMinutes) > 0) {
+                            stringResource(R.string.shift_ends_next_day)
+                        } else {
+                            stringResource(R.string.event_ends)
+                        },
+                        minuteOfDay = endMinute,
+                        palette = palette,
+                        onClick = { pickingTime = ShiftTimeField.End },
+                    )
+                    Text(stringResource(R.string.shift_reminder_label), color = palette.secondaryText, fontFamily = mono, fontSize = 12.sp)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        reminderOptions.forEach { minutes ->
+                            ShiftChip(
+                                label = shiftReminderLabel(minutes),
+                                palette = palette,
+                                selected = reminderMinutes == minutes,
+                                onClick = { reminderMinutes = minutes },
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = breakText,
+                        onValueChange = { breakText = it.filter(Char::isDigit).take(4) },
+                        label = { Text(stringResource(R.string.shift_break_label)) },
+                        placeholder = { Text(stringResource(R.string.shift_break_optional)) },
+                        supportingText = if (breakIsValid) null else {
+                            { Text(stringResource(R.string.shift_break_invalid)) }
+                        },
+                        isError = !breakIsValid,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = dotCalTextFieldColors(palette),
+                        textStyle = TextStyle(color = palette.primaryText, fontFamily = mono),
+                    )
                     ShiftColorRow(colorHex = color, palette = palette, onClick = { showColorPicker = true })
                 }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = name.isNotBlank(),
+                enabled = name.isNotBlank() && (isOff || breakIsValid),
                 onClick = {
                     onSave(
                         ShiftType(
@@ -2934,12 +2979,13 @@ private fun ShiftTypeEditorDialog(
                             startMinuteOfDay = if (isOff) null else startMinute,
                             durationMinutes = if (isOff) null else shiftDurationMinutes(startMinute, endMinute),
                             isAllDay = false,
-                            reminderMinutes = null,
+                            reminderMinutes = if (isOff) null else reminderMinutes,
+                            breakMinutes = if (isOff || breakText.isBlank()) null else parsedBreakMinutes,
                             createdAtMs = existing?.createdAtMs ?: System.currentTimeMillis(),
                         ),
                     )
                 },
-            ) { Text(stringResource(R.string.action_save), color = if (name.isNotBlank()) palette.accent else palette.disabledText) }
+            ) { Text(stringResource(R.string.action_save), color = if (name.isNotBlank() && (isOff || breakIsValid)) palette.accent else palette.disabledText) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = palette.primaryText) } },
     )
@@ -3449,6 +3495,9 @@ private fun ShiftGenerationPreviewRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(item.title, color = palette.primaryText, fontFamily = mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(item.date.format(formatter), color = palette.secondaryText, fontFamily = mono, fontSize = 11.sp)
+            item.displayTime?.let { timing ->
+                Text(shiftDisplayTimeLabel(timing.startMinuteOfDay, timing.durationMinutes), color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp)
+            }
             reason?.let { Text(it, color = palette.secondaryText, fontFamily = mono, fontSize = 10.sp) }
         }
         Text(action, color = if (item.action == ShiftPreviewAction.Removed) palette.accent else palette.primaryText, fontFamily = mono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
@@ -3598,7 +3647,31 @@ private fun shiftTypeSummary(type: ShiftType): String {
     val duration = type.durationMinutes ?: return allDay
     val start = minuteOfDayToLocalTimeOrNull(startMinute)?.format(editorTimeFormatter) ?: allDay
     val end = shiftLocalTime(shiftEndMinuteOfDay(startMinute, duration)).format(editorTimeFormatter)
-    return stringResource(R.string.shift_summary_range, start, end)
+    val range = if (shiftEndDayOffset(startMinute, duration) > 0) {
+        stringResource(R.string.shift_summary_range_next_day, start, end)
+    } else {
+        stringResource(R.string.shift_summary_range, start, end)
+    }
+    val breakLabel = type.breakMinutes?.let { stringResource(R.string.shift_summary_break, it) }
+    return "$range · ${listOfNotNull(breakLabel, shiftReminderLabel(type.reminderMinutes)).joinToString(" · ")}"
+}
+
+@Composable
+private fun shiftDisplayTimeLabel(startMinuteOfDay: Int, durationMinutes: Int): String {
+    val start = shiftLocalTime(startMinuteOfDay).format(editorTimeFormatter)
+    val end = shiftLocalTime(shiftEndMinuteOfDay(startMinuteOfDay, durationMinutes)).format(editorTimeFormatter)
+    return if (shiftEndDayOffset(startMinuteOfDay, durationMinutes) > 0) {
+        stringResource(R.string.shift_summary_range_next_day, start, end)
+    } else {
+        stringResource(R.string.shift_summary_range, start, end)
+    }
+}
+
+@Composable
+private fun shiftReminderLabel(minutes: Int?): String = when (minutes) {
+    null -> stringResource(R.string.shift_reminder_none)
+    0 -> stringResource(R.string.shift_reminder_at_start)
+    else -> stringResource(R.string.shift_reminder_minutes_before, minutes)
 }
 
 @Composable

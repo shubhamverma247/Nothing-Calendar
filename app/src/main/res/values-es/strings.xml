@@ -820,6 +820,16 @@
     <string name="shift_summary_off">Libre</string>
     <string name="shift_summary_all_day">Todo el día</string>
     <string name="shift_summary_range">%1$s - %2$s</string>
+    <string name="shift_summary_range_next_day">%1$s - %2$s (+1 día)</string>
+    <string name="shift_ends_next_day">Finaliza (+1 día)</string>
+    <string name="shift_reminder_label">RECORDATORIO</string>
+    <string name="shift_reminder_none">Sin recordatorio</string>
+    <string name="shift_reminder_at_start">Al comenzar</string>
+    <string name="shift_reminder_minutes_before">%1$d min antes</string>
+    <string name="shift_break_label">Duración del descanso (minutos)</string>
+    <string name="shift_break_optional">Opcional</string>
+    <string name="shift_break_invalid">El descanso debe ser más corto que el turno.</string>
+    <string name="shift_summary_break">Descanso de %1$d min</string>
     <string name="shift_pattern_summary">%1$s: %2$s</string>
     <string name="shift_type_missing">Falta</string>
     <string name="shift_no_shifts_selected">Ningún turno seleccionado</string>

@@ -21,6 +21,7 @@ data class ShiftType(
     val durationMinutes: Int?,
     val isAllDay: Boolean,
     val reminderMinutes: Int?,
+    val breakMinutes: Int? = null,
     val createdAtMs: Long,
 ) {
     val generatesEvent: Boolean
@@ -86,6 +87,15 @@ fun shiftDurationMinutes(startMinuteOfDay: Int, endMinuteOfDay: Int): Int {
 
 fun shiftEndMinuteOfDay(startMinuteOfDay: Int, durationMinutes: Int): Int =
     Math.floorMod(startMinuteOfDay + durationMinutes, MINUTES_PER_DAY)
+
+fun shiftEndDayOffset(startMinuteOfDay: Int, durationMinutes: Int): Int =
+    Math.floorDiv(
+        Math.floorMod(startMinuteOfDay, MINUTES_PER_DAY) + durationMinutes.coerceAtLeast(0),
+        MINUTES_PER_DAY,
+    )
+
+fun isValidShiftBreakMinutes(breakMinutes: Int?, durationMinutes: Int?): Boolean =
+    breakMinutes == null || (durationMinutes != null && breakMinutes in 1 until durationMinutes)
 
 data class ShiftGenerationRecord(
     val id: String,
@@ -236,6 +246,7 @@ class ShiftPatternStore internal constructor(private val rootDir: File) {
         .put("durationMinutes", type.durationMinutes ?: JSONObject.NULL)
         .put("isAllDay", type.isAllDay)
         .put("reminderMinutes", type.reminderMinutes ?: JSONObject.NULL)
+        .put("breakMinutes", type.breakMinutes ?: JSONObject.NULL)
         .put("createdAtMs", type.createdAtMs)
 
     private fun decodeType(text: String): ShiftType {
@@ -248,6 +259,7 @@ class ShiftPatternStore internal constructor(private val rootDir: File) {
             durationMinutes = if (o.isNull("durationMinutes")) null else o.optInt("durationMinutes"),
             isAllDay = o.optBoolean("isAllDay", false),
             reminderMinutes = if (o.isNull("reminderMinutes")) null else o.optInt("reminderMinutes"),
+            breakMinutes = if (!o.has("breakMinutes") || o.isNull("breakMinutes")) null else o.optInt("breakMinutes"),
             createdAtMs = o.optLong("createdAtMs", 0L),
         )
     }

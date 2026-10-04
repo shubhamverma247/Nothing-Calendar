@@ -37,6 +37,18 @@ class ShiftEventDraftTest {
     }
 
     @Test
+    fun breakDoesNotSplitOvernightShiftIntoMultipleEvents() {
+        val type = shiftType(startMinute = 22 * 60, durationMinutes = 8 * 60, breakMinutes = 30)
+
+        val draft = buildShiftEventDraft(type, date)
+
+        assertEquals(date, draft?.date)
+        assertEquals(date.plusDays(1), draft?.endDate)
+        assertEquals(LocalTime.of(22, 0), draft?.startTime)
+        assertEquals(LocalTime.of(6, 0), draft?.endTime)
+    }
+
+    @Test
     fun allDayShiftBuildsSingleAllDayDraft() {
         val type = shiftType(startMinute = null, durationMinutes = null, isAllDay = true)
 
@@ -60,6 +72,7 @@ class ShiftEventDraftTest {
         startMinute: Int?,
         durationMinutes: Int?,
         isAllDay: Boolean = false,
+        breakMinutes: Int? = null,
     ) = ShiftType(
         id = "shift-1",
         name = "Day",
@@ -68,6 +81,7 @@ class ShiftEventDraftTest {
         durationMinutes = durationMinutes,
         isAllDay = isAllDay,
         reminderMinutes = 30,
+        breakMinutes = breakMinutes,
         createdAtMs = 1L,
     )
 }

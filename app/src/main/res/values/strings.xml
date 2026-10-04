@@ -971,6 +971,16 @@
     <string name="shift_summary_off">Off</string>
     <string name="shift_summary_all_day">All-day</string>
     <string name="shift_summary_range">%1$s - %2$s</string>
+    <string name="shift_summary_range_next_day">%1$s - %2$s (+1 day)</string>
+    <string name="shift_ends_next_day">Ends (+1 day)</string>
+    <string name="shift_reminder_label">REMINDER</string>
+    <string name="shift_reminder_none">No reminder</string>
+    <string name="shift_reminder_at_start">At start</string>
+    <string name="shift_reminder_minutes_before">%1$d min before</string>
+    <string name="shift_break_label">Break duration (minutes)</string>
+    <string name="shift_break_optional">Optional</string>
+    <string name="shift_break_invalid">Break must be shorter than the shift.</string>
+    <string name="shift_summary_break">%1$d min break</string>
     <string name="shift_pattern_summary">%1$s: %2$s</string>
     <string name="shift_type_missing">Missing</string>
     <string name="shift_no_shifts_selected">No shifts selected</string>

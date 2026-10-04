@@ -753,6 +753,16 @@
     <string name="shift_summary_off">Aus</string>
     <string name="shift_summary_all_day">alle-Den</string>
     <string name="shift_summary_range">%1$s - %2$s</string>
+    <string name="shift_summary_range_next_day">%1$s - %2$s (+1 день)</string>
+    <string name="shift_ends_next_day">Окончание (+1 день)</string>
+    <string name="shift_reminder_label">НАПОМИНАНИЕ</string>
+    <string name="shift_reminder_none">Без напоминания</string>
+    <string name="shift_reminder_at_start">В начале</string>
+    <string name="shift_reminder_minutes_before">За %1$d мин</string>
+    <string name="shift_break_label">Длительность перерыва (минуты)</string>
+    <string name="shift_break_optional">Необязательно</string>
+    <string name="shift_break_invalid">Перерыв должен быть короче смены.</string>
+    <string name="shift_summary_break">Перерыв %1$d мин</string>
     <string name="shift_pattern_summary">%1$s: %2$s</string>
     <string name="shift_type_missing">Missing</string>
     <string name="shift_no_shifts_selected">Смены не выбраны</string>

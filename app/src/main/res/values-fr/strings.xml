@@ -713,6 +713,16 @@
     <string name="shift_summary_off">Desactive</string>
     <string name="shift_summary_all_day">Toute la journee</string>
     <string name="shift_summary_range">%1$s - %2$s</string>
+    <string name="shift_summary_range_next_day">%1$s - %2$s (+1 jour)</string>
+    <string name="shift_ends_next_day">Fin (+1 jour)</string>
+    <string name="shift_reminder_label">RAPPEL</string>
+    <string name="shift_reminder_none">Aucun rappel</string>
+    <string name="shift_reminder_at_start">Au début</string>
+    <string name="shift_reminder_minutes_before">%1$d min avant</string>
+    <string name="shift_break_label">Durée de la pause (minutes)</string>
+    <string name="shift_break_optional">Facultatif</string>
+    <string name="shift_break_invalid">La pause doit être plus courte que le service.</string>
+    <string name="shift_summary_break">Pause de %1$d min</string>
     <string name="shift_pattern_summary">%1$s: %2$s</string>
     <string name="shift_type_missing">Missing</string>
     <string name="shift_no_shifts_selected">Aucun shifts Selectionne</string>

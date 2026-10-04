@@ -33,4 +33,20 @@ class ShiftTimeMathTest {
 
         assertEquals(8 * 60, endMinute)
     }
+
+    @Test
+    fun overnightEndUsesNextCalendarDay() {
+        assertEquals(1, shiftEndDayOffset(startMinuteOfDay = 22 * 60, durationMinutes = 8 * 60))
+        assertEquals(0, shiftEndDayOffset(startMinuteOfDay = 8 * 60, durationMinutes = 8 * 60))
+    }
+
+    @Test
+    fun breakMustFitInsideTimedShift() {
+        assertEquals(true, isValidShiftBreakMinutes(null, durationMinutes = 8 * 60))
+        assertEquals(true, isValidShiftBreakMinutes(1, durationMinutes = 8 * 60))
+        assertEquals(true, isValidShiftBreakMinutes(479, durationMinutes = 8 * 60))
+        assertEquals(false, isValidShiftBreakMinutes(0, durationMinutes = 8 * 60))
+        assertEquals(false, isValidShiftBreakMinutes(480, durationMinutes = 8 * 60))
+        assertEquals(false, isValidShiftBreakMinutes(-1, durationMinutes = 8 * 60))
+    }
 }

@@ -28,11 +28,20 @@ data class ShiftEventFingerprint(
     val reminderMinutes: Int?,
 )
 
+data class ShiftDisplayTime(
+    val startMinuteOfDay: Int,
+    val durationMinutes: Int,
+) {
+    val endMinuteOfDay: Int get() = shiftEndMinuteOfDay(startMinuteOfDay, durationMinutes)
+    val endDayOffset: Int get() = shiftEndDayOffset(startMinuteOfDay, durationMinutes)
+}
+
 data class ShiftExpectedEvent(
     val date: LocalDate,
     val title: String,
     val shiftTypeId: String,
     val fingerprint: ShiftEventFingerprint,
+    val displayTime: ShiftDisplayTime? = null,
 )
 
 data class ShiftTrackedEvent(
@@ -50,6 +59,7 @@ data class ShiftGenerationPreviewItem(
     val eventId: String? = null,
     val shiftTypeId: String? = null,
     val skipReason: ShiftSkipReason? = null,
+    val displayTime: ShiftDisplayTime? = null,
 )
 
 data class ShiftGenerationPreview(
@@ -88,6 +98,7 @@ fun buildShiftGenerationPreview(
                         date = date,
                         title = wanted.title,
                         shiftTypeId = wanted.shiftTypeId,
+                        displayTime = wanted.displayTime,
                     ),
                 )
             } else if (wanted != null) {
@@ -106,13 +117,14 @@ private fun classifyTrackedEvent(
     val reason = tracked.protectedReason
     return when {
         reason != null -> skipped(tracked, reason, expected.shiftTypeId)
-        tracked.fingerprint == expected.fingerprint -> skipped(tracked, ShiftSkipReason.Unchanged, expected.shiftTypeId)
+        tracked.fingerprint == expected.fingerprint -> skipped(tracked, ShiftSkipReason.Unchanged, expected.shiftTypeId, expected.displayTime)
         else -> ShiftGenerationPreviewItem(
             action = ShiftPreviewAction.Updated,
             date = tracked.date,
             title = expected.title,
             eventId = tracked.eventId,
             shiftTypeId = expected.shiftTypeId,
+            displayTime = expected.displayTime,
         )
     }
 }
@@ -130,6 +142,7 @@ private fun skipped(
     tracked: ShiftTrackedEvent,
     reason: ShiftSkipReason,
     shiftTypeId: String? = null,
+    displayTime: ShiftDisplayTime? = null,
 ) = ShiftGenerationPreviewItem(
     action = ShiftPreviewAction.Skipped,
     date = tracked.date,
@@ -137,4 +150,5 @@ private fun skipped(
     eventId = tracked.eventId,
     shiftTypeId = shiftTypeId,
     skipReason = reason,
+    displayTime = displayTime,
 )

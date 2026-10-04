@@ -90,6 +90,23 @@ class ShiftGenerationPlannerTest {
         assertEquals(listOf(ShiftPreviewAction.Updated), preview.items.map { it.action })
     }
 
+    @Test
+    fun previewKeepsOvernightTimingForDisplay() {
+        val date = LocalDate.of(2026, 10, 10)
+        val timing = ShiftDisplayTime(startMinuteOfDay = 22 * 60, durationMinutes = 8 * 60)
+        val expected = expected(date, "Night").copy(displayTime = timing)
+
+        val preview = buildShiftGenerationPreview(
+            expected = listOf(expected),
+            tracked = emptyList(),
+            rangeStart = date,
+            rangeEnd = date,
+        )
+
+        assertEquals(timing, preview.items.single().displayTime)
+        assertEquals(1, preview.items.single().displayTime?.endDayOffset)
+    }
+
     private fun expected(date: LocalDate, title: String) = ShiftExpectedEvent(
         date = date,
         title = title,

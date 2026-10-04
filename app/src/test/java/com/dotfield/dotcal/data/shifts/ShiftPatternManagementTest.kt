@@ -133,6 +133,23 @@ class ShiftPatternManagementTest {
         )
     }
 
+    @Test
+    fun overnightShiftAtRangeEndProducesOneStartDateOccurrence() {
+        val night = shiftType("night").copy(startMinuteOfDay = 22 * 60, durationMinutes = 8 * 60)
+        val rangeEnd = LocalDate.of(2026, 10, 3)
+        val pattern = pattern(cycle = listOf(night.id))
+
+        val occurrences = expandShiftPattern(
+            pattern = pattern,
+            shiftTypes = mapOf(night.id to night),
+            rangeStart = rangeEnd,
+            rangeEnd = rangeEnd,
+        )
+
+        assertEquals(listOf(rangeEnd), occurrences.map { it.date })
+        assertEquals(rangeEnd.plusDays(1), buildShiftEventDraft(occurrences.single().shiftType, rangeEnd)?.endDate)
+    }
+
     private fun pattern(
         id: String = "pattern",
         name: String = "Rotation",
@@ -162,6 +179,7 @@ class ShiftPatternManagementTest {
         durationMinutes = 8 * 60,
         isAllDay = false,
         reminderMinutes = null,
+        breakMinutes = null,
         createdAtMs = 1L,
     )
 }

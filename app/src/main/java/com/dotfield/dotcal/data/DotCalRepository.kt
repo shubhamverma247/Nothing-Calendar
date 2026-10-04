@@ -57,6 +57,7 @@ import com.dotfield.dotcal.data.shifts.ShiftGenerationEvent
 import com.dotfield.dotcal.data.shifts.ShiftGenerationPreview
 import com.dotfield.dotcal.data.shifts.ShiftEventFingerprint
 import com.dotfield.dotcal.data.shifts.ShiftExpectedEvent
+import com.dotfield.dotcal.data.shifts.ShiftDisplayTime
 import com.dotfield.dotcal.data.shifts.ShiftPreviewAction
 import com.dotfield.dotcal.data.shifts.ShiftSkipReason
 import com.dotfield.dotcal.data.shifts.ShiftTrackedEvent
@@ -2197,6 +2198,10 @@ class DotCalRepository(
                 isAllDay = draft.isAllDay,
                 colorHex = draft.colorHex,
                 reminderMinutes = draft.reminderMinutes,
+            ),
+            displayTime = if (draft.isAllDay) null else ShiftDisplayTime(
+                startMinuteOfDay = occurrence.shiftType.startMinuteOfDay ?: return null,
+                durationMinutes = occurrence.shiftType.durationMinutes ?: return null,
             ),
         )
     }
