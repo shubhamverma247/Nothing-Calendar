@@ -50,6 +50,9 @@ import com.dotfield.dotcal.data.scheduling.FreeSlotEngine
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import com.dotfield.dotcal.data.shifts.GeneratedShiftOccurrence
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
+import com.dotfield.dotcal.data.shifts.ShiftContextRequest
+import com.dotfield.dotcal.data.shifts.ShiftContextResolution
+import com.dotfield.dotcal.data.shifts.ShiftContextResolver
 import com.dotfield.dotcal.data.shifts.ShiftEventGeneratedBy
 import com.dotfield.dotcal.data.shifts.ShiftEventMetadata
 import com.dotfield.dotcal.data.shifts.ShiftGenerationRecord
@@ -69,6 +72,8 @@ import com.dotfield.dotcal.data.shifts.buildShiftEventDraft
 import com.dotfield.dotcal.data.shifts.buildShiftPlanShareEvents
 import com.dotfield.dotcal.data.shifts.expandShiftPattern
 import com.dotfield.dotcal.data.shifts.buildShiftGenerationPreview
+import com.dotfield.dotcal.data.shifts.buildShiftEventSignal
+import com.dotfield.dotcal.data.shifts.cancelledShiftPatternDates
 import com.dotfield.dotcal.data.shifts.parseShiftEventMetadata
 import com.dotfield.dotcal.data.shifts.removableGeneratedShiftEventIds
 import com.dotfield.dotcal.data.shifts.shiftMetadataFor
@@ -1892,6 +1897,38 @@ class DotCalRepository(
             .filterKeys { it in ids }
             .mapNotNull { (id, value) -> parseShiftEventMetadata(value)?.let { id to it } }
             .toMap()
+    }
+
+    suspend fun resolveShiftContext(
+        rangeStart: LocalDate,
+        rangeEnd: LocalDate,
+        selectedPatternId: String? = null,
+    ): ShiftContextResolution = withContext(Dispatchers.IO) {
+        val metadataByEventId = sideStore.readNamespace(SHIFT_EVENT_METADATA_NAMESPACE)
+            .mapNotNull { (eventId, value) -> parseShiftEventMetadata(value)?.let { eventId to it } }
+            .toMap()
+        val actualShifts = metadataByEventId.mapNotNull { (eventId, metadata) ->
+            val event = dao.getEvent(eventId) ?: return@mapNotNull null
+            buildShiftEventSignal(
+                metadata = metadata,
+                startTimeMs = event.startTimeMs,
+                endTimeMs = event.endTimeMs,
+                timeZone = event.timeZone,
+                isAllDay = event.isAllDay == 1,
+            )
+        }
+        val generations = shiftPatternStore.listGenerations()
+        ShiftContextResolver.resolve(
+            ShiftContextRequest(
+                rangeStart = rangeStart,
+                rangeEnd = rangeEnd,
+                patterns = shiftPatternStore.listPatterns(),
+                shiftTypes = shiftPatternStore.listTypes(),
+                actualShifts = actualShifts,
+                selectedPatternId = selectedPatternId,
+                suppressedPatternDates = cancelledShiftPatternDates(generations, metadataByEventId),
+            ),
+        )
     }
 
     suspend fun deleteShiftPattern(id: String, removeGeneratedEvents: Boolean) = withContext(Dispatchers.IO) {
