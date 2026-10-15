@@ -167,4 +167,14 @@ class ProPurchaseOfferTest {
             nextPaidPricingPhase(phases) { it.priceAmountMicros }?.formattedPrice,
         )
     }
+    @Test
+    fun trialOfferKeepsNormalRenewalPriceSeparateFromFirstYearPrice() {
+        val offer = yearlyTrialOffer.copy(
+            formattedPrice = "₹749.25",
+            renewalFormattedPrice = "₹999.00",
+        )
+
+        assertEquals("₹749.25", offer.formattedPrice)
+        assertEquals("₹999.00", offer.renewalFormattedPrice)
+    }
 }

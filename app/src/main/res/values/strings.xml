@@ -807,7 +807,7 @@
     <string name="paywall_yearly_subtitle">%1$s / year</string>
     <string name="paywall_monthly_subtitle">%1$s / month</string>
     <string name="paywall_lifetime_subtitle">Pay once. Keep Pro forever.</string>
-    <string name="paywall_yearly_trial_fine_print">7-day free trial, then %1$s / year unless cancelled in Google Play.</string>
+    <string name="paywall_yearly_trial_fine_print">7-day free trial, then %1$s for the first year. Automatically renews at %2$s / year thereafter unless cancelled in Google Play. Cancel before the trial ends to avoid being charged.</string>
     <string name="paywall_subscription_fine_print">Subscription renews through Google Play. Cancel anytime.</string>
     <string name="paywall_manage_subscription">Manage subscription</string>
     <string name="paywall_one_time_no_subscription">One-time purchase. No subscription.</string>
@@ -1180,7 +1180,7 @@
     <string name="toast_file_attachment_failed">Could not attach PDF</string>
     <string name="toast_file_attachment_missing">File is missing</string>
     <string name="toast_file_attachment_no_app">No app can open this file</string>
-    <string name="toast_google_maps_unavailable">Google Maps is not installed</string>
+    <string name="toast_map_unavailable">No map app is available</string>
     <string name="toast_import_invalid_ics">Import failed - not a valid .ics file</string>
     <!-- Restore/import summaries. Two independent counts, so a plural on either one would be
          wrong; the counts are formatted into a neutral frame instead. -->

@@ -614,7 +614,7 @@
     <string name="paywall_yearly_subtitle">%1$s / год</string>
     <string name="paywall_monthly_subtitle">%1$s / месяц</string>
     <string name="paywall_lifetime_subtitle">Платите один раз. Pro навсегда.</string>
-    <string name="paywall_yearly_trial_fine_print">7-дневная бесплатная пробная версия, затем %1$s / год, если не отменить в Google Play.</string>
+    <string name="paywall_yearly_trial_fine_print">7-дневный бесплатный пробный период, затем %1$s за первый год. После этого подписка автоматически продлевается за %2$s / год, если её не отменить в Google Play. Отмените подписку до окончания пробного периода, чтобы избежать списания.</string>
     <string name="paywall_subscription_fine_print">Подписка продлевается через Google Play. Можно отменить в любое время.</string>
     <string name="paywall_manage_subscription">Управлять подпиской</string>
     <string name="paywall_one_time_no_subscription">Разовая покупка. Без подписки.</string>
@@ -967,7 +967,7 @@
     <string name="toast_file_attachment_failed">Не удалось прикрепить PDF</string>
     <string name="toast_file_attachment_missing">Файл отсутствует</string>
     <string name="toast_file_attachment_no_app">Нет приложения для открытия этого файла</string>
-    <string name="toast_google_maps_unavailable">Google Maps не установлен</string>
+    <string name="toast_map_unavailable">Нет доступного приложения с картами</string>
     <string name="toast_holidays_add_failed">Ne udalos dobavit prazdniki</string>
     <string name="toast_holidays_remove_failed">Ne udalos udalit prazdniki</string>
     <string name="toast_import_invalid_ics">Import ne udalsya - eto ne dopustimyy .ics fayl</string>

@@ -574,7 +574,7 @@
     <string name="paywall_yearly_subtitle">%1$s / tahun</string>
     <string name="paywall_monthly_subtitle">%1$s / bulan</string>
     <string name="paywall_lifetime_subtitle">Bayar sekali. Simpan Pro selamanya.</string>
-    <string name="paywall_yearly_trial_fine_print">Uji coba gratis 7 hari, lalu %1$s / tahun kecuali dibatalkan di Google Play.</string>
+    <string name="paywall_yearly_trial_fine_print">Uji coba gratis 7 hari, lalu %1$s untuk tahun pertama. Setelah itu diperpanjang otomatis sebesar %2$s / tahun kecuali dibatalkan di Google Play. Batalkan sebelum uji coba berakhir agar tidak dikenai biaya.</string>
     <string name="paywall_subscription_fine_print">Langganan diperpanjang lewat Google Play. Batalkan kapan saja.</string>
     <string name="paywall_manage_subscription">Kelola langganan</string>
     <string name="paywall_one_time_no_subscription">Pembelian satu kali. Tanpa langganan.</string>
@@ -911,7 +911,7 @@
     <string name="toast_file_attachment_failed">Tidak dapat melampirkan PDF</string>
     <string name="toast_file_attachment_missing">File tidak ditemukan</string>
     <string name="toast_file_attachment_no_app">Tidak ada aplikasi yang dapat membuka file ini</string>
-    <string name="toast_google_maps_unavailable">Google Maps belum terinstal</string>
+    <string name="toast_map_unavailable">Tidak ada aplikasi peta yang tersedia</string>
     <string name="toast_holidays_add_failed">Tidak dapat menambahkan hari libur</string>
     <string name="toast_holidays_remove_failed">Tidak dapat menghapus hari libur</string>
     <string name="toast_import_invalid_ics">Impor gagal - bukan file .ics yang valid</string>

@@ -574,7 +574,7 @@
     <string name="paywall_yearly_subtitle">%1$s / yıl</string>
     <string name="paywall_monthly_subtitle">%1$s / ay</string>
     <string name="paywall_lifetime_subtitle">Bir kez öde. Pro sonsuza kadar kalsın.</string>
-    <string name="paywall_yearly_trial_fine_print">7 gün ücretsiz deneme, ardından Google Play\'de iptal edilmezse %1$s / yıl.</string>
+    <string name="paywall_yearly_trial_fine_print">7 gün ücretsiz deneme, ardından ilk yıl için %1$s. Google Play\'de iptal edilmezse sonraki yıllarda otomatik olarak %2$s / yıl yenilenir. Ücret alınmasını önlemek için deneme bitmeden iptal edin.</string>
     <string name="paywall_subscription_fine_print">Abonelik Google Play üzerinden yenilenir. İstediğin zaman iptal et.</string>
     <string name="paywall_manage_subscription">Aboneliği yönet</string>
     <string name="paywall_one_time_no_subscription">Tek seferlik satın alma. Abonelik yok.</string>
@@ -911,7 +911,7 @@
     <string name="toast_file_attachment_failed">PDF eklenemedi</string>
     <string name="toast_file_attachment_missing">Dosya eksik</string>
     <string name="toast_file_attachment_no_app">Bu dosyayı açabilecek uygulama yok</string>
-    <string name="toast_google_maps_unavailable">Google Maps yüklü değil</string>
+    <string name="toast_map_unavailable">Kullanılabilir harita uygulaması yok</string>
     <string name="toast_holidays_add_failed">Tatiller eklenemedi</string>
     <string name="toast_holidays_remove_failed">Tatiller kaldirilamadi</string>
     <string name="toast_import_invalid_ics">Ice aktarma basarisiz - gecerli bir .ics dosyasi degil</string>

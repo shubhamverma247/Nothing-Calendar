@@ -629,7 +629,11 @@ internal fun PaywallScreen(
 @Composable
 private fun ProPurchaseOffer.checkoutFinePrint(): String = when (plan) {
     ProPurchasePlan.Yearly -> if (isSevenDayTrial) {
-        stringResource(R.string.paywall_yearly_trial_fine_print, formattedPrice)
+        stringResource(
+            R.string.paywall_yearly_trial_fine_print,
+            formattedPrice,
+            renewalFormattedPrice ?: formattedPrice,
+        )
     } else {
         stringResource(R.string.paywall_subscription_fine_print)
     }

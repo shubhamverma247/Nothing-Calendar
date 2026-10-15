@@ -654,7 +654,7 @@
     <string name="paywall_yearly_subtitle">%1$s / سنة</string>
     <string name="paywall_monthly_subtitle">%1$s / شهر</string>
     <string name="paywall_lifetime_subtitle">ادفع مرة واحدة. احتفظ بميزات Pro دائمًا.</string>
-    <string name="paywall_yearly_trial_fine_print">تجربة مجانية لمدة 7 أيام، ثم %1$s / سنة ما لم يتم الإلغاء في Google Play.</string>
+    <string name="paywall_yearly_trial_fine_print">تجربة مجانية لمدة 7 أيام، ثم %1$s للسنة الأولى. تتجدد تلقائياً بسعر %2$s / سنة بعد ذلك ما لم يتم الإلغاء في Google Play. ألغِ قبل انتهاء التجربة لتجنب تحصيل الرسوم.</string>
     <string name="paywall_subscription_fine_print">يتجدد الاشتراك عبر Google Play. يمكنك الإلغاء في أي وقت.</string>
     <string name="paywall_manage_subscription">إدارة الاشتراك</string>
     <string name="paywall_one_time_no_subscription">شراء لمرة واحدة. لا يوجد اشتراك.</string>
@@ -1023,7 +1023,7 @@
     <string name="toast_file_attachment_failed">تعذر إرفاق ملف PDF</string>
     <string name="toast_file_attachment_missing">الملف مفقود</string>
     <string name="toast_file_attachment_no_app">لا يوجد تطبيق يمكنه فتح هذا الملف</string>
-    <string name="toast_google_maps_unavailable">Google Maps غير مثبت</string>
+    <string name="toast_map_unavailable">لا يتوفر تطبيق خرائط</string>
     <string name="toast_holidays_add_failed">تعذرت إضافة العطلات</string>
     <string name="toast_holidays_remove_failed">تعذرت إزالة العطلات</string>
     <string name="toast_import_invalid_ics">فشل الاستيراد - ليس ملف .ics صالحا</string>

@@ -402,7 +402,7 @@ internal fun EventDetailScreen(
                                 textDecoration = TextDecoration.Underline,
                                 modifier = Modifier.clickable {
                                     if (!openEventLocationNavigation(context, event.location)) {
-                                        showDotCalToast(context, palette, R.string.toast_google_maps_unavailable)
+                                        showDotCalToast(context, palette, R.string.toast_map_unavailable)
                                     }
                                 },
                             )

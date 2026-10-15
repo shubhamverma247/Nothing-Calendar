@@ -433,15 +433,14 @@ private fun ProductDetails.subscriptionPurchaseOffers(): List<ProPurchaseOffer> 
         val trialPhase = pricingPhases.firstOrNull {
             it.priceAmountMicros == 0L && it.billingPeriod == "P7D"
         }
-        val hasSevenDayTrial = trialPhase != null ||
-            offer.offerId == YEARLY_TRIAL_OFFER_ID ||
-            offer.offerTags.contains(YEARLY_TRIAL_OFFER_ID)
+        val hasSevenDayTrial = trialPhase != null
         ProPurchaseOffer(
             plan = plan,
             formattedPrice = paidPhase.formattedPrice,
             productId = productId,
             productType = BillingClient.ProductType.SUBS,
             priceAmountMicros = paidPhase.priceAmountMicros,
+            renewalFormattedPrice = renewalPhase?.formattedPrice,
             comparisonFormattedPrice = renewalPhase?.formattedPrice?.takeUnless { it == paidPhase.formattedPrice },
             offerToken = offer.offerToken,
             offerId = offer.offerId,

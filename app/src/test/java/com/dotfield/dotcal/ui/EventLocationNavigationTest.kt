@@ -11,14 +11,11 @@ class EventLocationNavigationTest {
     }
 
     @Test
-    fun locationCreatesGoogleMapsNavigationUri() {
+    fun locationCreatesGenericMapNavigationUri() {
         assertEquals(
-            "google.navigation:q=1600%20Amphitheatre%20Parkway%2C%20Mountain%20View",
+            "geo:0,0?q=1600%20Amphitheatre%20Parkway%2C%20Mountain%20View",
             eventLocationNavigationUri("  1600 Amphitheatre Parkway, Mountain View  "),
         )
-        assertEquals(
-            "com.google.android.apps.maps",
-            GOOGLE_MAPS_PACKAGE,
-        )
     }
+
 }

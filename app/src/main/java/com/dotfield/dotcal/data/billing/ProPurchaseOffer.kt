@@ -13,6 +13,7 @@ data class ProPurchaseOffer(
     val productType: String,
     val priceAmountMicros: Long? = null,
     val comparisonFormattedPrice: String? = null,
+    val renewalFormattedPrice: String? = null,
     val offerToken: String? = null,
     val offerId: String? = null,
     val purchaseOptionId: String? = null,

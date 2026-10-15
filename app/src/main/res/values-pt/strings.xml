@@ -574,7 +574,7 @@
     <string name="paywall_yearly_subtitle">%1$s / ano</string>
     <string name="paywall_monthly_subtitle">%1$s / mês</string>
     <string name="paywall_lifetime_subtitle">Pague uma vez. Mantenha o Pro para sempre.</string>
-    <string name="paywall_yearly_trial_fine_print">Teste grátis de 7 dias, depois %1$s / ano, salvo cancelamento no Google Play.</string>
+    <string name="paywall_yearly_trial_fine_print">Teste grátis de 7 dias, depois %1$s no primeiro ano. Renova automaticamente por %2$s / ano depois disso, salvo cancelamento no Google Play. Cancele antes do fim do teste para evitar cobranças.</string>
     <string name="paywall_subscription_fine_print">A assinatura renova pelo Google Play. Cancele quando quiser.</string>
     <string name="paywall_manage_subscription">Gerenciar assinatura</string>
     <string name="paywall_one_time_no_subscription">Compra única. Sem assinatura.</string>
@@ -911,7 +911,7 @@
     <string name="toast_file_attachment_failed">Nao foi possivel anexar o PDF</string>
     <string name="toast_file_attachment_missing">Arquivo ausente</string>
     <string name="toast_file_attachment_no_app">Nenhum app pode abrir este arquivo</string>
-    <string name="toast_google_maps_unavailable">Google Maps não está instalado</string>
+    <string name="toast_map_unavailable">Nenhum aplicativo de mapas disponível</string>
     <string name="toast_holidays_add_failed">Nao foi possivel adicionar feriados</string>
     <string name="toast_holidays_remove_failed">Nao foi possivel remover feriados</string>
     <string name="toast_import_invalid_ics">Importacao falhou - arquivo .ics invalido</string>
