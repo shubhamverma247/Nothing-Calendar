@@ -3,17 +3,65 @@ package com.dotfield.dotcal.data.qr
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.ics.IcsExporter
 import com.dotfield.dotcal.data.ics.IcsParser
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.Result
+import com.google.zxing.ResultPoint
+import com.google.zxing.client.result.CalendarParsedResult
+import com.google.zxing.client.result.ResultParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayOutputStream
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.Base64
+import java.util.zip.Deflater
 
 class QrEventPayloadCodecTest {
 
     private val zone = ZoneId.of("Asia/Kolkata")
+
+    @Test
+    fun generatedPayloadIsStandardIcalendarText() {
+        val ics = IcsExporter.export(
+            listOf(
+                event(
+                    title = "Open calendar",
+                    start = LocalDateTime.of(2026, 11, 1, 14, 0),
+                    end = LocalDateTime.of(2026, 11, 1, 15, 0),
+                ),
+            ),
+        )
+
+        val encoded = QrEventPayloadCodec.encode(ics)
+
+        assertEquals(ics, encoded.payload)
+        assertTrue(encoded.payload.startsWith("BEGIN:VCALENDAR\r\n"))
+        assertTrue(encoded.payload.contains("BEGIN:VEVENT\r\n"))
+    }
+
+    @Test
+    fun generatedPayloadIsRecognizedByStandardQrCalendarParser() {
+        val ics = IcsExporter.export(
+            listOf(
+                event(
+                    title = "External calendar",
+                    start = LocalDateTime.of(2026, 11, 1, 14, 0),
+                    end = LocalDateTime.of(2026, 11, 1, 15, 0),
+                ),
+            ),
+        )
+
+        val encoded = QrEventPayloadCodec.encode(ics)
+        val parsed = ResultParser.parseResult(
+            Result(encoded.payload, null, emptyArray<ResultPoint>(), BarcodeFormat.QR_CODE),
+        )
+
+        assertTrue(parsed is CalendarParsedResult)
+        assertEquals("External calendar", (parsed as CalendarParsedResult).summary)
+    }
 
     @Test
     fun timedEventRoundTripsThroughExistingIcsParser() {
@@ -74,7 +122,7 @@ class QrEventPayloadCodecTest {
 
     @Test
     fun malformedPayloadsAreRejected() {
-        assertTrue(QrEventPayloadCodec.decode("https://example.com") is QrEventDecodeResult.NotDotCal)
+        assertTrue(QrEventPayloadCodec.decode("https://example.com") is QrEventDecodeResult.NotCalendar)
         assertTrue(QrEventPayloadCodec.decode("DOTCAL2:abcd") is QrEventDecodeResult.UnsupportedVersion)
         assertTrue(QrEventPayloadCodec.decode("DOTCAL1:not-base64%%%") is QrEventDecodeResult.Malformed)
         assertTrue(QrEventPayloadCodec.decode("DOTCAL1:SGVsbG8=") is QrEventDecodeResult.Malformed)
@@ -96,6 +144,84 @@ class QrEventPayloadCodecTest {
 
         assertTrue(result is QrEventDecodeResult.Success)
         assertFalse((result as QrEventDecodeResult.Success).dotCalPayload)
+    }
+
+    @Test
+    fun bareVeventTextIsAcceptedForInterop() {
+        val ics = IcsExporter.export(
+            listOf(
+                event(
+                    title = "External QR",
+                    start = LocalDateTime.of(2026, 11, 1, 14, 0),
+                    end = LocalDateTime.of(2026, 11, 1, 15, 0),
+                ),
+            ),
+        )
+        val vevent = ics.substringAfter("BEGIN:VEVENT").substringBefore("END:VEVENT")
+            .let { "BEGIN:VEVENT$it" + "END:VEVENT\r\n" }
+
+        val result = QrEventPayloadCodec.decode(vevent)
+
+        assertTrue(result is QrEventDecodeResult.Success)
+        assertFalse((result as QrEventDecodeResult.Success).dotCalPayload)
+        assertEquals("External QR", IcsParser.parse(result.icsText).single().title)
+    }
+
+    @Test
+    fun legacyDotCalPayloadStillDecodes() {
+        val ics = IcsExporter.export(
+            listOf(
+                event(
+                    title = "Legacy QR",
+                    start = LocalDateTime.of(2026, 11, 1, 14, 0),
+                    end = LocalDateTime.of(2026, 11, 1, 15, 0),
+                ),
+            ),
+        )
+
+        val result = QrEventPayloadCodec.decode(legacyPayload(ics))
+
+        assertTrue(result is QrEventDecodeResult.Success)
+        assertTrue((result as QrEventDecodeResult.Success).dotCalPayload)
+        assertEquals("Legacy QR", IcsParser.parse(result.icsText).single().title)
+    }
+
+    @Test
+    fun dotCalPayloadKeepsFourteenEventShiftPlanCompact() {
+        val events = (1..14).map { day ->
+            event(
+                title = "Night shift $day",
+                start = LocalDateTime.of(2026, 11, day, 22, 30),
+                end = LocalDateTime.of(2026, 11, day + 1, 6, 15),
+            )
+        }
+
+        val encoded = QrEventPayloadCodec.encodeDotCal(IcsExporter.export(events))
+        val decoded = QrEventPayloadCodec.decode(encoded.payload)
+
+        assertTrue(encoded.payload.startsWith(QrEventPayloadCodec.PREFIX))
+        assertTrue(encoded.payload.toByteArray(Charsets.UTF_8).size <= 1_500)
+        assertTrue(decoded is QrEventDecodeResult.Success)
+        assertTrue((decoded as QrEventDecodeResult.Success).dotCalPayload)
+        assertEquals(14, IcsParser.parse(decoded.icsText).size)
+    }
+
+    @Test
+    fun calendarTextWithBomAndLeadingWhitespaceIsAccepted() {
+        val ics = IcsExporter.export(
+            listOf(
+                event(
+                    title = "BOM event",
+                    start = LocalDateTime.of(2026, 11, 1, 14, 0),
+                    end = LocalDateTime.of(2026, 11, 1, 15, 0),
+                ),
+            ),
+        )
+
+        val result = QrEventPayloadCodec.decode("\uFEFF\n  $ics")
+
+        assertTrue(result is QrEventDecodeResult.Success)
+        assertEquals("BOM event", IcsParser.parse((result as QrEventDecodeResult.Success).icsText).single().title)
     }
 
     private fun assertRoundTrip(event: CalendarEvent) {
@@ -152,6 +278,22 @@ class QrEventPayloadCodecTest {
         repeat(length) {
             value = value * 1103515245 + 12345
             append(('!'..'~').elementAt((value ushr 16).mod(94)))
+        }
+    }
+
+    private fun legacyPayload(ics: String): String {
+        val deflater = Deflater(Deflater.DEFAULT_COMPRESSION, true)
+        return try {
+            deflater.setInput(ics.toByteArray(Charsets.UTF_8))
+            deflater.finish()
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(1_024)
+            while (!deflater.finished()) {
+                output.write(buffer, 0, deflater.deflate(buffer))
+            }
+            QrEventPayloadCodec.PREFIX + Base64.getEncoder().encodeToString(output.toByteArray())
+        } finally {
+            deflater.end()
         }
     }
 }

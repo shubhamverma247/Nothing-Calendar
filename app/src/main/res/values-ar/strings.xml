@@ -957,7 +957,7 @@
     <string name="qr_no_date">بلا تاريخ</string>
     <string name="qr_point_camera">Point Kamera at حدث QR</string>
     <string name="qr_reject_invalid">رمز الحدث غير صالح</string>
-    <string name="qr_reject_not_dotcal">هذا ليس رمز حدث DotCal</string>
+    <string name="qr_reject_not_calendar">هذا ليس رمز حدث تقويم مدعومًا</string>
     <string name="qr_reject_unsupported">DotCal حدث رمز needs newer App</string>
     <string name="qr_repeats">يتكرر</string>
     <string name="qr_save_image">حفظ Bild</string>

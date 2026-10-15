@@ -845,7 +845,7 @@
     <string name="qr_no_date">Aucune date</string>
     <string name="qr_point_camera">Point Camera at evenement QR</string>
     <string name="qr_reject_invalid">Code evenement invalide</string>
-    <string name="qr_reject_not_dotcal">Ce n est pas un code evenement DotCal</string>
+    <string name="qr_reject_not_calendar">Ce n est pas un code d événement de calendrier pris en charge</string>
     <string name="qr_reject_unsupported">DotCal evenement code needs un newer app</string>
     <string name="qr_repeats">Repeats</string>
     <string name="qr_save_image">Enregistrer Image</string>

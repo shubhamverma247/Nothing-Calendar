@@ -845,7 +845,7 @@
     <string name="qr_no_date">Tanpa tanggal</string>
     <string name="qr_point_camera">Point Camera at acara QR</string>
     <string name="qr_reject_invalid">Bukan kode acara yang valid</string>
-    <string name="qr_reject_not_dotcal">Bukan kode acara DotCal</string>
+    <string name="qr_reject_not_calendar">Bukan kode acara kalender yang didukung</string>
     <string name="qr_reject_unsupported">DotCal acara code needs sebuah newer app</string>
     <string name="qr_repeats">Repeats</string>
     <string name="qr_save_image">Simpan Imagem</string>

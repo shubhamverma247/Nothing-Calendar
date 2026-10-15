@@ -489,7 +489,7 @@ fun DotCalApp(
     val bulkFailedMessage = stringResource(R.string.bulk_edit_failed)
     val eventUpdatedMessage = stringResource(R.string.bulk_event_updated)
     val qrRejectInvalid = stringResource(R.string.qr_reject_invalid)
-    val qrRejectNotDotCal = stringResource(R.string.qr_reject_not_dotcal)
+    val qrRejectNotCalendar = stringResource(R.string.qr_reject_not_calendar)
     val qrRejectUnsupported = stringResource(R.string.qr_reject_unsupported)
     val bootPreferences = remember(context) { context.getSharedPreferences(BOOT_PREFS, android.content.Context.MODE_PRIVATE) }
     val bootThemeMode = remember(bootPreferences) {
@@ -2949,7 +2949,7 @@ fun DotCalApp(
                                 QrScanOutcome.Accepted
                             }
                         }
-                        QrEventDecodeResult.NotDotCal -> QrScanOutcome.Rejected(qrRejectNotDotCal)
+                        QrEventDecodeResult.NotCalendar -> QrScanOutcome.Rejected(qrRejectNotCalendar)
                         QrEventDecodeResult.UnsupportedVersion -> QrScanOutcome.Rejected(qrRejectUnsupported)
                         QrEventDecodeResult.Malformed -> QrScanOutcome.Rejected(qrRejectInvalid)
                     }

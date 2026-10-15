@@ -845,7 +845,7 @@
     <string name="qr_no_date">Tarih yok</string>
     <string name="qr_point_camera">Point Camera at etkinlik QR</string>
     <string name="qr_reject_invalid">Gecerli bir etkinlik kodu degil</string>
-    <string name="qr_reject_not_dotcal">DotCal etkinlik kodu degil</string>
+    <string name="qr_reject_not_calendar">Desteklenen bir takvim etkinligi kodu degil</string>
     <string name="qr_reject_unsupported">DotCal etkinlik code needs bir newer app</string>
     <string name="qr_repeats">Repeats</string>
     <string name="qr_save_image">Kaydet Imagem</string>

@@ -69,7 +69,7 @@ object ShiftPlanShareExporter {
     ): Uri {
         require(events.isNotEmpty()) { "No shifts to share" }
         require(events.size <= SHIFT_PLAN_QR_EVENT_LIMIT) { "QR shift limit exceeded" }
-        val payload = QrEventPayloadCodec.encode(IcsExporter.export(events)).payload
+        val payload = QrEventPayloadCodec.encodeDotCal(IcsExporter.export(events)).payload
         val bitmap = renderQrCard(planTitle, events, payload, accentColor, darkTheme)
         val file = shareFile(context, "$planTitle QR", "png")
         file.outputStream().use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }

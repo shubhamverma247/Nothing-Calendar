@@ -901,7 +901,7 @@
     <string name="qr_no_date">Без даты</string>
     <string name="qr_point_camera">Point Kamera at sobytie QR</string>
     <string name="qr_reject_invalid">Nedopustimyy kod sobytiya</string>
-    <string name="qr_reject_not_dotcal">Eto ne kod sobytiya DotCal</string>
+    <string name="qr_reject_not_calendar">Eto ne podderzhivaemyi kod sobytiya kalendarya</string>
     <string name="qr_reject_unsupported">DotCal sobytie code needs newer App</string>
     <string name="qr_repeats">Repeats</string>
     <string name="qr_save_image">Sohranit Bild</string>
