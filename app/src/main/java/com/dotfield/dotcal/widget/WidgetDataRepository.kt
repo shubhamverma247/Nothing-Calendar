@@ -5,9 +5,10 @@ import android.text.format.DateFormat
 import com.dotfield.dotcal.data.CalendarDao
 import com.dotfield.dotcal.data.CalendarEvent
 import com.dotfield.dotcal.data.DotCalDatabase
+import com.dotfield.dotcal.data.baseEventId
 import com.dotfield.dotcal.data.countdown.CountdownPinStore
-import com.dotfield.dotcal.data.provider.providerRdateStartTimes
 import com.dotfield.dotcal.data.privacy.AppPrivacyManager
+import com.dotfield.dotcal.data.recurrence.expandRecurringEvents
 import com.dotfield.dotcal.data.sidestore.EventSideStoreNamespaces
 import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
@@ -20,7 +21,6 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 data class WidgetEventItem(
@@ -54,6 +54,8 @@ data class WidgetCalendarData(
     val days: List<WidgetCalendarDay> = emptyList(),
 )
 
+private fun LocalDate.atStartMs(zoneId: ZoneId): Long = atStartOfDay(zoneId).toInstant().toEpochMilli()
+
 class WidgetDataRepository(
     private val context: Context,
     private val dao: CalendarDao,
@@ -86,12 +88,16 @@ class WidgetDataRepository(
             emptySet()
         }
         val providerRdates = sideStore.readNamespace(EventSideStoreNamespaces.ProviderRdates)
-        val visibleItems = dao.getVisibleEventsForWidget(rangeStart.atStartMs(zoneId), rangeEnd.atStartMs(zoneId), accountId)
-            .filterNot { it.id.substringBefore(RECURRENCE_SEPARATOR) in privateIds }
-            .expandRecurring(rangeStart, rangeEnd, providerRdates)
+        val visibleItems = expandRecurringEvents(
+            events = dao.getVisibleEventsForWidget(rangeStart.atStartMs(zoneId), rangeEnd.atStartMs(zoneId), accountId)
+                .filterNot { it.baseEventId() in privateIds },
+            rangeStart = rangeStart,
+            rangeEndExclusive = rangeEnd,
+            providerRdates = providerRdates,
+        )
             .filter { it.endTimeMs >= nowMs }
             .filter { config.content.showAllDayEvents || it.isAllDay == 0 }
-            .filter { config.category != WidgetCategory.Shift || it.id.substringBefore(RECURRENCE_SEPARATOR) in shiftEventIds }
+            .filter { config.category != WidgetCategory.Shift || it.baseEventId() in shiftEventIds }
             .sortedForWidget(zoneId)
         val use24Hour = DateFormat.is24HourFormat(context)
         val items = visibleItems.asWidgetItems(zoneId, use24Hour, nowMs)
@@ -103,7 +109,7 @@ class WidgetDataRepository(
         }
         val tasks = if (config.content.showTasks || config.category == WidgetCategory.Tasks) {
             dao.getOpenTasksForWidget(rangeEnd.atStartMs(zoneId), accountId)
-                .filterNot { it.id.substringBefore(RECURRENCE_SEPARATOR) in privateIds }
+                .filterNot { it.baseEventId() in privateIds }
                 .asWidgetItems(zoneId, use24Hour, nowMs)
                 .take(maxItems)
         } else {
@@ -163,13 +169,16 @@ class WidgetDataRepository(
         if (pinnedIds.isEmpty()) return emptyList()
         return pinnedIds
             .mapNotNull { id -> dao.getEvent(id) }
-            .filterNot { it.id.substringBefore(RECURRENCE_SEPARATOR) in privateIds }
+            .filterNot { it.baseEventId() in privateIds }
             .filter { event -> dao.getAccount(event.accountId)?.isVisible == 1 }
-            .expandRecurring(
-                rangeStart,
-                rangeEndExclusive.plusYears(1),
-                sideStore.readNamespace(EventSideStoreNamespaces.ProviderRdates),
-            )
+            .let { events ->
+                expandRecurringEvents(
+                    events = events,
+                    rangeStart = rangeStart,
+                    rangeEndExclusive = rangeEndExclusive.plusYears(1),
+                    providerRdates = sideStore.readNamespace(EventSideStoreNamespaces.ProviderRdates),
+                )
+            }
             .filter { it.endTimeMs >= nowMs }
             .sortedForWidget(zoneId)
             .asWidgetItems(zoneId, use24Hour, nowMs)
@@ -179,7 +188,7 @@ class WidgetDataRepository(
         return map { event ->
             val dateTime = Instant.ofEpochMilli(event.startTimeMs).atZone(zoneId)
             WidgetEventItem(
-                id = event.id.substringBefore(RECURRENCE_SEPARATOR),
+                id = event.baseEventId(),
                 title = event.title.toWidgetTitleCase(),
                 timeLabel = event.widgetTimeLabel(zoneId, use24Hour),
                 location = event.location.trim(),
@@ -211,109 +220,6 @@ class WidgetDataRepository(
         }
     }
 
-    private fun List<CalendarEvent>.expandRecurring(
-        rangeStart: LocalDate,
-        rangeEndExclusive: LocalDate,
-        providerRdates: Map<String, String> = emptyMap(),
-    ): List<CalendarEvent> {
-        val rangeStartMs = rangeStart.atStartMs(ZoneId.systemDefault())
-        val rangeEndMs = rangeEndExclusive.atStartMs(ZoneId.systemDefault())
-        return flatMap { event ->
-            val ruleEvents = when (event.rrule?.trim()) {
-                "FREQ=DAILY" -> event.generateOccurrences(rangeStart, rangeEndExclusive) { it.plusDays(1) }
-                "FREQ=WEEKLY" -> event.generateOccurrences(event.firstWeeklyDate(rangeStart), rangeEndExclusive) { it.plusWeeks(1) }
-                "FREQ=MONTHLY" -> event.expandMonthly(rangeStart, rangeEndExclusive)
-                "FREQ=YEARLY" -> event.expandYearly(rangeStart, rangeEndExclusive)
-                else -> listOf(event)
-            }
-            val rdateEvents = event.expandProviderRdates(providerRdates[event.id.substringBefore(RECURRENCE_SEPARATOR)], rangeStartMs, rangeEndMs)
-            (ruleEvents + rdateEvents).distinctBy { it.id }
-        }
-    }
-
-    private fun CalendarEvent.generateOccurrences(
-        firstVisibleDate: LocalDate,
-        rangeEndExclusive: LocalDate,
-        nextDate: (LocalDate) -> LocalDate,
-    ): List<CalendarEvent> {
-        val firstDate = startDate()
-        var cursor = maxOf(firstVisibleDate, firstDate)
-        val events = mutableListOf<CalendarEvent>()
-        while (cursor < rangeEndExclusive) {
-            occurrenceOn(cursor)?.let { events += it }
-            cursor = nextDate(cursor)
-        }
-        return events
-    }
-
-    private fun CalendarEvent.expandMonthly(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
-        val firstDate = startDate()
-        var cursorMonth = firstDate.withDayOfMonth(1).plusMonths(
-            ChronoUnit.MONTHS.between(firstDate.withDayOfMonth(1), rangeStart.withDayOfMonth(1)).coerceAtLeast(0),
-        )
-        val events = mutableListOf<CalendarEvent>()
-        while (cursorMonth < rangeEndExclusive.withDayOfMonth(1).plusMonths(1)) {
-            val date = YearMonth.from(cursorMonth).takeIf { firstDate.dayOfMonth <= it.lengthOfMonth() }?.atDay(firstDate.dayOfMonth)
-            if (date != null && date >= rangeStart && date < rangeEndExclusive) occurrenceOn(date)?.let { events += it }
-            cursorMonth = cursorMonth.plusMonths(1)
-        }
-        return events
-    }
-
-    private fun CalendarEvent.expandYearly(rangeStart: LocalDate, rangeEndExclusive: LocalDate): List<CalendarEvent> {
-        val firstDate = startDate()
-        val events = mutableListOf<CalendarEvent>()
-        for (year in maxOf(firstDate.year, rangeStart.year)..rangeEndExclusive.year) {
-            val date = runCatching { LocalDate.of(year, firstDate.monthValue, firstDate.dayOfMonth) }.getOrNull()
-            if (date != null && date >= rangeStart && date < rangeEndExclusive) occurrenceOn(date)?.let { events += it }
-        }
-        return events
-    }
-
-    private fun CalendarEvent.firstWeeklyDate(rangeStart: LocalDate): LocalDate {
-        val firstDate = startDate()
-        val weeksToRange = ChronoUnit.DAYS.between(firstDate, rangeStart).coerceAtLeast(0) / 7
-        return firstDate.plusWeeks(weeksToRange).let { if (it < rangeStart) it.plusWeeks(1) else it }
-    }
-
-    private fun CalendarEvent.occurrenceOn(date: LocalDate): CalendarEvent? {
-        val zoneId = safeZoneId(timeZone)
-        val startDateTime = Instant.ofEpochMilli(startTimeMs).atZone(zoneId).toLocalDateTime()
-        val occurrenceStart = date.atTime(startDateTime.toLocalTime()).atZone(zoneId).toInstant().toEpochMilli()
-        if (occurrenceStart in exceptionStartTimes()) return null
-        return copy(
-            id = "$id$RECURRENCE_SEPARATOR$occurrenceStart",
-            startTimeMs = occurrenceStart,
-            endTimeMs = occurrenceStart + (endTimeMs - startTimeMs),
-        )
-    }
-
-    private fun CalendarEvent.startDate(): LocalDate {
-        return Instant.ofEpochMilli(startTimeMs).atZone(safeZoneId(timeZone)).toLocalDate()
-    }
-
-    private fun CalendarEvent.expandProviderRdates(rdate: String?, rangeStartMs: Long, rangeEndMs: Long): List<CalendarEvent> {
-        if (rdate.isNullOrBlank()) return emptyList()
-        val durationMs = endTimeMs - startTimeMs
-        val exceptions = exceptionStartTimes()
-        return providerRdateStartTimes(rdate, isAllDay, timeZone)
-            .filterNot { it in exceptions }
-            .map { occurrenceStart ->
-                copy(
-                    id = "$id$RECURRENCE_SEPARATOR$occurrenceStart",
-                    startTimeMs = occurrenceStart,
-                    endTimeMs = occurrenceStart + durationMs,
-                )
-            }
-            .filter { occurrence -> occurrence.startTimeMs < rangeEndMs && occurrence.endTimeMs >= rangeStartMs }
-    }
-
-    private fun safeZoneId(id: String): ZoneId = runCatching { ZoneId.of(id) }.getOrDefault(ZoneId.systemDefault())
-
-    private fun CalendarEvent.exceptionStartTimes(): Set<Long> {
-        return exceptionDates.removePrefix("[").removeSuffix("]").split(',').mapNotNull { it.trim().toLongOrNull() }.toSet()
-    }
-
     private fun monthDays(
         displayMonthDate: LocalDate,
         today: LocalDate,
@@ -329,11 +235,8 @@ class WidgetDataRepository(
         return widgetMonthDays(displayMonthDate, today, weekStart, eventDays)
     }
 
-    private fun LocalDate.atStartMs(zoneId: ZoneId): Long = atStartOfDay(zoneId).toInstant().toEpochMilli()
-
     companion object {
         private const val WIDGET_RANGE_DAYS = 45L
-        private const val RECURRENCE_SEPARATOR = "::occurrence::"
         private const val SHIFT_EVENT_METADATA_NAMESPACE = "shift_event_metadata"
 
         fun create(context: Context): WidgetDataRepository {

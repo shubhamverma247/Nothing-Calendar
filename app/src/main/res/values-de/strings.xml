@@ -1269,4 +1269,20 @@
     <string name="shift_pattern_presets">VORLAGEN</string>
     <string name="shift_preset_rotating_days_nights">Wechselnde Tag-/Nachtschichten</string>
     <string name="shift_preset_four_on_four_off">Vier Arbeitstage, vier frei</string>
+    <string name="search_facet_status">Status</string>
+    <string name="search_date_this_week">Diese Woche</string>
+    <string name="search_status_any">Beliebig</string>
+    <string name="search_status_pending">Offen</string>
+    <string name="search_status_completed">Erledigt</string>
+    <string name="smart_views_title">Intelligente Ansichten</string>
+    <string name="smart_view_save">Ansicht speichern</string>
+    <string name="smart_view_save_title">Intelligente Ansicht speichern</string>
+    <string name="smart_view_pending_tasks">Offene Aufgaben</string>
+    <string name="smart_view_upcoming_appointments">Bevorstehende Termine</string>
+    <string name="smart_view_no_results">Keine Einträge entsprechen dieser Ansicht</string>
+    <string name="smart_view_delete">Gespeicherte Ansicht löschen</string>
+    <string name="smart_view_delete_title">Intelligente Ansicht löschen?</string>
+    <string name="smart_view_delete_named">Gespeicherte Ansicht %1$s löschen</string>
+    <string name="smart_view_save_failed">Ansicht konnte nicht gespeichert werden</string>
+    <string name="smart_view_delete_failed">Ansicht konnte nicht gelöscht werden</string>
 </resources>

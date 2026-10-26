@@ -1409,4 +1409,20 @@
     <string name="shift_pattern_presets">إعدادات مسبقة</string>
     <string name="shift_preset_rotating_days_nights">تناوب نهاري/ليلي</string>
     <string name="shift_preset_four_on_four_off">أربعة عمل/أربعة راحة</string>
+    <string name="search_facet_status">الحالة</string>
+    <string name="search_date_this_week">هذا الأسبوع</string>
+    <string name="search_status_any">الكل</string>
+    <string name="search_status_pending">قيد الانتظار</string>
+    <string name="search_status_completed">مكتمل</string>
+    <string name="smart_views_title">العروض الذكية</string>
+    <string name="smart_view_save">حفظ العرض</string>
+    <string name="smart_view_save_title">حفظ العرض الذكي</string>
+    <string name="smart_view_pending_tasks">المهام المعلقة</string>
+    <string name="smart_view_upcoming_appointments">المواعيد القادمة</string>
+    <string name="smart_view_no_results">لا توجد عناصر تطابق هذا العرض</string>
+    <string name="smart_view_delete">حذف العرض المحفوظ</string>
+    <string name="smart_view_delete_title">حذف العرض الذكي؟</string>
+    <string name="smart_view_delete_named">حذف العرض المحفوظ %1$s</string>
+    <string name="smart_view_save_failed">تعذر حفظ العرض الذكي</string>
+    <string name="smart_view_delete_failed">تعذر حذف العرض الذكي</string>
 </resources>

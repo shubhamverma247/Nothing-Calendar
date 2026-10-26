@@ -1269,4 +1269,20 @@
     <string name="shift_pattern_presets">PREDEFINIÇÕES</string>
     <string name="shift_preset_rotating_days_nights">Dias/noites alternados</string>
     <string name="shift_preset_four_on_four_off">Quatro de trabalho/quatro de folga</string>
+    <string name="search_facet_status">Estado</string>
+    <string name="search_date_this_week">Esta semana</string>
+    <string name="search_status_any">Qualquer</string>
+    <string name="search_status_pending">Pendente</string>
+    <string name="search_status_completed">Concluído</string>
+    <string name="smart_views_title">Visualizações inteligentes</string>
+    <string name="smart_view_save">Guardar visualização</string>
+    <string name="smart_view_save_title">Guardar visualização inteligente</string>
+    <string name="smart_view_pending_tasks">Tarefas pendentes</string>
+    <string name="smart_view_upcoming_appointments">Próximos compromissos</string>
+    <string name="smart_view_no_results">Nenhum item corresponde a esta visualização</string>
+    <string name="smart_view_delete">Eliminar visualização guardada</string>
+    <string name="smart_view_delete_title">Eliminar visualização inteligente?</string>
+    <string name="smart_view_delete_named">Eliminar visualização guardada %1$s</string>
+    <string name="smart_view_save_failed">Não foi possível guardar a visualização inteligente</string>
+    <string name="smart_view_delete_failed">Não foi possível eliminar a visualização inteligente</string>
 </resources>

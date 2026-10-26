@@ -841,6 +841,7 @@
     <string name="search_facet_type">Type</string>
     <string name="search_facet_time">Time</string>
     <string name="search_facet_calendar">Calendar</string>
+    <string name="search_facet_status">Status</string>
     <string name="search_facet_all_calendars">All calendars</string>
     <string name="search_type_all">All</string>
     <string name="search_type_events">Events</string>
@@ -848,7 +849,22 @@
     <string name="search_date_any_time">Any time</string>
     <string name="search_date_upcoming">Upcoming</string>
     <string name="search_date_past">Past</string>
+    <string name="search_date_this_week">This week</string>
     <string name="search_date_this_month">This month</string>
+    <string name="search_status_any">Any</string>
+    <string name="search_status_pending">Pending</string>
+    <string name="search_status_completed">Completed</string>
+    <string name="smart_views_title">Smart views</string>
+    <string name="smart_view_save">Save view</string>
+    <string name="smart_view_save_title">Save smart view</string>
+    <string name="smart_view_pending_tasks">Pending tasks</string>
+    <string name="smart_view_upcoming_appointments">Upcoming appointments</string>
+    <string name="smart_view_no_results">No items match this smart view</string>
+    <string name="smart_view_delete">Delete saved view</string>
+    <string name="smart_view_delete_title">Delete smart view?</string>
+    <string name="smart_view_delete_named">Delete saved view %1$s</string>
+    <string name="smart_view_save_failed">Could not save smart view</string>
+    <string name="smart_view_delete_failed">Could not delete smart view</string>
     <string name="search_task_when">TASK / %1$s</string>
 
     <!-- Templates and Calendar Sets -->

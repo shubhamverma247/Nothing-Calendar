@@ -3760,12 +3760,28 @@ fun DotCalApp(
             modifier = Modifier.modalOverlayModifier(palette.background),
         ) {
             val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+            val smartViews by viewModel.smartViews.collectAsStateWithLifecycle()
             val searchAccounts by viewModel.assignableAccounts.collectAsStateWithLifecycle()
             SearchScreen(
                 palette = palette,
                 results = searchResults,
                 accounts = searchAccounts,
-                onQueryChange = { viewModel.search(it) },
+                smartViews = smartViews,
+                weekStart = weekStartDay,
+                isPro = isPro,
+                onQueryChange = viewModel::search,
+                onRefreshViews = viewModel::refreshSmartViews,
+                onSaveView = { view ->
+                    viewModel.saveSmartView(view) { saved ->
+                        if (!saved) showDotCalToast(context, palette, R.string.smart_view_save_failed)
+                    }
+                },
+                onDeleteView = { id ->
+                    viewModel.deleteSmartView(id) { deleted ->
+                        if (!deleted) showDotCalToast(context, palette, R.string.smart_view_delete_failed)
+                    }
+                },
+                onRequestPro = { showPaywall = true },
                 onOpenEvent = { event ->
                     DotCalGlyphBridge.eventOpened(context, event.baseEventId())
                     showSearch = false

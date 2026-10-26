@@ -1269,4 +1269,20 @@
     <string name="shift_pattern_presets">PRESET</string>
     <string name="shift_preset_rotating_days_nights">Rotasi siang/malam</string>
     <string name="shift_preset_four_on_four_off">Empat kerja/empat libur</string>
+    <string name="search_facet_status">Status</string>
+    <string name="search_date_this_week">Minggu ini</string>
+    <string name="search_status_any">Semua</string>
+    <string name="search_status_pending">Tertunda</string>
+    <string name="search_status_completed">Selesai</string>
+    <string name="smart_views_title">Tampilan pintar</string>
+    <string name="smart_view_save">Simpan tampilan</string>
+    <string name="smart_view_save_title">Simpan tampilan pintar</string>
+    <string name="smart_view_pending_tasks">Tugas tertunda</string>
+    <string name="smart_view_upcoming_appointments">Janji mendatang</string>
+    <string name="smart_view_no_results">Tidak ada item yang cocok dengan tampilan ini</string>
+    <string name="smart_view_delete">Hapus tampilan tersimpan</string>
+    <string name="smart_view_delete_title">Hapus tampilan pintar?</string>
+    <string name="smart_view_delete_named">Hapus tampilan tersimpan %1$s</string>
+    <string name="smart_view_save_failed">Tampilan pintar tidak dapat disimpan</string>
+    <string name="smart_view_delete_failed">Tampilan pintar tidak dapat dihapus</string>
 </resources>

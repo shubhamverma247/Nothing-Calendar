@@ -1269,4 +1269,20 @@
     <string name="shift_pattern_presets">HAZIR DÜZENLER</string>
     <string name="shift_preset_rotating_days_nights">Dönüşümlü gündüz/gece</string>
     <string name="shift_preset_four_on_four_off">Dört gün çalışma/dört gün izin</string>
+    <string name="search_facet_status">Durum</string>
+    <string name="search_date_this_week">Bu hafta</string>
+    <string name="search_status_any">Tümü</string>
+    <string name="search_status_pending">Bekliyor</string>
+    <string name="search_status_completed">Tamamlandı</string>
+    <string name="smart_views_title">Akıllı görünümler</string>
+    <string name="smart_view_save">Görünümü kaydet</string>
+    <string name="smart_view_save_title">Akıllı görünümü kaydet</string>
+    <string name="smart_view_pending_tasks">Bekleyen görevler</string>
+    <string name="smart_view_upcoming_appointments">Yaklaşan randevular</string>
+    <string name="smart_view_no_results">Bu görünüme uyan öğe yok</string>
+    <string name="smart_view_delete">Kayıtlı görünümü sil</string>
+    <string name="smart_view_delete_title">Akıllı görünüm silinsin mi?</string>
+    <string name="smart_view_delete_named">%1$s kayıtlı görünümünü sil</string>
+    <string name="smart_view_save_failed">Akıllı görünüm kaydedilemedi</string>
+    <string name="smart_view_delete_failed">Akıllı görünüm silinemedi</string>
 </resources>

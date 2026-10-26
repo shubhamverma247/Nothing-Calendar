@@ -93,10 +93,46 @@ interface CalendarDao : ReminderCenterStore {
             OR calendar_events.description LIKE '%' || :q || '%'
             OR calendar_events.location LIKE '%' || :q || '%'
         )
+        AND (
+            :type = 'All'
+            OR (:type = 'Events' AND calendar_events.isTask = 0)
+            OR (:type = 'Tasks' AND calendar_events.isTask = 1)
+        )
+        AND (:accountId IS NULL OR calendar_events.accountId = :accountId)
+        AND (
+            :taskStatus = 'Any'
+            OR (:taskStatus = 'Pending' AND calendar_events.isTask = 1 AND calendar_events.isCompleted = 0)
+            OR (:taskStatus = 'Completed' AND calendar_events.isTask = 1 AND calendar_events.isCompleted = 1)
+        )
+        AND (
+            :dateRange = 'AnyTime'
+            OR calendar_events.id IN (:providerRdateIds)
+            OR (
+                calendar_events.rrule IS NOT NULL
+                AND calendar_events.rrule != ''
+                AND calendar_events.startTimeMs < :rangeEndMs
+            )
+            OR (:dateRange = 'Upcoming' AND calendar_events.startTimeMs > 0 AND calendar_events.endTimeMs > :rangeStartMs)
+            OR (:dateRange = 'Past' AND calendar_events.startTimeMs > 0 AND calendar_events.endTimeMs <= :rangeEndMs)
+            OR (
+                :dateRange IN ('ThisWeek', 'ThisMonth')
+                AND calendar_events.startTimeMs >= :rangeStartMs
+                AND calendar_events.startTimeMs < :rangeEndMs
+            )
+        )
         ORDER BY calendar_events.startTimeMs DESC
         """,
     )
-    suspend fun searchUserEvents(q: String): List<CalendarEvent>
+    suspend fun searchUserEvents(
+        q: String,
+        type: String,
+        accountId: String?,
+        taskStatus: String,
+        dateRange: String,
+        rangeStartMs: Long,
+        rangeEndMs: Long,
+        providerRdateIds: List<String>,
+    ): List<CalendarEvent>
 
     /**
      * "On This Day" candidates: master event rows (no per-occurrence expansion) from visible

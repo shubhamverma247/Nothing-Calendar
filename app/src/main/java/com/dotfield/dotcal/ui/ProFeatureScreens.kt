@@ -247,6 +247,11 @@ import com.dotfield.dotcal.data.RecurringEditScope
 import com.dotfield.dotcal.data.SyncMetadata
 import com.dotfield.dotcal.data.TaskEditorData
 import com.dotfield.dotcal.data.profiles.FocusProfile
+import com.dotfield.dotcal.data.smartviews.SmartView
+import com.dotfield.dotcal.data.smartviews.SmartViewDateRange
+import com.dotfield.dotcal.data.smartviews.SmartViewMatcher
+import com.dotfield.dotcal.data.smartviews.SmartViewTaskStatus
+import com.dotfield.dotcal.data.smartviews.SmartViewType
 import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftPatternPreset
 import com.dotfield.dotcal.data.shifts.ShiftGenerationPreview
@@ -276,7 +281,6 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.WeekFields
@@ -740,24 +744,34 @@ private fun PaywallFeatureRow(feature: ProFeature, palette: DotCalPalette) {
     }
 }
 
-private enum class SearchTypeFilter(@StringRes val labelRes: Int) {
-    All(R.string.search_type_all),
-    Events(R.string.search_type_events),
-    Tasks(R.string.search_type_tasks);
+private val SmartViewType.label: String
+    @Composable get() = stringResource(
+        when (this) {
+            SmartViewType.All -> R.string.search_type_all
+            SmartViewType.Events -> R.string.search_type_events
+            SmartViewType.Tasks -> R.string.search_type_tasks
+        },
+    )
 
-    val label: String
-        @Composable get() = stringResource(labelRes)
-}
+private val SmartViewDateRange.label: String
+    @Composable get() = stringResource(
+        when (this) {
+            SmartViewDateRange.AnyTime -> R.string.search_date_any_time
+            SmartViewDateRange.Upcoming -> R.string.search_date_upcoming
+            SmartViewDateRange.Past -> R.string.search_date_past
+            SmartViewDateRange.ThisWeek -> R.string.search_date_this_week
+            SmartViewDateRange.ThisMonth -> R.string.search_date_this_month
+        },
+    )
 
-private enum class SearchDatePreset(@StringRes val labelRes: Int) {
-    AnyTime(R.string.search_date_any_time),
-    Upcoming(R.string.search_date_upcoming),
-    Past(R.string.search_date_past),
-    ThisMonth(R.string.search_date_this_month);
-
-    val label: String
-        @Composable get() = stringResource(labelRes)
-}
+private val SmartViewTaskStatus.label: String
+    @Composable get() = stringResource(
+        when (this) {
+            SmartViewTaskStatus.Any -> R.string.search_status_any
+            SmartViewTaskStatus.Pending -> R.string.search_status_pending
+            SmartViewTaskStatus.Completed -> R.string.search_status_completed
+        },
+    )
 
 /**
  * Global Search (FREE): full-screen overlay to find events + tasks by text, with in-memory
@@ -770,47 +784,69 @@ internal fun SearchScreen(
     palette: DotCalPalette,
     results: List<CalendarEvent>,
     accounts: List<CalendarAccount>,
-    onQueryChange: (String) -> Unit,
+    smartViews: List<SmartView>,
+    weekStart: DayOfWeek,
+    isPro: Boolean,
+    onQueryChange: (SmartView, Boolean) -> Unit,
+    onRefreshViews: () -> Unit,
+    onSaveView: (SmartView) -> Unit,
+    onDeleteView: (String) -> Unit,
+    onRequestPro: () -> Unit,
     onOpenEvent: (CalendarEvent) -> Unit,
     onOpenTask: (CalendarEvent) -> Unit,
     onBack: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    var typeFilter by remember { mutableStateOf(SearchTypeFilter.All) }
-    var datePreset by remember { mutableStateOf(SearchDatePreset.AnyTime) }
+    var typeFilter by remember { mutableStateOf(SmartViewType.All) }
+    var datePreset by remember { mutableStateOf(SmartViewDateRange.AnyTime) }
     var accountId by remember { mutableStateOf<String?>(null) }
+    var taskStatus by remember { mutableStateOf(SmartViewTaskStatus.Any) }
+    var appliedViewId by remember { mutableStateOf<String?>(null) }
+    var includeBlankQuery by remember { mutableStateOf(false) }
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var pendingDeleteViewId by remember { mutableStateOf<String?>(null) }
     val focusRequester = remember { FocusRequester() }
     val trimmed = query.trim()
-
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
-    // Debounced query - re-run the DAO search a beat after typing stops.
-    LaunchedEffect(query) {
-        delay(220)
-        onQueryChange(query)
+    val activeFilter = remember(query, typeFilter, datePreset, accountId, taskStatus) {
+        SmartView(
+            id = "active",
+            name = "",
+            query = query.trim(),
+            type = typeFilter,
+            dateRange = datePreset,
+            accountId = accountId,
+            taskStatus = taskStatus,
+            createdAtMs = 0L,
+        )
     }
 
-    // In-memory facet filtering over the already-fetched results (cheap; no re-query).
-    val zone = ZoneId.systemDefault()
-    val todayStartMs = LocalDate.now().atStartOfDay(zone).toInstant().toEpochMilli()
-    val month = YearMonth.now()
-    val monthStartMs = month.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
-    val monthEndMs = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
-    val filtered = remember(results, typeFilter, datePreset, accountId, todayStartMs, monthStartMs, monthEndMs) {
-        results.filter { item ->
-            val typeOk = when (typeFilter) {
-                SearchTypeFilter.All -> true
-                SearchTypeFilter.Events -> item.isTask == 0
-                SearchTypeFilter.Tasks -> item.isTask == 1
-            }
-            val dateOk = when (datePreset) {
-                SearchDatePreset.AnyTime -> true
-                SearchDatePreset.Upcoming -> item.startTimeMs >= todayStartMs
-                SearchDatePreset.Past -> item.startTimeMs < todayStartMs
-                SearchDatePreset.ThisMonth -> item.startTimeMs in monthStartMs until monthEndMs
-            }
-            val accountOk = accountId == null || item.accountId == accountId
-            typeOk && dateOk && accountOk
-        }
+    LaunchedEffect(Unit) {
+        onRefreshViews()
+        runCatching { focusRequester.requestFocus() }
+    }
+    // Debounced query - re-run the DAO search a beat after typing stops.
+    LaunchedEffect(activeFilter, includeBlankQuery) {
+        delay(220)
+        onQueryChange(activeFilter, includeBlankQuery)
+    }
+
+    val today = LocalDate.now()
+    val nowMs = System.currentTimeMillis()
+    val filtered = remember(results, activeFilter, today, weekStart) {
+        SmartViewMatcher.filter(results, activeFilter, today, weekStart, nowMs = nowMs)
+    }
+    val builtInViews = listOf(
+        SmartView.pendingTasks().copy(name = stringResource(R.string.smart_view_pending_tasks)),
+        SmartView.upcomingAppointments().copy(name = stringResource(R.string.smart_view_upcoming_appointments)),
+    )
+    fun applyView(view: SmartView) {
+        query = view.query
+        typeFilter = view.type
+        datePreset = view.dateRange
+        accountId = view.accountId
+        taskStatus = view.taskStatus
+        appliedViewId = view.id
+        includeBlankQuery = true
     }
 
     Column(modifier = Modifier.fillMaxSize().background(palette.background)) {
@@ -837,7 +873,11 @@ internal fun SearchScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     BasicTextField(
                         value = query,
-                        onValueChange = { query = it.replace("\n", "") },
+                        onValueChange = {
+                            query = it.replace("\n", "")
+                            appliedViewId = null
+                            includeBlankQuery = false
+                        },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         textStyle = TextStyle(
@@ -865,10 +905,61 @@ internal fun SearchScreen(
                         },
                     )
                     if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }, modifier = Modifier.size(32.dp)) {
+                        IconButton(
+                            onClick = {
+                                query = ""
+                                appliedViewId = null
+                                includeBlankQuery = false
+                            },
+                            modifier = Modifier.size(32.dp),
+                        ) {
                             Icon(Icons.Default.Close, contentDescription = "Clear", tint = palette.secondaryText, modifier = Modifier.size(16.dp))
                         }
                     }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.smart_views_title),
+                    color = palette.primaryText,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                TextButton(
+                    onClick = { if (isPro) showSaveDialog = true else onRequestPro() },
+                    modifier = Modifier.height(48.dp),
+                ) {
+                    Text(stringResource(R.string.smart_view_save), color = palette.accent, fontFamily = mono, fontSize = 12.sp)
+                }
+            }
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(end = 4.dp),
+            ) {
+                lazyItems(builtInViews, key = { it.id }) { view ->
+                    SmartViewChip(
+                        view = view,
+                        selected = appliedViewId == view.id,
+                        palette = palette,
+                        onApply = { applyView(view) },
+                    )
+                }
+                lazyItems(smartViews, key = { it.id }) { view ->
+                    SmartViewChip(
+                        view = view,
+                        selected = appliedViewId == view.id,
+                        palette = palette,
+                        onApply = { if (isPro) applyView(view) else onRequestPro() },
+                        onDelete = { pendingDeleteViewId = view.id },
+                    )
                 }
             }
 
@@ -884,13 +975,15 @@ internal fun SearchScreen(
                     palette = palette,
                     modifier = Modifier.weight(1f),
                 ) { close ->
-                    SearchTypeFilter.values().forEach { type ->
+                    SmartViewType.entries.forEach { type ->
                         SearchDropdownItem(
                             label = type.label,
                             selected = typeFilter == type,
                             palette = palette,
                             onClick = {
                                 typeFilter = type
+                                if (type != SmartViewType.Tasks) taskStatus = SmartViewTaskStatus.Any
+                                appliedViewId = null
                                 close()
                             },
                         )
@@ -902,13 +995,14 @@ internal fun SearchScreen(
                     palette = palette,
                     modifier = Modifier.weight(1f),
                 ) { close ->
-                    SearchDatePreset.values().forEach { preset ->
+                    SmartViewDateRange.entries.forEach { preset ->
                         SearchDropdownItem(
                             label = preset.label,
                             selected = datePreset == preset,
                             palette = palette,
                             onClick = {
                                 datePreset = preset
+                                appliedViewId = null
                                 close()
                             },
                         )
@@ -928,6 +1022,7 @@ internal fun SearchScreen(
                         palette = palette,
                         onClick = {
                             accountId = null
+                            appliedViewId = null
                             close()
                         },
                     )
@@ -938,6 +1033,29 @@ internal fun SearchScreen(
                             palette = palette,
                             onClick = {
                                 accountId = account.id
+                                appliedViewId = null
+                                close()
+                            },
+                        )
+                    }
+                }
+            }
+            if (typeFilter == SmartViewType.Tasks) {
+                Spacer(modifier = Modifier.height(8.dp))
+                SearchFilterDropdown(
+                    label = stringResource(R.string.search_facet_status),
+                    value = taskStatus.label,
+                    palette = palette,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { close ->
+                    SmartViewTaskStatus.entries.forEach { status ->
+                        SearchDropdownItem(
+                            label = status.label,
+                            selected = taskStatus == status,
+                            palette = palette,
+                            onClick = {
+                                taskStatus = status
+                                appliedViewId = null
                                 close()
                             },
                         )
@@ -949,8 +1067,11 @@ internal fun SearchScreen(
         HorizontalDivider(color = palette.line.copy(alpha = 0.4f), thickness = 1.dp)
 
         when {
-            trimmed.isEmpty() -> SearchHintBox(stringResource(R.string.search_hint), palette)
-            filtered.isEmpty() -> SearchHintBox(stringResource(R.string.search_no_results, trimmed), palette)
+            trimmed.isEmpty() && !includeBlankQuery -> SearchHintBox(stringResource(R.string.search_hint), palette)
+            filtered.isEmpty() -> SearchHintBox(
+                if (includeBlankQuery) stringResource(R.string.smart_view_no_results) else stringResource(R.string.search_no_results, trimmed),
+                palette,
+            )
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp),
@@ -963,6 +1084,83 @@ internal fun SearchScreen(
                         EventRow(event = item, palette = palette, onClick = { onOpenEvent(item) })
                     }
                 }
+            }
+        }
+    }
+
+    if (showSaveDialog) {
+        TemplateNameDialog(
+            defaultName = "",
+            palette = palette,
+            title = stringResource(R.string.smart_view_save_title),
+            onDismiss = { showSaveDialog = false },
+            onConfirm = { name ->
+                onSaveView(
+                    activeFilter.copy(
+                        id = SmartView.newId(),
+                        name = name.trim(),
+                        createdAtMs = System.currentTimeMillis(),
+                    ),
+                )
+                showSaveDialog = false
+            },
+        )
+    }
+    pendingDeleteViewId?.let { viewId ->
+        ConfirmDeleteDialog(
+            title = stringResource(R.string.smart_view_delete_title),
+            confirmLabel = stringResource(R.string.action_delete),
+            palette = palette,
+            onDismiss = { pendingDeleteViewId = null },
+            onConfirm = {
+                onDeleteView(viewId)
+                if (appliedViewId == viewId) appliedViewId = null
+                pendingDeleteViewId = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun SmartViewChip(
+    view: SmartView,
+    selected: Boolean,
+    palette: DotCalPalette,
+    onApply: () -> Unit,
+    onDelete: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .height(48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) palette.accent.copy(alpha = 0.16f) else palette.eventCardSurface)
+            .border(1.dp, if (selected) palette.accent else palette.eventCardBorder, RoundedCornerShape(12.dp)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .height(48.dp)
+                .noRippleClickable(onClick = onApply)
+                .padding(start = 12.dp, end = if (onDelete == null) 12.dp else 6.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                view.name,
+                color = if (selected) palette.accent else palette.primaryText,
+                fontFamily = mono,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                fontSize = 12.sp,
+                maxLines = 1,
+            )
+        }
+        onDelete?.let { delete ->
+            IconButton(onClick = delete, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = stringResource(R.string.smart_view_delete_named, view.name),
+                    tint = palette.secondaryText,
+                    modifier = Modifier.size(15.dp),
+                )
             }
         }
     }
@@ -1082,8 +1280,11 @@ private fun SearchHintBox(message: String, palette: DotCalPalette) {
 
 @Composable
 private fun SearchTaskResultRow(task: CalendarEvent, palette: DotCalPalette, onClick: () -> Unit) {
-    val whenLabel = Instant.ofEpochMilli(task.startTimeMs).atZone(ZoneId.systemDefault()).toLocalDate()
-        .format(detailDateFormatter)
+    val whenLabel = if (task.hasTaskDate()) {
+        Instant.ofEpochMilli(task.startTimeMs).atZone(ZoneId.systemDefault()).toLocalDate().format(detailDateFormatter)
+    } else {
+        stringResource(R.string.task_no_date_header)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()

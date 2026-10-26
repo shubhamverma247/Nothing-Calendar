@@ -1339,4 +1339,20 @@
     <string name="shift_pattern_presets">ГОТОВЫЕ СХЕМЫ</string>
     <string name="shift_preset_rotating_days_nights">Чередование дней и ночей</string>
     <string name="shift_preset_four_on_four_off">Четыре рабочих/четыре выходных</string>
+    <string name="search_facet_status">Статус</string>
+    <string name="search_date_this_week">Эта неделя</string>
+    <string name="search_status_any">Любой</string>
+    <string name="search_status_pending">Ожидает</string>
+    <string name="search_status_completed">Выполнено</string>
+    <string name="smart_views_title">Умные представления</string>
+    <string name="smart_view_save">Сохранить</string>
+    <string name="smart_view_save_title">Сохранить умное представление</string>
+    <string name="smart_view_pending_tasks">Незавершённые задачи</string>
+    <string name="smart_view_upcoming_appointments">Предстоящие встречи</string>
+    <string name="smart_view_no_results">Нет элементов, подходящих для этого представления</string>
+    <string name="smart_view_delete">Удалить сохранённое представление</string>
+    <string name="smart_view_delete_title">Удалить умное представление?</string>
+    <string name="smart_view_delete_named">Удалить сохранённое представление %1$s</string>
+    <string name="smart_view_save_failed">Не удалось сохранить умное представление</string>
+    <string name="smart_view_delete_failed">Не удалось удалить умное представление</string>
 </resources>

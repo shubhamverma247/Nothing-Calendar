@@ -27,6 +27,7 @@ import com.dotfield.dotcal.data.scheduling.AvailabilityTextFormatter
 import com.dotfield.dotcal.data.scheduling.DayAvailability
 import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
+import com.dotfield.dotcal.data.smartviews.SmartView
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
 import com.dotfield.dotcal.data.shifts.ShiftEventMetadata
 import com.dotfield.dotcal.data.shifts.ShiftGenerationPreview
@@ -679,11 +680,37 @@ class DotCalViewModel(
     // ----- Global Search (FREE) -----
     private val _searchResults = MutableStateFlow<List<CalendarEvent>>(emptyList())
     val searchResults: StateFlow<List<CalendarEvent>> = _searchResults
+    private val _smartViews = MutableStateFlow<List<SmartView>>(emptyList())
+    val smartViews: StateFlow<List<SmartView>> = _smartViews
+    private var searchJob: Job? = null
     private var smartQuickAddResolveJob: Job? = null
 
-    fun search(query: String) {
+    fun search(view: SmartView, includeBlank: Boolean = false) {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            _searchResults.value = repository.searchItems(view, includeBlank)
+        }
+    }
+
+    fun refreshSmartViews() {
         viewModelScope.launch {
-            _searchResults.value = repository.searchItems(query)
+            _smartViews.value = repository.listSmartViews()
+        }
+    }
+
+    fun saveSmartView(view: SmartView, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.saveSmartView(view)
+            if (result.isSuccess) _smartViews.value = repository.listSmartViews()
+            onDone(result.isSuccess)
+        }
+    }
+
+    fun deleteSmartView(id: String, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.deleteSmartView(id)
+            if (result.isSuccess) _smartViews.value = repository.listSmartViews()
+            onDone(result.isSuccess)
         }
     }
 
@@ -784,6 +811,7 @@ class DotCalViewModel(
     }
 
     fun clearSearch() {
+        searchJob?.cancel()
         _searchResults.value = emptyList()
     }
 

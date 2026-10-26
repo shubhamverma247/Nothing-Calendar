@@ -1418,4 +1418,20 @@
     <string name="shift_pattern_presets">PREAJUSTES</string>
     <string name="shift_preset_rotating_days_nights">Días/noches rotativos</string>
     <string name="shift_preset_four_on_four_off">Cuatro de trabajo/cuatro libres</string>
+    <string name="search_facet_status">Estado</string>
+    <string name="search_date_this_week">Esta semana</string>
+    <string name="search_status_any">Cualquiera</string>
+    <string name="search_status_pending">Pendiente</string>
+    <string name="search_status_completed">Completado</string>
+    <string name="smart_views_title">Vistas inteligentes</string>
+    <string name="smart_view_save">Guardar vista</string>
+    <string name="smart_view_save_title">Guardar vista inteligente</string>
+    <string name="smart_view_pending_tasks">Tareas pendientes</string>
+    <string name="smart_view_upcoming_appointments">Próximas citas</string>
+    <string name="smart_view_no_results">Ningún elemento coincide con esta vista</string>
+    <string name="smart_view_delete">Eliminar vista guardada</string>
+    <string name="smart_view_delete_title">¿Eliminar vista inteligente?</string>
+    <string name="smart_view_delete_named">Eliminar vista guardada %1$s</string>
+    <string name="smart_view_save_failed">No se pudo guardar la vista inteligente</string>
+    <string name="smart_view_delete_failed">No se pudo eliminar la vista inteligente</string>
 </resources>

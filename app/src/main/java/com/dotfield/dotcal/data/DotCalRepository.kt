@@ -33,10 +33,10 @@ import com.dotfield.dotcal.data.insights.OnThisDayCandidate
 import com.dotfield.dotcal.data.insights.OnThisDayFinder
 import com.dotfield.dotcal.data.insights.OnThisDayMemory
 import com.dotfield.dotcal.data.provider.providerCalendarId
-import com.dotfield.dotcal.data.provider.providerRdateStartTimes
 import com.dotfield.dotcal.data.provider.providerReminderAlarmRequestCode
 import com.dotfield.dotcal.data.provider.ContactsProviderDataSource.Companion.BIRTHDAY_BASE_YEAR
 import com.dotfield.dotcal.data.recurrence.RecurrenceRule
+import com.dotfield.dotcal.data.recurrence.expandRecurringEvents
 import com.dotfield.dotcal.data.recurrence.planNextReminder
 import com.dotfield.dotcal.data.profiles.FocusProfile
 import com.dotfield.dotcal.data.profiles.FocusProfileStore
@@ -48,6 +48,9 @@ import com.dotfield.dotcal.data.scheduling.EventDragMath
 import com.dotfield.dotcal.data.scheduling.EventTimeRange
 import com.dotfield.dotcal.data.scheduling.FreeSlotEngine
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
+import com.dotfield.dotcal.data.smartviews.SmartView
+import com.dotfield.dotcal.data.smartviews.SmartViewMatcher
+import com.dotfield.dotcal.data.smartviews.SmartViewStore
 import com.dotfield.dotcal.data.shifts.GeneratedShiftOccurrence
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
 import com.dotfield.dotcal.data.shifts.ShiftContextRequest
@@ -178,6 +181,7 @@ class DotCalRepository(
     private val recentlyDeletedStore = RecentlyDeletedStore(context)
     private val eventTemplateStore = EventTemplateStore(context)
     private val focusProfileStore = FocusProfileStore(context)
+    private val smartViewStore = SmartViewStore(context)
     private val shiftPatternStore = ShiftPatternStore(context)
     private val sideStore = SharedSideStore(context)
     private val eventReadinessStore = EventReadinessStore(sideStore)
@@ -818,14 +822,55 @@ class DotCalRepository(
     /**
      * Global Search (FREE): one-shot text match over user events + tasks (master rows).
      * Reuses [CalendarDao.searchUserEvents] for the SQL LIKE, then drops Private Vault items
-     * via the existing [filterOutPrivate] helper. Facet filtering (calendar/type/date) is
-     * applied in-memory by the caller. Blank query returns empty. No schema change.
+     * via the existing [filterOutPrivate] helper. Smart View facets are applied in SQL before
+     * the caller performs its final occurrence-level check. Blank query loads all only for an
+     * explicitly applied smart view; ordinary blank search remains empty. No schema change.
      */
-    suspend fun searchItems(query: String): List<CalendarEvent> = withContext(Dispatchers.IO) {
-        val q = query.trim()
-        if (q.isBlank()) return@withContext emptyList()
+    suspend fun searchItems(query: String): List<CalendarEvent> = searchItems(
+        view = SmartView(id = "search", name = "", query = query, createdAtMs = 0L),
+        includeBlank = false,
+    )
+
+    suspend fun searchItems(view: SmartView, includeBlank: Boolean = false): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        val q = view.query.trim()
+        if (q.isBlank() && !includeBlank) return@withContext emptyList()
+        val nowMs = System.currentTimeMillis()
+        val zoneId = ZoneId.systemDefault()
+        val today = Instant.ofEpochMilli(nowMs).atZone(zoneId).toLocalDate()
+        val queryRange = SmartViewMatcher.databaseQueryRange(view.dateRange, today, nowMs, zoneId)
+        val providerRdates = if (queryRange == null) {
+            emptyMap()
+        } else {
+            sideStore.readNamespace(EventSideStoreNamespaces.ProviderRdates)
+        }
         val privateIds = privacyManager.observePrivateVaultIds().first()
-        dao.searchUserEvents(q).filterOutPrivate(privateIds)
+        val events = dao.searchUserEvents(
+            q = q,
+            type = view.type.name,
+            accountId = view.accountId,
+            taskStatus = view.taskStatus.name,
+            dateRange = view.dateRange.name,
+            rangeStartMs = queryRange?.startMs ?: 0L,
+            rangeEndMs = queryRange?.endMs ?: Long.MAX_VALUE,
+            providerRdateIds = providerRdates.keys.toList(),
+        ).filterOutPrivate(privateIds)
+        val expansionRange = SmartViewMatcher.recurrenceExpansionRange(view.dateRange, today)
+            ?: return@withContext events
+        withContext(Dispatchers.Default) {
+            expandRecurringEvents(events, expansionRange.first, expansionRange.second, providerRdates)
+        }
+    }
+
+    suspend fun listSmartViews(): List<SmartView> = withContext(Dispatchers.IO) {
+        smartViewStore.list()
+    }
+
+    suspend fun saveSmartView(view: SmartView) = withContext(Dispatchers.IO) {
+        smartViewStore.save(view)
+    }
+
+    suspend fun deleteSmartView(id: String) = withContext(Dispatchers.IO) {
+        smartViewStore.remove(id)
     }
 
     /**
@@ -2584,96 +2629,11 @@ class DotCalRepository(
         }
     }
 
-    private fun expandRecurringEvents(
-        events: List<CalendarEvent>,
-        rangeStart: LocalDate,
-        rangeEndExclusive: LocalDate,
-        providerRdates: Map<String, String> = emptyMap(),
-    ): List<CalendarEvent> {
-        val rangeStartMs = rangeStart.atStartMs()
-        val rangeEndMs = rangeEndExclusive.atStartMs()
-        val expanded = events.flatMap { event ->
-            val rule = RecurrenceRule.parse(event.rrule)
-            val ruleEvents = if (rule == null) listOf(event) else event.expandRule(rule, rangeStart, rangeEndExclusive)
-            val rdateEvents = event.expandProviderRdates(providerRdates[event.baseEventId()], rangeStartMs, rangeEndMs)
-            (ruleEvents + rdateEvents).distinctBy { it.id }
-        }
-        return expanded.sortedWith(compareBy<CalendarEvent> { it.startTimeMs }.thenBy { it.title })
-    }
-
     private fun expandRecurringTasks(tasks: List<CalendarEvent>): List<CalendarEvent> {
         val today = LocalDate.now()
         val rangeEnd = today.plusYears(1)
-        val expanded = tasks.flatMap { task ->
-            val rule = RecurrenceRule.parse(task.rrule)
-            if (rule == null) listOf(task) else task.expandRule(rule, today, rangeEnd)
-        }
+        val expanded = expandRecurringEvents(tasks, today, rangeEnd)
         return expanded.sortedWith(compareBy<CalendarEvent> { it.isCompleted }.thenBy { if (it.startTimeMs > 0L) it.startTimeMs else Long.MAX_VALUE }.thenBy { it.title })
-    }
-
-    /**
-     * Expand a structured [RecurrenceRule] into visible occurrences within [rangeStart, rangeEndExclusive).
-     * Honors INTERVAL, weekly/monthly BYDAY, COUNT and UNTIL. COUNT is evaluated from the series anchor
-     * (so counts stay stable across scroll/views); the unbounded/UNTIL-only case fast-forwards to the range
-     * for performance. EXDATE handling and per-occurrence timing are delegated to [occurrenceOn].
-     */
-    private fun CalendarEvent.expandRule(
-        rule: RecurrenceRule,
-        rangeStart: LocalDate,
-        rangeEndExclusive: LocalDate,
-    ): List<CalendarEvent> {
-        val firstDate = startDate()
-        val anchorCount = rule.count != null
-        var block = if (anchorCount) 0 else rule.fastForwardBlock(firstDate, rangeStart)
-        val out = mutableListOf<CalendarEvent>()
-        var emittedCount = 0
-        var iterations = 0
-        while (iterations < MAX_RECURRENCE_BLOCKS) {
-            iterations++
-            for (date in rule.datesForBlock(firstDate, block)) {
-                if (rule.until != null && date > rule.until) return out
-                if (anchorCount && emittedCount >= rule.count!!) return out
-                emittedCount++
-                if (date >= rangeStart && date < rangeEndExclusive) {
-                    occurrenceOn(date)?.let { out += it }
-                }
-            }
-            if (anchorCount && emittedCount >= rule.count!!) break
-            val anchor = rule.blockAnchorDate(firstDate, block)
-            if (rule.until != null && anchor > rule.until) break
-            if (!anchorCount && anchor >= rangeEndExclusive) break
-            block++
-        }
-        return out
-    }
-
-    private fun CalendarEvent.occurrenceOn(date: LocalDate): CalendarEvent? {
-        val zoneId = safeZoneId(timeZone)
-        val startDateTime = java.time.Instant.ofEpochMilli(startTimeMs).atZone(zoneId).toLocalDateTime()
-        val durationMs = endTimeMs - startTimeMs
-        val occurrenceStart = date.atTime(startDateTime.toLocalTime()).atZone(zoneId).toInstant().toEpochMilli()
-        if (occurrenceStart in exceptionStartTimes()) return null
-        return copy(
-            id = recurrenceOccurrenceId(id, occurrenceStart),
-            startTimeMs = occurrenceStart,
-            endTimeMs = occurrenceStart + durationMs,
-        )
-    }
-
-    private fun CalendarEvent.expandProviderRdates(rdate: String?, rangeStartMs: Long, rangeEndMs: Long): List<CalendarEvent> {
-        if (rdate.isNullOrBlank()) return emptyList()
-        val durationMs = endTimeMs - startTimeMs
-        val exceptions = exceptionStartTimes()
-        return providerRdateStartTimes(rdate, isAllDay, timeZone)
-            .filterNot { it in exceptions }
-            .map { occurrenceStart ->
-                copy(
-                    id = recurrenceOccurrenceId(id, occurrenceStart),
-                    startTimeMs = occurrenceStart,
-                    endTimeMs = occurrenceStart + durationMs,
-                )
-            }
-            .filter { occurrence -> occurrence.startTimeMs < rangeEndMs && occurrence.endTimeMs >= rangeStartMs }
     }
 
     private fun CalendarEvent.startDate(): LocalDate {
@@ -2731,9 +2691,6 @@ class DotCalRepository(
         private const val BIRTHDAY_COLOR = ContactsProviderDataSource.BIRTHDAY_COLOR
         private const val BIRTHDAY_REMINDER_MINUTES = 1440
         private const val BIRTHDAY_SORT_ORDER = 10
-
-        /** Safety cap on recurrence-block iteration; ~27 years of a daily rule. Guards pathological rules. */
-        private const val MAX_RECURRENCE_BLOCKS = 10_000
 
         fun holidayAccountId(countryCode: String): String = "$HOLIDAY_ACCOUNT_PREFIX$countryCode"
     }
