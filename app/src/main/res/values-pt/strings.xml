@@ -1285,4 +1285,15 @@
     <string name="smart_view_delete_named">Eliminar visualização guardada %1$s</string>
     <string name="smart_view_save_failed">Não foi possível guardar a visualização inteligente</string>
     <string name="smart_view_delete_failed">Não foi possível eliminar a visualização inteligente</string>
+    <string name="action_back">Voltar</string>
+    <string name="evening_review_open">Revisão noturna</string>
+    <string name="evening_review_title">Revisão de tarefas noturna</string>
+    <string name="evening_review_progress">%1$d de %2$d</string>
+    <string name="evening_review_tomorrow">Amanhã</string>
+    <string name="evening_review_unscheduled">Caixa de entrada</string>
+    <string name="evening_review_complete_title">Revisão concluída</string>
+    <string name="evening_review_complete_subtitle">As suas tarefas locais pendentes estão organizadas para esta noite.</string>
+    <string name="evening_review_delete_title">Eliminar esta tarefa?</string>
+    <string name="evening_review_action_failed">Não foi possível atualizar esta tarefa</string>
+    <string name="evening_review_change_saved">Tarefa atualizada</string>
 </resources>

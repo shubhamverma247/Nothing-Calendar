@@ -401,6 +401,8 @@ fun DotCalApp(
     var showJumpToDatePicker by remember { mutableStateOf(false) }
     var showRecentlyDeleted by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
+    var showEveningReview by remember { mutableStateOf(false) }
+    var eveningReviewReopenTaskId by remember { mutableStateOf<String?>(null) }
     var showTemplates by remember { mutableStateOf(false) }
     var showFocusProfiles by remember { mutableStateOf(false) }
     var showShiftPatterns by remember { mutableStateOf(false) }
@@ -587,6 +589,7 @@ fun DotCalApp(
                 // can't float over the PIN screen while the app is re-locked.
                 showSheet = false
                 showTaskEditor = false
+                showEveningReview = false
                 showQuickShiftAdd = false
                 editingTask = null
                 pendingDelete = null
@@ -1571,6 +1574,7 @@ fun DotCalApp(
             showFocusProfiles -> showFocusProfiles = false
             showShiftPatterns -> showShiftPatterns = false
             showSearch -> showSearch = false
+            showEveningReview -> showEveningReview = false
             showRecentlyDeleted -> showRecentlyDeleted = false
             showDateCalculator -> showDateCalculator = false
             showTimeInsights -> showTimeInsights = false
@@ -1662,7 +1666,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || qrShareSession != null || pendingIcsImport != null || showQrScanner || showQuickShiftAdd || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showRecentlyDeleted || showDateCalculator || showTimeInsights || showAvailability || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || qrShareSession != null || pendingIcsImport != null || showQrScanner || showQuickShiftAdd || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showEveningReview || showRecentlyDeleted || showDateCalculator || showTimeInsights || showAvailability || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -2053,6 +2057,10 @@ fun DotCalApp(
                             onTaskClick = { taskDetail = it },
                             onCompleteTask = viewModel::completeTask,
                             onDeleteTask = viewModel::deleteTask,
+                            onReviewClick = {
+                                eveningReviewReopenTaskId = null
+                                showEveningReview = true
+                            },
                         )
                         ScreenTab.Settings -> Unit
                     }
@@ -2083,6 +2091,46 @@ fun DotCalApp(
                 onSkip = ::finishOnboarding,
                 onPrimary = ::requestCurrentOnboardingPermission,
                 onSecondary = ::advanceOnboarding,
+            )
+        }
+        AnimatedVisibility(
+            visible = showEveningReview,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.modalOverlayModifier(palette.background),
+        ) {
+            EveningTaskReviewScreen(
+                tasks = tasks,
+                palette = palette,
+                reopenTaskId = eveningReviewReopenTaskId,
+                onBack = { showEveningReview = false },
+                onReopenHandled = { eveningReviewReopenTaskId = null },
+                onAction = { task, action, onDone ->
+                    viewModel.reviewTask(task, action) { result ->
+                        result.onSuccess { undoToken ->
+                            onDone(true)
+                            if (undoToken != null) {
+                                scope.launch {
+                                    snackbarHostState.currentSnackbarData?.dismiss()
+                                    val snackbarResult = snackbarHostState.showSnackbar(
+                                        message = context.getString(R.string.evening_review_change_saved),
+                                        actionLabel = context.getString(R.string.bulk_undo),
+                                        withDismissAction = true,
+                                    )
+                                    if (snackbarResult == SnackbarResult.ActionPerformed) {
+                                        viewModel.undoBulkEdit(undoToken) {
+                                            eveningReviewReopenTaskId = task.id
+                                            showDotCalToast(context, palette, R.string.toast_change_undone)
+                                        }
+                                    }
+                                }
+                            }
+                        }.onFailure {
+                            onDone(false)
+                            showDotCalToast(context, palette, R.string.evening_review_action_failed)
+                        }
+                    }
+                },
             )
         }
         AnimatedVisibility(

@@ -28,6 +28,7 @@ import com.dotfield.dotcal.data.scheduling.DayAvailability
 import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import com.dotfield.dotcal.data.smartviews.SmartView
+import com.dotfield.dotcal.data.tasks.EveningTaskReviewAction
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
 import com.dotfield.dotcal.data.shifts.ShiftEventMetadata
 import com.dotfield.dotcal.data.shifts.ShiftGenerationPreview
@@ -617,6 +618,16 @@ class DotCalViewModel(
     fun deleteTask(task: CalendarEvent) {
         viewModelScope.launch {
             repository.deleteTask(task)
+        }
+    }
+
+    fun reviewTask(
+        task: CalendarEvent,
+        action: EveningTaskReviewAction,
+        onDone: (Result<BulkEditUndoToken?>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onDone(repository.applyEveningTaskReviewAction(task, action))
         }
     }
 

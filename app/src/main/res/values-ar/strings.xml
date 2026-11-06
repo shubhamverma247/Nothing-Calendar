@@ -1425,4 +1425,15 @@
     <string name="smart_view_delete_named">حذف العرض المحفوظ %1$s</string>
     <string name="smart_view_save_failed">تعذر حفظ العرض الذكي</string>
     <string name="smart_view_delete_failed">تعذر حذف العرض الذكي</string>
+    <string name="action_back">رجوع</string>
+    <string name="evening_review_open">مراجعة المساء</string>
+    <string name="evening_review_title">مراجعة مهام المساء</string>
+    <string name="evening_review_progress">%1$d من %2$d</string>
+    <string name="evening_review_tomorrow">غدًا</string>
+    <string name="evening_review_unscheduled">صندوق الوارد</string>
+    <string name="evening_review_complete_title">اكتملت المراجعة</string>
+    <string name="evening_review_complete_subtitle">تم ترتيب مهامك المحلية غير المكتملة لهذه الليلة.</string>
+    <string name="evening_review_delete_title">حذف هذه المهمة؟</string>
+    <string name="evening_review_action_failed">تعذّر تحديث هذه المهمة</string>
+    <string name="evening_review_change_saved">تم تحديث المهمة</string>
 </resources>

@@ -83,6 +83,10 @@ import com.dotfield.dotcal.data.shifts.shiftMetadataFor
 import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import com.dotfield.dotcal.data.sidestore.EventSideStoreNamespaces
 import com.dotfield.dotcal.data.templates.EventTemplate
+import com.dotfield.dotcal.data.tasks.EveningTaskReviewAction
+import com.dotfield.dotcal.data.tasks.eveningReviewSchedule
+import com.dotfield.dotcal.data.tasks.isEveningTaskReviewEligible
+import com.dotfield.dotcal.data.tasks.runEveningTaskReviewMutation
 import com.dotfield.dotcal.data.templates.EventTemplateStore
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.trash.RecentlyDeletedStore
@@ -93,6 +97,7 @@ import com.dotfield.dotcal.prefs.CalendarPreferences
 import com.dotfield.dotcal.prefs.calendarPreferencesDataStore
 import com.dotfield.dotcal.widget.WidgetUpdateWorker
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -1430,6 +1435,57 @@ class DotCalRepository(
         dao.deleteRemindersForEvent(taskId)
         dao.deleteEvent(taskId)
         updateWidgets()
+    }
+
+    suspend fun applyEveningTaskReviewAction(
+        task: CalendarEvent,
+        action: EveningTaskReviewAction,
+    ): Result<BulkEditUndoToken?> = withContext(Dispatchers.IO) {
+        try {
+            val master = dao.getEvent(task.baseEventId()) ?: task
+            require(master.isEveningTaskReviewEligible()) { "TASK CANNOT BE REVIEWED" }
+            if (action == EveningTaskReviewAction.Skip) return@withContext Result.success(null)
+
+            val reminders = dao.getRemindersForEvent(master.id)
+            val undoToken = BulkEditUndoToken(
+                previousEvents = listOf(master),
+                previousReminders = reminders,
+                deletedSnapshotIds = if (action == EveningTaskReviewAction.Delete) listOf(master.id) else emptyList(),
+            )
+            runEveningTaskReviewMutation(
+                undoToken = undoToken,
+                mutate = {
+                    when (action) {
+                        EveningTaskReviewAction.Complete -> setTaskCompleted(master, completed = true)
+                        EveningTaskReviewAction.Delete -> deleteTask(master)
+                        EveningTaskReviewAction.Skip -> Unit
+                        else -> {
+                            val schedule = requireNotNull(
+                                master.eveningReviewSchedule(
+                                    action = action,
+                                    today = LocalDate.now(),
+                                    reminderMinutes = reminders.firstOrNull()?.minutesBefore,
+                                ),
+                            )
+                            saveLocalTask(
+                                existing = master,
+                                data = TaskEditorData(
+                                    title = master.title,
+                                    date = schedule.date,
+                                    time = schedule.time,
+                                    reminderMinutes = schedule.reminderMinutes,
+                                ),
+                            )
+                        }
+                    }
+                },
+                rollback = ::undoBulkEdit,
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
     }
 
     suspend fun bulkShiftEvents(eventIds: Set<String>, days: Long, hours: Long): BulkEditResult = withContext(Dispatchers.IO) {

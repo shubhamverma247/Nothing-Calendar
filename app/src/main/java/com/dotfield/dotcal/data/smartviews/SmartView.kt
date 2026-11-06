@@ -54,7 +54,7 @@ object SmartViewMatcher {
     fun recurrenceExpansionRange(range: SmartViewDateRange, today: LocalDate): Pair<LocalDate, LocalDate>? =
         when (range) {
             SmartViewDateRange.Upcoming -> today to today.plusYears(1)
-            SmartViewDateRange.Past -> today.minusYears(1) to today
+            SmartViewDateRange.Past -> today.minusYears(1) to today.plusDays(1)
             SmartViewDateRange.ThisWeek -> today.minusDays(6) to today.plusDays(8)
             SmartViewDateRange.ThisMonth -> today.withDayOfMonth(1) to today.plusMonths(1).withDayOfMonth(1)
             SmartViewDateRange.AnyTime -> null

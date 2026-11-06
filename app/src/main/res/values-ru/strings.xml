@@ -1355,4 +1355,15 @@
     <string name="smart_view_delete_named">Удалить сохранённое представление %1$s</string>
     <string name="smart_view_save_failed">Не удалось сохранить умное представление</string>
     <string name="smart_view_delete_failed">Не удалось удалить умное представление</string>
+    <string name="action_back">Назад</string>
+    <string name="evening_review_open">Вечерний обзор</string>
+    <string name="evening_review_title">Вечерний обзор задач</string>
+    <string name="evening_review_progress">%1$d из %2$d</string>
+    <string name="evening_review_tomorrow">Завтра</string>
+    <string name="evening_review_unscheduled">Входящие</string>
+    <string name="evening_review_complete_title">Обзор завершён</string>
+    <string name="evening_review_complete_subtitle">Незавершённые локальные задачи упорядочены на этот вечер.</string>
+    <string name="evening_review_delete_title">Удалить эту задачу?</string>
+    <string name="evening_review_action_failed">Не удалось обновить эту задачу</string>
+    <string name="evening_review_change_saved">Задача обновлена</string>
 </resources>

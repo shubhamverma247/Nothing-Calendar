@@ -103,6 +103,14 @@ class SmartViewMatcherTest {
     }
 
     @Test
+    fun pastRecurrenceExpansionIncludesOccurrencesEarlierToday() {
+        assertEquals(
+            today.minusYears(1) to today.plusDays(1),
+            SmartViewMatcher.recurrenceExpansionRange(SmartViewDateRange.Past, today),
+        )
+    }
+
+    @Test
     fun databaseQueryRangeBoundsUpcomingAndCurrentMonthViews() {
         val zone = ZoneId.of("UTC")
         val nowMs = today.atTime(18, 0).atZone(zone).toInstant().toEpochMilli()

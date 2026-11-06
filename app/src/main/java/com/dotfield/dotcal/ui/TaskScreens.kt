@@ -53,6 +53,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -319,6 +320,7 @@ internal fun TasksScreen(
     onTaskClick: (CalendarEvent) -> Unit,
     onCompleteTask: (CalendarEvent) -> Unit,
     onDeleteTask: (CalendarEvent) -> Unit,
+    onReviewClick: () -> Unit,
 ) {
     var filter by remember { mutableStateOf(TaskFilter.All) }
     val today = LocalDate.now()
@@ -349,6 +351,7 @@ internal fun TasksScreen(
                 selectedFilter = filter,
                 palette = palette,
                 onAddClick = onAddClick,
+                onReviewClick = onReviewClick,
                 onFilterSelected = { filter = it },
             )
             if (filteredTasks.isEmpty()) {
@@ -400,6 +403,7 @@ private fun TasksTopChrome(
     selectedFilter: TaskFilter,
     palette: DotCalPalette,
     onAddClick: () -> Unit,
+    onReviewClick: () -> Unit,
     onFilterSelected: (TaskFilter) -> Unit,
 ) {
     Column(
@@ -414,6 +418,17 @@ private fun TasksTopChrome(
             onTitleLongClick = {},
             onAdd = onAddClick,
         )
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onReviewClick, modifier = Modifier.height(48.dp)) {
+                Text(
+                    stringResource(R.string.evening_review_open),
+                    color = palette.accent,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
         Spacer(modifier = Modifier.fillMaxWidth().height(12.dp).background(palette.topBarSurface))
         TaskFilterSegmentedControl(
             selected = selectedFilter,

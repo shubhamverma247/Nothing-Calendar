@@ -1285,4 +1285,15 @@
     <string name="smart_view_delete_named">Hapus tampilan tersimpan %1$s</string>
     <string name="smart_view_save_failed">Tampilan pintar tidak dapat disimpan</string>
     <string name="smart_view_delete_failed">Tampilan pintar tidak dapat dihapus</string>
+    <string name="action_back">Kembali</string>
+    <string name="evening_review_open">Tinjauan malam</string>
+    <string name="evening_review_title">Tinjauan Tugas Malam</string>
+    <string name="evening_review_progress">%1$d dari %2$d</string>
+    <string name="evening_review_tomorrow">Besok</string>
+    <string name="evening_review_unscheduled">Kotak masuk</string>
+    <string name="evening_review_complete_title">Tinjauan selesai</string>
+    <string name="evening_review_complete_subtitle">Tugas lokal yang belum selesai sudah diatur untuk malam ini.</string>
+    <string name="evening_review_delete_title">Hapus tugas ini?</string>
+    <string name="evening_review_action_failed">Tugas ini tidak dapat diperbarui</string>
+    <string name="evening_review_change_saved">Tugas diperbarui</string>
 </resources>

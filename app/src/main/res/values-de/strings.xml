@@ -1285,4 +1285,15 @@
     <string name="smart_view_delete_named">Gespeicherte Ansicht %1$s löschen</string>
     <string name="smart_view_save_failed">Ansicht konnte nicht gespeichert werden</string>
     <string name="smart_view_delete_failed">Ansicht konnte nicht gelöscht werden</string>
+    <string name="action_back">Zurück</string>
+    <string name="evening_review_open">Abendliche Durchsicht</string>
+    <string name="evening_review_title">Abendliche Aufgabenprüfung</string>
+    <string name="evening_review_progress">%1$d von %2$d</string>
+    <string name="evening_review_tomorrow">Morgen</string>
+    <string name="evening_review_unscheduled">Eingang</string>
+    <string name="evening_review_complete_title">Durchsicht abgeschlossen</string>
+    <string name="evening_review_complete_subtitle">Deine unerledigten lokalen Aufgaben sind für heute Abend sortiert.</string>
+    <string name="evening_review_delete_title">Diese Aufgabe löschen?</string>
+    <string name="evening_review_action_failed">Aufgabe konnte nicht aktualisiert werden</string>
+    <string name="evening_review_change_saved">Aufgabe aktualisiert</string>
 </resources>

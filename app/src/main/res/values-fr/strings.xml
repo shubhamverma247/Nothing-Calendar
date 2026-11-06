@@ -1285,4 +1285,15 @@
     <string name="smart_view_delete_named">Supprimer la vue enregistrée %1$s</string>
     <string name="smart_view_save_failed">Impossible d’enregistrer la vue intelligente</string>
     <string name="smart_view_delete_failed">Impossible de supprimer la vue intelligente</string>
+    <string name="action_back">Retour</string>
+    <string name="evening_review_open">Revue du soir</string>
+    <string name="evening_review_title">Revue des tâches du soir</string>
+    <string name="evening_review_progress">%1$d sur %2$d</string>
+    <string name="evening_review_tomorrow">Demain</string>
+    <string name="evening_review_unscheduled">Boîte de réception</string>
+    <string name="evening_review_complete_title">Revue terminée</string>
+    <string name="evening_review_complete_subtitle">Vos tâches locales inachevées sont organisées pour ce soir.</string>
+    <string name="evening_review_delete_title">Supprimer cette tâche ?</string>
+    <string name="evening_review_action_failed">Impossible de mettre à jour cette tâche</string>
+    <string name="evening_review_change_saved">Tâche mise à jour</string>
 </resources>
