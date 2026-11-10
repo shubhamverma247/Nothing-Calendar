@@ -88,10 +88,20 @@ class ShiftWideDotCalWidget : DotCalWidget(
     DpSize(250.dp, 56.dp),
     setOf(DpSize(110.dp, 110.dp), DpSize(250.dp, 56.dp), DpSize(250.dp, 140.dp)),
 )
-class MediumDotCalWidget : DotCalWidget(LegacyWidgetKind.Medium, DotCalWidgetSize.Medium, DpSize(250.dp, 140.dp))
+class MediumDotCalWidget : DotCalWidget(
+    LegacyWidgetKind.Medium,
+    DotCalWidgetSize.Medium,
+    DpSize(250.dp, 140.dp),
+    useExactSize = true,
+)
 class LargeDotCalWidget : DotCalWidget(LegacyWidgetKind.Large, DotCalWidgetSize.Large, DpSize(250.dp, 250.dp), useExactSize = true)
 class EventCountdownDotCalWidget : DotCalWidget(LegacyWidgetKind.Countdown, DotCalWidgetSize.Countdown, DpSize(110.dp, 110.dp))
-class AgendaListDotCalWidget : DotCalWidget(LegacyWidgetKind.Agenda, DotCalWidgetSize.Medium, DpSize(250.dp, 140.dp))
+class AgendaListDotCalWidget : DotCalWidget(
+    LegacyWidgetKind.Agenda,
+    DotCalWidgetSize.Medium,
+    DpSize(250.dp, 140.dp),
+    useExactSize = true,
+)
 class MonthGridDotCalWidget : DotCalWidget(LegacyWidgetKind.MonthGrid, DotCalWidgetSize.Large, DpSize(250.dp, 250.dp), useExactSize = true)
 
 abstract class DotCalWidget(
@@ -109,7 +119,7 @@ abstract class DotCalWidget(
         val config = settings.instanceConfig
         val data = WidgetDataRepository.create(context).load(
             config = config,
-            defaultMaxItems = widgetSize.maxItems,
+            defaultMaxItems = widgetDataDefaultMaxItems(widgetSize, config),
             monthOffset = if (widgetSize == DotCalWidgetSize.MonthCompact) settings.monthOffset else 0,
         )
         provideContent {
@@ -632,6 +642,15 @@ private fun MediumWidget(
     data: WidgetCalendarData,
     palette: DotCalWidgetPalette,
 ) {
+    val visibleRows = mediumAgendaVisibleRowCount(
+        eventCount = data.events.size,
+        heightDp = LocalSize.current.height.value.toInt(),
+    )
+    val hiddenRows = widgetHiddenItemCount(
+        loadedCount = data.events.size,
+        overflowCount = data.moreItemCount,
+        visibleCount = visibleRows,
+    )
     WidgetSurfaceBox(palette) {
         Row(
             modifier = GlanceModifier.fillMaxSize().padding(start = 18.dp, end = 14.dp),
@@ -659,15 +678,18 @@ private fun MediumWidget(
                 Column(modifier = GlanceModifier.fillMaxWidth()) {
                     Text(config.timeRange.shortLabel(), maxLines = 1, style = monoStyle(palette.secondary, 10, FontWeight.Bold))
                     Spacer(GlanceModifier.height(6.dp))
-                    data.events.take(1).forEach { item ->
-                        MediumAgendaHero(context, item, config, palette)
+                    Column(modifier = GlanceModifier.fillMaxWidth()) {
+                        data.events.take(visibleRows).forEachIndexed { index, item ->
+                            if (index == 0) {
+                                MediumAgendaHero(context, item, config, palette)
+                            } else {
+                                MediumAgendaRow(context, item, config, palette)
+                            }
+                        }
                     }
-                    data.events.drop(1).take(2).forEach { item ->
-                        MediumAgendaRow(context, item, config, palette)
-                    }
-                    if (data.moreItemCount > 0) {
+                    if (hiddenRows > 0) {
                         Text(
-                            "+${data.moreItemCount} MORE",
+                            "+$hiddenRows MORE",
                             modifier = GlanceModifier.padding(start = 58.dp).clickable(actionStartActivity(openCalendarAgendaIntent(context))),
                             style = monoStyle(palette.secondary, 10, FontWeight.Bold),
                         )

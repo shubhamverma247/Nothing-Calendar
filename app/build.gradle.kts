@@ -12,8 +12,8 @@ android {
         applicationId = "com.dotfield.dotcal"
         minSdk = 30
         targetSdk = 36
-        versionCode = 52
-        versionName = "1.12"
+        versionCode = 53
+        versionName = "1.13"
     }
 
     buildTypes {

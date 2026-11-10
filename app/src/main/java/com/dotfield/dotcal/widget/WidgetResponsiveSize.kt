@@ -10,8 +10,12 @@ enum class WidgetResponsiveSizeClass {
 
 internal const val MONTH_AGENDA_MAX_ITEMS = 20
 internal const val MONTH_AGENDA_COLUMN_GROUP_SIZE = 9
+internal const val MEDIUM_AGENDA_MAX_ITEMS = 8
 private const val MONTH_AGENDA_FIXED_HEIGHT_DP = 224
 private const val MONTH_AGENDA_MORE_ROW_HEIGHT_DP = 18
+private const val MEDIUM_AGENDA_BASE_HEIGHT_DP = 140
+private const val MEDIUM_AGENDA_BASE_ROWS = 3
+private const val MEDIUM_AGENDA_ROW_HEIGHT_DP = 31
 
 fun classifyWidgetSize(widthDp: Int, heightDp: Int): WidgetResponsiveSizeClass {
     val width = widthDp.coerceAtLeast(0)
@@ -45,4 +49,30 @@ internal fun monthAgendaColumnGroupSizes(rowCount: Int): List<Int> {
             remaining -= groupSize
         }
     }
+}
+
+internal fun mediumAgendaRowCapacity(heightDp: Int): Int {
+    val additionalRows = (heightDp - MEDIUM_AGENDA_BASE_HEIGHT_DP)
+        .coerceAtLeast(0) / MEDIUM_AGENDA_ROW_HEIGHT_DP
+    return (MEDIUM_AGENDA_BASE_ROWS + additionalRows).coerceAtMost(MEDIUM_AGENDA_MAX_ITEMS)
+}
+
+internal fun mediumAgendaVisibleRowCount(eventCount: Int, heightDp: Int): Int =
+    eventCount.coerceIn(0, mediumAgendaRowCapacity(heightDp))
+
+internal fun widgetHiddenItemCount(loadedCount: Int, overflowCount: Int, visibleCount: Int): Int =
+    (loadedCount.coerceAtLeast(0) + overflowCount.coerceAtLeast(0) - visibleCount.coerceAtLeast(0))
+        .coerceAtLeast(0)
+
+internal fun widgetDataDefaultMaxItems(
+    widgetSize: DotCalWidgetSize,
+    config: WidgetInstanceConfig,
+): Int = if (
+    widgetSize == DotCalWidgetSize.Medium &&
+    config.category == WidgetCategory.Schedule &&
+    config.viewType == WidgetViewType.Agenda
+) {
+    MEDIUM_AGENDA_MAX_ITEMS
+} else {
+    widgetSize.maxItems
 }

@@ -94,4 +94,15 @@ class WidgetInstanceConfigTest {
 
         assertEquals(20, config.maxVisibleItems(DotCalWidgetSize.Large.maxItems))
     }
+
+    @Test
+    fun mediumAgendaLoadsEnoughItemsForTallLayouts() {
+        val agenda = WidgetInstanceConfig.legacyDefault(LegacyWidgetKind.Agenda)
+        val nextEvent = agenda.copy(viewType = WidgetViewType.NextEvent)
+        val today = agenda.copy(category = WidgetCategory.Today, viewType = WidgetViewType.Today)
+
+        assertEquals(8, widgetDataDefaultMaxItems(DotCalWidgetSize.Medium, agenda))
+        assertEquals(3, widgetDataDefaultMaxItems(DotCalWidgetSize.Medium, nextEvent))
+        assertEquals(3, widgetDataDefaultMaxItems(DotCalWidgetSize.Medium, today))
+    }
 }

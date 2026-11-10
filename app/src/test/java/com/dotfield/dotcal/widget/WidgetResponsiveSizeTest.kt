@@ -46,4 +46,25 @@ class WidgetResponsiveSizeTest {
         assertEquals(listOf(9, 9, 2), monthAgendaColumnGroupSizes(20))
         assertEquals(emptyList<Int>(), monthAgendaColumnGroupSizes(0))
     }
+
+    @Test
+    fun mediumAgendaUsesAdditionalHeightForMoreRows() {
+        assertEquals(3, mediumAgendaRowCapacity(140))
+        assertEquals(4, mediumAgendaRowCapacity(171))
+        assertEquals(6, mediumAgendaRowCapacity(250))
+        assertEquals(8, mediumAgendaRowCapacity(300))
+        assertEquals(8, mediumAgendaRowCapacity(600))
+    }
+
+    @Test
+    fun mediumAgendaVisibleRowsRespectEventsAndCapacity() {
+        assertEquals(2, mediumAgendaVisibleRowCount(eventCount = 2, heightDp = 300))
+        assertEquals(6, mediumAgendaVisibleRowCount(eventCount = 20, heightDp = 250))
+    }
+
+    @Test
+    fun hiddenItemCountIncludesLoadedRowsNotRenderedByWidget() {
+        assertEquals(123, widgetHiddenItemCount(loadedCount = 5, overflowCount = 121, visibleCount = 3))
+        assertEquals(0, widgetHiddenItemCount(loadedCount = 3, overflowCount = 0, visibleCount = 3))
+    }
 }
