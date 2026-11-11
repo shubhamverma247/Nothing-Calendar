@@ -624,6 +624,21 @@
     <string name="evening_review_delete_title">Delete this task?</string>
     <string name="evening_review_action_failed">Could not update this task</string>
     <string name="evening_review_change_saved">Task updated</string>
+    <string name="repair_my_day_open">Repair my day</string>
+    <string name="repair_my_day_open_pro">Repair my day · PRO</string>
+    <string name="repair_my_day_title">Repair My Day</string>
+    <string name="repair_my_day_intro">Select flexible tasks to move. Fixed, shared, recurring, provider, and all-day items stay untouched.</string>
+    <string name="repair_my_day_empty">No flexible timed tasks can be repaired today.</string>
+    <string name="repair_my_day_preview_action">Preview revised plan</string>
+    <string name="repair_my_day_preview_title">Revised plan</string>
+    <string name="repair_my_day_time_change">%1$s → %2$s</string>
+    <string name="repair_my_day_unplanned">Some selected tasks do not fit before 9 PM. Nothing has changed.</string>
+    <string name="repair_my_day_unchanged">Selected tasks already fit this plan.</string>
+    <string name="repair_my_day_back_selection">Back to selection</string>
+    <string name="repair_my_day_confirm">Confirm changes</string>
+    <string name="repair_my_day_applied">Day repaired</string>
+    <string name="repair_my_day_failed">Schedule changed. Review a fresh plan.</string>
+    <string name="repair_my_day_preview_failed">Could not build a revised plan</string>
 
     <!-- Task reminder metadata chip on the task card -->
     <string name="task_reminder_minutes_before">%1$d min before</string>

@@ -1296,4 +1296,19 @@
     <string name="evening_review_delete_title">Hapus tugas ini?</string>
     <string name="evening_review_action_failed">Tugas ini tidak dapat diperbarui</string>
     <string name="evening_review_change_saved">Tugas diperbarui</string>
+    <string name="repair_my_day_open">Perbaiki hari saya</string>
+    <string name="repair_my_day_open_pro">Perbaiki hari saya · PRO</string>
+    <string name="repair_my_day_title">Perbaiki Hari Saya</string>
+    <string name="repair_my_day_intro">Pilih tugas fleksibel untuk dipindahkan. Item tetap, bersama, berulang, penyedia, dan sepanjang hari tidak akan diubah.</string>
+    <string name="repair_my_day_empty">Tidak ada tugas fleksibel berwaktu yang dapat dipindahkan hari ini.</string>
+    <string name="repair_my_day_preview_action">Pratinjau rencana baru</string>
+    <string name="repair_my_day_preview_title">Rencana baru</string>
+    <string name="repair_my_day_time_change">%1$s → %2$s</string>
+    <string name="repair_my_day_unplanned">Beberapa tugas tidak muat sebelum pukul 21.00. Tidak ada yang diubah.</string>
+    <string name="repair_my_day_unchanged">Tugas yang dipilih sudah sesuai dengan rencana ini.</string>
+    <string name="repair_my_day_back_selection">Kembali ke pilihan</string>
+    <string name="repair_my_day_confirm">Konfirmasi perubahan</string>
+    <string name="repair_my_day_applied">Hari diperbaiki</string>
+    <string name="repair_my_day_failed">Jadwal berubah. Tinjau rencana baru.</string>
+    <string name="repair_my_day_preview_failed">Tidak dapat membuat rencana baru</string>
 </resources>

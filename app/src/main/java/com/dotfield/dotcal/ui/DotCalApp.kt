@@ -250,6 +250,7 @@ import com.dotfield.dotcal.data.shifts.ShiftPattern
 import com.dotfield.dotcal.data.shifts.ShiftType
 import com.dotfield.dotcal.data.shifts.SHIFT_PLAN_QR_EVENT_LIMIT
 import com.dotfield.dotcal.data.scheduling.FindTimeForThisMatcher
+import com.dotfield.dotcal.data.tasks.RepairMyDayPreview
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.prefs.AppLanguage
@@ -403,6 +404,10 @@ fun DotCalApp(
     var showSearch by remember { mutableStateOf(false) }
     var showEveningReview by remember { mutableStateOf(false) }
     var eveningReviewReopenTaskId by remember { mutableStateOf<String?>(null) }
+    var showRepairMyDay by remember { mutableStateOf(false) }
+    var repairMyDayCandidates by remember { mutableStateOf(emptyList<CalendarEvent>()) }
+    var repairMyDayPreview by remember { mutableStateOf<RepairMyDayPreview?>(null) }
+    var repairMyDayLoading by remember { mutableStateOf(false) }
     var showTemplates by remember { mutableStateOf(false) }
     var showFocusProfiles by remember { mutableStateOf(false) }
     var showShiftPatterns by remember { mutableStateOf(false) }
@@ -590,6 +595,8 @@ fun DotCalApp(
                 showSheet = false
                 showTaskEditor = false
                 showEveningReview = false
+                showRepairMyDay = false
+                repairMyDayPreview = null
                 showQuickShiftAdd = false
                 editingTask = null
                 pendingDelete = null
@@ -1575,6 +1582,10 @@ fun DotCalApp(
             showShiftPatterns -> showShiftPatterns = false
             showSearch -> showSearch = false
             showEveningReview -> showEveningReview = false
+            showRepairMyDay -> {
+                showRepairMyDay = false
+                repairMyDayPreview = null
+            }
             showRecentlyDeleted -> showRecentlyDeleted = false
             showDateCalculator -> showDateCalculator = false
             showTimeInsights -> showTimeInsights = false
@@ -1666,7 +1677,7 @@ fun DotCalApp(
     }
     val isAppLocked = appLockState.enabled && !appUnlocked && !showOnboarding && onboardingPreferenceLoaded
     BackHandler(enabled = isAppLocked) {}
-    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || qrShareSession != null || pendingIcsImport != null || showQrScanner || showQuickShiftAdd || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showEveningReview || showRecentlyDeleted || showDateCalculator || showTimeInsights || showAvailability || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
+    BackHandler(enabled = !showOnboarding && (showPaywall || pendingShareEvent != null || qrShareSession != null || pendingIcsImport != null || showQrScanner || showQuickShiftAdd || pendingCountdownLimitEvent != null || pendingCopyToDateEvent != null || showTemplates || showFocusProfiles || showShiftPatterns || showSearch || showEveningReview || showRepairMyDay || showRecentlyDeleted || showDateCalculator || showTimeInsights || showAvailability || showQuickAdd || showJumpToDatePicker || detailEvent != null || taskDetail != null || addSheet || showTaskEditor || screenTab == ScreenTab.Settings || screenTab == ScreenTab.Tasks)) {
         closeTopSurface()
     }
 
@@ -2061,6 +2072,24 @@ fun DotCalApp(
                                 eveningReviewReopenTaskId = null
                                 showEveningReview = true
                             },
+                            onRepairClick = {
+                                if (isPro) {
+                                    repairMyDayLoading = true
+                                    repairMyDayPreview = null
+                                    viewModel.loadRepairMyDayCandidates(tasks) { result ->
+                                        repairMyDayLoading = false
+                                        result.onSuccess { candidates ->
+                                            repairMyDayCandidates = candidates
+                                            showRepairMyDay = true
+                                        }.onFailure {
+                                            showDotCalToast(context, palette, R.string.repair_my_day_failed)
+                                        }
+                                    }
+                                } else {
+                                    showPaywall = true
+                                }
+                            },
+                            showRepairProBadge = !isPro,
                         )
                         ScreenTab.Settings -> Unit
                     }
@@ -2128,6 +2157,62 @@ fun DotCalApp(
                         }.onFailure {
                             onDone(false)
                             showDotCalToast(context, palette, R.string.evening_review_action_failed)
+                        }
+                    }
+                },
+            )
+        }
+        AnimatedVisibility(
+            visible = showRepairMyDay,
+            enter = slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing), initialOffsetX = { it }),
+            exit = slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing), targetOffsetX = { it }),
+            modifier = Modifier.modalOverlayModifier(palette.background),
+        ) {
+            RepairMyDayScreen(
+                candidates = repairMyDayCandidates,
+                preview = repairMyDayPreview,
+                isLoading = repairMyDayLoading,
+                palette = palette,
+                onBack = {
+                    showRepairMyDay = false
+                    repairMyDayPreview = null
+                },
+                onPreview = { selectedIds ->
+                    repairMyDayLoading = true
+                    viewModel.previewRepairMyDay(selectedIds) { result ->
+                        repairMyDayLoading = false
+                        result.onSuccess { repairMyDayPreview = it }
+                            .onFailure { showDotCalToast(context, palette, R.string.repair_my_day_preview_failed) }
+                    }
+                },
+                onClearPreview = { repairMyDayPreview = null },
+                onConfirm = { preview ->
+                    repairMyDayLoading = true
+                    viewModel.applyRepairMyDay(preview) { result ->
+                        repairMyDayLoading = false
+                        result.onSuccess { undoToken ->
+                            showRepairMyDay = false
+                            repairMyDayPreview = null
+                            scope.launch {
+                                snackbarHostState.currentSnackbarData?.dismiss()
+                                val snackbarResult = snackbarHostState.showSnackbar(
+                                    message = context.getString(R.string.repair_my_day_applied),
+                                    actionLabel = context.getString(R.string.bulk_undo),
+                                    withDismissAction = true,
+                                )
+                                if (snackbarResult == SnackbarResult.ActionPerformed) {
+                                    viewModel.undoRepairMyDay(undoToken) { undone ->
+                                        showDotCalToast(
+                                            context,
+                                            palette,
+                                            if (undone) R.string.toast_change_undone else R.string.repair_my_day_failed,
+                                        )
+                                    }
+                                }
+                            }
+                        }.onFailure {
+                            repairMyDayPreview = null
+                            showDotCalToast(context, palette, R.string.repair_my_day_failed)
                         }
                     }
                 },

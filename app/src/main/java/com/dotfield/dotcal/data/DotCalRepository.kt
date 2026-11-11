@@ -84,13 +84,18 @@ import com.dotfield.dotcal.data.sidestore.SharedSideStore
 import com.dotfield.dotcal.data.sidestore.EventSideStoreNamespaces
 import com.dotfield.dotcal.data.templates.EventTemplate
 import com.dotfield.dotcal.data.tasks.EveningTaskReviewAction
+import com.dotfield.dotcal.data.tasks.RepairMyDayPlanner
+import com.dotfield.dotcal.data.tasks.RepairMyDayPreview
 import com.dotfield.dotcal.data.tasks.eveningReviewSchedule
 import com.dotfield.dotcal.data.tasks.isEveningTaskReviewEligible
+import com.dotfield.dotcal.data.tasks.isRepairMyDayEligible
+import com.dotfield.dotcal.data.tasks.repairMyDayCandidates
 import com.dotfield.dotcal.data.tasks.runEveningTaskReviewMutation
 import com.dotfield.dotcal.data.templates.EventTemplateStore
 import com.dotfield.dotcal.data.trash.DeletedSnapshot
 import com.dotfield.dotcal.data.trash.RecentlyDeletedStore
 import com.dotfield.dotcal.reminders.ReminderScheduler
+import com.dotfield.dotcal.reminders.EventReminderScheduler
 import com.dotfield.dotcal.sync.CalendarSyncRepository
 import com.dotfield.dotcal.sync.CalendarSyncResult
 import com.dotfield.dotcal.prefs.CalendarPreferences
@@ -156,6 +161,8 @@ data class BirthdayImportResult(
 data class BulkEditUndoToken(
     val previousEvents: List<CalendarEvent> = emptyList(),
     val previousReminders: List<EventReminder> = emptyList(),
+    val appliedEvents: List<CalendarEvent> = emptyList(),
+    val appliedReminders: List<EventReminder> = emptyList(),
     val insertedEventIds: List<String> = emptyList(),
     val deletedSnapshotIds: List<String> = emptyList(),
     val previousGhostFlags: Map<String, Boolean> = emptyMap(),
@@ -170,6 +177,27 @@ data class BulkEditResult(
     val undoToken: BulkEditUndoToken,
 )
 
+internal fun CalendarEvent.toPlanningBusyPeriod(
+    planningZoneId: ZoneId,
+    isGhost: Boolean,
+): BusyPeriod {
+    if (isAllDay == 1) {
+        val eventZoneId = runCatching { ZoneId.of(timeZone) }.getOrDefault(ZoneId.systemDefault())
+        return BusyPeriod(
+            start = Instant.ofEpochMilli(startTimeMs).atZone(eventZoneId).toLocalDate().atStartOfDay(),
+            end = Instant.ofEpochMilli(endTimeMs).atZone(eventZoneId).toLocalDate().atStartOfDay(),
+            isAllDay = true,
+            isGhost = isGhost,
+        )
+    }
+    return BusyPeriod(
+        start = Instant.ofEpochMilli(startTimeMs).atZone(planningZoneId).toLocalDateTime(),
+        end = Instant.ofEpochMilli(endTimeMs).atZone(planningZoneId).toLocalDateTime(),
+        isAllDay = false,
+        isGhost = isGhost,
+    )
+}
+
 enum class RecurringEditScope {
     ThisEvent,
     ThisAndFollowing,
@@ -179,8 +207,8 @@ enum class RecurringEditScope {
 class DotCalRepository(
     private val dao: CalendarDao,
     private val context: Context,
+    private val reminderScheduler: EventReminderScheduler = ReminderScheduler(context),
 ) {
-    private val reminderScheduler = ReminderScheduler(context)
     private val reminderCenterActions = ReminderCenterActions(dao, reminderScheduler)
     private val privacyManager = AppPrivacyManager(context.applicationContext)
     private val recentlyDeletedStore = RecentlyDeletedStore(context)
@@ -686,6 +714,9 @@ class DotCalRepository(
     private suspend fun loadBusyPeriods(
         rangeStart: LocalDate,
         rangeEnd: LocalDate,
+        excludedEventIds: Set<String> = emptySet(),
+        planningZoneId: ZoneId = ZoneId.systemDefault(),
+        includePrivate: Boolean = false,
     ): List<BusyPeriod> {
         val rangeEndExclusive = rangeEnd.plusDays(1)
         val events = dao.observeEvents(rangeStart.atStartMs(), rangeEndExclusive.atStartMs())
@@ -696,20 +727,13 @@ class DotCalRepository(
             .filterValues { it == "1" }
             .keys
         val providerRdates = sideStore.readNamespace(EventSideStoreNamespaces.ProviderRdates)
+        val visibleEvents = if (includePrivate) events else events.filterOutPrivate(privateIds)
         return expandRecurringEvents(
-            events.filterOutPrivate(privateIds),
+            visibleEvents.filterNot { it.baseEventId() in excludedEventIds },
             rangeStart,
             rangeEndExclusive,
             providerRdates,
-        ).map { event ->
-            val zone = safeZoneId(event.timeZone)
-            BusyPeriod(
-                start = Instant.ofEpochMilli(event.startTimeMs).atZone(zone).toLocalDateTime(),
-                end = Instant.ofEpochMilli(event.endTimeMs).atZone(zone).toLocalDateTime(),
-                isAllDay = event.isAllDay == 1,
-                isGhost = event.baseEventId() in ghostIds,
-            )
-        }
+        ).map { event -> event.toPlanningBusyPeriod(planningZoneId, event.baseEventId() in ghostIds) }
     }
 
     fun observeAgendaEvents(rangeStart: LocalDate, rangeEnd: LocalDate): Flow<List<CalendarEvent>> {
@@ -1488,6 +1512,122 @@ class DotCalRepository(
         }
     }
 
+    suspend fun listRepairMyDayCandidates(
+        tasks: List<CalendarEvent>,
+        date: LocalDate = LocalDate.now(),
+        zoneId: ZoneId = ZoneId.systemDefault(),
+    ): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        val candidates = repairMyDayCandidates(tasks, date, zoneId)
+        val sharedIds = sharedEventIds(candidates.mapTo(mutableSetOf(), CalendarEvent::id))
+        candidates.filterNot { it.id in sharedIds }
+    }
+
+    suspend fun previewRepairMyDay(
+        selectedTaskIds: Set<String>,
+        now: LocalDateTime = LocalDateTime.now(),
+        zoneId: ZoneId = ZoneId.systemDefault(),
+    ): RepairMyDayPreview = withContext(Dispatchers.IO) {
+        val sharedIds = sharedEventIds(selectedTaskIds)
+        val tasks = selectedTaskIds.mapNotNull { taskId -> dao.getEvent(taskId) }
+            .filterNot { it.id in sharedIds }
+        val busyPeriods = loadBusyPeriods(
+            rangeStart = now.toLocalDate(),
+            rangeEnd = now.toLocalDate(),
+            excludedEventIds = selectedTaskIds,
+            planningZoneId = zoneId,
+            includePrivate = true,
+        )
+        RepairMyDayPlanner.preview(tasks, selectedTaskIds, busyPeriods, now, zoneId)
+    }
+
+    suspend fun applyRepairMyDay(preview: RepairMyDayPreview): Result<BulkEditUndoToken> =
+        withContext(Dispatchers.IO) {
+            try {
+                require(preview.canApply) { "REPAIR PLAN CANNOT BE APPLIED" }
+                val zoneId = safeZoneId(preview.zoneId)
+                val selectedIds = preview.changes.mapTo(mutableSetOf()) { it.taskId }
+                val refreshed = previewRepairMyDay(selectedIds, preview.planningStart, zoneId)
+                require(refreshed == preview) { "REPAIR PLAN CHANGED" }
+                require(sharedEventIds(selectedIds).isEmpty()) { "SHARED TASK CANNOT BE REPAIRED" }
+
+                val previousEvents = preview.changes.map { change ->
+                    requireNotNull(dao.getEvent(change.taskId))
+                        .also { task ->
+                            require(task.isRepairMyDayEligible(preview.date, zoneId)) { "TASK CANNOT BE REPAIRED" }
+                            require(
+                                task.startTimeMs == change.originalStartTimeMs &&
+                                    task.endTimeMs == change.originalEndTimeMs &&
+                                    task.updatedAtMs == change.originalUpdatedAtMs
+                            ) { "TASK CHANGED SINCE PREVIEW" }
+                        }
+                }
+                val previousReminders = previousEvents.flatMap { dao.getRemindersForEvent(it.id) }
+                val changesById = preview.changes.associateBy { it.taskId }
+                val now = System.currentTimeMillis()
+                val updatedEvents = previousEvents.map { task ->
+                    val change = requireNotNull(changesById[task.id])
+                    task.copy(
+                        startTimeMs = change.proposedStart.atZone(zoneId).toInstant().toEpochMilli(),
+                        endTimeMs = change.proposedEnd.atZone(zoneId).toInstant().toEpochMilli(),
+                        updatedAtMs = now,
+                    )
+                }
+                val updatedById = updatedEvents.associateBy(CalendarEvent::id)
+                val updatedReminders = previousReminders.map { reminder ->
+                    val previous = requireNotNull(previousEvents.firstOrNull { it.id == reminder.eventId })
+                    val updated = requireNotNull(updatedById[reminder.eventId])
+                    reminder.copy(
+                        triggerAtMs = reminder.triggerAtMs + updated.startTimeMs - previous.startTimeMs,
+                        isDelivered = 0,
+                    )
+                }
+                val undoToken = BulkEditUndoToken(
+                    previousEvents = previousEvents,
+                    previousReminders = previousReminders,
+                    appliedEvents = updatedEvents,
+                    appliedReminders = updatedReminders,
+                )
+                runEveningTaskReviewMutation(
+                    undoToken = undoToken,
+                    mutate = {
+                        check(
+                            dao.replaceEventsAndRemindersIfCurrent(
+                                expectedEvents = previousEvents,
+                                expectedReminders = previousReminders,
+                                replacementEvents = updatedEvents,
+                                replacementReminders = updatedReminders,
+                            ),
+                        ) { "TASK CHANGED DURING REPAIR" }
+                        previousReminders.forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+                        val appliedAtMs = System.currentTimeMillis()
+                        updatedReminders
+                            .filter { it.triggerAtMs > appliedAtMs && it.isDelivered == 0 }
+                            .forEach { reminder ->
+                                updatedEvents.firstOrNull { it.id == reminder.eventId }?.let { event ->
+                                    reminderScheduler.scheduleReminder(reminder, event)
+                                }
+                            }
+                        updateWidgets()
+                    },
+                    rollback = { undoRepairMyDay(it) },
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+        }
+
+    private suspend fun sharedEventIds(eventIds: Set<String>): Set<String> {
+        if (eventIds.isEmpty()) return emptySet()
+        return sideStore.readNamespace(EventSideStoreNamespaces.ProviderMeetingMetadata)
+            .filter { (eventId, encoded) ->
+                eventId in eventIds &&
+                    decodeProviderMeetingMetadata(encoded)?.hasMeaningfulMeetingDetails() == true
+            }
+            .keys
+    }
+
     suspend fun bulkShiftEvents(eventIds: Set<String>, days: Long, hours: Long): BulkEditResult = withContext(Dispatchers.IO) {
         val deltaMs = days * 86_400_000L + hours * 3_600_000L
         if (deltaMs == 0L) return@withContext BulkEditResult(0, 0, BulkEditUndoToken())
@@ -1763,6 +1903,11 @@ class DotCalRepository(
             sideStore.remove(SHIFT_EVENT_METADATA_NAMESPACE, eventId)
         }
         if (token.previousEvents.isNotEmpty()) {
+            token.previousEvents.forEach { event ->
+                dao.getRemindersForEvent(event.id).forEach { reminder ->
+                    reminderScheduler.cancelReminder(reminder.alarmRequestCode)
+                }
+            }
             dao.upsertEvents(token.previousEvents)
             token.previousEvents.forEach { dao.deleteRemindersForEvent(it.id) }
         }
@@ -1795,6 +1940,28 @@ class DotCalRepository(
         token.previousShiftGenerations.forEach(shiftPatternStore::saveGeneration)
         token.deletedSnapshotIds.forEach { recentlyDeletedStore.remove(it) }
         updateWidgets()
+    }
+
+    suspend fun undoRepairMyDay(token: BulkEditUndoToken): Boolean = withContext(Dispatchers.IO) {
+        if (token.appliedEvents.isEmpty() || token.previousEvents.isEmpty()) return@withContext false
+        val restored = dao.replaceEventsAndRemindersIfCurrent(
+            expectedEvents = token.appliedEvents,
+            expectedReminders = token.appliedReminders,
+            replacementEvents = token.previousEvents,
+            replacementReminders = token.previousReminders,
+        )
+        if (!restored) return@withContext false
+        token.appliedReminders.forEach { reminderScheduler.cancelReminder(it.alarmRequestCode) }
+        val now = System.currentTimeMillis()
+        token.previousReminders
+            .filter { it.triggerAtMs > now && it.isDelivered == 0 }
+            .forEach { reminder ->
+                token.previousEvents.firstOrNull { it.id == reminder.eventId }?.let { event ->
+                    reminderScheduler.scheduleReminder(reminder, event)
+                }
+            }
+        updateWidgets()
+        true
     }
 
     private suspend fun loadBulkEditableMasters(eventIds: Set<String>): List<CalendarEvent> {

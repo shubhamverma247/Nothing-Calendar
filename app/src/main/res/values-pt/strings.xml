@@ -1296,4 +1296,19 @@
     <string name="evening_review_delete_title">Eliminar esta tarefa?</string>
     <string name="evening_review_action_failed">Não foi possível atualizar esta tarefa</string>
     <string name="evening_review_change_saved">Tarefa atualizada</string>
+    <string name="repair_my_day_open">Reparar meu dia</string>
+    <string name="repair_my_day_open_pro">Reparar meu dia · PRO</string>
+    <string name="repair_my_day_title">Reparar meu dia</string>
+    <string name="repair_my_day_intro">Selecione tarefas flexíveis para mover. Itens fixos, compartilhados, recorrentes, de provedores e de dia inteiro não serão alterados.</string>
+    <string name="repair_my_day_empty">Não há tarefas flexíveis com horário para mover hoje.</string>
+    <string name="repair_my_day_preview_action">Ver plano revisado</string>
+    <string name="repair_my_day_preview_title">Plano revisado</string>
+    <string name="repair_my_day_time_change">%1$s → %2$s</string>
+    <string name="repair_my_day_unplanned">Algumas tarefas não cabem antes das 21h. Nada foi alterado.</string>
+    <string name="repair_my_day_unchanged">As tarefas selecionadas já cabem neste plano.</string>
+    <string name="repair_my_day_back_selection">Voltar à seleção</string>
+    <string name="repair_my_day_confirm">Confirmar alterações</string>
+    <string name="repair_my_day_applied">Dia reparado</string>
+    <string name="repair_my_day_failed">A agenda mudou. Revise um novo plano.</string>
+    <string name="repair_my_day_preview_failed">Não foi possível criar um plano revisado</string>
 </resources>

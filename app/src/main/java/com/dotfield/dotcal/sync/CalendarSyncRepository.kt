@@ -11,7 +11,7 @@ import com.dotfield.dotcal.data.recurrence.planNextReminder
 import com.dotfield.dotcal.data.provider.providerStatusIsCancelled
 import com.dotfield.dotcal.data.sidestore.EventSideStoreNamespaces
 import com.dotfield.dotcal.data.sidestore.SharedSideStore
-import com.dotfield.dotcal.reminders.ReminderScheduler
+import com.dotfield.dotcal.reminders.EventReminderScheduler
 import java.util.concurrent.TimeUnit
 
 private const val SYNC_PAST_DAYS = 30L
@@ -40,7 +40,7 @@ data class CalendarSyncResult(
 class CalendarSyncRepository(
     private val dao: CalendarDao,
     private val providerDataSource: CalendarProviderDataSource,
-    private val reminderScheduler: ReminderScheduler,
+    private val reminderScheduler: EventReminderScheduler,
     private val sideStore: SharedSideStore,
 ) {
     suspend fun sync(): CalendarSyncResult {

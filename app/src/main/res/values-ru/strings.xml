@@ -1366,4 +1366,19 @@
     <string name="evening_review_delete_title">Удалить эту задачу?</string>
     <string name="evening_review_action_failed">Не удалось обновить эту задачу</string>
     <string name="evening_review_change_saved">Задача обновлена</string>
+    <string name="repair_my_day_open">Исправить мой день</string>
+    <string name="repair_my_day_open_pro">Исправить мой день · PRO</string>
+    <string name="repair_my_day_title">Исправить мой день</string>
+    <string name="repair_my_day_intro">Выберите гибкие задачи для переноса. Фиксированные, общие, повторяющиеся, внешние и задачи на весь день останутся без изменений.</string>
+    <string name="repair_my_day_empty">Сегодня нет гибких задач со временем, которые можно перенести.</string>
+    <string name="repair_my_day_preview_action">Посмотреть новый план</string>
+    <string name="repair_my_day_preview_title">Обновлённый план</string>
+    <string name="repair_my_day_time_change">%1$s → %2$s</string>
+    <string name="repair_my_day_unplanned">Некоторые задачи не помещаются до 21:00. Ничего не изменено.</string>
+    <string name="repair_my_day_unchanged">Выбранные задачи уже вписываются в этот план.</string>
+    <string name="repair_my_day_back_selection">Вернуться к выбору</string>
+    <string name="repair_my_day_confirm">Подтвердить изменения</string>
+    <string name="repair_my_day_applied">День исправлен</string>
+    <string name="repair_my_day_failed">Расписание изменилось. Проверьте новый план.</string>
+    <string name="repair_my_day_preview_failed">Не удалось создать обновлённый план</string>
 </resources>

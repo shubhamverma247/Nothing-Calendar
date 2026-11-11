@@ -1296,4 +1296,19 @@
     <string name="evening_review_delete_title">Supprimer cette tâche ?</string>
     <string name="evening_review_action_failed">Impossible de mettre à jour cette tâche</string>
     <string name="evening_review_change_saved">Tâche mise à jour</string>
+    <string name="repair_my_day_open">Réparer ma journée</string>
+    <string name="repair_my_day_open_pro">Réparer ma journée · PRO</string>
+    <string name="repair_my_day_title">Réparer ma journée</string>
+    <string name="repair_my_day_intro">Sélectionnez les tâches flexibles à déplacer. Les éléments fixes, partagés, récurrents, fournisseur et sur toute la journée restent inchangés.</string>
+    <string name="repair_my_day_empty">Aucune tâche flexible avec horaire ne peut être déplacée aujourd’hui.</string>
+    <string name="repair_my_day_preview_action">Afficher le nouveau plan</string>
+    <string name="repair_my_day_preview_title">Plan révisé</string>
+    <string name="repair_my_day_time_change">%1$s → %2$s</string>
+    <string name="repair_my_day_unplanned">Certaines tâches ne tiennent pas avant 21 h. Rien n’a été modifié.</string>
+    <string name="repair_my_day_unchanged">Les tâches sélectionnées correspondent déjà à ce planning.</string>
+    <string name="repair_my_day_back_selection">Retour à la sélection</string>
+    <string name="repair_my_day_confirm">Confirmer les modifications</string>
+    <string name="repair_my_day_applied">Journée réparée</string>
+    <string name="repair_my_day_failed">Le planning a changé. Vérifiez un nouveau plan.</string>
+    <string name="repair_my_day_preview_failed">Impossible de créer un plan révisé</string>
 </resources>

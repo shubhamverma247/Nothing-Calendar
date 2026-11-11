@@ -29,6 +29,7 @@ import com.dotfield.dotcal.data.scheduling.FreeSlot
 import com.dotfield.dotcal.data.scheduling.FreeSlotRequest
 import com.dotfield.dotcal.data.smartviews.SmartView
 import com.dotfield.dotcal.data.tasks.EveningTaskReviewAction
+import com.dotfield.dotcal.data.tasks.RepairMyDayPreview
 import com.dotfield.dotcal.data.shifts.ShiftApplyResult
 import com.dotfield.dotcal.data.shifts.ShiftEventMetadata
 import com.dotfield.dotcal.data.shifts.ShiftGenerationPreview
@@ -595,6 +596,12 @@ class DotCalViewModel(
         }
     }
 
+    fun undoRepairMyDay(token: BulkEditUndoToken, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            onDone(repository.undoRepairMyDay(token))
+        }
+    }
+
     fun saveTask(existing: CalendarEvent?, data: TaskEditorData, onSaved: () -> Unit = {}) {
         viewModelScope.launch {
             repository.saveLocalTask(existing, data)
@@ -629,6 +636,31 @@ class DotCalViewModel(
         viewModelScope.launch {
             onDone(repository.applyEveningTaskReviewAction(task, action))
         }
+    }
+
+    fun loadRepairMyDayCandidates(
+        tasks: List<CalendarEvent>,
+        onDone: (Result<List<CalendarEvent>>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onDone(runCatching { repository.listRepairMyDayCandidates(tasks) })
+        }
+    }
+
+    fun previewRepairMyDay(
+        selectedTaskIds: Set<String>,
+        onDone: (Result<RepairMyDayPreview>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onDone(runCatching { repository.previewRepairMyDay(selectedTaskIds) })
+        }
+    }
+
+    fun applyRepairMyDay(
+        preview: RepairMyDayPreview,
+        onDone: (Result<BulkEditUndoToken>) -> Unit,
+    ) {
+        viewModelScope.launch { onDone(repository.applyRepairMyDay(preview)) }
     }
 
     fun punchDay(date: LocalDate) {

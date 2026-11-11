@@ -382,6 +382,26 @@ interface CalendarDao : ReminderCenterStore {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReminders(reminders: List<EventReminder>)
 
+    @Transaction
+    suspend fun replaceEventsAndRemindersIfCurrent(
+        expectedEvents: List<CalendarEvent>,
+        expectedReminders: List<EventReminder>,
+        replacementEvents: List<CalendarEvent>,
+        replacementReminders: List<EventReminder>,
+    ): Boolean {
+        require(expectedEvents.isNotEmpty())
+        require(expectedEvents.mapTo(mutableSetOf(), CalendarEvent::id) == replacementEvents.mapTo(mutableSetOf(), CalendarEvent::id))
+        val expectedRemindersByEvent = expectedReminders.groupBy(EventReminder::eventId)
+        expectedEvents.forEach { expected ->
+            if (getEvent(expected.id) != expected) return false
+            if (getRemindersForEvent(expected.id) != expectedRemindersByEvent[expected.id].orEmpty()) return false
+        }
+        upsertEvents(replacementEvents)
+        expectedEvents.forEach { deleteRemindersForEvent(it.id) }
+        if (replacementReminders.isNotEmpty()) insertReminders(replacementReminders)
+        return true
+    }
+
     @Query("UPDATE event_reminders SET isDelivered = 1 WHERE alarmRequestCode = :alarmRequestCode")
     override suspend fun markReminderDelivered(alarmRequestCode: Int)
 

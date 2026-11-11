@@ -1296,4 +1296,19 @@
     <string name="evening_review_delete_title">Bu görev silinsin mi?</string>
     <string name="evening_review_action_failed">Bu görev güncellenemedi</string>
     <string name="evening_review_change_saved">Görev güncellendi</string>
+    <string name="repair_my_day_open">Günümü onar</string>
+    <string name="repair_my_day_open_pro">Günümü onar · PRO</string>
+    <string name="repair_my_day_title">Günümü Onar</string>
+    <string name="repair_my_day_intro">Taşınacak esnek görevleri seçin. Sabit, paylaşılan, yinelenen, sağlayıcı ve tüm gün öğeleri değişmeden kalır.</string>
+    <string name="repair_my_day_empty">Bugün taşınabilecek saatli esnek görev yok.</string>
+    <string name="repair_my_day_preview_action">Yeni planı önizle</string>
+    <string name="repair_my_day_preview_title">Yenilenmiş plan</string>
+    <string name="repair_my_day_time_change">%1$s → %2$s</string>
+    <string name="repair_my_day_unplanned">Bazı görevler 21.00’den önce sığmıyor. Hiçbir şey değiştirilmedi.</string>
+    <string name="repair_my_day_unchanged">Seçili görevler zaten bu plana uyuyor.</string>
+    <string name="repair_my_day_back_selection">Seçime dön</string>
+    <string name="repair_my_day_confirm">Değişiklikleri onayla</string>
+    <string name="repair_my_day_applied">Gün onarıldı</string>
+    <string name="repair_my_day_failed">Program değişti. Yeni planı gözden geçirin.</string>
+    <string name="repair_my_day_preview_failed">Yenilenmiş plan oluşturulamadı</string>
 </resources>

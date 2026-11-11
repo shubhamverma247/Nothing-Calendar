@@ -321,6 +321,8 @@ internal fun TasksScreen(
     onCompleteTask: (CalendarEvent) -> Unit,
     onDeleteTask: (CalendarEvent) -> Unit,
     onReviewClick: () -> Unit,
+    onRepairClick: () -> Unit,
+    showRepairProBadge: Boolean,
 ) {
     var filter by remember { mutableStateOf(TaskFilter.All) }
     val today = LocalDate.now()
@@ -352,6 +354,8 @@ internal fun TasksScreen(
                 palette = palette,
                 onAddClick = onAddClick,
                 onReviewClick = onReviewClick,
+                onRepairClick = onRepairClick,
+                showRepairProBadge = showRepairProBadge,
                 onFilterSelected = { filter = it },
             )
             if (filteredTasks.isEmpty()) {
@@ -404,6 +408,8 @@ private fun TasksTopChrome(
     palette: DotCalPalette,
     onAddClick: () -> Unit,
     onReviewClick: () -> Unit,
+    onRepairClick: () -> Unit,
+    showRepairProBadge: Boolean,
     onFilterSelected: (TaskFilter) -> Unit,
 ) {
     Column(
@@ -418,14 +424,29 @@ private fun TasksTopChrome(
             onTitleLongClick = {},
             onAdd = onAddClick,
         )
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = onReviewClick, modifier = Modifier.height(48.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            TextButton(onClick = onReviewClick, modifier = Modifier.weight(1f).height(48.dp)) {
                 Text(
                     stringResource(R.string.evening_review_open),
                     color = palette.accent,
                     fontFamily = mono,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            TextButton(onClick = onRepairClick, modifier = Modifier.weight(1f).height(48.dp)) {
+                Text(
+                    stringResource(
+                        if (showRepairProBadge) R.string.repair_my_day_open_pro else R.string.repair_my_day_open,
+                    ),
+                    color = palette.accent,
+                    fontFamily = mono,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

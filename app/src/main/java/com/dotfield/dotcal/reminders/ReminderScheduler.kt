@@ -29,14 +29,22 @@ import kotlinx.coroutines.flow.first
 import java.text.DateFormat
 import java.util.Date
 
-class ReminderScheduler(private val context: Context) : ReminderCenterScheduler {
-    private val appContext = context.applicationContext
-    private val alarmManager = appContext.getSystemService(AlarmManager::class.java)
-
+interface EventReminderScheduler : ReminderCenterScheduler {
     fun scheduleReminder(
         reminder: EventReminder,
         event: CalendarEvent,
         occurrenceStartTimeMs: Long = event.startTimeMs,
+    )
+}
+
+class ReminderScheduler(private val context: Context) : EventReminderScheduler {
+    private val appContext = context.applicationContext
+    private val alarmManager = appContext.getSystemService(AlarmManager::class.java)
+
+    override fun scheduleReminder(
+        reminder: EventReminder,
+        event: CalendarEvent,
+        occurrenceStartTimeMs: Long,
     ) {
         val nowMs = System.currentTimeMillis()
         val plan = planNextReminder(event, reminder.minutesBefore, nowMs)

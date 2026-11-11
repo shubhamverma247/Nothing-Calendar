@@ -1436,4 +1436,19 @@
     <string name="evening_review_delete_title">حذف هذه المهمة؟</string>
     <string name="evening_review_action_failed">تعذّر تحديث هذه المهمة</string>
     <string name="evening_review_change_saved">تم تحديث المهمة</string>
+    <string name="repair_my_day_open">إصلاح يومي</string>
+    <string name="repair_my_day_open_pro">إصلاح يومي · PRO</string>
+    <string name="repair_my_day_title">إصلاح يومي</string>
+    <string name="repair_my_day_intro">اختر المهام المرنة لنقلها. لن تتغير العناصر الثابتة أو المشتركة أو المتكررة أو التابعة لمزوّد أو الممتدة طوال اليوم.</string>
+    <string name="repair_my_day_empty">لا توجد مهام مرنة محددة بوقت يمكن نقلها اليوم.</string>
+    <string name="repair_my_day_preview_action">معاينة الخطة المعدّلة</string>
+    <string name="repair_my_day_preview_title">الخطة المعدّلة</string>
+    <string name="repair_my_day_time_change">%1$s ← %2$s</string>
+    <string name="repair_my_day_unplanned">بعض المهام المحددة لا تتسع قبل الساعة 9 مساءً. لم يتغير شيء.</string>
+    <string name="repair_my_day_unchanged">المهام المحددة تتناسب بالفعل مع هذه الخطة.</string>
+    <string name="repair_my_day_back_selection">العودة إلى التحديد</string>
+    <string name="repair_my_day_confirm">تأكيد التغييرات</string>
+    <string name="repair_my_day_applied">تم إصلاح اليوم</string>
+    <string name="repair_my_day_failed">تغير الجدول. راجع خطة جديدة.</string>
+    <string name="repair_my_day_preview_failed">تعذر إنشاء خطة معدّلة</string>
 </resources>

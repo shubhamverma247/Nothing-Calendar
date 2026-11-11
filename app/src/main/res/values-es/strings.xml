@@ -1445,4 +1445,19 @@
     <string name="evening_review_delete_title">¿Eliminar esta tarea?</string>
     <string name="evening_review_action_failed">No se pudo actualizar esta tarea</string>
     <string name="evening_review_change_saved">Tarea actualizada</string>
+    <string name="repair_my_day_open">Reparar mi día</string>
+    <string name="repair_my_day_open_pro">Reparar mi día · PRO</string>
+    <string name="repair_my_day_title">Reparar mi día</string>
+    <string name="repair_my_day_intro">Selecciona tareas flexibles para mover. Los elementos fijos, compartidos, recurrentes, de proveedores y de todo el día no cambiarán.</string>
+    <string name="repair_my_day_empty">Hoy no hay tareas flexibles con hora que se puedan mover.</string>
+    <string name="repair_my_day_preview_action">Ver plan revisado</string>
+    <string name="repair_my_day_preview_title">Plan revisado</string>
+    <string name="repair_my_day_time_change">%1$s → %2$s</string>
+    <string name="repair_my_day_unplanned">Algunas tareas seleccionadas no caben antes de las 21:00. No se cambió nada.</string>
+    <string name="repair_my_day_unchanged">Las tareas seleccionadas ya encajan en este plan.</string>
+    <string name="repair_my_day_back_selection">Volver a la selección</string>
+    <string name="repair_my_day_confirm">Confirmar cambios</string>
+    <string name="repair_my_day_applied">Día reparado</string>
+    <string name="repair_my_day_failed">El horario cambió. Revisa un plan nuevo.</string>
+    <string name="repair_my_day_preview_failed">No se pudo crear un plan revisado</string>
 </resources>

@@ -1296,4 +1296,19 @@
     <string name="evening_review_delete_title">Diese Aufgabe löschen?</string>
     <string name="evening_review_action_failed">Aufgabe konnte nicht aktualisiert werden</string>
     <string name="evening_review_change_saved">Aufgabe aktualisiert</string>
+    <string name="repair_my_day_open">Meinen Tag reparieren</string>
+    <string name="repair_my_day_open_pro">Meinen Tag reparieren · PRO</string>
+    <string name="repair_my_day_title">Meinen Tag reparieren</string>
+    <string name="repair_my_day_intro">Wähle flexible Aufgaben zum Verschieben. Feste, geteilte, wiederkehrende, Anbieter- und Ganztageseinträge bleiben unverändert.</string>
+    <string name="repair_my_day_empty">Heute können keine flexiblen Aufgaben mit Uhrzeit verschoben werden.</string>
+    <string name="repair_my_day_preview_action">Neuen Plan ansehen</string>
+    <string name="repair_my_day_preview_title">Überarbeiteter Plan</string>
+    <string name="repair_my_day_time_change">%1$s → %2$s</string>
+    <string name="repair_my_day_unplanned">Einige ausgewählte Aufgaben passen nicht vor 21 Uhr. Nichts wurde geändert.</string>
+    <string name="repair_my_day_unchanged">Ausgewählte Aufgaben passen bereits in diesen Plan.</string>
+    <string name="repair_my_day_back_selection">Zurück zur Auswahl</string>
+    <string name="repair_my_day_confirm">Änderungen bestätigen</string>
+    <string name="repair_my_day_applied">Tag repariert</string>
+    <string name="repair_my_day_failed">Der Zeitplan hat sich geändert. Prüfe einen neuen Plan.</string>
+    <string name="repair_my_day_preview_failed">Überarbeiteter Plan konnte nicht erstellt werden</string>
 </resources>
